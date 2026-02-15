@@ -36,7 +36,12 @@ class MockIndicatorCalculationService implements IIndicatorCalculationService {
     stock: Stock
   ): number | string | null {
     const key = `${indicator}-${stock.code.value}`;
-    return this.mockValues.get(key) ?? stock.getValue(indicator);
+    // 如果有 mock 值（包括 null），直接返回 mock 值
+    if (this.mockValues.has(key)) {
+      return this.mockValues.get(key) ?? null;
+    }
+    // 否则返回 stock 的实际值
+    return stock.getValue(indicator);
   }
 }
 
@@ -970,6 +975,288 @@ describe("Property-Based Tests: FilterCondition 构造验证", () => {
           expect(() => FilterCondition.create(field, operator, value)).toThrow(
             InvalidFilterConditionError
           );
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+});
+
+/**
+ * Property-Based Tests for Missing Indicator Values
+ *
+ * Feature: stock-screening-platform
+ * Property 7: 缺失指标值导致条件不匹配
+ *
+ * 对于任意 FilterCondition 和任意 Stock，当 Stock 对应 IndicatorField 的值为 null 时，
+ * evaluate 方法应返回 false。
+ *
+ * **Validates: Requirements 3.3**
+ */
+describe("Property-Based Tests: 缺失指标值导致条件不匹配", () => {
+  const calcService = new MockIndicatorCalculationService();
+
+  /**
+   * 生成器：创建指标值为 null 的 Stock
+   */
+  const arbStockWithNullIndicator = fc
+    .tuple(
+      fc.constantFrom(
+        IndicatorField.ROE,
+        IndicatorField.PE,
+        IndicatorField.PB,
+        IndicatorField.EPS,
+        IndicatorField.REVENUE,
+        IndicatorField.NET_PROFIT,
+        IndicatorField.DEBT_RATIO,
+        IndicatorField.MARKET_CAP,
+        IndicatorField.FLOAT_MARKET_CAP,
+        IndicatorField.INDUSTRY,
+        IndicatorField.SECTOR
+      ),
+      fc.tuple(
+        fc.constantFrom("0", "3", "6"),
+        fc.integer({ min: 0, max: 99999 })
+      ).map(([prefix, num]) => `${prefix}${num.toString().padStart(5, "0")}`),
+      fc.string({ minLength: 2, maxLength: 10 })
+    )
+    .map(([nullField, code, name]) => {
+      // 创建一个 Stock，其中 nullField 对应的指标值为 null
+      const stockProps: {
+        code: StockCode;
+        name: string;
+        industry: string;
+        sector: string;
+        roe?: number | null;
+        pe?: number | null;
+        pb?: number | null;
+        eps?: number | null;
+        revenue?: number | null;
+        netProfit?: number | null;
+        debtRatio?: number | null;
+        marketCap?: number | null;
+        floatMarketCap?: number | null;
+      } = {
+        code: StockCode.create(code),
+        name,
+        industry: "测试行业",
+        sector: "主板",
+      };
+
+      // 根据 nullField 设置对应字段为 null
+      switch (nullField) {
+        case IndicatorField.ROE:
+          stockProps.roe = null;
+          break;
+        case IndicatorField.PE:
+          stockProps.pe = null;
+          break;
+        case IndicatorField.PB:
+          stockProps.pb = null;
+          break;
+        case IndicatorField.EPS:
+          stockProps.eps = null;
+          break;
+        case IndicatorField.REVENUE:
+          stockProps.revenue = null;
+          break;
+        case IndicatorField.NET_PROFIT:
+          stockProps.netProfit = null;
+          break;
+        case IndicatorField.DEBT_RATIO:
+          stockProps.debtRatio = null;
+          break;
+        case IndicatorField.MARKET_CAP:
+          stockProps.marketCap = null;
+          break;
+        case IndicatorField.FLOAT_MARKET_CAP:
+          stockProps.floatMarketCap = null;
+          break;
+        case IndicatorField.INDUSTRY:
+          stockProps.industry = "";
+          break;
+        case IndicatorField.SECTOR:
+          stockProps.sector = "";
+          break;
+      }
+
+      return { stock: new Stock(stockProps), nullField };
+    });
+
+  /**
+   * 生成器：为指定字段创建有效的 FilterCondition
+   */
+  const arbConditionForField = (field: IndicatorField) => {
+    const fieldValueType = getIndicatorValueType(field);
+
+    if (fieldValueType === IndicatorValueType.NUMERIC) {
+      // 数值型指标：使用 GREATER_THAN 运算符
+      return fc
+        .double({ min: -1000, max: 10000, noNaN: true })
+        .map((value) =>
+          FilterCondition.create(field, ComparisonOperator.GREATER_THAN, {
+            type: "numeric",
+            value,
+          })
+        );
+    } else {
+      // 文本型指标：使用 EQUAL 运算符
+      return fc
+        .string({ minLength: 1, maxLength: 20 })
+        .map((value) =>
+          FilterCondition.create(field, ComparisonOperator.EQUAL, {
+            type: "text",
+            value,
+          })
+        );
+    }
+  };
+
+  /**
+   * Property 7: 缺失指标值导致条件不匹配
+   *
+   * 对于任意 FilterCondition 和任意 Stock，当 Stock 对应 IndicatorField 的值为 null 时，
+   * evaluate 方法应返回 false。
+   *
+   * **Validates: Requirements 3.3**
+   */
+  it("Property 7: 缺失指标值应导致 evaluate 返回 false", () => {
+    fc.assert(
+      fc.property(arbStockWithNullIndicator, ({ stock, nullField }) => {
+        // 为 nullField 创建一个有效的 FilterCondition
+        return fc.assert(
+          fc.property(arbConditionForField(nullField), (condition) => {
+            // 验证 evaluate 返回 false
+            const result = condition.evaluate(stock, calcService);
+            expect(result).toBe(false);
+          }),
+          { numRuns: 10 }
+        );
+      }),
+      { numRuns: 100 }
+    );
+  });
+
+  /**
+   * Property 7.1: 缺失指标值应对所有运算符返回 false
+   *
+   * 验证无论使用什么运算符，缺失的指标值都应导致 evaluate 返回 false
+   */
+  it("Property 7.1: 缺失指标值对所有运算符都返回 false", () => {
+    // 数值型指标的所有兼容运算符
+    const numericOperators = [
+      ComparisonOperator.GREATER_THAN,
+      ComparisonOperator.LESS_THAN,
+      ComparisonOperator.EQUAL,
+      ComparisonOperator.NOT_EQUAL,
+    ];
+
+    // 文本型指标的所有兼容运算符
+    const textOperators = [
+      ComparisonOperator.EQUAL,
+      ComparisonOperator.NOT_EQUAL,
+      ComparisonOperator.CONTAINS,
+    ];
+
+    fc.assert(
+      fc.property(
+        fc.constantFrom(
+          IndicatorField.ROE,
+          IndicatorField.PE,
+          IndicatorField.PB
+        ),
+        fc.tuple(
+          fc.constantFrom("0", "3", "6"),
+          fc.integer({ min: 0, max: 99999 })
+        ).map(([prefix, num]) => `${prefix}${num.toString().padStart(5, "0")}`),
+        (field, code) => {
+          const operators = numericOperators;
+
+          // 创建指标值为 null 的 Stock
+          const stockProps: {
+            code: StockCode;
+            name: string;
+            industry: string;
+            sector: string;
+            roe?: number | null;
+            pe?: number | null;
+            pb?: number | null;
+          } = {
+            code: StockCode.create(code),
+            name: "测试股票",
+            industry: "测试行业",
+            sector: "主板",
+          };
+
+          if (field === IndicatorField.ROE) stockProps.roe = null;
+          if (field === IndicatorField.PE) stockProps.pe = null;
+          if (field === IndicatorField.PB) stockProps.pb = null;
+
+          const stock = new Stock(stockProps);
+
+          // 对每个运算符测试
+          operators.forEach((operator) => {
+            const condition = FilterCondition.create(field, operator, {
+              type: "numeric",
+              value: 0.15,
+            });
+
+            // 验证 evaluate 返回 false
+            const result = condition.evaluate(stock, calcService);
+            expect(result).toBe(false);
+          });
+        }
+      ),
+      { numRuns: 100 }
+    );
+  });
+
+  /**
+   * Property 7.2: 计算服务返回 null 应导致条件不匹配
+   *
+   * 验证当 IIndicatorCalculationService 返回 null 时，evaluate 也应返回 false
+   */
+  it("Property 7.2: 计算服务返回 null 应导致 evaluate 返回 false", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(
+          IndicatorField.ROE,
+          IndicatorField.PE,
+          IndicatorField.REVENUE_CAGR_3Y,
+          IndicatorField.NET_PROFIT_CAGR_3Y
+        ),
+        fc.tuple(
+          fc.constantFrom("0", "3", "6"),
+          fc.integer({ min: 0, max: 99999 })
+        ).map(([prefix, num]) => `${prefix}${num.toString().padStart(5, "0")}`),
+        fc.double({ min: -1000, max: 10000, noNaN: true }),
+        (field, code, conditionValue) => {
+          // 创建一个新的 mock 服务实例，确保每次测试都是独立的
+          const mockCalcService = new MockIndicatorCalculationService();
+
+          // 创建一个有值的 Stock（但计算服务会返回 null）
+          const stock = new Stock({
+            code: StockCode.create(code),
+            name: "测试股票",
+            industry: "测试行业",
+            sector: "主板",
+            roe: 0.28,
+            pe: 35.5,
+          });
+
+          // 设置计算服务返回 null
+          mockCalcService.setMockValue(field, code, null);
+
+          // 创建条件
+          const condition = FilterCondition.create(
+            field,
+            ComparisonOperator.GREATER_THAN,
+            { type: "numeric", value: conditionValue }
+          );
+
+          // 验证 evaluate 返回 false
+          const result = condition.evaluate(stock, mockCalcService);
+          expect(result).toBe(false);
         }
       ),
       { numRuns: 100 }

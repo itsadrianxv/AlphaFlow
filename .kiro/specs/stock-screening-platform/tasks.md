@@ -86,7 +86,7 @@
     - 生成随机 FilterGroup 树和 Stock，验证 AND/OR/NOT 语义
     - **Validates: Requirements 2.1**
 
-  - [~] 2.6 编写缺失指标值属性基测试
+  - [x] 2.6 编写缺失指标值属性基测试
     - **Property 7: 缺失指标值导致条件不匹配**
     - 生成随机 FilterCondition 和指标值为 null 的 Stock
     - 验证 evaluate 返回 false
