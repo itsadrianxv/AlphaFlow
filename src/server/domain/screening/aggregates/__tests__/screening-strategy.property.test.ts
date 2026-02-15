@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
-import { ScreeningStrategy } from "../screening-strategy.js";
+import { ScreeningStrategy } from "../index.js";
 import { FilterGroup } from "../../entities/filter-group.js";
 import { FilterCondition } from "../../value-objects/filter-condition.js";
 import { ScoringConfig, NormalizationMethod } from "../../value-objects/scoring-config.js";

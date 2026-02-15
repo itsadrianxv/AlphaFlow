@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ScreeningStrategy } from "../screening-strategy.js";
+import { ScreeningStrategy } from "../index.js";
 import { FilterGroup } from "../../entities/filter-group.js";
 import { FilterCondition } from "../../value-objects/filter-condition.js";
 import { ScoringConfig, NormalizationMethod } from "../../value-objects/scoring-config.js";
@@ -19,7 +19,7 @@ import { LogicalOperator } from "../../enums/logical-operator.js";
 import { InvalidStrategyError } from "../../errors.js";
 import { Stock } from "../../entities/stock.js";
 import { StockCode } from "../../value-objects/stock-code.js";
-import type { IScoringService, IIndicatorCalculationService } from "../screening-strategy.js";
+import type { IScoringService, IIndicatorCalculationService } from "../index.js";
 import { ScoredStock } from "../../value-objects/scored-stock.js";
 
 describe("ScreeningStrategy", () => {

@@ -17,7 +17,6 @@
  */
 
 import type { ScoredStock } from "./scored-stock.js";
-import { ScoredStock as ScoredStockClass } from "./scored-stock.js";
 
 /**
  * ScreeningResult 值对象
@@ -172,6 +171,9 @@ export class ScreeningResult {
     if (typeof executionTime !== "number") {
       throw new Error("executionTime 必须为数字");
     }
+
+    // Lazy import to avoid circular dependency
+    const { ScoredStock: ScoredStockClass } = require("./scored-stock.js") as typeof import("./scored-stock.js");
 
     const matchedStocks = matchedStocksData.map((stockData) =>
       ScoredStockClass.fromDict(stockData)
