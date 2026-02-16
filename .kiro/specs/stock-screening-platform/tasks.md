@@ -179,14 +179,14 @@
   - 确保所有领域层测试通过，如有问题请向用户确认。
 
 - [ ] 7. 数据层：Prisma Schema 与 Repository 实现
-  - [-] 7.1 扩展 Prisma Schema
+  - [x] 7.1 扩展 Prisma Schema
     - 在 `prisma/schema.prisma` 中新增 ScreeningStrategy、ScreeningSession、WatchList 模型
     - 在 User 模型中添加 strategies、screeningSessions、watchLists 关联字段
     - 添加必要的索引（userId、isTemplate、strategyId、executedAt、name）
     - 运行 `prisma db push` 同步数据库
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
 
-  - [~] 7.2 实现 PrismaScreeningStrategyRepository
+  - [x] 7.2 实现 PrismaScreeningStrategyRepository
     - 创建 `src/server/infrastructure/screening/prisma-screening-strategy-repository.ts`
     - 实现 IScreeningStrategyRepository 接口：save、findById、delete、findAll、findTemplates、findByName
     - 处理 FilterGroup 和 ScoringConfig 的 JSON 序列化/反序列化
