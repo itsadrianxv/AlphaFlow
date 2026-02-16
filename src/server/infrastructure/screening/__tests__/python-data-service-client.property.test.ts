@@ -129,7 +129,7 @@ describe("PythonDataServiceClient - Property 12: HTTP 响应映射正确性", ()
         fc.string({ minLength: 2, maxLength: 10 }),
         fc.constantFrom("白酒", "医药", "银行", "科技", "制造"),
         fc.constantFrom("主板", "创业板", "科创板"),
-        fc.date({ min: new Date("2020-01-01"), max: new Date("2024-12-31") }),
+        fc.date({ min: new Date("2020-01-01"), max: new Date("2024-12-31") }).filter(d => !isNaN(d.getTime())),
         (code, name, industry, sector, dataDate) => {
           const stockDataJson = {
             code,

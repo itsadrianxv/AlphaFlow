@@ -168,6 +168,7 @@ export class PrismaScreeningSessionRepository
       otherStockCodes: otherStockCodes.map((code) => code.value),
       filtersSnapshot: filtersSnapshot.toDict(),
       scoringConfigSnapshot: scoringConfigSnapshot.toDict(),
+      userId: record.userId,
     });
   }
 }
