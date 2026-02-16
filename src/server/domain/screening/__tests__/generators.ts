@@ -311,3 +311,75 @@ export const arbStock = fc.record({
     floatMarketCap: props.floatMarketCap ?? null,
   });
 });
+
+/**
+ * 生成 ScreeningStrategy 聚合根
+ */
+export const arbScreeningStrategy = fc
+  .record({
+    name: arbStrategyName,
+    description: fc.option(fc.string({ maxLength: 200 })),
+    filters: arbFilterGroup(),
+    scoringConfig: arbScoringConfig,
+    tags: fc.array(fc.string({ minLength: 1, maxLength: 20 }), { maxLength: 5 }),
+    isTemplate: fc.boolean(),
+    userId: arbUserId,
+  })
+  .map((props) => {
+    // 动态导入以避免循环依赖
+    const { ScreeningStrategy } = require("../aggregates/screening-strategy.js");
+    return ScreeningStrategy.create({
+      name: props.name,
+      description: props.description ?? undefined,
+      filters: props.filters,
+      scoringConfig: props.scoringConfig,
+      tags: props.tags,
+      isTemplate: props.isTemplate,
+      userId: props.userId,
+    });
+  });
+
+/**
+ * 生成 WatchList 聚合根
+ */
+export const arbWatchList = fc
+  .record({
+    name: fc.string({ minLength: 1, maxLength: 50 }).filter(name => name.trim().length > 0),
+    description: fc.option(fc.string({ maxLength: 200 })),
+    userId: arbUserId,
+    stocks: fc.array(
+      fc.record({
+        code: arbStockCode,
+        name: fc.string({ minLength: 2, maxLength: 10 }),
+        note: fc.option(fc.string({ maxLength: 100 })),
+        tags: fc.array(fc.string({ minLength: 1, maxLength: 20 }), { maxLength: 5 }),
+      }),
+      { maxLength: 20 }
+    ),
+  })
+  .map((props) => {
+    // 动态导入以避免循环依赖
+    const { WatchList } = require("../aggregates/watch-list.js");
+    
+    const watchList = WatchList.create({
+      name: props.name,
+      description: props.description ?? undefined,
+      userId: props.userId,
+    });
+
+    // 添加股票（去重以避免 DuplicateStockError）
+    const uniqueStocks = new Map(
+      props.stocks.map(stock => [stock.code, stock])
+    );
+
+    for (const stock of uniqueStocks.values()) {
+      watchList.addStock(
+        StockCode.create(stock.code),
+        stock.name,
+        stock.note ?? undefined,
+        stock.tags
+      );
+    }
+
+    return watchList;
+  });

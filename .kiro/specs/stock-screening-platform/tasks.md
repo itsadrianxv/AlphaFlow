@@ -281,7 +281,7 @@
     - 在 `package.json` 中添加 test 脚本
     - _Requirements: 全局_
 
-  - [~] 12.2 创建 fast-check 生成器工具库
+  - [x] 12.2 创建 fast-check 生成器工具库
     - 创建 `src/server/domain/screening/__tests__/generators.ts`
     - 实现核心生成器：arbStockCode、arbIndicatorField、arbNumericValue、arbTextValue、arbListValue、arbRangeValue
     - 实现 arbFilterCondition（过滤不兼容组合）
