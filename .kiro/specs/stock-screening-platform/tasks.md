@@ -211,7 +211,7 @@
     - 创建 `python_services/app/services/__init__.py`
     - _Requirements: 6.1_
 
-  - [~] 8.2 实现 AkShare 数据适配器
+  - [x] 8.2 实现 AkShare 数据适配器
     - 创建 `python_services/app/services/akshare_adapter.py`
     - 实现 get_all_stock_codes()：调用 AkShare 获取全市场 A 股代码列表
     - 实现 get_stocks_by_codes(codes)：批量查询股票基础数据
