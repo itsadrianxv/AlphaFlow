@@ -203,7 +203,7 @@
     - _Requirements: 5.1_
 
 - [ ] 8. Python FastAPI 数据服务
-  - [~] 8.1 搭建 Python FastAPI 项目结构
+  - [x] 8.1 搭建 Python FastAPI 项目结构
     - 创建 `python_services/app/main.py`：FastAPI 入口，注册路由，配置 CORS
     - 创建 `python_services/requirements.txt`：fastapi、uvicorn、akshare、pydantic
     - 创建 `python_services/app/__init__.py`
