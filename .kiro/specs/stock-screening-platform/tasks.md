@@ -158,7 +158,7 @@
     - 实现路由逻辑：BASIC → stock.getValue、TIME_SERIES → IHistoricalDataProvider、DERIVED → 硬编码公式
     - _Requirements: 3.2_
 
-  - [~] 5.3 实现 IScoringService 领域服务
+  - [x] 5.3 实现 IScoringService 领域服务
     - 创建 `src/server/domain/screening/services/scoring-service.ts`
     - 定义接口和实现类
     - 实现 MIN_MAX 归一化：(value - min) / (max - min)，缺失值归一化得分为 0
