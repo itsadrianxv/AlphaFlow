@@ -233,7 +233,7 @@
     - _Requirements: 6.1, 6.2, 6.3_
 
 - [ ] 9. 基础设施层：Python 数据服务 HTTP Client
-  - [~] 9.1 实现 PythonDataServiceClient
+  - [x] 9.1 实现 PythonDataServiceClient
     - 创建 `src/server/infrastructure/screening/python-data-service-client.ts`
     - 实现 IMarketDataRepository 和 IHistoricalDataProvider 接口
     - 将 HTTP JSON 响应映射为领域层 Stock 实体和 IndicatorDataPoint 值对象
