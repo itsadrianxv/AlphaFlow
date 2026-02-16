@@ -13,11 +13,11 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import type { ScoredStock } from "../value-objects/scored-stock";
-import type { StockCode } from "../value-objects/stock-code";
-import type { FilterGroup } from "../entities/filter-group";
-import type { ScoringConfig } from "../value-objects/scoring-config";
-import type { ScreeningResult } from "../value-objects/screening-result";
+import { ScoredStock } from "../value-objects/scored-stock.js";
+import { StockCode } from "../value-objects/stock-code.js";
+import { FilterGroup } from "../entities/filter-group.js";
+import { ScoringConfig } from "../value-objects/scoring-config.js";
+import type { ScreeningResult } from "../value-objects/screening-result.js";
 
 /**
  * ScreeningSession 创建参数
@@ -263,12 +263,7 @@ export class ScreeningSession {
       throw new Error("otherStockCodes 必须为数组");
     }
 
-    // 导入依赖类型
-    const { ScoredStock } = require("../value-objects/scored-stock") as typeof import("../value-objects/scored-stock");
-    const { StockCode } = require("../value-objects/stock-code") as typeof import("../value-objects/stock-code");
-    const { FilterGroup } = require("../entities/filter-group") as typeof import("../entities/filter-group");
-    const { ScoringConfig } = require("../value-objects/scoring-config") as typeof import("../value-objects/scoring-config");
-
+    // 导入依赖类型 - 直接使用顶部导入的类
     // 反序列化
     const topStocks = topStocksData.map((stockData) =>
       ScoredStock.fromDict(stockData)

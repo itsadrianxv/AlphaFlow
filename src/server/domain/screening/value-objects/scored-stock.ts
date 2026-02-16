@@ -22,7 +22,7 @@
  * );
  */
 
-import type { StockCode } from "./stock-code.js";
+import { StockCode } from "./stock-code.js";
 import type { IndicatorField } from "../enums/indicator-field.js";
 
 /**
@@ -224,9 +224,6 @@ export class ScoredStock {
     if (!Array.isArray(matchedConditionsData)) {
       throw new Error("matchedConditions 必须为数组");
     }
-
-    // 导入 StockCode
-    const { StockCode } = require("./stock-code") as typeof import("./stock-code");
 
     const scoreBreakdown = new Map<IndicatorField, number>();
     for (const [field, breakdownScore] of Object.entries(scoreBreakdownObj)) {

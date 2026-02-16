@@ -92,7 +92,7 @@
     - 验证 evaluate 返回 false
     - **Validates: Requirements 3.3**
 
-- [-] 3. Checkpoint - 值对象与实体测试通过
+- [x] 3. Checkpoint - 值对象与实体测试通过
   - 确保所有已编写的测试通过，如有问题请向用户确认。
 
 - [ ] 4. 领域层：聚合根
@@ -114,7 +114,7 @@
     - 生成随机策略，克隆后修改新策略，验证原策略不受影响
     - **Validates: Requirements 1.4**
 
-  - [~] 4.4 实现 ScreeningSession 聚合根
+  - [x] 4.4 实现 ScreeningSession 聚合根
     - 创建 `src/server/domain/screening/aggregates/screening-session.ts`
     - 实现 create 静态工厂方法：前 50 只保存完整 ScoredStock，其余仅保存 StockCode
     - 实现 getAllMatchedCodes、getStockDetail、getTopN、countMatched 方法
