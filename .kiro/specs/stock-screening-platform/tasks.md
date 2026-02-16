@@ -275,7 +275,7 @@
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
 - [ ] 12. 测试配置与 fast-check 生成器
-  - [~] 12.1 配置 Vitest 测试环境
+  - [x] 12.1 配置 Vitest 测试环境
     - 安装 vitest 开发依赖（如尚未安装）
     - 创建 `vitest.config.ts` 配置文件
     - 在 `package.json` 中添加 test 脚本
