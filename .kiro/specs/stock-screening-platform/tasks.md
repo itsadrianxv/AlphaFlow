@@ -290,7 +290,7 @@
     - 实现 arbStock、arbScreeningStrategy、arbWatchList
     - _Requirements: 全局_
 
-- [-] 13. Final Checkpoint - 全部测试通过
+- [x] 13. Final Checkpoint - 全部测试通过
   - 确保所有单元测试、属性基测试和集成测试通过，如有问题请向用户确认。
 
 ## Notes
