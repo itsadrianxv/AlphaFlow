@@ -23,7 +23,7 @@
  */
 
 import { StockCode } from "./stock-code.js";
-import type { IndicatorField } from "../enums/indicator-field.js";
+import type { IndicatorField } from "../enums/indicator-field";
 
 /**
  * 筛选条件简化表示（用于 matchedConditions）

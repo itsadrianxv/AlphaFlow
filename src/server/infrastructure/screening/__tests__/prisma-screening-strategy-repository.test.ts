@@ -7,15 +7,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import type { PrismaClient } from "../../../../../generated/prisma/index.js";
-import { PrismaScreeningStrategyRepository } from "../prisma-screening-strategy-repository.js";
-import { ScreeningStrategy } from "../../../domain/screening/aggregates/screening-strategy.js";
-import { FilterGroup } from "../../../domain/screening/entities/filter-group.js";
-import { FilterCondition } from "../../../domain/screening/value-objects/filter-condition.js";
-import { ScoringConfig } from "../../../domain/screening/value-objects/scoring-config.js";
-import { IndicatorField } from "../../../domain/screening/enums/indicator-field.js";
-import { ComparisonOperator } from "../../../domain/screening/enums/comparison-operator.js";
-import { LogicalOperator } from "../../../domain/screening/enums/logical-operator.js";
+import type { PrismaClient } from "../../../../../generated/prisma/index";
+import { PrismaScreeningStrategyRepository } from "../prisma-screening-strategy-repository";
+import { ScreeningStrategy } from "../../../domain/screening/aggregates/screening-strategy";
+import { FilterGroup } from "../../../domain/screening/entities/filter-group";
+import { FilterCondition } from "../../../domain/screening/value-objects/filter-condition";
+import { ScoringConfig } from "../../../domain/screening/value-objects/scoring-config";
+import { IndicatorField } from "../../../domain/screening/enums/indicator-field";
+import { ComparisonOperator } from "../../../domain/screening/enums/comparison-operator";
+import { LogicalOperator } from "../../../domain/screening/enums/logical-operator";
 
 describe("PrismaScreeningStrategyRepository", () => {
   let mockPrisma: any;

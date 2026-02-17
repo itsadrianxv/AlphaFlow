@@ -12,12 +12,12 @@
  * Requirements: 3.4, 3.5
  */
 
-import type { Stock } from "../entities/stock.js";
-import type { ScoringConfig } from "../value-objects/scoring-config.js";
+import type { Stock } from "../entities/stock";
+import type { ScoringConfig } from "../value-objects/scoring-config";
 import type { IIndicatorCalculationService } from "./indicator-calculation-service.js";
-import { ScoredStock, type MatchedCondition } from "../value-objects/scored-stock.js";
-import type { IndicatorField } from "../enums/indicator-field.js";
-import { ScoringError } from "../errors.js";
+import { ScoredStock, type MatchedCondition } from "../value-objects/scored-stock";
+import type { IndicatorField } from "../enums/indicator-field";
+import { ScoringError } from "../errors";
 
 /**
  * 评分服务接口

@@ -3,18 +3,18 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { PrismaClient } from "../../../../../generated/prisma/index.js";
-import { PrismaScreeningSessionRepository } from "../prisma-screening-session-repository.js";
-import { ScreeningSession } from "../../../domain/screening/aggregates/screening-session.js";
-import { ScreeningResult } from "../../../domain/screening/value-objects/screening-result.js";
-import { ScoredStock } from "../../../domain/screening/value-objects/scored-stock.js";
-import { StockCode } from "../../../domain/screening/value-objects/stock-code.js";
-import { FilterGroup } from "../../../domain/screening/entities/filter-group.js";
-import { FilterCondition } from "../../../domain/screening/value-objects/filter-condition.js";
-import { ScoringConfig, NormalizationMethod } from "../../../domain/screening/value-objects/scoring-config.js";
-import { IndicatorField } from "../../../domain/screening/enums/indicator-field.js";
-import { ComparisonOperator } from "../../../domain/screening/enums/comparison-operator.js";
-import { LogicalOperator } from "../../../domain/screening/enums/logical-operator.js";
+import { PrismaClient } from "../../../../../generated/prisma/index";
+import { PrismaScreeningSessionRepository } from "../prisma-screening-session-repository";
+import { ScreeningSession } from "../../../domain/screening/aggregates/screening-session";
+import { ScreeningResult } from "../../../domain/screening/value-objects/screening-result";
+import { ScoredStock } from "../../../domain/screening/value-objects/scored-stock";
+import { StockCode } from "../../../domain/screening/value-objects/stock-code";
+import { FilterGroup } from "../../../domain/screening/entities/filter-group";
+import { FilterCondition } from "../../../domain/screening/value-objects/filter-condition";
+import { ScoringConfig, NormalizationMethod } from "../../../domain/screening/value-objects/scoring-config";
+import { IndicatorField } from "../../../domain/screening/enums/indicator-field";
+import { ComparisonOperator } from "../../../domain/screening/enums/comparison-operator";
+import { LogicalOperator } from "../../../domain/screening/enums/logical-operator";
 
 describe("PrismaScreeningSessionRepository", () => {
   let prisma: PrismaClient;

@@ -5,10 +5,10 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { WatchList } from "../watch-list.js";
-import { StockCode } from "../../value-objects/stock-code.js";
-import { WatchedStock } from "../../value-objects/watched-stock.js";
-import { DuplicateStockError, StockNotFoundError } from "../../errors.js";
+import { WatchList } from "../watch-list";
+import { StockCode } from "../../value-objects/stock-code";
+import { WatchedStock } from "../../value-objects/watched-stock";
+import { DuplicateStockError, StockNotFoundError } from "../../errors";
 
 describe("WatchList", () => {
   describe("create", () => {

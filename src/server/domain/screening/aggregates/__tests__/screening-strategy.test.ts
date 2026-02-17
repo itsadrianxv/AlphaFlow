@@ -9,18 +9,18 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ScreeningStrategy } from "../screening-strategy.js";
-import type { IScoringService, IIndicatorCalculationService } from "../screening-strategy.js";
-import { FilterGroup } from "../../entities/filter-group.js";
-import { FilterCondition } from "../../value-objects/filter-condition.js";
-import { ScoringConfig, NormalizationMethod } from "../../value-objects/scoring-config.js";
-import { IndicatorField } from "../../enums/indicator-field.js";
-import { ComparisonOperator } from "../../enums/comparison-operator.js";
-import { LogicalOperator } from "../../enums/logical-operator.js";
-import { InvalidStrategyError } from "../../errors.js";
-import { Stock } from "../../entities/stock.js";
-import { StockCode } from "../../value-objects/stock-code.js";
-import { ScoredStock } from "../../value-objects/scored-stock.js";
+import { ScreeningStrategy } from "../screening-strategy";
+import type { IScoringService, IIndicatorCalculationService } from "../screening-strategy";
+import { FilterGroup } from "../../entities/filter-group";
+import { FilterCondition } from "../../value-objects/filter-condition";
+import { ScoringConfig, NormalizationMethod } from "../../value-objects/scoring-config";
+import { IndicatorField } from "../../enums/indicator-field";
+import { ComparisonOperator } from "../../enums/comparison-operator";
+import { LogicalOperator } from "../../enums/logical-operator";
+import { InvalidStrategyError } from "../../errors";
+import { Stock } from "../../entities/stock";
+import { StockCode } from "../../value-objects/stock-code";
+import { ScoredStock } from "../../value-objects/scored-stock";
 
 describe("ScreeningStrategy", () => {
   // Debug: Check if ScreeningStrategy is defined

@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { PythonDataServiceClient } from "../python-data-service-client.js";
+import { PythonDataServiceClient } from "../python-data-service-client";
 import { StockCode } from "~/server/domain/screening/value-objects/stock-code.js";
 import { DataNotAvailableError } from "~/server/domain/screening/errors.js";
 import { IndicatorField } from "~/server/domain/screening/enums/indicator-field.js";

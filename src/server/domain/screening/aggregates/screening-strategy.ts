@@ -18,16 +18,16 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { FilterGroup } from "../entities/filter-group.js";
-import { ScoringConfig } from "../value-objects/scoring-config.js";
-import { ScreeningResult } from "../value-objects/screening-result.js";
-import { InvalidStrategyError } from "../errors.js";
-import type { Stock } from "../entities/stock.js";
-import type { ScoredStock } from "../value-objects/scored-stock.js";
-import type { IIndicatorCalculationService } from "../value-objects/filter-condition.js";
+import { FilterGroup } from "../entities/filter-group";
+import { ScoringConfig } from "../value-objects/scoring-config";
+import { ScreeningResult } from "../value-objects/screening-result";
+import { InvalidStrategyError } from "../errors";
+import type { Stock } from "../entities/stock";
+import type { ScoredStock } from "../value-objects/scored-stock";
+import type { IIndicatorCalculationService } from "../value-objects/filter-condition";
 
 // Re-export IIndicatorCalculationService for convenience
-export type { IIndicatorCalculationService } from "../value-objects/filter-condition.js";
+export type { IIndicatorCalculationService } from "../value-objects/filter-condition";
 
 /**
  * IScoringService 接口

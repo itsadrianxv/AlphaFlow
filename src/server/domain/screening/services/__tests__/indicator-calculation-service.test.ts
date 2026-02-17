@@ -11,11 +11,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   IndicatorCalculationService,
   type IIndicatorCalculationService,
-} from "../indicator-calculation-service.js";
-import type { IHistoricalDataProvider } from "../../repositories/historical-data-provider.js";
-import { Stock } from "../../entities/stock.js";
-import { StockCode } from "../../value-objects/stock-code.js";
-import { IndicatorField } from "../../enums/indicator-field.js";
+} from "../indicator-calculation-service";
+import type { IHistoricalDataProvider } from "../../repositories/historical-data-provider";
+import { Stock } from "../../entities/stock";
+import { StockCode } from "../../value-objects/stock-code";
+import { IndicatorField } from "../../enums/indicator-field";
 
 describe("IndicatorCalculationService", () => {
   let service: IIndicatorCalculationService;

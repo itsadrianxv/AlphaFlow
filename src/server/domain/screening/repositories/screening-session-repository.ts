@@ -7,7 +7,7 @@
  * Requirements: 4.1, 4.2, 4.3, 4.4
  */
 
-import type { ScreeningSession } from "../aggregates/screening-session.js";
+import type { ScreeningSession } from "../aggregates/screening-session";
 
 /**
  * 筛选会话仓储接口

@@ -13,10 +13,10 @@
 
 import { describe, it, expect, vi } from "vitest";
 import * as fc from "fast-check";
-import { ScoringService } from "../scoring-service.js";
-import { IndicatorCalculationService } from "../indicator-calculation-service.js";
-import { arbStock, arbScoringConfig } from "../../__tests__/generators.js";
-import type { IHistoricalDataProvider } from "../../repositories/historical-data-provider.js";
+import { ScoringService } from "../scoring-service";
+import { IndicatorCalculationService } from "../indicator-calculation-service";
+import { arbStock, arbScoringConfig } from "../../__tests__/generators";
+import type { IHistoricalDataProvider } from "../../repositories/historical-data-provider";
 
 describe("ScoringService - Property-Based Tests", () => {
   // 创建 mock 历史数据提供者

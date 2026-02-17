@@ -3,16 +3,16 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { ScreeningSession } from "../screening-session.js";
-import { ScreeningResult } from "../../value-objects/screening-result.js";
-import { ScoredStock } from "../../value-objects/scored-stock.js";
-import { StockCode } from "../../value-objects/stock-code.js";
-import { FilterGroup } from "../../entities/filter-group.js";
-import { FilterCondition } from "../../value-objects/filter-condition.js";
-import { ScoringConfig, NormalizationMethod } from "../../value-objects/scoring-config.js";
-import { IndicatorField } from "../../enums/indicator-field.js";
-import { ComparisonOperator } from "../../enums/comparison-operator.js";
-import { LogicalOperator } from "../../enums/logical-operator.js";
+import { ScreeningSession } from "../screening-session";
+import { ScreeningResult } from "../../value-objects/screening-result";
+import { ScoredStock } from "../../value-objects/scored-stock";
+import { StockCode } from "../../value-objects/stock-code";
+import { FilterGroup } from "../../entities/filter-group";
+import { FilterCondition } from "../../value-objects/filter-condition";
+import { ScoringConfig, NormalizationMethod } from "../../value-objects/scoring-config";
+import { IndicatorField } from "../../enums/indicator-field";
+import { ComparisonOperator } from "../../enums/comparison-operator";
+import { LogicalOperator } from "../../enums/logical-operator";
 
 describe("ScreeningSession", () => {
   function createScoredStock(code: string, name: string, score: number): ScoredStock {

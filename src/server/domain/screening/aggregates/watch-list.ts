@@ -20,9 +20,9 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { WatchedStock } from "../value-objects/watched-stock.js";
-import { StockCode } from "../value-objects/stock-code.js";
-import { DuplicateStockError, StockNotFoundError } from "../errors.js";
+import { WatchedStock } from "../value-objects/watched-stock";
+import { StockCode } from "../value-objects/stock-code";
+import { DuplicateStockError, StockNotFoundError } from "../errors";
 
 /**
  * WatchList 创建参数

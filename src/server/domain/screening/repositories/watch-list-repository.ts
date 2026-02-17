@@ -7,7 +7,7 @@
  * Requirements: 5.1
  */
 
-import type { WatchList } from "../aggregates/watch-list.js";
+import type { WatchList } from "../aggregates/watch-list";
 
 /**
  * 自选股列表仓储接口

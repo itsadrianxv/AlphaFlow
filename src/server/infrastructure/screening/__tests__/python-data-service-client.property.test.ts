@@ -13,7 +13,7 @@
 
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
-import { PythonDataServiceClient } from "../python-data-service-client.js";
+import { PythonDataServiceClient } from "../python-data-service-client";
 import { StockCode } from "~/server/domain/screening/value-objects/stock-code.js";
 import { arbStockCode } from "~/server/domain/screening/__tests__/generators.js";
 

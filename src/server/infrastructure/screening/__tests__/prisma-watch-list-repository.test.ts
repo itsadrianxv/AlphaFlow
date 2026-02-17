@@ -7,10 +7,10 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { PrismaClient } from "../../../../../generated/prisma/index.js";
-import { PrismaWatchListRepository } from "../prisma-watch-list-repository.js";
-import { WatchList } from "../../../domain/screening/aggregates/watch-list.js";
-import { StockCode } from "../../../domain/screening/value-objects/stock-code.js";
+import type { PrismaClient } from "../../../../../generated/prisma/index";
+import { PrismaWatchListRepository } from "../prisma-watch-list-repository";
+import { WatchList } from "../../../domain/screening/aggregates/watch-list";
+import { StockCode } from "../../../domain/screening/value-objects/stock-code";
 
 describe("PrismaWatchListRepository", () => {
   let mockPrisma: any;

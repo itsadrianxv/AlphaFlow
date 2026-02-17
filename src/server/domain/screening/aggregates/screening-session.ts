@@ -13,11 +13,11 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { ScoredStock } from "../value-objects/scored-stock.js";
-import { StockCode } from "../value-objects/stock-code.js";
-import { FilterGroup } from "../entities/filter-group.js";
-import { ScoringConfig } from "../value-objects/scoring-config.js";
-import type { ScreeningResult } from "../value-objects/screening-result.js";
+import { ScoredStock } from "../value-objects/scored-stock";
+import { StockCode } from "../value-objects/stock-code";
+import { FilterGroup } from "../entities/filter-group";
+import { ScoringConfig } from "../value-objects/scoring-config";
+import type { ScreeningResult } from "../value-objects/screening-result";
 
 /**
  * ScreeningSession 创建参数

@@ -1,6 +1,6 @@
-import { StockCode } from "../value-objects/stock-code.js";
-import { IndicatorField, getIndicatorCategory } from "../enums/indicator-field.js";
-import { IndicatorCategory } from "../enums/indicator-category.js";
+import { StockCode } from "../value-objects/stock-code";
+import { IndicatorField, getIndicatorCategory } from "../enums/indicator-field";
+import { IndicatorCategory } from "../enums/indicator-category";
 
 /**
  * Stock 实体属性接口

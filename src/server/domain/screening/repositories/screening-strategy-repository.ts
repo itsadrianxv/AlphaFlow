@@ -7,7 +7,7 @@
  * Requirements: 1.1, 1.7
  */
 
-import type { ScreeningStrategy } from "../aggregates/screening-strategy.js";
+import type { ScreeningStrategy } from "../aggregates/screening-strategy";
 
 /**
  * 筛选策略仓储接口

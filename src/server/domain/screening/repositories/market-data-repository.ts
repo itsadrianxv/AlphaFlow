@@ -7,8 +7,8 @@
  * Requirements: 6.1, 6.2, 6.4
  */
 
-import type { StockCode } from "../value-objects/stock-code.js";
-import type { Stock } from "../entities/stock.js";
+import type { StockCode } from "../value-objects/stock-code";
+import type { Stock } from "../entities/stock";
 
 /**
  * 市场数据仓储接口

@@ -10,10 +10,10 @@
 
 import { describe, it } from "vitest";
 import * as fc from "fast-check";
-import { WatchList } from "../watch-list.js";
-import { StockCode } from "../../value-objects/stock-code.js";
-import { DuplicateStockError } from "../../errors.js";
-import { arbStockCode } from "../../__tests__/generators.js";
+import { WatchList } from "../watch-list";
+import { StockCode } from "../../value-objects/stock-code";
+import { DuplicateStockError } from "../../errors";
+import { arbStockCode } from "../../__tests__/generators";
 
 /**
  * 定义操作类型

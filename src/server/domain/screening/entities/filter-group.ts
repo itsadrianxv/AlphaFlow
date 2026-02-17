@@ -32,10 +32,10 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { LogicalOperator } from "../enums/logical-operator.js";
-import { FilterCondition, type IIndicatorCalculationService } from "../value-objects/filter-condition.js";
+import { LogicalOperator } from "../enums/logical-operator";
+import { FilterCondition, type IIndicatorCalculationService } from "../value-objects/filter-condition";
 import type { Stock } from "./stock.js";
-import { InvalidFilterConditionError } from "../errors.js";
+import { InvalidFilterConditionError } from "../errors";
 
 /**
  * FilterGroup 实体属性接口

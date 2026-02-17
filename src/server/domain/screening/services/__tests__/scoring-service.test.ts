@@ -9,12 +9,12 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { ScoringService } from "../scoring-service.js";
-import { Stock } from "../../entities/stock.js";
-import { StockCode } from "../../value-objects/stock-code.js";
-import { ScoringConfig } from "../../value-objects/scoring-config.js";
-import { IndicatorField } from "../../enums/indicator-field.js";
-import type { IIndicatorCalculationService } from "../indicator-calculation-service.js";
+import { ScoringService } from "../scoring-service";
+import { Stock } from "../../entities/stock";
+import { StockCode } from "../../value-objects/stock-code";
+import { ScoringConfig } from "../../value-objects/scoring-config";
+import { IndicatorField } from "../../enums/indicator-field";
+import type { IIndicatorCalculationService } from "../indicator-calculation-service";
 
 describe("ScoringService", () => {
   // 创建 mock 指标计算服务

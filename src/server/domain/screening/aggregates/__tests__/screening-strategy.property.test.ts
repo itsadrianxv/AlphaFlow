@@ -16,15 +16,15 @@
 
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
-import { ScreeningStrategy } from "../screening-strategy.js";
-import { FilterGroup } from "../../entities/filter-group.js";
-import { FilterCondition } from "../../value-objects/filter-condition.js";
-import { ScoringConfig, NormalizationMethod } from "../../value-objects/scoring-config.js";
-import { InvalidStrategyError } from "../../errors.js";
-import { LogicalOperator } from "../../enums/logical-operator.js";
-import { IndicatorField } from "../../enums/indicator-field.js";
-import { ComparisonOperator } from "../../enums/comparison-operator.js";
-import type { IndicatorValue } from "../../value-objects/indicator-value.js";
+import { ScreeningStrategy } from "../screening-strategy";
+import { FilterGroup } from "../../entities/filter-group";
+import { FilterCondition } from "../../value-objects/filter-condition";
+import { ScoringConfig, NormalizationMethod } from "../../value-objects/scoring-config";
+import { InvalidStrategyError } from "../../errors";
+import { LogicalOperator } from "../../enums/logical-operator";
+import { IndicatorField } from "../../enums/indicator-field";
+import { ComparisonOperator } from "../../enums/comparison-operator";
+import type { IndicatorValue } from "../../value-objects/indicator-value";
 
 // Local generators to avoid circular dependencies
 const arbStrategyName = fc.string({ minLength: 1, maxLength: 50 }).filter(name => name.trim().length > 0);

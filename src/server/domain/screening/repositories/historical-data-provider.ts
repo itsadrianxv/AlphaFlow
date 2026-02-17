@@ -7,8 +7,8 @@
  * Requirements: 3.2, 6.3
  */
 
-import type { StockCode } from "../value-objects/stock-code.js";
-import type { IndicatorField } from "../enums/indicator-field.js";
+import type { StockCode } from "../value-objects/stock-code";
+import type { IndicatorField } from "../enums/indicator-field";
 
 /**
  * 指标数据点

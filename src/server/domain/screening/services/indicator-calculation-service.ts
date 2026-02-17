@@ -9,15 +9,15 @@
  * Requirements: 3.2
  */
 
-import type { Stock } from "../entities/stock.js";
-import type { IndicatorField } from "../enums/indicator-field.js";
-import type { IHistoricalDataProvider } from "../repositories/historical-data-provider.js";
+import type { Stock } from "../entities/stock";
+import type { IndicatorField } from "../enums/indicator-field";
+import type { IHistoricalDataProvider } from "../repositories/historical-data-provider";
 import {
   getIndicatorCategory,
   getIndicatorFieldMetadata,
-} from "../enums/indicator-field.js";
-import { IndicatorCategory } from "../enums/indicator-category.js";
-import { IndicatorCalculationError } from "../errors.js";
+} from "../enums/indicator-field";
+import { IndicatorCategory } from "../enums/indicator-category";
+import { IndicatorCalculationError } from "../errors";
 
 /**
  * 指标计算服务接口
