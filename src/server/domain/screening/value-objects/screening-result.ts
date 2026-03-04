@@ -16,7 +16,7 @@
  * );
  */
 
-import type { ScoredStock } from "./scored-stock.js";
+import type { ScoredStock } from "./scored-stock";
 
 /**
  * ScreeningResult 值对象
@@ -173,7 +173,7 @@ export class ScreeningResult {
     }
 
     // Lazy import to avoid circular dependency
-    const { ScoredStock: ScoredStockClass } = require("./scored-stock.js") as typeof import("./scored-stock.js");
+    const { ScoredStock: ScoredStockClass } = require("./scored-stock") as typeof import("./scored-stock");
 
     const matchedStocks = matchedStocksData.map((stockData) =>
       ScoredStockClass.fromDict(stockData)
