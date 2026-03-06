@@ -10,19 +10,19 @@
 }
 
 :root {
-  --market-bg: #060f1c;
-  --market-bg-strong: #050b16;
-  --market-panel: rgba(13, 28, 46, 0.9);
-  --market-panel-soft: rgba(10, 22, 37, 0.85);
-  --market-border: rgba(95, 132, 166, 0.35);
-  --market-border-strong: rgba(121, 165, 204, 0.52);
-  --market-text: #e8f3ff;
-  --market-text-muted: #8fa8c2;
-  --market-accent: #5dd8ff;
-  --market-positive: #35e8b1;
-  --market-warning: #fbb85c;
-  --market-danger: #ff7f92;
-  --market-shadow: 0 24px 78px -42px rgba(2, 9, 19, 0.95);
+  --market-bg: #091721;
+  --market-bg-strong: #07111a;
+  --market-panel: rgba(14, 31, 46, 0.9);
+  --market-panel-soft: rgba(11, 24, 36, 0.86);
+  --market-border: rgba(112, 146, 170, 0.33);
+  --market-border-strong: rgba(127, 172, 201, 0.48);
+  --market-text: #e9f4ef;
+  --market-text-muted: #96acb1;
+  --market-accent: #60d7bc;
+  --market-positive: #4ee6bc;
+  --market-warning: #f4c26f;
+  --market-danger: #ff8f9f;
+  --market-shadow: 0 24px 72px -44px rgba(3, 10, 19, 0.92);
 }
 
 html,
@@ -34,9 +34,9 @@ body {
   margin: 0;
   background-color: var(--market-bg-strong);
   background-image:
-    radial-gradient(circle at 8% 10%, rgba(79, 182, 255, 0.15), transparent 34%),
-    radial-gradient(circle at 84% 12%, rgba(49, 228, 173, 0.12), transparent 38%),
-    radial-gradient(circle at 76% 90%, rgba(255, 183, 92, 0.08), transparent 42%);
+    radial-gradient(circle at 7% 12%, rgba(96, 215, 188, 0.14), transparent 34%),
+    radial-gradient(circle at 85% 14%, rgba(102, 193, 255, 0.11), transparent 38%),
+    radial-gradient(circle at 72% 88%, rgba(244, 194, 111, 0.08), transparent 40%);
   color: var(--market-text);
   font-family: var(--font-body), "Noto Sans SC", "PingFang SC", "Microsoft YaHei",
     sans-serif;
@@ -54,7 +54,7 @@ body {
   min-height: 100vh;
   overflow: hidden;
   background:
-    linear-gradient(155deg, rgba(7, 16, 29, 0.96), rgba(6, 13, 23, 0.94)),
+    linear-gradient(155deg, rgba(9, 20, 33, 0.96), rgba(8, 18, 29, 0.94)),
     var(--market-bg);
 }
 
@@ -65,9 +65,9 @@ body {
   inset: 0;
   z-index: 0;
   background:
-    radial-gradient(circle at 16% 18%, rgba(93, 216, 255, 0.2), transparent 34%),
-    radial-gradient(circle at 84% 9%, rgba(53, 232, 177, 0.17), transparent 36%),
-    radial-gradient(circle at 56% 92%, rgba(251, 184, 92, 0.11), transparent 36%);
+    radial-gradient(circle at 16% 18%, rgba(96, 215, 188, 0.19), transparent 34%),
+    radial-gradient(circle at 84% 9%, rgba(112, 196, 255, 0.15), transparent 36%),
+    radial-gradient(circle at 56% 92%, rgba(244, 194, 111, 0.1), transparent 36%);
 }
 
 .market-shell::after {
@@ -105,24 +105,24 @@ body {
   border: 1px solid var(--market-border);
   background: linear-gradient(
       160deg,
-      rgba(19, 40, 63, 0.94),
-      rgba(12, 26, 42, 0.9) 58%
+      rgba(18, 38, 55, 0.94),
+      rgba(13, 28, 41, 0.91) 58%
     ),
-    rgba(13, 28, 46, 0.9);
+    rgba(14, 31, 46, 0.9);
   box-shadow: var(--market-shadow);
   backdrop-filter: blur(14px);
 }
 
 .market-soft-panel {
-  border: 1px solid rgba(89, 124, 156, 0.28);
+  border: 1px solid rgba(95, 132, 159, 0.29);
   background: var(--market-panel-soft);
-  box-shadow: inset 0 1px 0 rgba(132, 173, 209, 0.08);
+  box-shadow: inset 0 1px 0 rgba(129, 173, 197, 0.1);
 }
 
 .market-chip {
-  border: 1px solid rgba(98, 139, 175, 0.42);
-  background: rgba(13, 31, 50, 0.82);
-  color: #b9d3ec;
+  border: 1px solid rgba(108, 149, 175, 0.4);
+  background: rgba(14, 32, 48, 0.83);
+  color: #b9d4d0;
 }
 
 .market-data {
@@ -136,29 +136,29 @@ body {
 }
 
 .market-divider {
-  border-color: rgba(87, 121, 153, 0.35);
+  border-color: rgba(89, 126, 151, 0.34);
 }
 
 .market-button-primary {
-  border: 1px solid rgba(61, 197, 247, 0.65);
-  background: linear-gradient(135deg, rgba(22, 120, 176, 0.88), rgba(16, 88, 140, 0.9));
-  color: #ecf7ff;
+  border: 1px solid rgba(107, 195, 255, 0.58);
+  background: linear-gradient(135deg, rgba(33, 118, 170, 0.9), rgba(19, 93, 141, 0.92));
+  color: #eef9ff;
 }
 
 .market-button-primary:hover {
-  border-color: rgba(100, 219, 255, 0.78);
-  background: linear-gradient(135deg, rgba(28, 141, 203, 0.93), rgba(17, 103, 161, 0.95));
+  border-color: rgba(126, 215, 255, 0.8);
+  background: linear-gradient(135deg, rgba(39, 133, 190, 0.94), rgba(22, 103, 157, 0.96));
 }
 
 .market-button-positive {
-  border: 1px solid rgba(47, 221, 163, 0.62);
-  background: linear-gradient(135deg, rgba(15, 128, 97, 0.9), rgba(11, 101, 78, 0.92));
-  color: #ecfff7;
+  border: 1px solid rgba(76, 224, 180, 0.58);
+  background: linear-gradient(135deg, rgba(18, 132, 104, 0.92), rgba(12, 103, 83, 0.94));
+  color: #effff8;
 }
 
 .market-button-positive:hover {
-  border-color: rgba(95, 255, 201, 0.75);
-  background: linear-gradient(135deg, rgba(19, 150, 113, 0.95), rgba(12, 115, 88, 0.96));
+  border-color: rgba(108, 241, 201, 0.76);
+  background: linear-gradient(135deg, rgba(23, 151, 121, 0.96), rgba(14, 116, 94, 0.97));
 }
 
 .market-button-danger {

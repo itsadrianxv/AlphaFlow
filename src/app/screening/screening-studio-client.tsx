@@ -937,14 +937,13 @@ export function ScreeningStudioClient() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="font-[family-name:var(--font-display)] text-xs tracking-[0.45em] text-[#8aa5bf]">
-                SIGNAL WORKBENCH
+                INVESTMENT STUDIO
               </p>
               <h1 className="mt-3 font-[family-name:var(--font-display)] text-3xl font-semibold leading-tight text-[#f0f8ff] sm:text-4xl">
                 策略筛选与自选股研究台
               </h1>
               <p className="mt-3 max-w-3xl font-[family-name:var(--font-body)] text-sm leading-7 text-[#a6bdd3] sm:text-base">
-                前端直接映射现有 tRPC 后端：策略
-                CRUD、策略执行、会话回溯、自选股维护。你可以把它当作实时可操作的研究工作台，而不是静态演示页。
+                面向投资者的一站式工作台：先筛选，再复盘，再沉淀到自选清单。你可以把研究动作连成闭环，持续优化自己的投资决策。
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -958,7 +957,7 @@ export function ScreeningStudioClient() {
                 href="/workflows"
                 className="rounded-full border border-[#2f8dc8]/25 bg-[#12364f]/45 px-4 py-2 text-sm font-medium text-[#89deff] transition hover:border-[#2f8dc8]/50"
               >
-                打开工作流中心
+                行业研究任务中心
               </Link>
             </div>
           </div>
@@ -977,48 +976,42 @@ export function ScreeningStudioClient() {
             className="studio-rise rounded-2xl border border-[#35526f]/35 bg-[#10243a]/88 p-4"
             style={{ animationDelay: "0.08s" }}
           >
-            <p className="text-xs tracking-[0.2em] text-[#8ca7c1]">
-              STRATEGIES
-            </p>
+            <p className="text-xs tracking-[0.2em] text-[#8ca7c1]">策略库</p>
             <p className="mt-2 text-3xl font-semibold text-[#f2f8ff]">
               {strategies.length}
             </p>
-            <p className="mt-1 text-xs text-[#96afc7]">可复用选股策略</p>
+            <p className="mt-1 text-xs text-[#96afc7]">可复用筛选方案</p>
           </article>
           <article
             className="studio-rise rounded-2xl border border-[#35526f]/35 bg-[#10243a]/88 p-4"
             style={{ animationDelay: "0.12s" }}
           >
-            <p className="text-xs tracking-[0.2em] text-[#8ca7c1]">SESSIONS</p>
+            <p className="text-xs tracking-[0.2em] text-[#8ca7c1]">执行记录</p>
             <p className="mt-2 text-3xl font-semibold text-[#f2f8ff]">
               {sessions.length}
             </p>
-            <p className="mt-1 text-xs text-[#96afc7]">最近执行会话</p>
+            <p className="mt-1 text-xs text-[#96afc7]">近期筛选结果</p>
           </article>
           <article
             className="studio-rise rounded-2xl border border-[#35526f]/35 bg-[#10243a]/88 p-4"
             style={{ animationDelay: "0.16s" }}
           >
-            <p className="text-xs tracking-[0.2em] text-[#8ca7c1]">
-              WATCHLISTS
-            </p>
+            <p className="text-xs tracking-[0.2em] text-[#8ca7c1]">跟踪清单</p>
             <p className="mt-2 text-3xl font-semibold text-[#f2f8ff]">
               {watchLists.length}
             </p>
-            <p className="mt-1 text-xs text-[#96afc7]">跟踪组合数量</p>
+            <p className="mt-1 text-xs text-[#96afc7]">沉淀中的观察组合</p>
           </article>
           <article
             className="studio-rise rounded-2xl border border-[#35526f]/35 bg-[#081426] p-4 text-[#e9f5ff]"
             style={{ animationDelay: "0.2s" }}
           >
-            <p className="text-xs tracking-[0.2em] text-[#9cb7cc]">
-              DATA ENDPOINT
-            </p>
+            <p className="text-xs tracking-[0.2em] text-[#9cb7cc]">今日建议</p>
             <p className="mt-2 text-sm leading-6 text-[#edf7ff]">
-              http://localhost:8000
+              优先执行近期回撤后的策略，观察命中标的的估值与盈利匹配度。
             </p>
             <p className="mt-1 text-xs text-[#9cb6cc]">
-              Python FastAPI 财务数据服务
+              执行后可直接加入自选清单
             </p>
           </article>
         </section>
@@ -1030,7 +1023,7 @@ export function ScreeningStudioClient() {
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
-                策略仓库与执行会话
+                第一步：制定并执行策略
               </h2>
               <button
                 type="button"
@@ -1040,7 +1033,7 @@ export function ScreeningStudioClient() {
                 }}
                 className="rounded-full border border-[#d2e5f9]/20 bg-[#0f2137]/88 px-3 py-1.5 text-xs font-medium text-[#d2e5f9] transition hover:border-[#d2e5f9]/45"
               >
-                新建策略草稿
+                新建策略
               </button>
             </div>
 
@@ -1138,7 +1131,7 @@ export function ScreeningStudioClient() {
             <section className="mt-6 rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h3 className="text-lg font-semibold text-[#e9f4ff]">
-                  {strategyMode === "create" ? "创建策略" : "更新策略"}
+                  {strategyMode === "create" ? "策略信息" : "编辑策略"}
                 </h3>
                 {strategyMode === "update" ? (
                   <button
@@ -1149,10 +1142,14 @@ export function ScreeningStudioClient() {
                     }}
                     className="rounded-full border border-[#e1eeff]/34 px-3 py-1 text-xs text-[#97afc7] transition hover:border-[#e1eeff]/45"
                   >
-                    切换为创建
+                    新建模式
                   </button>
                 ) : null}
               </div>
+              <p className="mt-2 text-xs leading-5 text-[#91aac2]">
+                先填写策略名称、标签和描述即可保存；JSON
+                区域用于高级规则配置，默认模板可直接执行。
+              </p>
 
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <label className="text-xs text-[#97b0c9]">
@@ -1214,7 +1211,7 @@ export function ScreeningStudioClient() {
 
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
                 <label className="text-xs text-[#97b0c9]">
-                  过滤条件 JSON
+                  高级筛选规则 JSON
                   <textarea
                     value={strategyForm.filtersJson}
                     onChange={(event) =>
@@ -1229,7 +1226,7 @@ export function ScreeningStudioClient() {
                 </label>
 
                 <label className="text-xs text-[#97b0c9]">
-                  评分配置 JSON
+                  高级评分规则 JSON
                   <textarea
                     value={strategyForm.scoringConfigJson}
                     onChange={(event) =>
@@ -1253,8 +1250,8 @@ export function ScreeningStudioClient() {
                 {strategyPending
                   ? "提交中..."
                   : strategyMode === "create"
-                    ? "创建策略"
-                    : "更新策略"}
+                    ? "保存策略"
+                    : "保存更新"}
               </button>
               {strategyDetailQuery.error ? (
                 <p className="mt-3 rounded-xl border border-[#ff7f92]/45 bg-[#5b2432]/50 px-3 py-2 text-xs text-[#ffbec9]">
@@ -1266,7 +1263,7 @@ export function ScreeningStudioClient() {
             <section className="mt-6 rounded-2xl border border-[#35526f]/35 bg-[#0f2238] p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-lg font-semibold text-[#e9f4ff]">
-                  执行会话
+                  第二步：查看执行结果
                 </h3>
                 <button
                   type="button"
@@ -1356,7 +1353,7 @@ export function ScreeningStudioClient() {
                       </div>
 
                       <h4 className="mt-4 text-sm font-semibold text-[#e4f1ff]">
-                        Top Stocks
+                        优先关注标的
                       </h4>
                       {parsedTopStocks.length === 0 ? (
                         <p className="mt-2 text-xs text-[#92abc3]">
@@ -1418,12 +1415,12 @@ export function ScreeningStudioClient() {
             style={{ animationDelay: "0.3s" }}
           >
             <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
-              自选股管理
+              第三步：维护跟踪清单
             </h2>
 
             <section className="mt-4 rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
               <h3 className="text-base font-semibold text-[#e1eeff]">
-                创建新列表
+                创建新清单
               </h3>
               <div className="mt-3 grid gap-2">
                 <input
@@ -1446,14 +1443,14 @@ export function ScreeningStudioClient() {
                   disabled={watchListPending}
                   className="rounded-xl border border-[#e1eeff]/34 bg-[#2582b5] px-4 py-2 text-sm font-medium text-[#e8f6ff] transition hover:bg-[#1d6f9f] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {createWatchListMutation.isPending ? "创建中..." : "创建列表"}
+                  {createWatchListMutation.isPending ? "创建中..." : "创建清单"}
                 </button>
               </div>
             </section>
 
             <section className="mt-4 rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
               <h3 className="text-base font-semibold text-[#e1eeff]">
-                列表面板
+                清单列表
               </h3>
               <div className="mt-3 grid max-h-52 gap-2 overflow-auto pr-1">
                 {watchListsQuery.isLoading ? (
@@ -1503,7 +1500,7 @@ export function ScreeningStudioClient() {
 
             <section className="mt-4 rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
               <h3 className="text-base font-semibold text-[#e1eeff]">
-                列表信息编辑
+                清单信息编辑
               </h3>
               {selectedWatchList ? (
                 <>
@@ -1532,7 +1529,7 @@ export function ScreeningStudioClient() {
 
                   <div className="mt-4 border-t border-[#35526f]/35 pt-4">
                     <h4 className="text-sm font-semibold text-[#e6f2ff]">
-                      添加股票
+                      添加标的
                     </h4>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
                       <input
@@ -1574,13 +1571,13 @@ export function ScreeningStudioClient() {
                       disabled={addStockMutation.isPending}
                       className="mt-2 rounded-xl border border-[#e1eeff]/34 bg-[#227cae] px-4 py-2 text-sm font-medium text-[#e8f6ff] transition hover:bg-[#1b6f9f] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      添加到列表
+                      添加到清单
                     </button>
                   </div>
 
                   <div className="mt-4 border-t border-[#35526f]/35 pt-4">
                     <h4 className="text-sm font-semibold text-[#e6f2ff]">
-                      更新选中股票
+                      更新选中标的
                     </h4>
                     {parsedWatchStocks.length === 0 ? (
                       <p className="mt-2 text-xs text-[#92abc3]">
@@ -1631,7 +1628,7 @@ export function ScreeningStudioClient() {
                           }
                           className="mt-2 rounded-xl border border-[#e1eeff]/34 bg-[#11916f] px-4 py-2 text-sm font-medium text-[#ecfff8] transition hover:bg-[#0f6f58] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          更新备注与标签
+                          保存备注与标签
                         </button>
                       </>
                     )}
@@ -1646,7 +1643,7 @@ export function ScreeningStudioClient() {
 
             <section className="mt-4 rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
               <h3 className="text-base font-semibold text-[#e1eeff]">
-                股票明细
+                清单明细
               </h3>
               {watchListDetailQuery.isLoading ? (
                 <p className="mt-2 text-sm text-[#8ea8c1]">列表详情加载中...</p>
@@ -1717,26 +1714,26 @@ export function ScreeningStudioClient() {
           watchListsQuery.error) && (
           <section className="rounded-2xl border border-[#ff7f92]/45 bg-[#5b2432]/50 px-4 py-3 text-sm text-[#ffbec9]">
             <p>
-              接口异常：
+              数据加载异常：
               {strategiesQuery.error?.message ??
                 sessionsQuery.error?.message ??
                 watchListsQuery.error?.message}
             </p>
             <p className="mt-1 text-xs text-[#ff9aac]">
-              如果提示未授权，请先在首页登录 NextAuth 账号。
+              如果提示未授权，请先回首页登录账号后重试。
             </p>
           </section>
         )}
 
         {selectedSession ? (
           <section className="rounded-2xl border border-[#35526f]/35 bg-[#0f2137]/88 px-4 py-3 text-xs text-[#92abc3]">
-            当前会话状态:
+            当前结果查看状态:
             <span
               className={`ml-2 font-semibold ${statusClassName(
                 sessionDetailQuery.data ? "SUCCEEDED" : "PENDING",
               )}`}
             >
-              {sessionDetailQuery.data ? "已加载详情" : "等待加载"}
+              {sessionDetailQuery.data ? "已加载" : "加载中"}
             </span>
             <span className="ml-2">
               ({selectedSession.strategyName} /{" "}
