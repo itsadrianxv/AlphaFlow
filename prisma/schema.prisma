@@ -3,7 +3,7 @@
 
 generator client {
     provider = "prisma-client-js"
-    output   = "../generated/prisma"
+    output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -67,6 +67,7 @@ model User {
     strategies       ScreeningStrategy[]
     screeningSessions ScreeningSession[]
     watchLists       WatchList[]
+    workflowRuns     WorkflowRun[]
 }
 
 model VerificationToken {
@@ -131,4 +132,117 @@ model WatchList {
 
     @@index([userId])
     @@index([name])
+}
+
+enum WorkflowRunStatus {
+    PENDING
+    RUNNING
+    SUCCEEDED
+    FAILED
+    CANCELLED
+}
+
+enum WorkflowNodeRunStatus {
+    PENDING
+    RUNNING
+    SUCCEEDED
+    FAILED
+    SKIPPED
+}
+
+enum WorkflowEventType {
+    RUN_CREATED
+    RUN_STARTED
+    RUN_CANCEL_REQUESTED
+    RUN_CANCELLED
+    RUN_SUCCEEDED
+    RUN_FAILED
+    NODE_STARTED
+    NODE_PROGRESS
+    NODE_SUCCEEDED
+    NODE_FAILED
+}
+
+model WorkflowTemplate {
+    id          String        @id @default(cuid())
+    code        String
+    version     Int
+    graphConfig Json
+    inputSchema Json
+    isActive    Boolean       @default(true)
+    createdAt   DateTime      @default(now())
+    updatedAt   DateTime      @updatedAt
+    runs        WorkflowRun[]
+
+    @@unique([code, version])
+    @@index([code, isActive])
+}
+
+model WorkflowRun {
+    id                      String             @id @default(cuid())
+    templateId              String
+    userId                  String
+    query                   String
+    input                   Json
+    status                  WorkflowRunStatus  @default(PENDING)
+    progressPercent         Int                @default(0)
+    currentNodeKey          String?
+    checkpointKey           String?
+    cancellationRequestedAt DateTime?
+    idempotencyKey          String?
+    result                  Json?
+    errorCode               String?
+    errorMessage            String?
+    startedAt               DateTime?
+    completedAt             DateTime?
+    createdAt               DateTime           @default(now())
+    updatedAt               DateTime           @updatedAt
+    template                WorkflowTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
+    user                    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+    nodeRuns                WorkflowNodeRun[]
+    events                  WorkflowEvent[]
+
+    @@index([templateId])
+    @@index([userId, createdAt])
+    @@index([userId, idempotencyKey])
+    @@index([status, createdAt])
+}
+
+model WorkflowNodeRun {
+    id           String                @id @default(cuid())
+    runId        String
+    nodeKey      String
+    agentName    String
+    attempt      Int                   @default(1)
+    status       WorkflowNodeRunStatus @default(PENDING)
+    input        Json?
+    output       Json?
+    errorCode    String?
+    errorMessage String?
+    durationMs   Int?
+    startedAt    DateTime?
+    completedAt  DateTime?
+    createdAt    DateTime              @default(now())
+    updatedAt    DateTime              @updatedAt
+    run          WorkflowRun           @relation(fields: [runId], references: [id], onDelete: Cascade)
+    events       WorkflowEvent[]
+
+    @@unique([runId, nodeKey, attempt])
+    @@index([runId, status])
+}
+
+model WorkflowEvent {
+    id         String            @id @default(cuid())
+    runId      String
+    nodeRunId  String?
+    sequence   Int
+    eventType  WorkflowEventType
+    payload    Json
+    occurredAt DateTime
+    createdAt  DateTime          @default(now())
+    run        WorkflowRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+    nodeRun    WorkflowNodeRun?  @relation(fields: [nodeRunId], references: [id], onDelete: SetNull)
+
+    @@unique([runId, sequence])
+    @@index([runId, occurredAt])
 }
