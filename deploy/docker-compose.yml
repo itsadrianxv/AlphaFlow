@@ -20,6 +20,18 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   python-service:
     build:
       context: ..
@@ -52,6 +64,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
       python-service:
         condition: service_healthy
     environment:
@@ -68,10 +82,38 @@ services:
       AUTH_CREDENTIALS_USERNAME: ${AUTH_CREDENTIALS_USERNAME:-admin}
       AUTH_CREDENTIALS_PASSWORD: ${AUTH_CREDENTIALS_PASSWORD:-admin123456}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       PYTHON_SERVICE_URL: http://python-service:8000/api
+      PYTHON_INTELLIGENCE_SERVICE_URL: ${PYTHON_INTELLIGENCE_SERVICE_URL:-http://python-service:8000}
     ports:
       - "${WEB_PORT:-3000}:3000"
     command: ["sh", "-c", "npm run db:push && npm run start"]
 
+  workflow-worker:
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        SKIP_ENV_VALIDATION: "1"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-service:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      AUTH_SECRET: ${AUTH_SECRET}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PYTHON_INTELLIGENCE_SERVICE_URL: ${PYTHON_INTELLIGENCE_SERVICE_URL:-http://python-service:8000}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      WORKFLOW_WORKER_POLL_INTERVAL_MS: ${WORKFLOW_WORKER_POLL_INTERVAL_MS:-2000}
+    command: ["npm", "run", "worker:workflow"]
+
 volumes:
   postgres_data:
+  redis_data:
