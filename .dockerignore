@@ -10,6 +10,7 @@ npm-debug.log*
 deploy/.env
 
 python_services/.venv
+python_services/.venv_wsl
 python_services/venv
 python_services/.pytest_cache
 python_services/__pycache__

@@ -1,4 +1,4 @@
-services:
+﻿services:
   postgres:
     image: postgres:16
     restart: unless-stopped
@@ -40,6 +40,10 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      INTELLIGENCE_CACHE_TTL_SECONDS: ${INTELLIGENCE_CACHE_TTL_SECONDS:-300}
+      INTELLIGENCE_CACHE_STALE_SECONDS: ${INTELLIGENCE_CACHE_STALE_SECONDS:-1800}
+      INTELLIGENCE_SPOT_CACHE_TTL_SECONDS: ${INTELLIGENCE_SPOT_CACHE_TTL_SECONDS:-120}
+      INTELLIGENCE_ENABLE_MOCK_FALLBACK: ${INTELLIGENCE_ENABLE_MOCK_FALLBACK:-true}
     ports:
       - "${PYTHON_SERVICE_PORT:-8000}:8000"
     healthcheck:
@@ -71,7 +75,11 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3000"
-      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_SECRET_1: ${AUTH_SECRET_1:-}
+      AUTH_SECRET_2: ${AUTH_SECRET_2:-}
+      AUTH_SECRET_3: ${AUTH_SECRET_3:-}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
       AUTH_URL: ${AUTH_URL:-http://localhost:3000}
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
       NEXTAUTH_URL: ${AUTH_URL:-http://localhost:3000}
@@ -105,7 +113,11 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      AUTH_SECRET: ${AUTH_SECRET}
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_SECRET_1: ${AUTH_SECRET_1:-}
+      AUTH_SECRET_2: ${AUTH_SECRET_2:-}
+      AUTH_SECRET_3: ${AUTH_SECRET_3:-}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       PYTHON_INTELLIGENCE_SERVICE_URL: ${PYTHON_INTELLIGENCE_SERVICE_URL:-http://python-service:8000}
@@ -117,3 +129,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
+
+
