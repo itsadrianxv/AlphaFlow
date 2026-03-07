@@ -40,7 +40,7 @@
 
 ## 自动 Git 提交规则
 
-当你完成以下任何一类操作后，必须自动执行 `git add -A`、`git commit -m "<message>"`、`git push`：
+当你完成以下任何一类操作后，必须自动执行 `git add {修改的文件}`、`git commit -m "<message>"`、`git push`：
 
 1. 修复 bug 或错误（如导入路径修复、运行时报错修复）
 2. 新增功能或文件
