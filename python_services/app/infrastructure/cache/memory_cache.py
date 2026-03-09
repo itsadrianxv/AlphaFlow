@@ -7,14 +7,8 @@ import threading
 import time
 from typing import Any
 
+from app.infrastructure.cache.base import CacheLookup
 from app.policies.cache_policy import CachePolicy
-
-
-@dataclass(frozen=True)
-class CacheLookup:
-    value: Any
-    as_of: str
-    is_stale: bool
 
 
 @dataclass
@@ -39,10 +33,22 @@ class MemoryCache:
                 return None
 
             if entry.expires_at >= now:
-                return CacheLookup(value=entry.value, as_of=entry.as_of, is_stale=False)
+                return CacheLookup(
+                    value=entry.value,
+                    as_of=entry.as_of,
+                    is_stale=False,
+                    expires_at=entry.expires_at,
+                    stale_until=entry.stale_until,
+                )
 
             if allow_stale and entry.stale_until >= now:
-                return CacheLookup(value=entry.value, as_of=entry.as_of, is_stale=True)
+                return CacheLookup(
+                    value=entry.value,
+                    as_of=entry.as_of,
+                    is_stale=True,
+                    expires_at=entry.expires_at,
+                    stale_until=entry.stale_until,
+                )
 
             if entry.stale_until < now:
                 self._entries.pop(key, None)
@@ -64,4 +70,3 @@ class MemoryCache:
     def clear(self) -> None:
         with self._lock:
             self._entries.clear()
-
