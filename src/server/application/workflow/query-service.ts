@@ -3,7 +3,7 @@ import {
   WORKFLOW_ERROR_CODES,
   WorkflowDomainError,
 } from "~/server/domain/workflow/errors";
-import { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
+import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 
 export class WorkflowQueryService {
   constructor(private readonly repository: PrismaWorkflowRunRepository) {}
@@ -62,6 +62,7 @@ export class WorkflowQueryService {
     limit: number;
     cursor?: string;
     status?: WorkflowRunStatus;
+    templateCode?: string;
   }) {
     const records = await this.repository.listRunsForUser(params);
 

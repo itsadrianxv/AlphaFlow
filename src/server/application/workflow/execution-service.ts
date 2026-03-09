@@ -1,18 +1,22 @@
-import { WorkflowEventType } from "~/generated/prisma";
+import { WorkflowEventType, WorkflowNodeRunStatus } from "~/generated/prisma";
+import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
 import {
   WORKFLOW_ERROR_CODES,
   WorkflowDomainError,
 } from "~/server/domain/workflow/errors";
 import type {
-  QuickResearchGraphState,
-  QuickResearchNodeKey,
   WorkflowEventStreamType,
+  WorkflowGraphState,
+  WorkflowNodeKey,
 } from "~/server/domain/workflow/types";
-import { QUICK_RESEARCH_NODE_KEYS } from "~/server/domain/workflow/types";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
+import { FirecrawlClient } from "~/server/infrastructure/intelligence/firecrawl-client";
 import { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
+import { CompanyResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
+import { WorkflowGraphRegistry } from "~/server/infrastructure/workflow/langgraph/graph-registry";
 import { QuickResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
+import type { WorkflowGraphRunner } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
 import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
 
@@ -21,6 +25,10 @@ class RunCancelledError extends Error {
     super(message);
     this.name = "RunCancelledError";
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function mapEventType(
@@ -48,71 +56,48 @@ function mapEventType(
   }
 }
 
-function getNodeOutput(
-  nodeKey: QuickResearchNodeKey,
-  state: QuickResearchGraphState,
-): Record<string, unknown> {
-  if (nodeKey === "agent1_industry_overview") {
-    return {
-      intent: state.intent,
-      industryOverview: state.industryOverview,
-    };
-  }
-
-  if (nodeKey === "agent2_market_heat") {
-    return {
-      heatAnalysis: state.heatAnalysis,
-    };
-  }
-
-  if (nodeKey === "agent3_candidate_screening") {
-    return {
-      candidates: state.candidates,
-    };
-  }
-
-  if (nodeKey === "agent4_credibility_batch") {
-    return {
-      credibility: state.credibility,
-    };
-  }
-
-  return {
-    competition: state.competition,
-    finalReport: state.finalReport,
-  };
-}
-
 export type WorkflowExecutionServiceDependencies = {
   repository: PrismaWorkflowRunRepository;
   runtimeStore: RedisWorkflowRuntimeStore;
-  graph: QuickResearchLangGraph;
+  graphs: WorkflowGraphRunner[];
 };
 
 export function createWorkflowExecutionService(
   repository: PrismaWorkflowRunRepository,
+  options?: {
+    runtimeStore?: RedisWorkflowRuntimeStore;
+    graphs?: WorkflowGraphRunner[];
+  },
 ) {
+  const deepSeekClient = new DeepSeekClient();
   const intelligenceService = new IntelligenceAgentService({
-    deepSeekClient: new DeepSeekClient(),
+    deepSeekClient,
     dataClient: new PythonIntelligenceDataClient(),
+  });
+  const companyResearchService = new CompanyResearchAgentService({
+    deepSeekClient,
+    firecrawlClient: new FirecrawlClient(),
   });
 
   return new WorkflowExecutionService({
     repository,
-    runtimeStore: new RedisWorkflowRuntimeStore(),
-    graph: new QuickResearchLangGraph(intelligenceService),
+    runtimeStore: options?.runtimeStore ?? new RedisWorkflowRuntimeStore(),
+    graphs: options?.graphs ?? [
+      new QuickResearchLangGraph(intelligenceService),
+      new CompanyResearchLangGraph(companyResearchService),
+    ],
   });
 }
 
 export class WorkflowExecutionService {
   private readonly repository: PrismaWorkflowRunRepository;
   private readonly runtimeStore: RedisWorkflowRuntimeStore;
-  private readonly graph: QuickResearchLangGraph;
+  private readonly graphRegistry: WorkflowGraphRegistry;
 
   constructor(dependencies: WorkflowExecutionServiceDependencies) {
     this.repository = dependencies.repository;
     this.runtimeStore = dependencies.runtimeStore;
-    this.graph = dependencies.graph;
+    this.graphRegistry = new WorkflowGraphRegistry(dependencies.graphs);
   }
 
   async executeRecoverableRunningRun(workerId: string) {
@@ -122,7 +107,17 @@ export class WorkflowExecutionService {
       const checkpoint = await this.runtimeStore.loadCheckpoint(run.id);
 
       if (!checkpoint) {
-        continue;
+        const runDetail = await this.repository.getRunById(run.id);
+        const hasCompletedNodes =
+          runDetail?.nodeRuns.some(
+            (nodeRun) =>
+              nodeRun.status === WorkflowNodeRunStatus.SUCCEEDED ||
+              nodeRun.status === WorkflowNodeRunStatus.SKIPPED,
+          ) ?? false;
+
+        if (!hasCompletedNodes) {
+          continue;
+        }
       }
 
       await this.executeRun(run.id, workerId, true);
@@ -158,6 +153,8 @@ export class WorkflowExecutionService {
       );
     }
 
+    const graph = this.graphRegistry.get(run.template.code);
+
     if (await this.repository.isCancellationRequested(runId)) {
       await this.repository.markRunCancelled({
         runId,
@@ -172,32 +169,37 @@ export class WorkflowExecutionService {
     }
 
     const checkpoint = await this.runtimeStore.loadCheckpoint(runId);
+    let state: WorkflowGraphState =
+      checkpoint ??
+      graph.buildInitialState({
+        runId,
+        userId: run.userId,
+        query: run.query,
+        input: ((run.input ?? {}) as Record<string, unknown>) ?? {},
+        progressPercent: run.progressPercent,
+      });
+
+    state = this.restoreStateFromCompletedNodeRuns(graph, state, run.nodeRuns);
+
     let startNodeIndex = 0;
+    const resumeNodeKey = state.lastCompletedNodeKey ?? state.currentNodeKey;
 
-    let state: QuickResearchGraphState = checkpoint ?? {
-      runId,
-      userId: run.userId,
-      query: run.query,
-      progressPercent: run.progressPercent,
-      currentNodeKey: undefined,
-      errors: [],
-    };
-
-    if (checkpoint?.currentNodeKey) {
-      const checkpointNodeIndex = QUICK_RESEARCH_NODE_KEYS.findIndex(
-        (nodeKey) => nodeKey === checkpoint.currentNodeKey,
-      );
+    if (resumeNodeKey) {
+      const checkpointNodeIndex = graph.getNodeOrder().indexOf(resumeNodeKey);
 
       if (checkpointNodeIndex >= 0) {
         startNodeIndex = checkpointNodeIndex + 1;
       }
     }
 
-    const nodeRunIds = new Map<QuickResearchNodeKey, string>();
-    const nodeStartedAt = new Map<QuickResearchNodeKey, number>();
+    const existingNodeRunIds = new Map<WorkflowNodeKey, string>(
+      run.nodeRuns.map((nodeRun) => [nodeRun.nodeKey, nodeRun.id]),
+    );
+    const nodeRunIds = new Map<WorkflowNodeKey, string>();
+    const nodeStartedAt = new Map<WorkflowNodeKey, number>();
 
     try {
-      const executedState = await this.graph.execute({
+      const executedState = await graph.execute({
         initialState: state,
         startNodeIndex,
         hooks: {
@@ -216,9 +218,11 @@ export class WorkflowExecutionService {
                 nodeKey,
                 recovering,
                 workerId,
+                templateCode: run.template.code,
               },
             });
 
+            existingNodeRunIds.set(nodeKey, nodeRun.id);
             nodeRunIds.set(nodeKey, nodeRun.id);
             nodeStartedAt.set(nodeKey, Date.now());
 
@@ -235,7 +239,9 @@ export class WorkflowExecutionService {
             );
           },
           onNodeProgress: async (nodeKey, payload) => {
-            const nodeRunId = nodeRunIds.get(nodeKey);
+            const nodeRunId =
+              nodeRunIds.get(nodeKey) ?? existingNodeRunIds.get(nodeKey);
+
             await this.repository.addNodeProgressEvent({
               runId,
               nodeRunId,
@@ -248,10 +254,48 @@ export class WorkflowExecutionService {
               nodeKey,
             );
           },
+          onNodeSkipped: async (nodeKey, updatedState, payload) => {
+            const nodeRunId =
+              existingNodeRunIds.get(nodeKey) ??
+              (await this.repository.findNodeRun(runId, nodeKey, 1))?.id;
+
+            if (!nodeRunId) {
+              throw new WorkflowDomainError(
+                WORKFLOW_ERROR_CODES.WORKFLOW_NODE_EXECUTION_FAILED,
+                `节点跳过记录缺失: ${nodeKey}`,
+              );
+            }
+
+            await this.repository.markNodeSkipped({
+              runId,
+              nodeRunId,
+              nodeKey,
+              output: graph.getNodeOutput(nodeKey, updatedState),
+              durationMs: 0,
+              reason: String(payload.reason ?? "skipped"),
+              eventPayload: payload,
+            });
+
+            await this.repository.updateRunProgress({
+              runId,
+              currentNodeKey: nodeKey,
+              progressPercent: updatedState.progressPercent,
+            });
+
+            await this.runtimeStore.saveCheckpoint(runId, updatedState);
+            await this.publishLatestEvent(
+              runId,
+              updatedState.progressPercent,
+              nodeKey,
+            );
+
+            state = updatedState;
+          },
           onNodeSucceeded: async (nodeKey, updatedState) => {
             const startedAt = nodeStartedAt.get(nodeKey) ?? Date.now();
             const durationMs = Date.now() - startedAt;
-            const nodeRunId = nodeRunIds.get(nodeKey);
+            const nodeRunId =
+              nodeRunIds.get(nodeKey) ?? existingNodeRunIds.get(nodeKey);
 
             if (!nodeRunId) {
               throw new WorkflowDomainError(
@@ -264,8 +308,9 @@ export class WorkflowExecutionService {
               runId,
               nodeRunId,
               nodeKey,
-              output: getNodeOutput(nodeKey, updatedState),
+              output: graph.getNodeOutput(nodeKey, updatedState),
               durationMs,
+              eventPayload: graph.getNodeEventPayload(nodeKey, updatedState),
             });
 
             await this.repository.updateRunProgress({
@@ -298,9 +343,7 @@ export class WorkflowExecutionService {
 
       await this.repository.markRunSucceeded({
         runId,
-        result: (state.finalReport ?? {
-          generatedAt: new Date().toISOString(),
-        }) as Record<string, unknown>,
+        result: graph.getRunResult(state),
       });
 
       await this.runtimeStore.clearCheckpoint(runId);
@@ -327,7 +370,9 @@ export class WorkflowExecutionService {
         error instanceof Error ? error.message : "未知执行错误";
 
       if (state.currentNodeKey) {
-        const nodeRunId = nodeRunIds.get(state.currentNodeKey);
+        const nodeRunId =
+          nodeRunIds.get(state.currentNodeKey) ??
+          existingNodeRunIds.get(state.currentNodeKey);
 
         if (nodeRunId) {
           await this.repository.markNodeFailed({
@@ -361,6 +406,55 @@ export class WorkflowExecutionService {
     }
   }
 
+  private restoreStateFromCompletedNodeRuns(
+    graph: WorkflowGraphRunner,
+    baseState: WorkflowGraphState,
+    nodeRuns: Array<{
+      nodeKey: string;
+      status: WorkflowNodeRunStatus;
+      output: unknown;
+    }>,
+  ) {
+    const nodeOrder = graph.getNodeOrder();
+    let state = baseState;
+
+    const completedNodeRuns = nodeRuns
+      .filter(
+        (nodeRun) =>
+          nodeRun.status === WorkflowNodeRunStatus.SUCCEEDED ||
+          nodeRun.status === WorkflowNodeRunStatus.SKIPPED,
+      )
+      .sort(
+        (left, right) =>
+          nodeOrder.indexOf(left.nodeKey) - nodeOrder.indexOf(right.nodeKey),
+      );
+
+    for (const nodeRun of completedNodeRuns) {
+      const nodeIndex = nodeOrder.indexOf(nodeRun.nodeKey);
+
+      if (nodeIndex < 0) {
+        continue;
+      }
+
+      state = graph.mergeNodeOutput(
+        state,
+        nodeRun.nodeKey,
+        isRecord(nodeRun.output) ? nodeRun.output : {},
+      );
+      state = {
+        ...state,
+        currentNodeKey: nodeRun.nodeKey,
+        lastCompletedNodeKey: nodeRun.nodeKey,
+        progressPercent: Math.max(
+          state.progressPercent,
+          Math.round(((nodeIndex + 1) / nodeOrder.length) * 100),
+        ),
+      };
+    }
+
+    return state;
+  }
+
   private async publishLatestEvent(
     runId: string,
     progressPercent: number,
@@ -386,7 +480,7 @@ export class WorkflowExecutionService {
       runId,
       sequence: latestEvent.sequence,
       type: eventType,
-      nodeKey: payloadNodeKey as QuickResearchNodeKey | undefined,
+      nodeKey: payloadNodeKey,
       progressPercent,
       timestamp: latestEvent.occurredAt.toISOString(),
       payload,
