@@ -14,6 +14,7 @@ from app.contracts.market import (
 )
 from app.contracts.meta import GatewayWarning
 from app.gateway.common import build_meta, execute_cached, gateway_cache
+from app.infrastructure.metrics.recorder import metrics_recorder
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
 from app.providers.akshare.client import AkShareProviderClient
@@ -26,7 +27,12 @@ class MarketGateway:
         self._retry_policy = RetryPolicy()
         self._cache = gateway_cache
 
-    def get_stock(self, request_id: str, stock_code: str) -> MarketStockResponse:
+    def get_stock(
+        self,
+        request_id: str,
+        stock_code: str,
+        force_refresh: bool = False,
+    ) -> MarketStockResponse:
         started_at = time.perf_counter()
         result = execute_cached(
             dataset="stock_snapshot",
@@ -39,6 +45,7 @@ class MarketGateway:
             cache_policy=get_cache_policy("stock_snapshot"),
             retry_policy=self._retry_policy,
             cache=self._cache,
+            force_refresh=force_refresh,
         )
 
         return MarketStockResponse(
@@ -58,6 +65,7 @@ class MarketGateway:
         self,
         request_id: str,
         stock_codes: list[str],
+        force_refresh: bool = False,
     ) -> MarketStockBatchResponse:
         started_at = time.perf_counter()
         result = execute_cached(
@@ -71,6 +79,7 @@ class MarketGateway:
             cache_policy=get_cache_policy("stock_batch"),
             retry_policy=self._retry_policy,
             cache=self._cache,
+            force_refresh=force_refresh,
         )
 
         found_codes = {item.stockCode for item in result.data}
@@ -93,6 +102,13 @@ class MarketGateway:
                 )
             )
 
+        metrics_recorder.record_batch_success(
+            dataset="stock_batch",
+            provider=result.provider,
+            success_count=len(result.data),
+            total_count=len(stock_codes),
+        )
+
         return MarketStockBatchResponse(
             meta=build_meta(
                 request_id=request_id,
@@ -111,8 +127,10 @@ class MarketGateway:
         request_id: str,
         theme: str,
         limit: int,
+        force_refresh: bool = False,
     ) -> ThemeCandidatesResponse:
         started_at = time.perf_counter()
+        metrics_recorder.record_theme_request(dataset="theme_candidates", theme=theme)
         result = execute_cached(
             dataset="theme_candidates",
             provider=self._provider_client.provider_name,
@@ -124,6 +142,7 @@ class MarketGateway:
             cache_policy=get_cache_policy("theme_candidates"),
             retry_policy=self._retry_policy,
             cache=self._cache,
+            force_refresh=force_refresh,
         )
 
         return ThemeCandidatesResponse(
@@ -141,4 +160,3 @@ class MarketGateway:
 
 
 market_gateway = MarketGateway()
-

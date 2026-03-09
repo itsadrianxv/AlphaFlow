@@ -13,6 +13,15 @@ class AkShareAdapter:
     """AkShare 数据适配器，处理数据转换和错误处理"""
 
     @staticmethod
+    def get_stock_universe() -> list[dict[str, Any]]:
+        """获取全市场股票基础快照，并在单次 AkShare 调用内完成映射。"""
+        try:
+            spot_df = ak.stock_zh_a_spot_em()
+            return [_map_spot_row(row) for _, row in spot_df.iterrows()]
+        except Exception as e:
+            raise Exception(f"获取全市场股票快照失败: {str(e)}") from e
+
+    @staticmethod
     def get_all_stock_codes() -> list[str]:
         """
         获取全市场 A 股股票代码列表
@@ -24,23 +33,7 @@ class AkShareAdapter:
             Exception: AkShare 调用失败时抛出
         """
         try:
-            # 获取沪深 A 股实时行情数据
-            df = ak.stock_zh_a_spot_em()
-            
-            # 提取股票代码列，AkShare 返回的代码格式可能包含市场前缀
-            # 需要清理为纯 6 位数字代码
-            codes = df["代码"].tolist()
-            
-            # 过滤并标准化代码格式（确保 6 位数字）
-            cleaned_codes = []
-            for code in codes:
-                # 移除可能的市场前缀（如 'SH', 'SZ'）
-                clean_code = str(code).replace("SH", "").replace("SZ", "").strip()
-                # 确保是 6 位数字
-                if clean_code.isdigit() and len(clean_code) == 6:
-                    cleaned_codes.append(clean_code)
-            
-            return cleaned_codes
+            return [item["code"] for item in AkShareAdapter.get_stock_universe() if item.get("code")]
         except Exception as e:
             raise Exception(f"获取股票代码列表失败: {str(e)}") from e
 
@@ -73,42 +66,10 @@ class AkShareAdapter:
             Exception: AkShare 调用失败时抛出
         """
         try:
-            # 获取实时行情数据
             spot_df = ak.stock_zh_a_spot_em()
-            
-            # 获取个股信息（包含行业等信息）
-            # 注意：AkShare 的个股信息接口可能需要逐个查询，这里先用实时行情数据
-            
-            results = []
-            for code in codes:
-                # 在实时行情中查找该股票
-                stock_data = spot_df[spot_df["代码"] == code]
-                
-                if stock_data.empty:
-                    continue
-                
-                row = stock_data.iloc[0]
-                
-                # 构建返回数据（部分字段可能需要额外接口获取）
-                stock_info = {
-                    "code": code,
-                    "name": row.get("名称", ""),
-                    "industry": row.get("行业", "未知"),  # 实时行情可能不包含行业
-                    "sector": row.get("板块", "主板"),
-                    "roe": _safe_float(row.get("ROE", None)),
-                    "pe": _safe_float(row.get("市盈率-动态", None)),
-                    "pb": _safe_float(row.get("市净率", None)),
-                    "eps": None,  # 需要从财务数据获取
-                    "revenue": None,  # 需要从财务数据获取
-                    "netProfit": None,  # 需要从财务数据获取
-                    "debtRatio": None,  # 需要从财务数据获取
-                    "marketCap": _safe_float(row.get("总市值", None)),
-                    "floatMarketCap": _safe_float(row.get("流通市值", None)),
-                    "dataDate": datetime.now().strftime("%Y-%m-%d"),
-                }
-                
-                results.append(stock_info)
-            
+            normalized_codes = {str(code).strip() for code in codes}
+            filtered_df = spot_df[spot_df["代码"].astype(str).isin(normalized_codes)]
+            results = [_map_spot_row(row) for _, row in filtered_df.iterrows()]
             return results
         except Exception as e:
             raise Exception(f"批量查询股票数据失败: {str(e)}") from e
@@ -224,3 +185,25 @@ def _safe_float(value: Any) -> float | None:
         return float(value)
     except (ValueError, TypeError):
         return None
+
+
+def _map_spot_row(row: pd.Series) -> dict[str, Any]:
+    code = str(row.get("代码") or "").replace("SH", "").replace("SZ", "").strip()
+    return {
+        "code": code if code.isdigit() and len(code) == 6 else "",
+        "name": row.get("名称", ""),
+        "industry": row.get("行业", "未知"),
+        "sector": row.get("板块", "主板"),
+        "roe": _safe_float(row.get("ROE", None)),
+        "pe": _safe_float(row.get("市盈率-动态", None)),
+        "pb": _safe_float(row.get("市净率", None)),
+        "eps": None,
+        "revenue": None,
+        "netProfit": None,
+        "debtRatio": None,
+        "marketCap": _safe_float(row.get("总市值", None)),
+        "floatMarketCap": _safe_float(row.get("流通市值", None)),
+        "turnoverRate": _safe_float(row.get("换手率", None)),
+        "changePercent": _safe_float(row.get("涨跌幅", None)),
+        "dataDate": datetime.now().strftime("%Y-%m-%d"),
+    }
