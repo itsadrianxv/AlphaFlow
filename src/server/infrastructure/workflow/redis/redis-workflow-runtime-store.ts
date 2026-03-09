@@ -1,7 +1,7 @@
 import Redis from "ioredis";
 import { env } from "~/env";
 import type {
-  QuickResearchGraphState,
+  WorkflowGraphState,
   WorkflowStreamEvent,
 } from "~/server/domain/workflow/types";
 
@@ -41,18 +41,18 @@ export class RedisWorkflowRuntimeStore {
     return getRunEventChannel(runId);
   }
 
-  async saveCheckpoint(runId: string, state: QuickResearchGraphState) {
+  async saveCheckpoint(runId: string, state: WorkflowGraphState) {
     await this.publisher.set(getCheckpointKey(runId), JSON.stringify(state));
   }
 
-  async loadCheckpoint(runId: string): Promise<QuickResearchGraphState | null> {
+  async loadCheckpoint(runId: string): Promise<WorkflowGraphState | null> {
     const raw = await this.publisher.get(getCheckpointKey(runId));
 
     if (!raw) {
       return null;
     }
 
-    return JSON.parse(raw) as QuickResearchGraphState;
+    return JSON.parse(raw) as WorkflowGraphState;
   }
 
   async clearCheckpoint(runId: string) {

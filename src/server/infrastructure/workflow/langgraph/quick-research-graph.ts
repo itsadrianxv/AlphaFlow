@@ -1,10 +1,20 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
-import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
+import type { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
 import type {
   QuickResearchGraphState,
   QuickResearchNodeKey,
+  WorkflowGraphState,
+  WorkflowNodeKey,
 } from "~/server/domain/workflow/types";
-import { QUICK_RESEARCH_NODE_KEYS } from "~/server/domain/workflow/types";
+import {
+  QUICK_RESEARCH_NODE_KEYS,
+  QUICK_RESEARCH_TEMPLATE_CODE,
+} from "~/server/domain/workflow/types";
+import type {
+  WorkflowGraphBuildInitialStateParams,
+  WorkflowGraphExecutionHooks,
+  WorkflowGraphRunner,
+} from "~/server/infrastructure/workflow/langgraph/workflow-graph";
 
 const WorkflowState = Annotation.Root({
   runId: Annotation<string>,
@@ -77,19 +87,9 @@ type NodeExecutor = (
   state: QuickResearchGraphState,
 ) => Promise<Partial<QuickResearchGraphState>>;
 
-export type QuickResearchGraphExecutionHooks = {
-  onNodeStarted?: (nodeKey: QuickResearchNodeKey) => Promise<void> | void;
-  onNodeProgress?: (
-    nodeKey: QuickResearchNodeKey,
-    payload: Record<string, unknown>,
-  ) => Promise<void> | void;
-  onNodeSucceeded?: (
-    nodeKey: QuickResearchNodeKey,
-    updatedState: QuickResearchGraphState,
-  ) => Promise<void> | void;
-};
+export class QuickResearchLangGraph implements WorkflowGraphRunner {
+  readonly templateCode = QUICK_RESEARCH_TEMPLATE_CODE;
 
-export class QuickResearchLangGraph {
   private readonly intelligenceService: IntelligenceAgentService;
 
   private readonly nodeExecutors: Record<QuickResearchNodeKey, NodeExecutor>;
@@ -98,9 +98,8 @@ export class QuickResearchLangGraph {
     this.intelligenceService = intelligenceService;
     this.nodeExecutors = {
       agent1_industry_overview: async (state) => {
-        const { overview } = await this.intelligenceService.generateIndustryOverview(
-          state.query,
-        );
+        const { overview } =
+          await this.intelligenceService.generateIndustryOverview(state.query);
 
         return {
           intent: state.query,
@@ -142,11 +141,12 @@ export class QuickResearchLangGraph {
         };
       },
       agent5_competition_summary: async (state) => {
-        const competitionSummary = await this.intelligenceService.summarizeCompetition({
-          query: state.query,
-          candidates: state.candidates ?? [],
-          credibility: state.credibility ?? [],
-        });
+        const competitionSummary =
+          await this.intelligenceService.summarizeCompetition({
+            query: state.query,
+            candidates: state.candidates ?? [],
+            credibility: state.credibility ?? [],
+          });
 
         const finalReport = this.intelligenceService.buildFinalReport({
           overview: state.industryOverview ?? "暂无行业概览",
@@ -166,26 +166,124 @@ export class QuickResearchLangGraph {
   }
 
   getNodeOrder() {
-    return QUICK_RESEARCH_NODE_KEYS;
+    return [...QUICK_RESEARCH_NODE_KEYS];
+  }
+
+  buildInitialState(
+    params: WorkflowGraphBuildInitialStateParams,
+  ): QuickResearchGraphState {
+    return {
+      runId: params.runId,
+      userId: params.userId,
+      query: params.query,
+      progressPercent: params.progressPercent,
+      currentNodeKey: undefined,
+      errors: [],
+    };
+  }
+
+  getNodeOutput(nodeKey: WorkflowNodeKey, state: WorkflowGraphState) {
+    const quickState = state as QuickResearchGraphState;
+
+    if (nodeKey === "agent1_industry_overview") {
+      return {
+        intent: quickState.intent,
+        industryOverview: quickState.industryOverview,
+      };
+    }
+
+    if (nodeKey === "agent2_market_heat") {
+      return {
+        heatAnalysis: quickState.heatAnalysis,
+      };
+    }
+
+    if (nodeKey === "agent3_candidate_screening") {
+      return {
+        candidates: quickState.candidates,
+      };
+    }
+
+    if (nodeKey === "agent4_credibility_batch") {
+      return {
+        credibility: quickState.credibility,
+      };
+    }
+
+    return {
+      competition: quickState.competition,
+      finalReport: quickState.finalReport,
+    };
+  }
+
+  getNodeEventPayload(nodeKey: WorkflowNodeKey, state: WorkflowGraphState) {
+    const quickState = state as QuickResearchGraphState;
+
+    if (nodeKey === "agent3_candidate_screening") {
+      return {
+        candidateCount: quickState.candidates?.length ?? 0,
+      };
+    }
+
+    if (nodeKey === "agent4_credibility_batch") {
+      return {
+        credibilityCount: quickState.credibility?.length ?? 0,
+      };
+    }
+
+    if (nodeKey === "agent5_competition_summary") {
+      return {
+        topPickCount: quickState.finalReport?.topPicks.length ?? 0,
+      };
+    }
+
+    return {};
+  }
+
+  mergeNodeOutput(
+    state: WorkflowGraphState,
+    nodeKey: WorkflowNodeKey,
+    output: Record<string, unknown>,
+  ) {
+    return {
+      ...state,
+      ...output,
+      currentNodeKey: nodeKey,
+      lastCompletedNodeKey: nodeKey,
+    };
+  }
+
+  getRunResult(state: WorkflowGraphState): Record<string, unknown> {
+    const quickState = state as QuickResearchGraphState;
+
+    return (quickState.finalReport ?? {
+      generatedAt: new Date().toISOString(),
+    }) as Record<string, unknown>;
   }
 
   async execute(params: {
-    initialState: QuickResearchGraphState;
+    initialState: WorkflowGraphState;
     startNodeIndex?: number;
-    hooks?: QuickResearchGraphExecutionHooks;
+    hooks?: WorkflowGraphExecutionHooks;
   }) {
     let state = {
-      ...params.initialState,
-      errors: params.initialState.errors,
+      ...(params.initialState as QuickResearchGraphState),
+      errors: (params.initialState.errors ?? []) as string[],
     };
 
     const startIndex = params.startNodeIndex ?? 0;
 
-    for (let index = startIndex; index < QUICK_RESEARCH_NODE_KEYS.length; index += 1) {
+    for (
+      let index = startIndex;
+      index < QUICK_RESEARCH_NODE_KEYS.length;
+      index += 1
+    ) {
       const nodeKey = QUICK_RESEARCH_NODE_KEYS[index];
+
       if (!nodeKey) {
         continue;
       }
+
       const nodeGraph = this.buildSingleNodeGraph(nodeKey);
 
       await params.hooks?.onNodeStarted?.(nodeKey);
@@ -198,7 +296,9 @@ export class QuickResearchLangGraph {
         currentNodeKey: nodeKey,
       };
 
-      const result = (await nodeGraph.invoke(state)) as typeof WorkflowState.State;
+      const result = (await nodeGraph.invoke(
+        state,
+      )) as typeof WorkflowState.State;
       const progressPercent = Math.round(
         ((index + 1) / QUICK_RESEARCH_NODE_KEYS.length) * 100,
       );
@@ -217,7 +317,9 @@ export class QuickResearchLangGraph {
 
   private buildSingleNodeGraph(nodeKey: QuickResearchNodeKey) {
     return new StateGraph(WorkflowState)
-      .addNode(nodeKey, (state) => this.nodeExecutors[nodeKey](state as QuickResearchGraphState))
+      .addNode(nodeKey, (state) =>
+        this.nodeExecutors[nodeKey](state as QuickResearchGraphState),
+      )
       .addEdge(START, nodeKey)
       .addEdge(nodeKey, END)
       .compile();

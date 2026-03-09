@@ -1,14 +1,31 @@
 import {
-  Prisma,
+  type Prisma,
+  type PrismaClient,
   WorkflowEventType,
   WorkflowNodeRunStatus,
   WorkflowRunStatus,
-  type PrismaClient,
 } from "~/generated/prisma";
-import { QUICK_RESEARCH_NODE_KEYS } from "~/server/domain/workflow/types";
+import {
+  COMPANY_RESEARCH_NODE_KEYS,
+  COMPANY_RESEARCH_TEMPLATE_CODE,
+  QUICK_RESEARCH_NODE_KEYS,
+  QUICK_RESEARCH_TEMPLATE_CODE,
+  SCREENING_INSIGHT_PIPELINE_NODE_KEYS,
+  SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
+  TIMING_SIGNAL_PIPELINE_NODE_KEYS,
+  TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
+  WATCHLIST_TIMING_CARDS_PIPELINE_NODE_KEYS,
+  WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
+  WATCHLIST_TIMING_PIPELINE_NODE_KEYS,
+  WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
+} from "~/server/domain/workflow/types";
 
 const toJson = (value: unknown): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
+
+function buildCheckpointKey(runId: string) {
+  return `workflow:checkpoint:${runId}`;
+}
 
 export type WorkflowRunDetailRecord = Awaited<
   ReturnType<PrismaWorkflowRunRepository["getRunDetailForUser"]>
@@ -44,12 +61,12 @@ export class PrismaWorkflowRunRepository {
     return this.prisma.workflowTemplate.upsert({
       where: {
         code_version: {
-          code: "quick_industry_research",
+          code: QUICK_RESEARCH_TEMPLATE_CODE,
           version: 1,
         },
       },
       create: {
-        code: "quick_industry_research",
+        code: QUICK_RESEARCH_TEMPLATE_CODE,
         version: 1,
         graphConfig: {
           nodes: QUICK_RESEARCH_NODE_KEYS,
@@ -66,12 +83,224 @@ export class PrismaWorkflowRunRepository {
         isActive: true,
       },
       update: {
+        graphConfig: {
+          nodes: QUICK_RESEARCH_NODE_KEYS,
+        },
         isActive: true,
       },
     });
   }
 
-  async findPendingOrRunningByIdempotency(userId: string, idempotencyKey: string) {
+  async ensureCompanyResearchTemplate() {
+    return this.prisma.workflowTemplate.upsert({
+      where: {
+        code_version: {
+          code: COMPANY_RESEARCH_TEMPLATE_CODE,
+          version: 1,
+        },
+      },
+      create: {
+        code: COMPANY_RESEARCH_TEMPLATE_CODE,
+        version: 1,
+        graphConfig: {
+          nodes: COMPANY_RESEARCH_NODE_KEYS,
+        },
+        inputSchema: {
+          type: "object",
+          required: ["companyName"],
+          properties: {
+            companyName: {
+              type: "string",
+            },
+            stockCode: {
+              type: "string",
+            },
+            officialWebsite: {
+              type: "string",
+            },
+            focusConcepts: {
+              type: "array",
+              items: {
+                type: "string",
+              },
+            },
+            keyQuestion: {
+              type: "string",
+            },
+            supplementalUrls: {
+              type: "array",
+              items: {
+                type: "string",
+              },
+            },
+          },
+        },
+        isActive: true,
+      },
+      update: {
+        graphConfig: {
+          nodes: COMPANY_RESEARCH_NODE_KEYS,
+        },
+        isActive: true,
+      },
+    });
+  }
+
+  async ensureScreeningInsightPipelineTemplate() {
+    return this.prisma.workflowTemplate.upsert({
+      where: {
+        code_version: {
+          code: SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
+          version: 1,
+        },
+      },
+      create: {
+        code: SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
+        version: 1,
+        graphConfig: {
+          nodes: SCREENING_INSIGHT_PIPELINE_NODE_KEYS,
+        },
+        inputSchema: {
+          type: "object",
+          required: ["screeningSessionId"],
+          properties: {
+            screeningSessionId: {
+              type: "string",
+            },
+            maxInsightsPerSession: {
+              type: "integer",
+            },
+          },
+        },
+        isActive: true,
+      },
+      update: {
+        graphConfig: {
+          nodes: SCREENING_INSIGHT_PIPELINE_NODE_KEYS,
+        },
+        isActive: true,
+      },
+    });
+  }
+
+  async ensureTimingSignalPipelineTemplate() {
+    return this.prisma.workflowTemplate.upsert({
+      where: {
+        code_version: {
+          code: TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
+          version: 1,
+        },
+      },
+      create: {
+        code: TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
+        version: 1,
+        graphConfig: {
+          nodes: TIMING_SIGNAL_PIPELINE_NODE_KEYS,
+        },
+        inputSchema: {
+          type: "object",
+          required: ["stockCode"],
+          properties: {
+            stockCode: {
+              type: "string",
+            },
+            asOfDate: {
+              type: "string",
+            },
+          },
+        },
+        isActive: true,
+      },
+      update: {
+        graphConfig: {
+          nodes: TIMING_SIGNAL_PIPELINE_NODE_KEYS,
+        },
+        isActive: true,
+      },
+    });
+  }
+
+  async ensureWatchlistTimingCardsPipelineTemplate() {
+    return this.prisma.workflowTemplate.upsert({
+      where: {
+        code_version: {
+          code: WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
+          version: 1,
+        },
+      },
+      create: {
+        code: WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
+        version: 1,
+        graphConfig: {
+          nodes: WATCHLIST_TIMING_CARDS_PIPELINE_NODE_KEYS,
+        },
+        inputSchema: {
+          type: "object",
+          required: ["watchListId"],
+          properties: {
+            watchListId: {
+              type: "string",
+            },
+            asOfDate: {
+              type: "string",
+            },
+          },
+        },
+        isActive: true,
+      },
+      update: {
+        graphConfig: {
+          nodes: WATCHLIST_TIMING_CARDS_PIPELINE_NODE_KEYS,
+        },
+        isActive: true,
+      },
+    });
+  }
+
+  async ensureWatchlistTimingPipelineTemplate() {
+    return this.prisma.workflowTemplate.upsert({
+      where: {
+        code_version: {
+          code: WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
+          version: 1,
+        },
+      },
+      create: {
+        code: WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
+        version: 1,
+        graphConfig: {
+          nodes: WATCHLIST_TIMING_PIPELINE_NODE_KEYS,
+        },
+        inputSchema: {
+          type: "object",
+          required: ["watchListId", "portfolioSnapshotId"],
+          properties: {
+            watchListId: {
+              type: "string",
+            },
+            portfolioSnapshotId: {
+              type: "string",
+            },
+            asOfDate: {
+              type: "string",
+            },
+          },
+        },
+        isActive: true,
+      },
+      update: {
+        graphConfig: {
+          nodes: WATCHLIST_TIMING_PIPELINE_NODE_KEYS,
+        },
+        isActive: true,
+      },
+    });
+  }
+
+  async findPendingOrRunningByIdempotency(
+    userId: string,
+    idempotencyKey: string,
+  ) {
     return this.prisma.workflowRun.findFirst({
       where: {
         userId,
@@ -91,6 +320,7 @@ export class PrismaWorkflowRunRepository {
     userId: string;
     query: string;
     input: Record<string, unknown>;
+    nodeKeys: string[];
     idempotencyKey?: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
@@ -112,12 +342,12 @@ export class PrismaWorkflowRunRepository {
           id: run.id,
         },
         data: {
-          checkpointKey: `workflow:checkpoint:${run.id}`,
+          checkpointKey: buildCheckpointKey(run.id),
         },
       });
 
       await tx.workflowNodeRun.createMany({
-        data: QUICK_RESEARCH_NODE_KEYS.map((nodeKey) => ({
+        data: params.nodeKeys.map((nodeKey) => ({
           runId: run.id,
           nodeKey,
           agentName: nodeKey,
@@ -170,6 +400,9 @@ export class PrismaWorkflowRunRepository {
       },
       include: {
         template: true,
+        nodeRuns: {
+          orderBy: [{ createdAt: "asc" }, { nodeKey: "asc" }],
+        },
       },
     });
   }
@@ -194,11 +427,19 @@ export class PrismaWorkflowRunRepository {
     limit: number;
     cursor?: string;
     status?: WorkflowRunStatus;
+    templateCode?: string;
   }) {
     const records = await this.prisma.workflowRun.findMany({
       where: {
         userId: params.userId,
         status: params.status,
+        template: params.templateCode
+          ? {
+              is: {
+                code: params.templateCode,
+              },
+            }
+          : undefined,
       },
       include: {
         template: true,
@@ -222,7 +463,7 @@ export class PrismaWorkflowRunRepository {
 
     const hasMore = records.length > params.limit;
     const items = hasMore ? records.slice(0, params.limit) : records;
-    const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
 
     return {
       items,
@@ -442,6 +683,7 @@ export class PrismaWorkflowRunRepository {
     nodeKey: string;
     output: Record<string, unknown>;
     durationMs: number;
+    eventPayload?: Record<string, unknown>;
   }) {
     return this.prisma.$transaction(async (tx) => {
       const nodeRun = await tx.workflowNodeRun.update({
@@ -463,6 +705,48 @@ export class PrismaWorkflowRunRepository {
         payload: {
           nodeKey: params.nodeKey,
           durationMs: params.durationMs,
+          ...params.eventPayload,
+        },
+      });
+
+      return nodeRun;
+    });
+  }
+
+  async markNodeSkipped(params: {
+    runId: string;
+    nodeRunId: string;
+    nodeKey: string;
+    output: Record<string, unknown>;
+    durationMs: number;
+    reason: string;
+    eventPayload?: Record<string, unknown>;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const nodeRun = await tx.workflowNodeRun.update({
+        where: {
+          id: params.nodeRunId,
+        },
+        data: {
+          status: WorkflowNodeRunStatus.SKIPPED,
+          output: toJson(params.output),
+          durationMs: params.durationMs,
+          completedAt: new Date(),
+          errorCode: null,
+          errorMessage: null,
+        },
+      });
+
+      await this.createEventTx(tx, {
+        runId: params.runId,
+        nodeRunId: params.nodeRunId,
+        eventType: WorkflowEventType.NODE_SUCCEEDED,
+        payload: {
+          nodeKey: params.nodeKey,
+          durationMs: params.durationMs,
+          skipped: true,
+          reason: params.reason,
+          ...params.eventPayload,
         },
       });
 
@@ -571,10 +855,7 @@ export class PrismaWorkflowRunRepository {
     });
   }
 
-  async markRunCancelled(params: {
-    runId: string;
-    reason: string;
-  }) {
+  async markRunCancelled(params: { runId: string; reason: string }) {
     return this.prisma.$transaction(async (tx) => {
       const now = new Date();
       const run = await tx.workflowRun.update({
@@ -614,7 +895,10 @@ export class PrismaWorkflowRunRepository {
       return false;
     }
 
-    return Boolean(run.cancellationRequestedAt) || run.status === WorkflowRunStatus.CANCELLED;
+    return (
+      Boolean(run.cancellationRequestedAt) ||
+      run.status === WorkflowRunStatus.CANCELLED
+    );
   }
 
   async loadLatestEventSequence(runId: string) {
