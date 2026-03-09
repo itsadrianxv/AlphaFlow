@@ -66,7 +66,13 @@ model User {
     posts            Post[]
     strategies       ScreeningStrategy[]
     screeningSessions ScreeningSession[]
+    screeningInsights ScreeningInsight[]
+    researchReminders ResearchReminder[]
     watchLists       WatchList[]
+    timingSignalSnapshots TimingSignalSnapshot[]
+    timingAnalysisCards TimingAnalysisCard[]
+    portfolioSnapshots PortfolioSnapshot[]
+    timingRecommendations TimingRecommendation[]
     workflowRuns     WorkflowRun[]
 }
 
@@ -120,6 +126,7 @@ model ScreeningSession {
     strategy              ScreeningStrategy? @relation(fields: [strategyId], references: [id], onDelete: SetNull)
     userId                String
     user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+    insights              ScreeningInsight[]
 
     @@index([userId])
     @@index([strategyId])
@@ -145,9 +152,204 @@ model WatchList {
 
     userId      String
     user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    insights    ScreeningInsight[]
+    timingAnalysisCards TimingAnalysisCard[]
+    timingRecommendations TimingRecommendation[]
 
     @@index([userId])
     @@index([name])
+}
+
+enum ScreeningInsightStatus {
+    ACTIVE
+    NEEDS_REVIEW
+    ARCHIVED
+}
+
+enum ResearchReminderType {
+    REVIEW
+}
+
+enum ResearchReminderStatus {
+    PENDING
+    TRIGGERED
+    CANCELLED
+}
+
+model ScreeningInsight {
+    id                String                 @id @default(cuid())
+    userId            String
+    screeningSessionId String
+    watchListId       String?
+    stockCode         String
+    stockName         String
+    score             Float
+    status            ScreeningInsightStatus @default(ACTIVE)
+    summary           String
+    nextReviewAt      DateTime?
+    qualityFlags      String[]
+    latestVersionId   String?
+    currentVersion    Int                    @default(1)
+    createdAt         DateTime               @default(now())
+    updatedAt         DateTime               @updatedAt
+    user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    screeningSession  ScreeningSession       @relation(fields: [screeningSessionId], references: [id], onDelete: Cascade)
+    watchList         WatchList?             @relation(fields: [watchListId], references: [id], onDelete: SetNull)
+    versions          ScreeningInsightVersion[]
+    reminders         ResearchReminder[]
+
+    @@unique([screeningSessionId, stockCode])
+    @@index([userId, updatedAt])
+    @@index([screeningSessionId])
+    @@index([stockCode])
+}
+
+model ScreeningInsightVersion {
+    id               String           @id @default(cuid())
+    insightId        String
+    version          Int
+    summary          String
+    thesisJson       Json
+    risksJson        Json
+    catalystsJson    Json
+    reviewPlanJson   Json
+    evidenceRefsJson Json
+    qualityFlagsJson Json
+    createdAt        DateTime         @default(now())
+    insight          ScreeningInsight @relation(fields: [insightId], references: [id], onDelete: Cascade)
+
+    @@unique([insightId, version])
+    @@index([insightId, createdAt])
+}
+
+model ResearchReminder {
+    id           String                 @id @default(cuid())
+    userId       String
+    insightId    String
+    stockCode    String
+    reminderType ResearchReminderType
+    scheduledAt  DateTime
+    status       ResearchReminderStatus @default(PENDING)
+    payload      Json
+    triggeredAt  DateTime?
+    createdAt    DateTime               @default(now())
+    updatedAt    DateTime               @updatedAt
+    user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    insight      ScreeningInsight       @relation(fields: [insightId], references: [id], onDelete: Cascade)
+
+    @@unique([insightId, reminderType, scheduledAt])
+    @@index([userId, status, scheduledAt])
+    @@index([insightId])
+}
+
+model TimingSignalSnapshot {
+    id           String    @id @default(cuid())
+    userId       String
+    workflowRunId String?
+    stockCode    String
+    stockName    String
+    asOfDate     DateTime
+    sourceType   String
+    sourceId     String
+    timeframe    String    @default("DAILY")
+    barsCount    Int
+    indicators   Json
+    signalSummary Json
+    createdAt    DateTime  @default(now())
+
+    user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+    workflowRun  WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+    analysisCards TimingAnalysisCard[]
+
+    @@index([userId, createdAt])
+    @@index([workflowRunId])
+    @@index([userId, stockCode, asOfDate])
+    @@index([sourceType, sourceId])
+}
+
+model TimingAnalysisCard {
+    id                String    @id @default(cuid())
+    userId            String
+    workflowRunId     String?
+    watchListId       String?
+    stockCode         String
+    stockName         String
+    sourceType        String
+    sourceId          String
+    signalSnapshotId  String
+    actionBias        String
+    confidence        Float
+    marketRegime      String?
+    summary           String
+    triggerNotes      String[]
+    invalidationNotes String[]
+    riskFlags         String[]
+    reasoning         Json
+    createdAt         DateTime  @default(now())
+    updatedAt         DateTime  @updatedAt
+
+    user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+    workflowRun      WorkflowRun?         @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+    watchList        WatchList?           @relation(fields: [watchListId], references: [id], onDelete: SetNull)
+    signalSnapshot   TimingSignalSnapshot @relation(fields: [signalSnapshotId], references: [id], onDelete: Cascade)
+
+    @@index([userId, createdAt])
+    @@index([workflowRunId])
+    @@index([watchListId, createdAt])
+    @@index([signalSnapshotId])
+    @@index([userId, stockCode, createdAt])
+    @@index([sourceType, sourceId])
+}
+
+model PortfolioSnapshot {
+    id              String   @id @default(cuid())
+    userId          String
+    name            String
+    baseCurrency    String   @default("CNY")
+    cash            Float
+    totalCapital    Float
+    positions       Json
+    riskPreferences Json
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    timingRecommendations  TimingRecommendation[]
+
+    @@index([userId, updatedAt])
+    @@index([userId, name])
+}
+
+model TimingRecommendation {
+    id                  String   @id @default(cuid())
+    userId              String
+    workflowRunId       String?
+    portfolioSnapshotId String
+    watchListId         String
+    stockCode           String
+    stockName           String
+    action              String
+    priority            Int
+    confidence          Float
+    suggestedMinPct     Float
+    suggestedMaxPct     Float
+    riskBudgetPct       Float
+    marketRegime        String
+    riskFlags           String[]
+    reasoning           Json
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+
+    user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+    workflowRun       WorkflowRun?      @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+    portfolioSnapshot PortfolioSnapshot @relation(fields: [portfolioSnapshotId], references: [id], onDelete: Cascade)
+    watchList         WatchList         @relation(fields: [watchListId], references: [id], onDelete: Cascade)
+
+    @@index([userId, createdAt])
+    @@index([workflowRunId])
+    @@index([portfolioSnapshotId, createdAt])
+    @@index([watchListId, createdAt])
+    @@index([userId, stockCode, createdAt])
 }
 
 enum WorkflowRunStatus {
@@ -217,6 +419,9 @@ model WorkflowRun {
     user                    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
     nodeRuns                WorkflowNodeRun[]
     events                  WorkflowEvent[]
+    timingSignalSnapshots   TimingSignalSnapshot[]
+    timingAnalysisCards     TimingAnalysisCard[]
+    timingRecommendations   TimingRecommendation[]
 
     @@index([templateId])
     @@index([userId, createdAt])
