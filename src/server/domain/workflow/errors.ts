@@ -6,6 +6,7 @@ export const WORKFLOW_ERROR_CODES = {
   WORKFLOW_NODE_EXECUTION_FAILED: "WORKFLOW_NODE_EXECUTION_FAILED",
   WORKFLOW_CANCEL_NOT_ALLOWED: "WORKFLOW_CANCEL_NOT_ALLOWED",
   INTELLIGENCE_DATA_UNAVAILABLE: "INTELLIGENCE_DATA_UNAVAILABLE",
+  TIMING_DATA_UNAVAILABLE: "TIMING_DATA_UNAVAILABLE",
   INTELLIGENCE_LLM_PARSE_FAILED: "INTELLIGENCE_LLM_PARSE_FAILED",
 } as const;
 
@@ -22,6 +23,8 @@ export class WorkflowDomainError extends Error {
   }
 }
 
-export function isWorkflowDomainError(error: unknown): error is WorkflowDomainError {
+export function isWorkflowDomainError(
+  error: unknown,
+): error is WorkflowDomainError {
   return error instanceof WorkflowDomainError;
 }
