@@ -11,6 +11,9 @@ akshare>=1.18.0
 # HTTP client (for potential external API calls)
 httpx==0.26.0
 
+# Optional L2 cache backend
+redis==5.2.1
+
 # Development dependencies (optional, can be moved to requirements-dev.txt)
 pytest==7.4.4
 pytest-asyncio==0.23.3

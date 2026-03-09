@@ -8,6 +8,9 @@ Python FastAPI 微服务，向主应用提供 AkShare 数据接口。
 - Workflow 情报数据：主题资讯、候选股、公司证据（含批量）
 - 主题词 -> A 股概念映射：白名单/黑名单 + 智谱 Web Search + 本地自动匹配
 - 智能降级：AkShare 请求失败时优先读缓存，再走兜底数据
+- 统一网关缓存：`L1 内存缓存 + L2 Redis 缓存 + stale fallback`
+- 管理任务：`refresh-universe`、`refresh-concepts`、`prewarm-hot-themes`
+- 基础可观测性：provider latency / error、cache hit、stale fallback、batch success 等指标
 
 ## 目录结构
 
@@ -15,9 +18,28 @@ Python FastAPI 微服务，向主应用提供 AkShare 数据接口。
 python_services/
   app/
     main.py
+    contracts/
+      admin.py
     routers/
+      admin_jobs.py
       stock_data.py
       intelligence_data.py
+      market_data.py
+      intelligence_v1.py
+    gateway/
+      common.py
+      market_gateway.py
+      intelligence_gateway.py
+    infrastructure/
+      cache/
+        memory_cache.py
+        redis_cache.py
+      metrics/
+        recorder.py
+    jobs/
+      refresh_universe.py
+      refresh_concepts.py
+      prewarm_hot_themes.py
     services/
       akshare_adapter.py
       intelligence_data_adapter.py
@@ -51,6 +73,19 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `GET /api/intelligence/concepts/match?theme=...&limit=...`
 - `GET /api/intelligence/concepts/rules?theme=...`
 - `PUT /api/intelligence/concepts/rules`
+- `GET /api/admin/metrics`
+- `POST /api/admin/jobs/refresh-universe`
+- `POST /api/admin/jobs/refresh-concepts`
+- `POST /api/admin/jobs/prewarm-hot-themes`
+
+标准化 v1：
+
+- `GET /api/v1/market/stocks/{stockCode}`
+- `POST /api/v1/market/stocks/batch`
+- `GET /api/v1/market/themes/{theme}/candidates`
+- `GET /api/v1/intelligence/themes/{theme}/news`
+- `GET /api/v1/intelligence/themes/{theme}/concepts`
+- `GET /api/v1/intelligence/stocks/{stockCode}/evidence`
 
 ## 概念匹配优先级
 
@@ -67,6 +102,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `INTELLIGENCE_CACHE_STALE_SECONDS`：过期后可继续回退的 stale 窗口（默认 `1800`）
 - `INTELLIGENCE_SPOT_CACHE_TTL_SECONDS`：股票快照缓存 TTL（默认 `120`）
 - `INTELLIGENCE_ENABLE_MOCK_FALLBACK`：是否启用兜底数据（默认 `true`）
+- `GATEWAY_REDIS_URL`：Redis 连接串，配置后启用 L2 分布式缓存（可选）
+- `GATEWAY_REDIS_PREFIX`：Redis key 前缀（默认 `gateway-cache`）
+- `GATEWAY_HOT_THEMES`：热门主题预热回退列表，逗号分隔（默认 `AI,算力,机器人`）
 
 智谱 Web Search：
 
@@ -144,6 +182,38 @@ curl -X PUT "http://localhost:8000/api/intelligence/concepts/rules" \
 ```
 
 响应结构与查询规则一致。
+
+## 管理任务示例
+
+### 4) 刷新全市场基础缓存
+
+```bash
+curl -X POST "http://localhost:8000/api/admin/jobs/refresh-universe" \
+  -H "Content-Type: application/json" \
+  -d '{"batchSize": 200}'
+```
+
+### 5) 刷新概念板块与成分股缓存
+
+```bash
+curl -X POST "http://localhost:8000/api/admin/jobs/refresh-concepts" \
+  -H "Content-Type: application/json" \
+  -d '{"limit": 100}'
+```
+
+### 6) 预热热门主题缓存
+
+```bash
+curl -X POST "http://localhost:8000/api/admin/jobs/prewarm-hot-themes" \
+  -H "Content-Type: application/json" \
+  -d '{"maxThemes": 5, "evidencePerTheme": 3}'
+```
+
+### 7) 查看基础 metrics
+
+```bash
+curl "http://localhost:8000/api/admin/metrics"
+```
 
 ## 测试
 
