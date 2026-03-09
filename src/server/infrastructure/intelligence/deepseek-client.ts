@@ -11,7 +11,7 @@ export type DeepSeekClientConfig = {
   timeoutMs?: number;
 };
 
-type DeepSeekMessage = {
+export type DeepSeekMessage = {
   role: "system" | "user";
   content: string;
 };
@@ -24,6 +24,24 @@ type DeepSeekResponse = {
   }>;
 };
 
+function extractJsonCandidate(content: string): string {
+  const fencedMatch = content.match(/```json\s*([\s\S]*?)```/i);
+
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim();
+  }
+
+  const firstBracketIndex = [content.indexOf("{"), content.indexOf("[")]
+    .filter((index) => index >= 0)
+    .sort((left, right) => left - right)[0];
+
+  if (firstBracketIndex === undefined) {
+    return content.trim();
+  }
+
+  return content.slice(firstBracketIndex).trim();
+}
+
 export class DeepSeekClient {
   private readonly apiKey?: string;
   private readonly baseUrl: string;
@@ -35,6 +53,10 @@ export class DeepSeekClient {
     this.baseUrl = config?.baseUrl ?? env.DEEPSEEK_BASE_URL;
     this.model = config?.model ?? "deepseek-chat";
     this.timeoutMs = config?.timeoutMs ?? 15_000;
+  }
+
+  isConfigured() {
+    return Boolean(this.apiKey);
   }
 
   async complete(messages: DeepSeekMessage[], fallbackText: string) {
@@ -96,6 +118,19 @@ export class DeepSeekClient {
       );
     } finally {
       clearTimeout(timer);
+    }
+  }
+
+  async completeJson<T>(
+    messages: DeepSeekMessage[],
+    fallbackValue: T,
+  ): Promise<T> {
+    const raw = await this.complete(messages, JSON.stringify(fallbackValue));
+
+    try {
+      return JSON.parse(extractJsonCandidate(raw)) as T;
+    } catch {
+      return fallbackValue;
     }
   }
 }
