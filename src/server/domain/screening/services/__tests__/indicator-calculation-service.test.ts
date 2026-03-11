@@ -94,7 +94,7 @@ describe("IndicatorCalculationService", () => {
       expect(mockHistoricalDataProvider.getIndicatorHistory).toHaveBeenCalledWith(
         stock.code,
         IndicatorField.REVENUE,
-        3
+        4
       );
     });
 

@@ -6,7 +6,7 @@
 from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, ConfigDict
-from app.services.akshare_adapter import AkShareAdapter
+from app.providers.screening.factory import get_screening_provider
 
 router = APIRouter()
 
@@ -109,7 +109,8 @@ async def get_all_stock_codes():
         StockCodesResponse: 包含股票代码列表和总数
     """
     try:
-        codes = AkShareAdapter.get_all_stock_codes()
+        provider = get_screening_provider()
+        codes = provider.get_all_stock_codes()
         return StockCodesResponse(codes=codes, total=len(codes))
     except Exception as e:
         raise HTTPException(
@@ -141,7 +142,8 @@ async def get_stocks_by_codes(request: BatchStockRequest):
                     status_code=400, detail=f"无效的股票代码格式: {code}"
                 )
 
-        stocks_data = AkShareAdapter.get_stocks_by_codes(request.codes)
+        provider = get_screening_provider()
+        stocks_data = provider.get_stock_batch(request.codes)
 
         # 转换为 Pydantic 模型
         return [StockData(**stock) for stock in stocks_data]
@@ -196,7 +198,8 @@ async def get_indicator_history(
                 detail=f"不支持的指标: {indicator}，支持的指标: {', '.join(valid_indicators)}",
             )
 
-        history_data = AkShareAdapter.get_indicator_history(code, indicator, years)
+        provider = get_screening_provider()
+        history_data = provider.get_indicator_history(code, indicator, years)
 
         # 转换为 Pydantic 模型
         return [IndicatorDataPoint(**point) for point in history_data]
@@ -223,7 +226,8 @@ async def get_available_industries():
         IndustriesResponse: 包含行业列表和总数
     """
     try:
-        industries = AkShareAdapter.get_available_industries()
+        provider = get_screening_provider()
+        industries = provider.get_available_industries()
         return IndustriesResponse(industries=industries, total=len(industries))
     except Exception as e:
         raise HTTPException(

@@ -1,10 +1,11 @@
 ﻿# Stock Screening Python Service
 
-Python FastAPI 微服务，向主应用提供 AkShare 数据接口。
+Python FastAPI 微服务，向主应用提供 iFinD 主用、AkShare 兜底的数据接口。
 
 ## 能力概览
 
 - 股票基础数据：代码列表、批量行情、历史指标、行业列表
+- Screening 兼容链路：legacy `/api/stocks/*` 默认优先走 iFinD，失败后按配置回退 AkShare
 - Workflow 情报数据：主题资讯、候选股、公司证据（含批量）
 - 主题词 -> A 股概念映射：白名单/黑名单 + 智谱 Web Search + 本地自动匹配
 - 智能降级：AkShare 请求失败时优先读缓存，再走兜底数据
@@ -36,6 +37,10 @@ python_services/
         redis_cache.py
       metrics/
         recorder.py
+    providers/
+      screening/
+        factory.py
+        ifind_provider.py
     jobs/
       refresh_universe.py
       refresh_concepts.py
@@ -58,6 +63,10 @@ python -m venv .venv
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+说明：
+
+- `iFinDPy` 如需手工安装，可在运行环境中额外安装；未安装或登录失败时，screening legacy 接口会按配置自动回退到 AkShare。
 
 ## 关键接口
 
@@ -95,6 +104,13 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 4. 智谱失败或无结果时，回退本地自动匹配
 
 ## 环境变量
+
+Screening provider：
+
+- `IFIND_USERNAME`：iFinD 登录用户名
+- `IFIND_PASSWORD`：iFinD 登录密码
+- `SCREENING_PRIMARY_PROVIDER`：screening legacy 接口主 provider（默认 `ifind`）
+- `SCREENING_ENABLE_AKSHARE_FALLBACK`：是否开启 AkShare 兜底（默认 `true`）
 
 缓存与降级：
 

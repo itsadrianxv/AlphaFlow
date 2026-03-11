@@ -28,6 +28,10 @@ export const env = createEnv({
       .string()
       .url()
       .default("http://127.0.0.1:8000"),
+    IFIND_USERNAME: z.string().optional(),
+    IFIND_PASSWORD: z.string().optional(),
+    SCREENING_PRIMARY_PROVIDER: z.string().optional(),
+    SCREENING_ENABLE_AKSHARE_FALLBACK: z.string().optional(),
     DEEPSEEK_API_KEY: z.string().optional(),
     DEEPSEEK_BASE_URL: z.string().url().default("https://api.deepseek.com"),
     FIRECRAWL_API_KEY: z.string().optional(),
@@ -78,6 +82,11 @@ export const env = createEnv({
     PYTHON_SERVICE_URL: process.env.PYTHON_SERVICE_URL,
     PYTHON_INTELLIGENCE_SERVICE_URL:
       process.env.PYTHON_INTELLIGENCE_SERVICE_URL,
+    IFIND_USERNAME: process.env.IFIND_USERNAME,
+    IFIND_PASSWORD: process.env.IFIND_PASSWORD,
+    SCREENING_PRIMARY_PROVIDER: process.env.SCREENING_PRIMARY_PROVIDER,
+    SCREENING_ENABLE_AKSHARE_FALLBACK:
+      process.env.SCREENING_ENABLE_AKSHARE_FALLBACK,
     DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL: process.env.DEEPSEEK_BASE_URL,
     FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,

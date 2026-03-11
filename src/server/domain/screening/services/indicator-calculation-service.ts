@@ -232,7 +232,7 @@ export class IndicatorCalculationService
       const dataPoints = await this.historicalDataProvider.getIndicatorHistory(
         stock.code,
         baseIndicator,
-        years
+        years + 1
       );
 
       // 需要至少 years + 1 个数据点（包括起始年和结束年）
