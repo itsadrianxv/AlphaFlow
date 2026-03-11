@@ -1,5 +1,8 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
-import type { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
+import type {
+  CandidateCredibilityResult,
+  IntelligenceAgentService,
+} from "~/server/application/intelligence/intelligence-agent-service";
 import type {
   QuickResearchGraphState,
   QuickResearchNodeKey,
@@ -24,59 +27,13 @@ const WorkflowState = Annotation.Root({
   currentNodeKey: Annotation<QuickResearchNodeKey | undefined>,
   intent: Annotation<string | undefined>,
   industryOverview: Annotation<string | undefined>,
-  heatAnalysis: Annotation<
-    | {
-        heatScore: number;
-        heatConclusion: string;
-      }
-    | undefined
-  >,
-  candidates: Annotation<
-    | Array<{
-        stockCode: string;
-        stockName: string;
-        reason: string;
-        score: number;
-      }>
-    | undefined
-  >,
-  credibility: Annotation<
-    | Array<{
-        stockCode: string;
-        credibilityScore: number;
-        highlights: string[];
-        risks: string[];
-      }>
-    | undefined
-  >,
+  news: Annotation<QuickResearchGraphState["news"]>,
+  heatAnalysis: Annotation<QuickResearchGraphState["heatAnalysis"]>,
+  candidates: Annotation<QuickResearchGraphState["candidates"]>,
+  credibility: Annotation<QuickResearchGraphState["credibility"]>,
+  evidenceList: Annotation<QuickResearchGraphState["evidenceList"]>,
   competition: Annotation<string | undefined>,
-  finalReport: Annotation<
-    | {
-        overview: string;
-        heatScore: number;
-        heatConclusion: string;
-        candidates: Array<{
-          stockCode: string;
-          stockName: string;
-          reason: string;
-          score: number;
-        }>;
-        credibility: Array<{
-          stockCode: string;
-          credibilityScore: number;
-          highlights: string[];
-          risks: string[];
-        }>;
-        topPicks: Array<{
-          stockCode: string;
-          stockName: string;
-          reason: string;
-        }>;
-        competitionSummary: string;
-        generatedAt: string;
-      }
-    | undefined
-  >,
+  finalReport: Annotation<QuickResearchGraphState["finalReport"]>,
   errors: Annotation<string[]>({
     reducer: (left, right) => left.concat(right),
     default: () => [],
@@ -98,20 +55,23 @@ export class QuickResearchLangGraph implements WorkflowGraphRunner {
     this.intelligenceService = intelligenceService;
     this.nodeExecutors = {
       agent1_industry_overview: async (state) => {
-        const { overview } =
+        const { overview, news } =
           await this.intelligenceService.generateIndustryOverview(state.query);
 
         return {
           intent: state.query,
           industryOverview: overview,
+          news,
         };
       },
       agent2_market_heat: async (state) => {
         const heatAnalysis = await this.intelligenceService.analyzeMarketHeat(
           state.query,
+          state.news,
         );
 
         return {
+          news: heatAnalysis.news,
           heatAnalysis: {
             heatScore: heatAnalysis.heatScore,
             heatConclusion: heatAnalysis.heatConclusion,
@@ -131,13 +91,15 @@ export class QuickResearchLangGraph implements WorkflowGraphRunner {
       },
       agent4_credibility_batch: async (state) => {
         const candidates = state.candidates ?? [];
-        const credibility = await this.intelligenceService.evaluateCredibility(
-          state.query,
-          candidates,
-        );
+        const result: CandidateCredibilityResult =
+          await this.intelligenceService.evaluateCredibility(
+            state.query,
+            candidates,
+          );
 
         return {
-          credibility,
+          credibility: result.credibility,
+          evidenceList: result.evidenceList,
         };
       },
       agent5_competition_summary: async (state) => {
@@ -148,13 +110,28 @@ export class QuickResearchLangGraph implements WorkflowGraphRunner {
             credibility: state.credibility ?? [],
           });
 
+        const confidenceAnalysis =
+          await this.intelligenceService.analyzeQuickResearchOverall({
+            query: state.query,
+            overview: state.industryOverview ?? "No overview",
+            heatConclusion:
+              state.heatAnalysis?.heatConclusion ?? "No heat conclusion",
+            candidates: state.candidates ?? [],
+            credibility: state.credibility ?? [],
+            competitionSummary,
+            news: state.news ?? [],
+            evidenceList: state.evidenceList ?? [],
+          });
+
         const finalReport = this.intelligenceService.buildFinalReport({
-          overview: state.industryOverview ?? "暂无行业概览",
+          overview: state.industryOverview ?? "No overview",
           heatScore: state.heatAnalysis?.heatScore ?? 50,
-          heatConclusion: state.heatAnalysis?.heatConclusion ?? "热度信息不足",
+          heatConclusion:
+            state.heatAnalysis?.heatConclusion ?? "No heat conclusion",
           candidates: state.candidates ?? [],
           credibility: state.credibility ?? [],
           competitionSummary,
+          confidenceAnalysis,
         });
 
         return {
@@ -189,6 +166,7 @@ export class QuickResearchLangGraph implements WorkflowGraphRunner {
       return {
         intent: quickState.intent,
         industryOverview: quickState.industryOverview,
+        newsCount: quickState.news?.length ?? 0,
       };
     }
 
@@ -234,6 +212,8 @@ export class QuickResearchLangGraph implements WorkflowGraphRunner {
     if (nodeKey === "agent5_competition_summary") {
       return {
         topPickCount: quickState.finalReport?.topPicks.length ?? 0,
+        confidenceStatus:
+          quickState.finalReport?.confidenceAnalysis?.status ?? "UNAVAILABLE",
       };
     }
 
@@ -288,7 +268,7 @@ export class QuickResearchLangGraph implements WorkflowGraphRunner {
 
       await params.hooks?.onNodeStarted?.(nodeKey);
       await params.hooks?.onNodeProgress?.(nodeKey, {
-        message: "节点执行中",
+        message: "Node is running",
       });
 
       state = {

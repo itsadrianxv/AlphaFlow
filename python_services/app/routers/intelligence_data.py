@@ -8,9 +8,17 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.contracts.intelligence import (
+    ConfidenceAnalysis,
+    ConfidenceCheckBatchRequest,
+    ConfidenceCheckBatchResponse,
+    ConfidenceCheckRequest,
+)
 from app.services.intelligence_data_adapter import IntelligenceDataAdapter
+from app.services.confidence_analysis_service import ConfidenceAnalysisService
 
 router = APIRouter()
+confidence_analysis_service = ConfidenceAnalysisService()
 
 
 class ThemeNewsItem(BaseModel):
@@ -193,3 +201,29 @@ async def get_company_evidence_batch(request: EvidenceBatchRequest):
         )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"批量获取公司证据失败: {exc}") from exc
+
+
+@router.post(
+    "/intelligence/confidence/check",
+    response_model=ConfidenceAnalysis,
+    summary="Run confidence analysis for a generated response",
+)
+async def run_confidence_check(request: ConfidenceCheckRequest):
+    try:
+        return confidence_analysis_service.check(request)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"可信度分析失败: {exc}") from exc
+
+
+@router.post(
+    "/intelligence/confidence/check-batch",
+    response_model=ConfidenceCheckBatchResponse,
+    summary="Run batch confidence analysis",
+)
+async def run_confidence_check_batch(request: ConfidenceCheckBatchRequest):
+    try:
+        return ConfidenceCheckBatchResponse(
+            items=confidence_analysis_service.check_batch(request.items)
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"批量可信度分析失败: {exc}") from exc

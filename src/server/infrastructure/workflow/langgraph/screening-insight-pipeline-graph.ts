@@ -1,4 +1,5 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
+import type { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import type { InsightDataClient } from "~/server/application/intelligence/insight-archive-service";
 import {
   buildInsightEvidenceRefs,
@@ -10,6 +11,11 @@ import type {
 } from "~/server/application/intelligence/insight-synthesis-service";
 import type { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { ScreeningInsight } from "~/server/domain/intelligence/aggregates/screening-insight";
+import type {
+  ConfidenceAnalysisStatus,
+  ConfidenceLevel,
+} from "~/server/domain/intelligence/confidence";
+import { summarizeConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import { EvidenceReference } from "~/server/domain/intelligence/entities/evidence-reference";
 import type { IScreeningInsightRepository } from "~/server/domain/intelligence/repositories/screening-insight-repository";
 import type { InsightQualityFlag } from "~/server/domain/intelligence/types";
@@ -74,6 +80,7 @@ export type ScreeningInsightPipelineGraphDependencies = {
   insightRepository: IScreeningInsightRepository;
   dataClient: InsightDataClient;
   synthesisService: InsightSynthesisService;
+  confidenceAnalysisService: ConfidenceAnalysisService;
   reminderSchedulingService: ReminderSchedulingService;
   maxInsightsPerSession?: number;
 };
@@ -108,6 +115,10 @@ function toInsightCard(params: {
   draft: SynthesizedInsightDraft;
   existing?: ScreeningInsight | null;
 }): ScreeningInsightPipelineInsightCard {
+  const confidenceSummary = summarizeConfidenceAnalysis(
+    params.draft.confidenceAnalysis,
+  );
+
   return {
     insightId: params.existing?.id,
     latestVersionId: params.existing?.latestVersionId,
@@ -124,6 +135,13 @@ function toInsightCard(params: {
     catalysts: params.draft.catalysts.map((item) => item.toDict()),
     reviewPlan: params.draft.reviewPlan.toDict(),
     evidenceRefs: params.draft.evidenceRefs.map((item) => item.toDict()),
+    confidenceAnalysis: params.draft.confidenceAnalysis,
+    confidenceScore: confidenceSummary.confidenceScore,
+    confidenceLevel: confidenceSummary.confidenceLevel,
+    confidenceStatus: confidenceSummary.confidenceStatus,
+    supportedClaimCount: confidenceSummary.supportedClaimCount,
+    insufficientClaimCount: confidenceSummary.insufficientClaimCount,
+    contradictedClaimCount: confidenceSummary.contradictedClaimCount,
     existingInsightId: params.existing?.id,
     existingVersion: params.existing?.version,
     existingLatestVersionId: params.existing?.latestVersionId,
@@ -153,6 +171,16 @@ function toInsightAggregate(
       EvidenceReference.fromDict(item),
     ),
     qualityFlags: card.qualityFlags as InsightQualityFlag[],
+    confidenceAnalysis: card.confidenceAnalysis,
+    confidenceScore: card.confidenceScore,
+    confidenceLevel:
+      (card.confidenceLevel as ConfidenceLevel | undefined) ?? "unknown",
+    confidenceStatus:
+      (card.confidenceStatus as ConfidenceAnalysisStatus | undefined) ??
+      "UNAVAILABLE",
+    supportedClaimCount: card.supportedClaimCount,
+    insufficientClaimCount: card.insufficientClaimCount,
+    contradictedClaimCount: card.contradictedClaimCount,
     status: card.status,
     version: card.existingVersion ?? 1,
     latestVersionId: card.existingLatestVersionId,
@@ -169,6 +197,7 @@ export class ScreeningInsightPipelineLangGraph implements WorkflowGraphRunner {
   private readonly insightRepository: IScreeningInsightRepository;
   private readonly dataClient: InsightDataClient;
   private readonly synthesisService: InsightSynthesisService;
+  private readonly confidenceAnalysisService: ConfidenceAnalysisService;
   private readonly reminderSchedulingService: ReminderSchedulingService;
   private readonly maxInsightsPerSession: number;
   private readonly nodeExecutors: Record<
@@ -181,6 +210,7 @@ export class ScreeningInsightPipelineLangGraph implements WorkflowGraphRunner {
     this.insightRepository = dependencies.insightRepository;
     this.dataClient = dependencies.dataClient;
     this.synthesisService = dependencies.synthesisService;
+    this.confidenceAnalysisService = dependencies.confidenceAnalysisService;
     this.reminderSchedulingService = dependencies.reminderSchedulingService;
     this.maxInsightsPerSession = dependencies.maxInsightsPerSession ?? 10;
     this.nodeExecutors = {
@@ -268,6 +298,15 @@ export class ScreeningInsightPipelineLangGraph implements WorkflowGraphRunner {
             factsBundle: item.factsBundle as never,
             evidenceRefs,
           });
+          const confidenceAnalysis =
+            await this.confidenceAnalysisService.analyzeScreeningInsight({
+              stockCode: item.stockCode,
+              stockName: item.stockName,
+              thesis: draft.thesis,
+              risks: draft.risks,
+              catalysts: draft.catalysts,
+              evidenceRefs,
+            });
           const existing =
             await this.insightRepository.findBySessionAndStockCode(
               sessionId,
@@ -279,7 +318,10 @@ export class ScreeningInsightPipelineLangGraph implements WorkflowGraphRunner {
               stockCode: item.stockCode,
               stockName: item.stockName,
               score: item.score,
-              draft,
+              draft: {
+                ...draft,
+                confidenceAnalysis,
+              },
               existing,
             }),
           );
@@ -330,6 +372,13 @@ export class ScreeningInsightPipelineLangGraph implements WorkflowGraphRunner {
             status: saved.status,
             summary: saved.summary,
             nextReviewAt: saved.reviewPlan.nextReviewAt.toISOString(),
+            confidenceAnalysis: saved.confidenceAnalysis,
+            confidenceScore: saved.confidenceScore,
+            confidenceLevel: saved.confidenceLevel,
+            confidenceStatus: saved.confidenceStatus,
+            supportedClaimCount: saved.supportedClaimCount,
+            insufficientClaimCount: saved.insufficientClaimCount,
+            contradictedClaimCount: saved.contradictedClaimCount,
           });
         }
 
@@ -557,6 +606,12 @@ export class ScreeningInsightPipelineLangGraph implements WorkflowGraphRunner {
         status: item.status,
         nextReviewAt: item.nextReviewAt,
         qualityFlags: item.qualityFlags,
+        confidenceScore: item.confidenceScore,
+        confidenceLevel: item.confidenceLevel,
+        confidenceStatus: item.confidenceStatus,
+        supportedClaimCount: item.supportedClaimCount,
+        insufficientClaimCount: item.insufficientClaimCount,
+        contradictedClaimCount: item.contradictedClaimCount,
       })),
     };
   }

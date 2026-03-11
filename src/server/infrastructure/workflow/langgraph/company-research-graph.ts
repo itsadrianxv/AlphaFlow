@@ -45,7 +45,7 @@ function toResearchInput(input: Record<string, unknown>): CompanyResearchInput {
   const companyName =
     typeof input.companyName === "string" && input.companyName.trim().length > 0
       ? input.companyName.trim()
-      : "未知公司";
+      : "Unknown company";
 
   return {
     companyName,
@@ -78,6 +78,15 @@ function toResearchInput(input: Record<string, unknown>): CompanyResearchInput {
   };
 }
 
+function createFallbackBrief(state: CompanyResearchGraphState) {
+  return {
+    companyName: state.researchInput.companyName,
+    researchGoal: state.query,
+    focusConcepts: state.researchInput.focusConcepts ?? [],
+    keyQuestions: [],
+  };
+}
+
 export class CompanyResearchLangGraph implements WorkflowGraphRunner {
   readonly templateCode = COMPANY_RESEARCH_TEMPLATE_CODE;
 
@@ -100,12 +109,7 @@ export class CompanyResearchLangGraph implements WorkflowGraphRunner {
       agent2_concept_mapping: async (state) => {
         const conceptInsights =
           await this.companyResearchService.mapConceptInsights(
-            state.brief ?? {
-              companyName: state.researchInput.companyName,
-              researchGoal: state.query,
-              focusConcepts: state.researchInput.focusConcepts ?? [],
-              keyQuestions: [],
-            },
+            state.brief ?? createFallbackBrief(state),
           );
 
         return {
@@ -115,12 +119,7 @@ export class CompanyResearchLangGraph implements WorkflowGraphRunner {
       agent3_question_design: async (state) => {
         const deepQuestions =
           await this.companyResearchService.designDeepQuestions({
-            brief: state.brief ?? {
-              companyName: state.researchInput.companyName,
-              researchGoal: state.query,
-              focusConcepts: state.researchInput.focusConcepts ?? [],
-              keyQuestions: [],
-            },
+            brief: state.brief ?? createFallbackBrief(state),
             conceptInsights: state.conceptInsights ?? [],
           });
 
@@ -130,12 +129,7 @@ export class CompanyResearchLangGraph implements WorkflowGraphRunner {
       },
       agent4_evidence_collection: async (state) => {
         const collected = await this.companyResearchService.collectEvidence({
-          brief: state.brief ?? {
-            companyName: state.researchInput.companyName,
-            researchGoal: state.query,
-            focusConcepts: state.researchInput.focusConcepts ?? [],
-            keyQuestions: [],
-          },
+          brief: state.brief ?? createFallbackBrief(state),
           questions: state.deepQuestions ?? [],
         });
 
@@ -145,12 +139,7 @@ export class CompanyResearchLangGraph implements WorkflowGraphRunner {
         };
       },
       agent5_investment_synthesis: async (state) => {
-        const brief = state.brief ?? {
-          companyName: state.researchInput.companyName,
-          researchGoal: state.query,
-          focusConcepts: state.researchInput.focusConcepts ?? [],
-          keyQuestions: [],
-        };
+        const brief = state.brief ?? createFallbackBrief(state);
         const findings = await this.companyResearchService.answerQuestions({
           brief,
           questions: state.deepQuestions ?? [],
@@ -161,6 +150,13 @@ export class CompanyResearchLangGraph implements WorkflowGraphRunner {
           conceptInsights: state.conceptInsights ?? [],
           findings,
         });
+        const confidenceAnalysis =
+          await this.companyResearchService.analyzeConfidence({
+            brief,
+            findings,
+            verdict,
+            evidence: state.evidence ?? [],
+          });
         const finalReport = this.companyResearchService.buildFinalReport({
           brief,
           conceptInsights: state.conceptInsights ?? [],
@@ -171,9 +167,10 @@ export class CompanyResearchLangGraph implements WorkflowGraphRunner {
             provider: "firecrawl",
             configured: false,
             queries: [],
-            notes: ["未产生抓取摘要"],
+            notes: ["No crawler notes available."],
           },
           verdict,
+          confidenceAnalysis,
         });
 
         return {
@@ -254,6 +251,8 @@ export class CompanyResearchLangGraph implements WorkflowGraphRunner {
     if (nodeKey === "agent5_investment_synthesis") {
       return {
         findingCount: companyState.findings?.length ?? 0,
+        confidenceStatus:
+          companyState.finalReport?.confidenceAnalysis?.status ?? "UNAVAILABLE",
       };
     }
 
@@ -308,7 +307,7 @@ export class CompanyResearchLangGraph implements WorkflowGraphRunner {
 
       await params.hooks?.onNodeStarted?.(nodeKey);
       await params.hooks?.onNodeProgress?.(nodeKey, {
-        message: "节点执行中",
+        message: "Node is running",
       });
 
       state = {

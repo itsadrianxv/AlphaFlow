@@ -1,3 +1,8 @@
+import type { ConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
+import type {
+  CompanyEvidence,
+  ThemeNewsItem,
+} from "~/server/domain/intelligence/types";
 import type {
   MarketRegimeAnalysis,
   MarketRegimeSnapshot,
@@ -171,6 +176,7 @@ export type QuickResearchCredibility = {
   credibilityScore: number;
   highlights: string[];
   risks: string[];
+  confidenceAnalysis?: ConfidenceAnalysis;
 };
 
 export type QuickResearchTopPick = {
@@ -187,6 +193,7 @@ export type QuickResearchResultDto = {
   credibility: QuickResearchCredibility[];
   topPicks: QuickResearchTopPick[];
   competitionSummary: string;
+  confidenceAnalysis?: ConfidenceAnalysis;
   generatedAt: string;
 };
 
@@ -204,12 +211,14 @@ export type QuickResearchGraphState = WorkflowGraphState & {
   currentNodeKey?: QuickResearchNodeKey;
   intent?: string;
   industryOverview?: string;
+  news?: ThemeNewsItem[];
   heatAnalysis?: {
     heatScore: number;
     heatConclusion: string;
   };
   candidates?: QuickResearchCandidate[];
   credibility?: QuickResearchCredibility[];
+  evidenceList?: CompanyEvidence[];
   competition?: string;
   finalReport?: QuickResearchResultDto;
 };
@@ -285,6 +294,7 @@ export type CompanyResearchResultDto = {
     queries: string[];
     notes: string[];
   };
+  confidenceAnalysis?: ConfidenceAnalysis;
   generatedAt: string;
 };
 
@@ -392,6 +402,13 @@ export type ScreeningInsightPipelineInsightCard = {
   catalysts: Record<string, unknown>[];
   reviewPlan: Record<string, unknown>;
   evidenceRefs: Record<string, unknown>[];
+  confidenceAnalysis?: ConfidenceAnalysis;
+  confidenceScore?: number | null;
+  confidenceLevel?: ConfidenceAnalysis["level"];
+  confidenceStatus?: ConfidenceAnalysis["status"];
+  supportedClaimCount?: number;
+  insufficientClaimCount?: number;
+  contradictedClaimCount?: number;
   existingInsightId?: string;
   existingVersion?: number;
   existingLatestVersionId?: string;

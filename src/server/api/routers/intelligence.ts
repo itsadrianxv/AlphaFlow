@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import { InsightArchiveService } from "~/server/application/intelligence/insight-archive-service";
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
@@ -11,6 +12,7 @@ import { ScreeningSessionStatus } from "~/server/domain/screening/enums/screenin
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
 import { PrismaScreeningInsightRepository } from "~/server/infrastructure/intelligence/prisma-screening-insight-repository";
+import { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
 import { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
 import { PrismaScreeningSessionRepository } from "~/server/infrastructure/screening/prisma-screening-session-repository";
 
@@ -21,6 +23,9 @@ const paginationSchema = z.object({
 
 function createArchiveService(db: PrismaClient) {
   const reminderRepository = new PrismaResearchReminderRepository(db);
+  const confidenceAnalysisService = new ConfidenceAnalysisService({
+    client: new PythonConfidenceAnalysisClient(),
+  });
 
   return new InsightArchiveService({
     insightRepository: new PrismaScreeningInsightRepository(db),
@@ -30,6 +35,7 @@ function createArchiveService(db: PrismaClient) {
       reviewPlanPolicy: new ReviewPlanPolicy(),
       qualityService: new InsightQualityService(),
     }),
+    confidenceAnalysisService,
     reminderSchedulingService: new ReminderSchedulingService({
       reminderRepository,
     }),
@@ -56,6 +62,12 @@ export const intelligenceRouter = createTRPCRouter({
         summary: item.summary,
         status: item.status,
         version: item.version,
+        confidenceScore: item.confidenceScore,
+        confidenceLevel: item.confidenceLevel,
+        confidenceStatus: item.confidenceStatus,
+        supportedClaimCount: item.supportedClaimCount,
+        insufficientClaimCount: item.insufficientClaimCount,
+        contradictedClaimCount: item.contradictedClaimCount,
         nextReviewAt: item.reviewPlan.nextReviewAt,
         qualityFlags: [...item.qualityFlags],
         updatedAt: item.updatedAt,
@@ -90,6 +102,13 @@ export const intelligenceRouter = createTRPCRouter({
         reviewPlan: insight.reviewPlan.toDict(),
         evidenceRefs: insight.evidenceRefs.map((item) => item.toDict()),
         qualityFlags: [...insight.qualityFlags],
+        confidenceScore: insight.confidenceScore,
+        confidenceLevel: insight.confidenceLevel,
+        confidenceStatus: insight.confidenceStatus,
+        supportedClaimCount: insight.supportedClaimCount,
+        insufficientClaimCount: insight.insufficientClaimCount,
+        contradictedClaimCount: insight.contradictedClaimCount,
+        confidenceAnalysis: insight.confidenceAnalysis,
         status: insight.status,
         version: insight.version,
         latestVersionId: insight.latestVersionId,
@@ -125,6 +144,12 @@ export const intelligenceRouter = createTRPCRouter({
         summary: item.summary,
         status: item.status,
         version: item.version,
+        confidenceScore: item.confidenceScore,
+        confidenceLevel: item.confidenceLevel,
+        confidenceStatus: item.confidenceStatus,
+        supportedClaimCount: item.supportedClaimCount,
+        insufficientClaimCount: item.insufficientClaimCount,
+        contradictedClaimCount: item.contradictedClaimCount,
         nextReviewAt: item.reviewPlan.nextReviewAt,
         qualityFlags: [...item.qualityFlags],
       }));

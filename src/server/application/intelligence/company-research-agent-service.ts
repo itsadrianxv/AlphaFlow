@@ -1,3 +1,4 @@
+import type { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import type {
   CompanyConceptInsight,
   CompanyEvidenceNote,
@@ -18,6 +19,7 @@ import type {
 export type CompanyResearchAgentServiceDependencies = {
   deepSeekClient: DeepSeekClient;
   firecrawlClient: FirecrawlClient;
+  confidenceAnalysisService: ConfidenceAnalysisService;
 };
 
 function normalizeUrl(url?: string) {
@@ -247,10 +249,12 @@ function buildSearchQueries(
 export class CompanyResearchAgentService {
   private readonly deepSeekClient: DeepSeekClient;
   private readonly firecrawlClient: FirecrawlClient;
+  private readonly confidenceAnalysisService: ConfidenceAnalysisService;
 
   constructor(dependencies: CompanyResearchAgentServiceDependencies) {
     this.deepSeekClient = dependencies.deepSeekClient;
     this.firecrawlClient = dependencies.firecrawlClient;
+    this.confidenceAnalysisService = dependencies.confidenceAnalysisService;
   }
 
   async buildResearchBrief(
@@ -460,6 +464,15 @@ export class CompanyResearchAgentService {
     );
   }
 
+  async analyzeConfidence(params: {
+    brief: CompanyResearchBrief;
+    findings: CompanyQuestionFinding[];
+    verdict: CompanyResearchVerdict;
+    evidence: CompanyEvidenceNote[];
+  }) {
+    return this.confidenceAnalysisService.analyzeCompanyResearch(params);
+  }
+
   buildFinalReport(params: {
     brief: CompanyResearchBrief;
     conceptInsights: CompanyConceptInsight[];
@@ -468,6 +481,7 @@ export class CompanyResearchAgentService {
     evidence: CompanyEvidenceNote[];
     crawler: CompanyResearchResultDto["crawler"];
     verdict: CompanyResearchVerdict;
+    confidenceAnalysis?: CompanyResearchResultDto["confidenceAnalysis"];
   }): CompanyResearchResultDto {
     return {
       brief: params.brief,
@@ -477,6 +491,7 @@ export class CompanyResearchAgentService {
       evidence: params.evidence,
       crawler: params.crawler,
       verdict: params.verdict,
+      confidenceAnalysis: params.confidenceAnalysis,
       generatedAt: new Date().toISOString(),
     };
   }

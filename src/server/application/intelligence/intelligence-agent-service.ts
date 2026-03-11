@@ -1,4 +1,5 @@
-﻿import type {
+import type { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
+import type {
   CompanyEvidence,
   ThemeNewsItem,
 } from "~/server/domain/intelligence/types";
@@ -19,9 +20,15 @@ export type MarketHeatAnalysis = {
   news: ThemeNewsItem[];
 };
 
+export type CandidateCredibilityResult = {
+  credibility: QuickResearchCredibility[];
+  evidenceList: CompanyEvidence[];
+};
+
 export type IntelligenceAgentServiceDependencies = {
   deepSeekClient: DeepSeekClient;
   dataClient: PythonIntelligenceDataClient;
+  confidenceAnalysisService: ConfidenceAnalysisService;
 };
 
 function buildHeatScore(news: ThemeNewsItem[]) {
@@ -61,7 +68,10 @@ function mapEvidenceToCredibility(
   return {
     stockCode: evidence.stockCode,
     credibilityScore: evidence.credibilityScore || fallbackScore,
-    highlights: evidence.catalysts,
+    highlights:
+      evidence.catalysts.length > 0
+        ? evidence.catalysts
+        : [evidence.evidenceSummary],
     risks: evidence.risks,
   };
 }
@@ -86,10 +96,12 @@ function mapCandidateToQuickResearch(
 export class IntelligenceAgentService {
   private readonly deepSeekClient: DeepSeekClient;
   private readonly dataClient: PythonIntelligenceDataClient;
+  private readonly confidenceAnalysisService: ConfidenceAnalysisService;
 
   constructor(dependencies: IntelligenceAgentServiceDependencies) {
     this.deepSeekClient = dependencies.deepSeekClient;
     this.dataClient = dependencies.dataClient;
+    this.confidenceAnalysisService = dependencies.confidenceAnalysisService;
   }
 
   async generateIndustryOverview(
@@ -192,11 +204,13 @@ export class IntelligenceAgentService {
   async evaluateCredibility(
     concept: string,
     candidates: QuickResearchCandidate[],
-  ): Promise<QuickResearchCredibility[]> {
-    const evidenceList = await this.dataClient.getEvidenceBatch({
-      concept,
-      stockCodes: candidates.map((candidate) => candidate.stockCode),
-    });
+  ): Promise<CandidateCredibilityResult> {
+    const evidenceList = await this.dataClient
+      .getEvidenceBatch({
+        concept,
+        stockCodes: candidates.map((candidate) => candidate.stockCode),
+      })
+      .catch(() => []);
 
     const mapped = new Map(
       evidenceList.map((evidence) => [
@@ -205,7 +219,7 @@ export class IntelligenceAgentService {
       ]),
     );
 
-    return candidates.map((candidate, index) => {
+    const credibility = candidates.map((candidate, index) => {
       return (
         mapped.get(candidate.stockCode) ?? {
           stockCode: candidate.stockCode,
@@ -215,6 +229,22 @@ export class IntelligenceAgentService {
         }
       );
     });
+
+    const analyses =
+      await this.confidenceAnalysisService.analyzeQuickResearchCandidates({
+        query: concept,
+        candidates,
+        credibility,
+        evidenceList,
+      });
+
+    return {
+      credibility: credibility.map((item) => ({
+        ...item,
+        confidenceAnalysis: analyses.get(item.stockCode),
+      })),
+      evidenceList,
+    };
   }
 
   async summarizeCompetition(params: {
@@ -246,6 +276,19 @@ export class IntelligenceAgentService {
       .catch(() => fallback);
   }
 
+  async analyzeQuickResearchOverall(params: {
+    query: string;
+    overview: string;
+    heatConclusion: string;
+    candidates: QuickResearchCandidate[];
+    credibility: QuickResearchCredibility[];
+    competitionSummary: string;
+    news: ThemeNewsItem[];
+    evidenceList: CompanyEvidence[];
+  }) {
+    return this.confidenceAnalysisService.analyzeQuickResearchOverall(params);
+  }
+
   buildFinalReport(params: {
     overview: string;
     heatScore: number;
@@ -253,6 +296,7 @@ export class IntelligenceAgentService {
     candidates: QuickResearchCandidate[];
     credibility: QuickResearchCredibility[];
     competitionSummary: string;
+    confidenceAnalysis?: QuickResearchResultDto["confidenceAnalysis"];
   }): QuickResearchResultDto {
     const topCredibility = [...params.credibility].sort(
       (left, right) => right.credibilityScore - left.credibilityScore,
@@ -278,6 +322,7 @@ export class IntelligenceAgentService {
       credibility: params.credibility,
       topPicks,
       competitionSummary: params.competitionSummary,
+      confidenceAnalysis: params.confidenceAnalysis,
       generatedAt: new Date().toISOString(),
     };
   }

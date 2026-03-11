@@ -195,6 +195,12 @@ model ScreeningInsight {
     summary           String
     nextReviewAt      DateTime?
     qualityFlags      String[]
+    confidenceScore   Float?
+    confidenceLevel   String                 @default("unknown")
+    confidenceStatus  String                 @default("UNAVAILABLE")
+    supportedClaimCount Int                  @default(0)
+    insufficientClaimCount Int               @default(0)
+    contradictedClaimCount Int               @default(0)
     latestVersionId   String?
     currentVersion    Int                    @default(1)
     createdAt         DateTime               @default(now())
@@ -222,6 +228,7 @@ model ScreeningInsightVersion {
     reviewPlanJson   Json
     evidenceRefsJson Json
     qualityFlagsJson Json
+    confidenceAnalysisJson Json?
     createdAt        DateTime         @default(now())
     insight          ScreeningInsight @relation(fields: [insightId], references: [id], onDelete: Cascade)
 

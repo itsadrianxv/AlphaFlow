@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "~/generated/prisma";
 import { ScreeningInsight } from "~/server/domain/intelligence/aggregates/screening-insight";
+import type { ConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import { EvidenceReference } from "~/server/domain/intelligence/entities/evidence-reference";
 import { ScreeningInsightVersion } from "~/server/domain/intelligence/entities/screening-insight-version";
 import type { IScreeningInsightRepository } from "~/server/domain/intelligence/repositories/screening-insight-repository";
@@ -24,6 +25,12 @@ type InsightRecord = {
   summary: string;
   nextReviewAt: Date | null;
   qualityFlags: string[];
+  confidenceScore: number | null;
+  confidenceLevel: string;
+  confidenceStatus: string;
+  supportedClaimCount: number;
+  insufficientClaimCount: number;
+  contradictedClaimCount: number;
   latestVersionId: string | null;
   currentVersion: number;
   createdAt: Date;
@@ -41,6 +48,7 @@ type InsightVersionRecord = {
   reviewPlanJson: unknown;
   evidenceRefsJson: unknown;
   qualityFlagsJson: unknown;
+  confidenceAnalysisJson: unknown;
   createdAt: Date;
 };
 
@@ -59,6 +67,7 @@ function serializeInsightVersion(
     reviewPlanJson: toJson(insight.reviewPlan.toDict()),
     evidenceRefsJson: toJson(insight.evidenceRefs.map((item) => item.toDict())),
     qualityFlagsJson: toJson([...insight.qualityFlags]),
+    confidenceAnalysisJson: toJson(insight.confidenceAnalysis ?? null),
   };
 }
 
@@ -74,6 +83,7 @@ function versionContentEquals(
     reviewPlanJson: insight.reviewPlan.toDict(),
     evidenceRefsJson: insight.evidenceRefs.map((item) => item.toDict()),
     qualityFlagsJson: [...insight.qualityFlags],
+    confidenceAnalysisJson: insight.confidenceAnalysis ?? null,
   };
 
   const stored = {
@@ -117,6 +127,17 @@ function toDomain(
       versionRecord.evidenceRefsJson as Record<string, unknown>[]
     ).map((item) => EvidenceReference.fromDict(item)),
     qualityFlags: versionRecord.qualityFlagsJson as InsightQualityFlag[],
+    confidenceAnalysis: (versionRecord.confidenceAnalysisJson ?? undefined) as
+      | ConfidenceAnalysis
+      | undefined,
+    confidenceScore: record.confidenceScore,
+    confidenceLevel:
+      record.confidenceLevel as ScreeningInsight["confidenceLevel"],
+    confidenceStatus:
+      record.confidenceStatus as ScreeningInsight["confidenceStatus"],
+    supportedClaimCount: record.supportedClaimCount,
+    insufficientClaimCount: record.insufficientClaimCount,
+    contradictedClaimCount: record.contradictedClaimCount,
     status: record.status as ScreeningInsight["status"],
     version: record.currentVersion,
     latestVersionId: record.latestVersionId ?? undefined,
@@ -148,6 +169,9 @@ function toVersionDomain(
       (item) => EvidenceReference.fromDict(item),
     ),
     qualityFlags: record.qualityFlagsJson as InsightQualityFlag[],
+    confidenceAnalysis: (record.confidenceAnalysisJson ?? undefined) as
+      | ConfidenceAnalysis
+      | undefined,
     createdAt: record.createdAt,
   });
 }
@@ -182,6 +206,12 @@ export class PrismaScreeningInsightRepository
             summary: insight.summary,
             nextReviewAt: insight.reviewPlan.nextReviewAt,
             qualityFlags: [...insight.qualityFlags],
+            confidenceScore: insight.confidenceScore,
+            confidenceLevel: insight.confidenceLevel,
+            confidenceStatus: insight.confidenceStatus,
+            supportedClaimCount: insight.supportedClaimCount,
+            insufficientClaimCount: insight.insufficientClaimCount,
+            contradictedClaimCount: insight.contradictedClaimCount,
             currentVersion: 1,
             createdAt: insight.createdAt,
             updatedAt: insight.updatedAt,
@@ -228,6 +258,12 @@ export class PrismaScreeningInsightRepository
             summary: insight.summary,
             nextReviewAt: insight.reviewPlan.nextReviewAt,
             qualityFlags: [...insight.qualityFlags],
+            confidenceScore: insight.confidenceScore,
+            confidenceLevel: insight.confidenceLevel,
+            confidenceStatus: insight.confidenceStatus,
+            supportedClaimCount: insight.supportedClaimCount,
+            insufficientClaimCount: insight.insufficientClaimCount,
+            contradictedClaimCount: insight.contradictedClaimCount,
             updatedAt: new Date(),
           },
         });
@@ -258,6 +294,12 @@ export class PrismaScreeningInsightRepository
           summary: insight.summary,
           nextReviewAt: insight.reviewPlan.nextReviewAt,
           qualityFlags: [...insight.qualityFlags],
+          confidenceScore: insight.confidenceScore,
+          confidenceLevel: insight.confidenceLevel,
+          confidenceStatus: insight.confidenceStatus,
+          supportedClaimCount: insight.supportedClaimCount,
+          insufficientClaimCount: insight.insufficientClaimCount,
+          contradictedClaimCount: insight.contradictedClaimCount,
           latestVersionId: createdVersion.id,
           currentVersion: nextVersion,
           updatedAt: new Date(),

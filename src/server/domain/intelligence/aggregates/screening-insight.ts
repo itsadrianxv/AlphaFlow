@@ -1,4 +1,10 @@
 import { v4 as uuidv4 } from "uuid";
+import type {
+  ConfidenceAnalysis,
+  ConfidenceAnalysisStatus,
+  ConfidenceLevel,
+} from "~/server/domain/intelligence/confidence";
+import { summarizeConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import { EvidenceReference } from "~/server/domain/intelligence/entities/evidence-reference";
 import { ScreeningInsightVersion } from "~/server/domain/intelligence/entities/screening-insight-version";
 import { InvalidInsightError } from "~/server/domain/intelligence/errors";
@@ -25,6 +31,13 @@ export type ScreeningInsightParams = {
   reviewPlan: ReviewPlan;
   evidenceRefs: EvidenceReference[];
   qualityFlags: InsightQualityFlag[];
+  confidenceAnalysis?: ConfidenceAnalysis;
+  confidenceScore?: number | null;
+  confidenceLevel?: ConfidenceLevel;
+  confidenceStatus?: ConfidenceAnalysisStatus;
+  supportedClaimCount?: number;
+  insufficientClaimCount?: number;
+  contradictedClaimCount?: number;
   status: ScreeningInsightStatus;
   version?: number;
   latestVersionId?: string;
@@ -52,6 +65,13 @@ export class ScreeningInsight {
   private readonly _reviewPlan: ReviewPlan;
   private readonly _evidenceRefs: readonly EvidenceReference[];
   private readonly _qualityFlags: readonly InsightQualityFlag[];
+  private readonly _confidenceAnalysis?: ConfidenceAnalysis;
+  private readonly _confidenceScore: number | null;
+  private readonly _confidenceLevel: ConfidenceLevel;
+  private readonly _confidenceStatus: ConfidenceAnalysisStatus;
+  private readonly _supportedClaimCount: number;
+  private readonly _insufficientClaimCount: number;
+  private readonly _contradictedClaimCount: number;
   private readonly _status: ScreeningInsightStatus;
   private readonly _version: number;
   private readonly _latestVersionId?: string;
@@ -72,6 +92,21 @@ export class ScreeningInsight {
     this._reviewPlan = params.reviewPlan;
     this._evidenceRefs = [...params.evidenceRefs];
     this._qualityFlags = [...params.qualityFlags];
+    const summary = summarizeConfidenceAnalysis(params.confidenceAnalysis);
+    this._confidenceAnalysis = params.confidenceAnalysis;
+    this._confidenceScore =
+      params.confidenceScore !== undefined
+        ? params.confidenceScore
+        : summary.confidenceScore;
+    this._confidenceLevel = params.confidenceLevel ?? summary.confidenceLevel;
+    this._confidenceStatus =
+      params.confidenceStatus ?? summary.confidenceStatus;
+    this._supportedClaimCount =
+      params.supportedClaimCount ?? summary.supportedClaimCount;
+    this._insufficientClaimCount =
+      params.insufficientClaimCount ?? summary.insufficientClaimCount;
+    this._contradictedClaimCount =
+      params.contradictedClaimCount ?? summary.contradictedClaimCount;
     this._status = params.status;
     this._version = params.version ?? 1;
     this._latestVersionId = params.latestVersionId;
@@ -129,6 +164,34 @@ export class ScreeningInsight {
 
   get qualityFlags(): readonly InsightQualityFlag[] {
     return this._qualityFlags;
+  }
+
+  get confidenceAnalysis(): ConfidenceAnalysis | undefined {
+    return this._confidenceAnalysis;
+  }
+
+  get confidenceScore(): number | null {
+    return this._confidenceScore;
+  }
+
+  get confidenceLevel(): ConfidenceLevel {
+    return this._confidenceLevel;
+  }
+
+  get confidenceStatus(): ConfidenceAnalysisStatus {
+    return this._confidenceStatus;
+  }
+
+  get supportedClaimCount(): number {
+    return this._supportedClaimCount;
+  }
+
+  get insufficientClaimCount(): number {
+    return this._insufficientClaimCount;
+  }
+
+  get contradictedClaimCount(): number {
+    return this._contradictedClaimCount;
   }
 
   get status(): ScreeningInsightStatus {
@@ -202,6 +265,7 @@ export class ScreeningInsight {
       reviewPlan: this._reviewPlan,
       evidenceRefs: [...this._evidenceRefs],
       qualityFlags: [...this._qualityFlags],
+      confidenceAnalysis: this._confidenceAnalysis,
       createdAt,
     });
   }
@@ -225,6 +289,13 @@ export class ScreeningInsight {
       reviewPlan: this._reviewPlan,
       evidenceRefs: [...this._evidenceRefs],
       qualityFlags: [...this._qualityFlags],
+      confidenceAnalysis: this._confidenceAnalysis,
+      confidenceScore: this._confidenceScore,
+      confidenceLevel: this._confidenceLevel,
+      confidenceStatus: this._confidenceStatus,
+      supportedClaimCount: this._supportedClaimCount,
+      insufficientClaimCount: this._insufficientClaimCount,
+      contradictedClaimCount: this._contradictedClaimCount,
       status: this._status,
       version: params.version,
       latestVersionId: params.latestVersionId,
@@ -248,6 +319,13 @@ export class ScreeningInsight {
       reviewPlan: this._reviewPlan.toDict(),
       evidenceRefs: this._evidenceRefs.map((item) => item.toDict()),
       qualityFlags: [...this._qualityFlags],
+      confidenceScore: this._confidenceScore,
+      confidenceLevel: this._confidenceLevel,
+      confidenceStatus: this._confidenceStatus,
+      supportedClaimCount: this._supportedClaimCount,
+      insufficientClaimCount: this._insufficientClaimCount,
+      contradictedClaimCount: this._contradictedClaimCount,
+      confidenceAnalysis: this._confidenceAnalysis,
       status: this._status,
       version: this._version,
       latestVersionId: this._latestVersionId,
@@ -279,6 +357,22 @@ export class ScreeningInsight {
         (item) => EvidenceReference.fromDict(item),
       ),
       qualityFlags: data.qualityFlags as InsightQualityFlag[],
+      confidenceAnalysis: data.confidenceAnalysis as
+        | ConfidenceAnalysis
+        | undefined,
+      confidenceScore:
+        (data.confidenceScore as number | null | undefined) ?? null,
+      confidenceLevel:
+        (data.confidenceLevel as ConfidenceLevel | undefined) ?? "unknown",
+      confidenceStatus:
+        (data.confidenceStatus as ConfidenceAnalysisStatus | undefined) ??
+        "UNAVAILABLE",
+      supportedClaimCount:
+        (data.supportedClaimCount as number | undefined) ?? 0,
+      insufficientClaimCount:
+        (data.insufficientClaimCount as number | undefined) ?? 0,
+      contradictedClaimCount:
+        (data.contradictedClaimCount as number | undefined) ?? 0,
       status: data.status as ScreeningInsightStatus,
       version: data.version as number,
       latestVersionId: data.latestVersionId as string | undefined,

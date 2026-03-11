@@ -76,6 +76,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `GET /api/intelligence/candidates?theme&limit`
 - `GET /api/intelligence/evidence/{stock_code}?concept`
 - `POST /api/intelligence/evidence/batch`
+- `POST /api/intelligence/confidence/check`
+- `POST /api/intelligence/confidence/check-batch`
 
 新增：
 
@@ -128,6 +130,14 @@ Screening provider：
 - `ZHIPU_WEB_SEARCH_MODEL`：模型名（可选，默认 `glm-4-plus`）
 - `ZHIPU_WEB_SEARCH_TIMEOUT_SECONDS`：请求超时秒数（可选，默认 `8`）
 - `ZHIPU_WEB_SEARCH_RETRIES`：失败重试次数（可选，默认 `2`）
+
+可信度分析：
+
+- `REFCHECKER_ENABLED`：是否启用 RefChecker 运行时（默认 `false`）
+- `REFCHECKER_MODEL`：RefChecker 使用的 LLM 模型名
+- `REFCHECKER_API_BASE`：可选自定义 API Base
+- `REFCHECKER_TIMEOUT_SECONDS`：请求超时秒数
+- `REFCHECKER_BATCH_SIZE`：批量处理大小
 
 规则存储：
 

@@ -12,7 +12,10 @@ import {
   statusTone,
   WorkspaceShell,
 } from "~/app/_components/ui";
-import { buildResearchDigest } from "~/app/workflows/research-view-models";
+import {
+  buildResearchDigest,
+  extractConfidenceAnalysis,
+} from "~/app/workflows/research-view-models";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   QUICK_RESEARCH_TEMPLATE_CODE,
@@ -44,12 +47,25 @@ function formatDate(value?: Date | null) {
   }).format(value);
 }
 
+function formatConfidenceLevel(level?: string) {
+  switch (level) {
+    case "high":
+      return "HIGH";
+    case "medium":
+      return "MEDIUM";
+    case "low":
+      return "LOW";
+    default:
+      return "UNKNOWN";
+  }
+}
+
 const statusLabels: Record<string, string> = {
-  PENDING: "等待执行",
-  RUNNING: "研究进行中",
-  SUCCEEDED: "结论已生成",
-  FAILED: "需要重跑",
-  CANCELLED: "已取消",
+  PENDING: "Waiting",
+  RUNNING: "Running",
+  SUCCEEDED: "Succeeded",
+  FAILED: "Failed",
+  CANCELLED: "Cancelled",
 };
 
 function getBackLink(templateCode?: string) {
@@ -102,11 +118,11 @@ function getSection(templateCode?: string) {
 
 function getTitle(templateCode?: string) {
   if (templateCode === COMPANY_RESEARCH_TEMPLATE_CODE) {
-    return "公司结论详情";
+    return "Company Conclusion";
   }
 
   if (templateCode === QUICK_RESEARCH_TEMPLATE_CODE) {
-    return "行业结论详情";
+    return "Industry Conclusion";
   }
 
   if (
@@ -115,10 +131,10 @@ function getTitle(templateCode?: string) {
     templateCode === WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE ||
     templateCode === TIMING_REVIEW_LOOP_TEMPLATE_CODE
   ) {
-    return "择时结论详情";
+    return "Timing Conclusion";
   }
 
-  return "研究结论详情";
+  return "Research Conclusion";
 }
 
 export function RunInvestorClient({ runId }: RunInvestorClientProps) {
@@ -158,7 +174,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
     currentNodeKey: run?.currentNodeKey,
     result: run?.result,
   });
-
+  const confidenceAnalysis = extractConfidenceAnalysis(run?.result);
   const nextSectionItems =
     digest.gaps.length > 0 ? digest.gaps : digest.nextActions;
 
@@ -167,14 +183,14 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
       section={getSection(run?.template.code)}
       eyebrow="Investment Conclusion"
       title={getTitle(run?.template.code)}
-      description="默认视图只保留一句话结论、多空要点、证据摘要与下一步动作；节点、事件与原始结果请移步调试页。"
+      description="Keep the main investment conclusion, evidence summary, risks, next actions, and confidence analysis in one place."
       actions={
         <>
           <Link href={getBackLink(run?.template.code)} className="app-button">
-            返回上一页
+            Back
           </Link>
           <Link href={`/workflows/${runId}/debug`} className="app-button">
-            查看调试信息
+            Debug View
           </Link>
           {run && (run.status === "RUNNING" || run.status === "PENDING") ? (
             <button
@@ -182,7 +198,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
               onClick={() => cancelMutation.mutate({ runId })}
               className="app-button app-button-danger"
             >
-              取消研究
+              Cancel
             </button>
           ) : null}
         </>
@@ -190,27 +206,27 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
       summary={
         <>
           <KpiCard
-            label="当前状态"
+            label="Status"
             value={run ? (statusLabels[run.status] ?? run.status) : "-"}
-            hint={run?.currentNodeKey ?? "结论页默认隐藏流程细节"}
+            hint={run?.currentNodeKey ?? "No active node"}
             tone={statusTone(run?.status)}
           />
           <KpiCard
-            label="发起时间"
+            label="Created"
             value={formatDate(run?.createdAt)}
-            hint="用于确认结论时效性"
+            hint="Run creation time"
             tone="neutral"
           />
           <KpiCard
-            label="完成时间"
+            label="Completed"
             value={formatDate(run?.completedAt)}
-            hint="运行中任务会持续刷新"
+            hint="Refreshes while the run is active"
             tone="info"
           />
           <KpiCard
-            label="核心指标"
+            label="Primary Metric"
             value={digest.metrics[0]?.value ?? "-"}
-            hint={digest.metrics[0]?.label ?? "暂无指标"}
+            hint={digest.metrics[0]?.label ?? "No metric"}
             tone={digest.verdictTone}
           />
         </>
@@ -218,13 +234,13 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
     >
       {runQuery.isLoading ? (
         <EmptyState
-          title="正在加载结论详情"
-          description="结果摘要会在读取完成后显示。"
+          title="Loading conclusion details"
+          description="The result summary will appear after the run data is loaded."
         />
       ) : !run ? (
         <EmptyState
-          title="未找到对应研究"
-          description="这条研究记录可能已被删除，或当前账号无权访问。"
+          title="Run not found"
+          description="The run may have been removed, or the current account may not have access to it."
         />
       ) : (
         <>
@@ -242,19 +258,99 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
 
           {run.errorMessage ? (
             <div className="rounded-[16px] border border-[rgba(201,119,132,0.34)] bg-[rgba(81,33,43,0.22)] px-4 py-3 text-sm text-[var(--app-danger)]">
-              {run.errorCode ? `${run.errorCode}：` : ""}
+              {run.errorCode ? `${run.errorCode}: ` : ""}
               {run.errorMessage}
             </div>
           ) : null}
 
           <Panel
-            title="关键指标"
-            description="这些指标帮助你快速判断这份研究值得不值得继续往下读。"
+            title="Confidence Analysis"
+            description="Adds support, insufficient-evidence, and contradiction signals without rewriting the original conclusion."
+          >
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+                <div className="text-xs text-[var(--app-text-soft)]">
+                  Confidence Score
+                </div>
+                <div className="app-data mt-2 text-lg text-[var(--app-text)]">
+                  {confidenceAnalysis?.finalScore ?? "N/A"}
+                </div>
+              </div>
+              <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+                <div className="text-xs text-[var(--app-text-soft)]">Level</div>
+                <div className="app-data mt-2 text-lg text-[var(--app-text)]">
+                  {formatConfidenceLevel(confidenceAnalysis?.level)}
+                </div>
+              </div>
+              <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+                <div className="text-xs text-[var(--app-text-soft)]">
+                  Supported/Insufficient/Contradicted
+                </div>
+                <div className="app-data mt-2 text-lg text-[var(--app-text)]">
+                  {confidenceAnalysis
+                    ? `${confidenceAnalysis.supportedCount}/${confidenceAnalysis.insufficientCount}/${confidenceAnalysis.contradictedCount}`
+                    : "0/0/0"}
+                </div>
+              </div>
+              <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+                <div className="text-xs text-[var(--app-text-soft)]">
+                  Evidence Coverage
+                </div>
+                <div className="app-data mt-2 text-lg text-[var(--app-text)]">
+                  {confidenceAnalysis
+                    ? `${confidenceAnalysis.evidenceCoverageScore}%`
+                    : "N/A"}
+                </div>
+              </div>
+            </div>
+
+            {confidenceAnalysis?.notes.length ? (
+              <div className="mt-4 grid gap-2">
+                {confidenceAnalysis.notes.map((note) => (
+                  <div
+                    key={note}
+                    className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.84)] px-3 py-2 text-sm leading-6 text-[var(--app-text-muted)]"
+                  >
+                    {note}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {confidenceAnalysis?.claims.length ? (
+              <div className="mt-4 grid gap-3">
+                {confidenceAnalysis.claims.map((claim) => (
+                  <details
+                    key={claim.claimId}
+                    className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.84)] px-4 py-3"
+                  >
+                    <summary className="cursor-pointer text-sm text-[var(--app-text)]">
+                      {claim.claimText}
+                    </summary>
+                    <div className="mt-3 space-y-2 text-sm text-[var(--app-text-muted)]">
+                      <p>Label: {claim.label}</p>
+                      <p>{claim.explanation}</p>
+                      {claim.matchedReferenceIds.length > 0 ? (
+                        <p>
+                          Matched references:{" "}
+                          {claim.matchedReferenceIds.join(", ")}
+                        </p>
+                      ) : null}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            ) : null}
+          </Panel>
+
+          <Panel
+            title="Key Metrics"
+            description="These metrics help judge whether the run is worth reading further."
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {digest.metrics.length === 0 ? (
                 <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3 text-sm text-[var(--app-text-muted)]">
-                  当前没有结构化指标，建议直接阅读结论摘要与后续动作。
+                  No structured metrics are available yet.
                 </div>
               ) : (
                 digest.metrics.map((metric) => (
@@ -276,27 +372,27 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
 
           <div className="grid gap-4 xl:grid-cols-2">
             <KeyPointList
-              title="多头理由"
+              title="Bull Case"
               items={digest.bullPoints}
-              emptyText="当前没有单独提炼多头理由。"
+              emptyText="No bull case has been extracted."
               tone="success"
             />
             <KeyPointList
-              title="风险与反证"
+              title="Risks"
               items={digest.bearPoints}
-              emptyText="当前没有单独提炼风险与反证。"
+              emptyText="No explicit risks have been extracted."
               tone="warning"
             />
             <KeyPointList
-              title="证据摘要"
+              title="Evidence Summary"
               items={digest.evidence}
-              emptyText="当前没有结构化证据摘要。"
+              emptyText="No structured evidence summary is available."
               tone="info"
             />
             <KeyPointList
-              title={digest.gaps.length > 0 ? "待核验缺口" : "建议动作"}
+              title={digest.gaps.length > 0 ? "Open Gaps" : "Next Actions"}
               items={nextSectionItems}
-              emptyText="当前没有单独列出待办动作。"
+              emptyText="No follow-up action is listed."
               tone="neutral"
             />
           </div>

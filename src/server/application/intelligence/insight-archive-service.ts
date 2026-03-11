@@ -1,3 +1,4 @@
+import type { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import {
   buildInsightEvidenceRefs,
   mapScreeningStockToFactsBundle,
@@ -17,6 +18,7 @@ export type InsightArchiveServiceDependencies = {
   insightRepository: IScreeningInsightRepository;
   dataClient: InsightDataClient;
   synthesisService: InsightSynthesisService;
+  confidenceAnalysisService: ConfidenceAnalysisService;
   reminderSchedulingService: ReminderSchedulingService;
   maxInsightsPerSession?: number;
 };
@@ -25,6 +27,7 @@ export class InsightArchiveService {
   private readonly insightRepository: IScreeningInsightRepository;
   private readonly dataClient: InsightDataClient;
   private readonly synthesisService: InsightSynthesisService;
+  private readonly confidenceAnalysisService: ConfidenceAnalysisService;
   private readonly reminderSchedulingService: ReminderSchedulingService;
   private readonly maxInsightsPerSession: number;
 
@@ -32,6 +35,7 @@ export class InsightArchiveService {
     this.insightRepository = dependencies.insightRepository;
     this.dataClient = dependencies.dataClient;
     this.synthesisService = dependencies.synthesisService;
+    this.confidenceAnalysisService = dependencies.confidenceAnalysisService;
     this.reminderSchedulingService = dependencies.reminderSchedulingService;
     this.maxInsightsPerSession = dependencies.maxInsightsPerSession ?? 10;
   }
@@ -60,6 +64,15 @@ export class InsightArchiveService {
         factsBundle,
         evidenceRefs,
       });
+      const confidenceAnalysis =
+        await this.confidenceAnalysisService.analyzeScreeningInsight({
+          stockCode: stock.stockCode.value,
+          stockName: stock.stockName,
+          thesis: draft.thesis,
+          risks: draft.risks,
+          catalysts: draft.catalysts,
+          evidenceRefs,
+        });
       const existing = await this.insightRepository.findBySessionAndStockCode(
         session.id,
         stock.stockCode.value,
@@ -79,6 +92,7 @@ export class InsightArchiveService {
         reviewPlan: draft.reviewPlan,
         evidenceRefs: draft.evidenceRefs,
         qualityFlags: draft.qualityFlags,
+        confidenceAnalysis,
         status: draft.status,
         version: existing?.version ?? 1,
         latestVersionId: existing?.latestVersionId,

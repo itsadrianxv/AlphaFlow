@@ -1,6 +1,11 @@
 import { WorkflowEventType, WorkflowNodeRunStatus } from "~/generated/prisma";
 import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
+import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
+import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
+import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
+import { InsightQualityService } from "~/server/domain/intelligence/services/insight-quality-service";
+import { ReviewPlanPolicy } from "~/server/domain/intelligence/services/review-plan-policy";
 import {
   WORKFLOW_ERROR_CODES,
   WorkflowDomainError,
@@ -12,10 +17,15 @@ import type {
 } from "~/server/domain/workflow/types";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import { FirecrawlClient } from "~/server/infrastructure/intelligence/firecrawl-client";
+import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
+import { PrismaScreeningInsightRepository } from "~/server/infrastructure/intelligence/prisma-screening-insight-repository";
+import { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
 import { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
+import { PrismaScreeningSessionRepository } from "~/server/infrastructure/screening/prisma-screening-session-repository";
 import { CompanyResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
 import { WorkflowGraphRegistry } from "~/server/infrastructure/workflow/langgraph/graph-registry";
 import { QuickResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
+import { ScreeningInsightPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph";
 import type { WorkflowGraphRunner } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
 import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
@@ -69,14 +79,30 @@ export function createWorkflowExecutionService(
     graphs?: WorkflowGraphRunner[];
   },
 ) {
+  const prisma = repository.getPrismaClient();
   const deepSeekClient = new DeepSeekClient();
+  const intelligenceDataClient = new PythonIntelligenceDataClient();
+  const confidenceAnalysisService = new ConfidenceAnalysisService({
+    client: new PythonConfidenceAnalysisClient(),
+  });
   const intelligenceService = new IntelligenceAgentService({
     deepSeekClient,
-    dataClient: new PythonIntelligenceDataClient(),
+    dataClient: intelligenceDataClient,
+    confidenceAnalysisService,
   });
   const companyResearchService = new CompanyResearchAgentService({
     deepSeekClient,
     firecrawlClient: new FirecrawlClient(),
+    confidenceAnalysisService,
+  });
+  const reminderRepository = new PrismaResearchReminderRepository(prisma);
+  const reminderSchedulingService = new ReminderSchedulingService({
+    reminderRepository,
+  });
+  const synthesisService = new InsightSynthesisService({
+    completionClient: deepSeekClient,
+    reviewPlanPolicy: new ReviewPlanPolicy(),
+    qualityService: new InsightQualityService(),
   });
 
   return new WorkflowExecutionService({
@@ -85,6 +111,16 @@ export function createWorkflowExecutionService(
     graphs: options?.graphs ?? [
       new QuickResearchLangGraph(intelligenceService),
       new CompanyResearchLangGraph(companyResearchService),
+      new ScreeningInsightPipelineLangGraph({
+        screeningSessionRepository: new PrismaScreeningSessionRepository(
+          prisma,
+        ),
+        insightRepository: new PrismaScreeningInsightRepository(prisma),
+        dataClient: intelligenceDataClient,
+        synthesisService,
+        confidenceAnalysisService,
+        reminderSchedulingService,
+      }),
     ],
   });
 }

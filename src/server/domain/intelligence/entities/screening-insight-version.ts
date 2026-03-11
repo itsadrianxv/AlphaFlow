@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import type { ConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import { EvidenceReference } from "~/server/domain/intelligence/entities/evidence-reference";
 import { InvalidInsightError } from "~/server/domain/intelligence/errors";
 import type { InsightQualityFlag } from "~/server/domain/intelligence/types";
@@ -17,6 +18,7 @@ export type ScreeningInsightVersionParams = {
   reviewPlan: ReviewPlan;
   evidenceRefs: EvidenceReference[];
   qualityFlags: InsightQualityFlag[];
+  confidenceAnalysis?: ConfidenceAnalysis;
   createdAt?: Date;
 };
 
@@ -30,6 +32,7 @@ export class ScreeningInsightVersion {
   private readonly _reviewPlan: ReviewPlan;
   private readonly _evidenceRefs: readonly EvidenceReference[];
   private readonly _qualityFlags: readonly InsightQualityFlag[];
+  private readonly _confidenceAnalysis?: ConfidenceAnalysis;
   private readonly _createdAt: Date;
 
   private constructor(params: ScreeningInsightVersionParams) {
@@ -42,6 +45,7 @@ export class ScreeningInsightVersion {
     this._reviewPlan = params.reviewPlan;
     this._evidenceRefs = [...params.evidenceRefs];
     this._qualityFlags = [...params.qualityFlags];
+    this._confidenceAnalysis = params.confidenceAnalysis;
     this._createdAt = params.createdAt ?? new Date();
   }
 
@@ -85,6 +89,10 @@ export class ScreeningInsightVersion {
     return this._qualityFlags;
   }
 
+  get confidenceAnalysis(): ConfidenceAnalysis | undefined {
+    return this._confidenceAnalysis;
+  }
+
   get createdAt(): Date {
     return this._createdAt;
   }
@@ -115,6 +123,7 @@ export class ScreeningInsightVersion {
       reviewPlan: this._reviewPlan.toDict(),
       evidenceRefs: this._evidenceRefs.map((item) => item.toDict()),
       qualityFlags: [...this._qualityFlags],
+      confidenceAnalysis: this._confidenceAnalysis,
       createdAt: this._createdAt.toISOString(),
     };
   }
@@ -138,6 +147,9 @@ export class ScreeningInsightVersion {
         (item) => EvidenceReference.fromDict(item),
       ),
       qualityFlags: data.qualityFlags as InsightQualityFlag[],
+      confidenceAnalysis: data.confidenceAnalysis as
+        | ConfidenceAnalysis
+        | undefined,
       createdAt: data.createdAt
         ? new Date(data.createdAt as string)
         : undefined,

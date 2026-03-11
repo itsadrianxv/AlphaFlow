@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import type { EvidenceReference } from "~/server/domain/intelligence/entities/evidence-reference";
 import type { InsightQualityService } from "~/server/domain/intelligence/services/insight-quality-service";
 import type { ReviewPlanPolicy } from "~/server/domain/intelligence/services/review-plan-policy";
@@ -62,6 +63,7 @@ export type SynthesizedInsightDraft = {
   reviewPlan: ReviewPlan;
   evidenceRefs: EvidenceReference[];
   qualityFlags: ReturnType<InsightQualityService["evaluate"]>;
+  confidenceAnalysis?: ConfidenceAnalysis;
   status: ScreeningInsightStatus;
 };
 

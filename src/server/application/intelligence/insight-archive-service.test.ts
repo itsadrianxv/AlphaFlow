@@ -3,6 +3,7 @@ import { InsightArchiveService } from "~/server/application/intelligence/insight
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import type { ScreeningInsight } from "~/server/domain/intelligence/aggregates/screening-insight";
+import { createUnavailableConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import type { ResearchReminder } from "~/server/domain/intelligence/entities/research-reminder";
 import type { ScreeningInsightVersion } from "~/server/domain/intelligence/entities/screening-insight-version";
 import type { IReminderRepository } from "~/server/domain/intelligence/repositories/reminder-repository";
@@ -191,6 +192,10 @@ describe("InsightArchiveService", () => {
         }),
       },
       synthesisService,
+      confidenceAnalysisService: {
+        analyzeScreeningInsight: async () =>
+          createUnavailableConfidenceAnalysis(["test fallback"]),
+      } as never,
       reminderSchedulingService: new ReminderSchedulingService({
         reminderRepository,
       }),

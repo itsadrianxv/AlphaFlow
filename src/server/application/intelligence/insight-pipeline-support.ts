@@ -1,3 +1,4 @@
+import { normalizeExternalCredibilityScore } from "~/server/domain/intelligence/confidence";
 import { EvidenceReference } from "~/server/domain/intelligence/entities/evidence-reference";
 import type {
   CompanyEvidence,
@@ -7,11 +8,13 @@ import type { ScreeningSession } from "~/server/domain/screening/aggregates/scre
 import type { ScoredStock } from "~/server/domain/screening/value-objects/scored-stock";
 
 function mapConfidence(score?: number) {
-  if ((score ?? 0) >= 0.75) {
+  const normalized = normalizeExternalCredibilityScore(score) ?? 0;
+
+  if (normalized >= 0.75) {
     return "high" as const;
   }
 
-  if ((score ?? 0) >= 0.45) {
+  if (normalized >= 0.45) {
     return "medium" as const;
   }
 
@@ -36,6 +39,9 @@ export function mapScreeningStockToFactsBundle(
     value: Record<string, unknown>;
   }>;
   const scoreExplanations = stockData.scoreExplanations as string[];
+  const normalizedEvidenceScore = normalizeExternalCredibilityScore(
+    evidence?.credibilityScore,
+  );
 
   return {
     stock: {
@@ -59,7 +65,7 @@ export function mapScreeningStockToFactsBundle(
       totalScanned: session.totalScanned,
       matchedCount: session.countMatched(),
       executionTimeMs: session.executionTime,
-      evidenceCredibilityScore: evidence?.credibilityScore,
+      evidenceCredibilityScore: normalizedEvidenceScore,
     },
     conceptMatches: evidence?.concept
       ? [
@@ -74,12 +80,12 @@ export function mapScreeningStockToFactsBundle(
     companyEvidence: evidence
       ? [
           {
-            title: `${evidence.companyName} 证据摘要`,
+            title: `${evidence.companyName} evidence summary`,
             sourceName: "python-intelligence-service",
             snippet: evidence.evidenceSummary,
             extractedFact: evidence.evidenceSummary,
             publishedAt: evidence.updatedAt,
-            credibilityScore: evidence.credibilityScore,
+            credibilityScore: normalizedEvidenceScore,
           },
         ]
       : [],
@@ -94,15 +100,15 @@ export function buildInsightEvidenceRefs(
 ) {
   const refs = [
     EvidenceReference.create({
-      title: `${stock.stockName} 筛选结果快照`,
+      title: `${stock.stockName} screening snapshot`,
       sourceName: "screening-session",
       snippet:
         stock.scoreExplanations[0] ??
-        `${stock.stockName} 在策略 ${session.strategyName} 中评分靠前。`,
+        `${stock.stockName} ranked near the top in ${session.strategyName}.`,
       extractedFact: [
-        `评分 ${Math.round(stock.score * 100)} 分`,
-        `命中 ${stock.matchedConditions.length} 个条件`,
-      ].join("；"),
+        `Score ${Math.round(stock.score * 100)}`,
+        `${stock.matchedConditions.length} matched conditions`,
+      ].join("; "),
       publishedAt:
         session.completedAt?.toISOString() ?? session.executedAt.toISOString(),
       credibilityScore: stock.score,
@@ -112,12 +118,14 @@ export function buildInsightEvidenceRefs(
   if (evidence) {
     refs.push(
       EvidenceReference.create({
-        title: `${evidence.companyName} 外部证据摘要`,
+        title: `${evidence.companyName} external evidence`,
         sourceName: "python-intelligence-service",
         snippet: evidence.evidenceSummary,
         extractedFact: evidence.evidenceSummary,
         publishedAt: evidence.updatedAt,
-        credibilityScore: evidence.credibilityScore,
+        credibilityScore: normalizeExternalCredibilityScore(
+          evidence.credibilityScore,
+        ),
       }),
     );
   }

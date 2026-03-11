@@ -1,3 +1,4 @@
+import type { ConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   type CompanyResearchResultDto,
@@ -50,6 +51,52 @@ function uniqueList(items: Array<string | null | undefined>, limit = 4) {
 
 function formatPercent(value: number) {
   return `${value.toFixed(0)}%`;
+}
+
+function formatConfidenceScore(analysis?: ConfidenceAnalysis | null) {
+  if (!analysis || analysis.finalScore === null) {
+    return "未分析";
+  }
+
+  return `${analysis.finalScore}`;
+}
+
+function formatConfidenceLevel(analysis?: ConfidenceAnalysis | null) {
+  if (!analysis) {
+    return "未知";
+  }
+
+  switch (analysis.level) {
+    case "high":
+      return "高";
+    case "medium":
+      return "中";
+    case "low":
+      return "低";
+    default:
+      return "未知";
+  }
+}
+
+function buildConfidenceMetrics(
+  analysis?: ConfidenceAnalysis | null,
+): Array<{ label: string; value: string }> {
+  if (!analysis) {
+    return [{ label: "可信度", value: "未分析" }];
+  }
+
+  return [
+    { label: "可信度", value: formatConfidenceScore(analysis) },
+    { label: "可信等级", value: formatConfidenceLevel(analysis) },
+    {
+      label: "支持/不足/冲突",
+      value: `${analysis.supportedCount}/${analysis.insufficientCount}/${analysis.contradictedCount}`,
+    },
+    {
+      label: "证据覆盖率",
+      value: `${analysis.evidenceCoverageScore}%`,
+    },
+  ];
 }
 
 export function getTemplateLabel(templateCode?: string) {
@@ -119,7 +166,7 @@ function buildQuickResearchDigest(
     headline: firstSentence(result.heatConclusion),
     summary: result.overview,
     bullPoints: uniqueList(
-      topPicks.map((item) => `${item.stockName}：${item.reason}`),
+      topPicks.map((item) => `${item.stockName}: ${item.reason}`),
       3,
     ),
     bearPoints: uniqueList([...credibilityRisks, result.competitionSummary], 3),
@@ -132,14 +179,14 @@ function buildQuickResearchDigest(
     ),
     gaps: [],
     nextActions: uniqueList(
-      topPicks.map((item) => `转入公司判断：${item.stockName}`),
+      topPicks.map((item) => `转入公司判断: ${item.stockName}`),
       3,
     ),
     metrics: [
+      ...buildConfidenceMetrics(result.confidenceAnalysis),
       { label: "赛道热度", value: formatPercent(result.heatScore) },
       { label: "候选标的", value: String(result.candidates.length) },
       { label: "重点标的", value: String(result.topPicks.length) },
-      { label: "可信度样本", value: String(result.credibility.length) },
     ],
   };
 }
@@ -169,7 +216,7 @@ function buildCompanyResearchDigest(
     bullPoints: uniqueList(result.verdict.bullPoints, 4),
     bearPoints: uniqueList(result.verdict.bearPoints, 4),
     evidence: uniqueList(
-      result.evidence.map((item) => `${item.title}：${item.extractedFact}`),
+      result.evidence.map((item) => `${item.title}: ${item.extractedFact}`),
       4,
     ),
     gaps: uniqueList(
@@ -178,13 +225,11 @@ function buildCompanyResearchDigest(
     ),
     nextActions: uniqueList(result.verdict.nextChecks, 4),
     metrics: [
+      ...buildConfidenceMetrics(result.confidenceAnalysis),
       { label: "证据条数", value: String(result.evidence.length) },
       { label: "高置信回答", value: String(highConfidenceCount) },
       { label: "待核验缺口", value: String(gapCount) },
-      {
-        label: "重点概念",
-        value: String(result.brief.focusConcepts.length),
-      },
+      { label: "重点概念", value: String(result.brief.focusConcepts.length) },
     ],
   };
 }
@@ -202,18 +247,18 @@ function buildGenericDigest(params: {
   if (params.status === "RUNNING" || params.status === "PENDING") {
     return {
       templateLabel,
-      verdictLabel: params.status === "RUNNING" ? "研究进行中" : "等待执行",
+      verdictLabel: params.status === "RUNNING" ? "进行中" : "等待执行",
       verdictTone: params.status === "RUNNING" ? "info" : "warning",
       headline: firstSentence(params.query),
       summary:
         params.currentNodeKey && params.currentNodeKey.length > 0
-          ? `当前正在处理：${params.currentNodeKey}`
+          ? `当前正在处理: ${params.currentNodeKey}`
           : "研究正在生成中，稍后可查看正式结论。",
       bullPoints: [],
       bearPoints: [],
       evidence: [],
       gaps: [],
-      nextActions: [`等待本次研究完成（${params.progressPercent ?? 0}%）`],
+      nextActions: [`等待本次研究完成: ${params.progressPercent ?? 0}%`],
       metrics: [
         { label: "当前进度", value: `${params.progressPercent ?? 0}%` },
       ],
@@ -240,7 +285,7 @@ function buildGenericDigest(params: {
     ? Object.entries(params.result)
         .filter(([, value]) => typeof value === "string")
         .slice(0, 4)
-        .map(([key, value]) => `${key}：${value as string}`)
+        .map(([key, value]) => `${key}: ${value as string}`)
     : [];
 
   return {
@@ -287,4 +332,18 @@ export function buildResearchDigest(params: {
   }
 
   return buildGenericDigest(params);
+}
+
+export function extractConfidenceAnalysis(
+  result: unknown,
+): ConfidenceAnalysis | null {
+  if (isQuickResearchResult(result)) {
+    return result.confidenceAnalysis ?? null;
+  }
+
+  if (isCompanyResearchResult(result)) {
+    return result.confidenceAnalysis ?? null;
+  }
+
+  return null;
 }

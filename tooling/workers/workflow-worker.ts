@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { env } from "~/env";
+import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import { WorkflowExecutionService } from "~/server/application/workflow/execution-service";
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
@@ -20,6 +21,7 @@ import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-cl
 import { FirecrawlClient } from "~/server/infrastructure/intelligence/firecrawl-client";
 import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
 import { PrismaScreeningInsightRepository } from "~/server/infrastructure/intelligence/prisma-screening-insight-repository";
+import { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
 import { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
 import { PrismaWatchListRepository } from "~/server/infrastructure/screening/prisma-watch-list-repository";
 import { PrismaPortfolioSnapshotRepository } from "~/server/infrastructure/timing/prisma-portfolio-snapshot-repository";
@@ -44,6 +46,9 @@ import { PrismaScreeningSessionRepository } from "~/server/infrastructure/screen
 const workflowRepository = new PrismaWorkflowRunRepository(db);
 const deepSeekClient = new DeepSeekClient();
 const pythonDataClient = new PythonIntelligenceDataClient();
+const confidenceAnalysisService = new ConfidenceAnalysisService({
+  client: new PythonConfidenceAnalysisClient(),
+});
 const reminderRepository = new PrismaResearchReminderRepository(db);
 const insightRepository = new PrismaScreeningInsightRepository(db);
 const screeningSessionRepository = new PrismaScreeningSessionRepository(db);
@@ -85,12 +90,14 @@ const executionService = new WorkflowExecutionService({
       new IntelligenceAgentService({
         deepSeekClient,
         dataClient: pythonDataClient,
+        confidenceAnalysisService,
       }),
     ),
     new CompanyResearchLangGraph(
       new CompanyResearchAgentService({
         deepSeekClient,
         firecrawlClient: new FirecrawlClient(),
+        confidenceAnalysisService,
       }),
     ),
     new ScreeningInsightPipelineLangGraph({
@@ -98,6 +105,7 @@ const executionService = new WorkflowExecutionService({
       insightRepository,
       dataClient: pythonDataClient,
       synthesisService,
+      confidenceAnalysisService,
       reminderSchedulingService,
     }),
     new TimingSignalPipelineLangGraph({

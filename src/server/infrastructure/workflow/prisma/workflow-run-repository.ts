@@ -38,6 +38,10 @@ export type WorkflowRunDetailRecord = Awaited<
 export class PrismaWorkflowRunRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  getPrismaClient() {
+    return this.prisma;
+  }
+
   async getTemplateByCodeAndVersion(code: string, version?: number) {
     if (version !== undefined) {
       return this.prisma.workflowTemplate.findUnique({
