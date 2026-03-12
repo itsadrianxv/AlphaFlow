@@ -168,19 +168,19 @@ function CompanyRunCard({
         <KeyPointList
           title="看多理由"
           items={digest.bullPoints}
-          emptyText="等待正式结论后补充。"
+          emptyText="待更新。"
           tone="success"
         />
         <KeyPointList
           title="风险点"
           items={digest.bearPoints}
-          emptyText="当前未单独标注风险点。"
+          emptyText="未标注。"
           tone="warning"
         />
         <KeyPointList
           title="证据摘要"
           items={digest.evidence}
-          emptyText="进入详情页查看完整证据。"
+          emptyText="查看详情。"
           tone="info"
         />
         <KeyPointList
@@ -188,7 +188,7 @@ function CompanyRunCard({
           items={
             digest.nextActions.length > 0 ? digest.nextActions : digest.gaps
           }
-          emptyText="进入详情页查看完整待办。"
+          emptyText="查看详情。"
           tone="neutral"
         />
       </div>
@@ -292,7 +292,6 @@ export function CompanyResearchClient() {
       section="companyResearch"
       eyebrow="Company Judgement"
       title="公司判断"
-      description="先给出标的结论、证据与风险，再引导你继续核验最关键的问题；抓取过程与调试信息退到次级页面。"
       actions={
         <>
           <Link href="/" className="app-button">
@@ -308,28 +307,12 @@ export function CompanyResearchClient() {
       }
       summary={
         <>
-          <KpiCard
-            label="研究卡片"
-            value={sortedRuns.length}
-            hint="最近 20 条公司判断记录"
-            tone="info"
-          />
-          <KpiCard
-            label="进行中"
-            value={liveRuns.length}
-            hint="仍在收集证据与结论"
-            tone="warning"
-          />
-          <KpiCard
-            label="已完成"
-            value={finishedRuns.length}
-            hint="可继续阅读完整结论"
-            tone="success"
-          />
+          <KpiCard label="研究卡片" value={sortedRuns.length} tone="info" />
+          <KpiCard label="进行中" value={liveRuns.length} tone="warning" />
+          <KpiCard label="已完成" value={finishedRuns.length} tone="success" />
           <KpiCard
             label="最近更新"
             value={formatDate(sortedRuns[0]?.createdAt ?? null)}
-            hint="用于确认当前研究节奏"
             tone="neutral"
           />
         </>
@@ -338,7 +321,6 @@ export function CompanyResearchClient() {
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Panel
           title="发起公司判断"
-          description="只需要先回答两件事：研究哪家公司、最想优先确认什么问题。其余字段作为高级选项收起。"
           actions={
             <button
               type="button"
@@ -410,10 +392,7 @@ export function CompanyResearchClient() {
           </div>
         </Panel>
 
-        <Panel
-          title="快速样例"
-          description="直接套用一个公司判断场景，再改成你自己的标的。"
-        >
+        <Panel title="快速样例">
           <div className="grid gap-3">
             {starterCases.map((item) => (
               <button
@@ -437,16 +416,15 @@ export function CompanyResearchClient() {
                 </p>
               </button>
             ))}
-            <div className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.72)] p-4 text-sm leading-6 text-[var(--app-text-muted)]">
-              当前流程会先做概念映射，再生成“利润占比”“投入强度”“兑现节奏”这类深问题，随后抓取网页证据并产出投资判断。
-            </div>
+            <p className="text-xs text-[var(--app-text-soft)]">
+              点击填入样例。
+            </p>
           </div>
         </Panel>
       </div>
 
       <Panel
         title="最新公司判断"
-        description="优先显示结论、证据摘要与待核验动作；运行中的任务仅展示进度与当前步骤。"
         actions={
           <button
             type="button"
@@ -458,15 +436,9 @@ export function CompanyResearchClient() {
         }
       >
         {runsQuery.isLoading ? (
-          <EmptyState
-            title="正在加载公司判断"
-            description="研究卡会在查询完成后显示。"
-          />
+          <EmptyState title="正在加载公司判断" />
         ) : sortedRuns.length === 0 ? (
-          <EmptyState
-            title="还没有公司判断记录"
-            description="从上方发起一个标的研究，系统会自动生成新的公司判断。"
-          />
+          <EmptyState title="还没有公司判断记录" />
         ) : (
           <div className="grid gap-4">
             {sortedRuns.map((run) => (

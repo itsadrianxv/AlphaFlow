@@ -126,24 +126,24 @@ export default async function Home() {
     liveScreeningSessions[0] ?? screeningSessions?.[0] ?? null;
 
   const priorityTitle = !signedIn
-    ? "先登录你的研究空间"
+    ? "登录研究空间"
     : priorityRecommendation
       ? `${priorityRecommendation.stockName}：${actionLabelMap[priorityRecommendation.action] ?? priorityRecommendation.action}`
       : priorityResearch
         ? `继续处理：${priorityResearch.query}`
         : priorityScreening
           ? `查看最新机会池：${priorityScreening.strategyName}`
-          : "今天先从机会池或行业判断开始";
+          : "暂无优先事项";
 
   const priorityDescription = !signedIn
-    ? "登录后会同步你的机会池、研究记录与组合建议。"
+    ? "登录后同步研究数据。"
     : priorityRecommendation
       ? `${priorityRecommendation.reasoning.actionRationale} 当前风险预算上限 ${formatPct(priorityRecommendation.riskBudgetPct)}，建议区间 ${formatPct(priorityRecommendation.suggestedMinPct)} ~ ${formatPct(priorityRecommendation.suggestedMaxPct)}。`
       : priorityResearch
-        ? `${getTemplateLabel(priorityResearch.templateCode)}正在更新，当前进度 ${priorityResearch.progressPercent}%。`
+        ? `${getTemplateLabel(priorityResearch.templateCode)} · ${priorityResearch.progressPercent}%`
         : priorityScreening
-          ? `最近一次筛选策略为“${priorityScreening.strategyName}”，最新状态：${priorityScreening.currentStep ?? "等待查看结果"}。`
-          : "当前没有进行中的流程，建议先筛出候选，再进入深度研究与择时。";
+          ? `${priorityScreening.strategyName} · ${priorityScreening.currentStep ?? "等待结果"}`
+          : "暂无进行中的流程。";
 
   return (
     <HydrateClient>
@@ -151,7 +151,7 @@ export default async function Home() {
         section="home"
         eyebrow="Today Dashboard"
         title="今日投资看板"
-        description="主界面只回答三件事：现在怎么看、为什么、下一步做什么。优先处理结论明确、能直接推动投资动作的事项。"
+        description="聚合重点建议、风险约束和在跑流程。"
         actions={
           <>
             <Link href="/screening" className="app-button app-button-success">
@@ -180,15 +180,15 @@ export default async function Home() {
               }
               hint={
                 priorityRecommendation
-                  ? `${actionLabelMap[priorityRecommendation.action] ?? priorityRecommendation.action} 建议已生成`
-                  : "等待新的组合建议"
+                  ? `${actionLabelMap[priorityRecommendation.action] ?? priorityRecommendation.action} 已生成`
+                  : "暂无新建议"
               }
               tone="success"
             />
             <KpiCard
               label="进行中的研究"
               value={liveRuns.length + liveScreeningSessions.length}
-              hint="包含研究判断与机会池刷新"
+              hint="研究与筛选"
               tone="warning"
             />
             <KpiCard
@@ -209,7 +209,7 @@ export default async function Home() {
                       )
                     : "--"
               }
-              hint="优先关注预算是否与当前动作一致"
+              hint="当前上限"
               tone="neutral"
             />
           </>
@@ -258,14 +258,10 @@ export default async function Home() {
         />
 
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <Panel
-            title="今日优先处理"
-            description="优先看已形成投资动作的项目，其次看进行中的研究和最新机会池刷新。"
-          >
+          <Panel title="今日优先处理">
             {!signedIn ? (
               <EmptyState
-                title="登录后开始使用投资看板"
-                description="登录后会聚合你的机会池、研究记录、组合建议与风险预算。"
+                title="登录后查看投资看板"
                 actions={
                   <Link
                     href="/api/auth/signin"
@@ -303,7 +299,7 @@ export default async function Home() {
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <article className="rounded-[16px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.86)] p-4">
-                    <p className="market-kicker">研究动态</p>
+                    <p className="market-kicker">研究</p>
                     {priorityResearch ? (
                       <>
                         <p className="mt-3 text-base font-medium text-[var(--app-text)]">
@@ -317,13 +313,13 @@ export default async function Home() {
                       </>
                     ) : (
                       <p className="mt-3 text-sm text-[var(--app-text-muted)]">
-                        当前没有进行中的研究流程。
+                        暂无进行中的研究。
                       </p>
                     )}
                   </article>
 
                   <article className="rounded-[16px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.86)] p-4">
-                    <p className="market-kicker">机会池刷新</p>
+                    <p className="market-kicker">机会池</p>
                     {priorityScreening ? (
                       <>
                         <p className="mt-3 text-base font-medium text-[var(--app-text)]">
@@ -336,7 +332,7 @@ export default async function Home() {
                       </>
                     ) : (
                       <p className="mt-3 text-sm text-[var(--app-text-muted)]">
-                        近期没有新的筛选刷新记录。
+                        暂无新的筛选刷新。
                       </p>
                     )}
                   </article>
@@ -345,15 +341,9 @@ export default async function Home() {
             )}
           </Panel>
 
-          <Panel
-            title="风险预算 / 组合语境"
-            description="用预算、现金与市场状态约束当前动作，避免结论脱离组合现实。"
-          >
+          <Panel title="风险预算 / 组合语境">
             {!signedIn ? (
-              <EmptyState
-                title="登录后显示组合语境"
-                description="这里会展示你的组合快照、当前预算约束与最近一组市场环境判断。"
-              />
+              <EmptyState title="登录后查看组合语境" />
             ) : portfolioSnapshot ? (
               <div className="grid gap-3">
                 <article className="rounded-[16px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.86)] p-4">
@@ -424,7 +414,6 @@ export default async function Home() {
             ) : (
               <EmptyState
                 title="还没有组合快照"
-                description="先在择时组合页保存一份组合快照，这里才能把风险预算带回到今日看板。"
                 actions={
                   <Link
                     href="/timing"
@@ -440,7 +429,6 @@ export default async function Home() {
 
         <Panel
           title="最新择时建议"
-          description="只显示最近一组已落库的建议，帮助你快速知道应该观察、试仓还是加仓。"
           actions={
             <Link href="/timing" className="app-button app-button-primary">
               打开择时组合
@@ -448,15 +436,9 @@ export default async function Home() {
           }
         >
           {!signedIn ? (
-            <EmptyState
-              title="登录后显示组合建议"
-              description="完成登录并保存组合快照后，这里会展示当前最新一组仓位建议。"
-            />
+            <EmptyState title="登录后查看组合建议" />
           ) : latestRecommendations.length === 0 ? (
-            <EmptyState
-              title="还没有新的择时建议"
-              description="先生成单股信号或自选股建议，系统会把最新一组建议回填到今日看板。"
-            />
+            <EmptyState title="还没有新的择时建议" />
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {latestRecommendations.slice(0, 4).map((recommendation) => (
@@ -501,20 +483,11 @@ export default async function Home() {
           )}
         </Panel>
 
-        <Panel
-          title="进行中的研究"
-          description="保留最近需要继续跟进的研究流程，避免你在模块之间来回切换。"
-        >
+        <Panel title="进行中的研究">
           {!signedIn ? (
-            <EmptyState
-              title="登录后显示研究动态"
-              description="登录后会在这里展示进行中的行业判断、公司判断与机会池刷新。"
-            />
+            <EmptyState title="登录后查看研究动态" />
           ) : liveRuns.length === 0 && liveScreeningSessions.length === 0 ? (
-            <EmptyState
-              title="当前没有进行中的研究"
-              description="你可以从机会池开始筛选候选，再转入行业判断、公司判断与择时组合。"
-            />
+            <EmptyState title="当前没有进行中的研究" />
           ) : (
             <div className="grid gap-3 lg:grid-cols-2">
               {liveRuns.map((run) => (

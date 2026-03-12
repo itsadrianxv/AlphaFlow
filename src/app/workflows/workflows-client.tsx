@@ -139,19 +139,19 @@ function InvestorRunCard({
         <KeyPointList
           title="看多理由"
           items={digest.bullPoints}
-          emptyText="等待正式结论后补充。"
+          emptyText="待更新。"
           tone="success"
         />
         <KeyPointList
           title="风险点"
           items={digest.bearPoints}
-          emptyText="当前未单独标注风险点。"
+          emptyText="未标注。"
           tone="warning"
         />
         <KeyPointList
           title="下一步动作"
           items={digest.nextActions}
-          emptyText="进入详情页查看完整后续动作。"
+          emptyText="查看详情。"
           tone="info"
         />
       </div>
@@ -241,7 +241,6 @@ export function WorkflowsClient() {
       section="workflows"
       eyebrow="Industry Judgement"
       title="行业判断"
-      description="围绕一个清晰问题生成行业结论，默认先给出判断、风险与下一步动作；过程细节退到次级页面。"
       actions={
         <>
           <Link href="/" className="app-button">
@@ -260,28 +259,12 @@ export function WorkflowsClient() {
       }
       summary={
         <>
-          <KpiCard
-            label="研究卡片"
-            value={sortedRuns.length}
-            hint="最近 20 条行业判断记录"
-            tone="info"
-          />
-          <KpiCard
-            label="进行中"
-            value={liveRuns.length}
-            hint="仍在生成结论与证据"
-            tone="warning"
-          />
-          <KpiCard
-            label="已完成"
-            value={finishedRuns.length}
-            hint="已可进入详情页阅读"
-            tone="success"
-          />
+          <KpiCard label="研究卡片" value={sortedRuns.length} tone="info" />
+          <KpiCard label="进行中" value={liveRuns.length} tone="warning" />
+          <KpiCard label="已完成" value={finishedRuns.length} tone="success" />
           <KpiCard
             label="最近更新"
             value={formatDate(sortedRuns[0]?.createdAt ?? null)}
-            hint="用于确认当前研究节奏"
             tone="neutral"
           />
         </>
@@ -290,7 +273,6 @@ export function WorkflowsClient() {
       <div className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr]">
         <Panel
           title="形成行业判断"
-          description="建议使用“行业 / 链条 / 主题 + 关键问题”的格式，把真正影响投资动作的判断问清楚。"
           actions={
             <button
               type="button"
@@ -332,10 +314,7 @@ export function WorkflowsClient() {
           </div>
         </Panel>
 
-        <Panel
-          title="优质提问模板"
-          description="先套一个成熟框架，再补你最关心的变量与验证口径。"
-        >
+        <Panel title="问题模板">
           <div className="grid gap-3">
             {quickPrompts.map((prompt) => (
               <button
@@ -347,16 +326,15 @@ export function WorkflowsClient() {
                 {prompt}
               </button>
             ))}
-            <div className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.72)] p-4 text-sm leading-6 text-[var(--app-text-muted)]">
-              一个好的行业判断问题，通常同时包含范围、变量和验证口径，例如“盈利兑现节奏如何判断”会比“怎么看这个行业”更容易产出投资动作。
-            </div>
+            <p className="text-xs text-[var(--app-text-soft)]">
+              点击填入问题。
+            </p>
           </div>
         </Panel>
       </div>
 
       <Panel
         title="最新行业判断"
-        description="优先显示已形成结论的研究卡；只有仍在运行的任务才显示进度。"
         actions={
           <button
             type="button"
@@ -368,15 +346,9 @@ export function WorkflowsClient() {
         }
       >
         {runsQuery.isLoading ? (
-          <EmptyState
-            title="正在加载行业判断"
-            description="研究卡会在查询完成后显示。"
-          />
+          <EmptyState title="正在加载行业判断" />
         ) : sortedRuns.length === 0 ? (
-          <EmptyState
-            title="还没有行业判断记录"
-            description="从上方发起一个清晰问题，系统会自动生成新的行业判断。"
-          />
+          <EmptyState title="还没有行业判断记录" />
         ) : (
           <div className="grid gap-4">
             {sortedRuns.map((run) => (

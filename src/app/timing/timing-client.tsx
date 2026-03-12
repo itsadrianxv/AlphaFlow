@@ -161,9 +161,7 @@ export function TimingClient() {
   const [selectedPresetId, setSelectedPresetId] = useState("");
   const [presetDraftId, setPresetDraftId] = useState("");
   const [presetName, setPresetName] = useState("稳健日频预设");
-  const [presetDescription, setPresetDescription] = useState(
-    "默认日频权重与三阶段复查窗。",
-  );
+  const [presetDescription, setPresetDescription] = useState("");
   const [presetConfigJson, setPresetConfigJson] = useState(
     defaultPresetConfigJson,
   );
@@ -445,7 +443,6 @@ export function TimingClient() {
       section="timing"
       eyebrow="Portfolio Decisions"
       title="择时组合"
-      description="先看最新建议与风险预算，再决定是否生成或刷新信号。把组合语境放在技术信号之前，避免动作脱离仓位现实。"
       actions={
         <>
           <Link href="/workflows" className="app-button">
@@ -458,22 +455,11 @@ export function TimingClient() {
       }
       summary={
         <>
-          <KpiCard
-            label="信号总数"
-            value={summary.totalCards}
-            hint={`覆盖 ${summary.distinctStocks} 只股票`}
-            tone="info"
-          />
-          <KpiCard
-            label="加仓候选"
-            value={summary.addCount}
-            hint="当前信号中偏向加仓的数量"
-            tone="success"
-          />
+          <KpiCard label="信号总数" value={summary.totalCards} tone="info" />
+          <KpiCard label="加仓候选" value={summary.addCount} tone="success" />
           <KpiCard
             label="组合建议"
             value={summary.recommendationCount}
-            hint="当前筛选条件下最新一组建议"
             tone="warning"
           />
           <KpiCard
@@ -483,11 +469,7 @@ export function TimingClient() {
                 ? formatDate(summary.latestCreatedAt)
                 : formatPct(summary.riskBudgetPct)
             }
-            hint={
-              summary.riskBudgetPct === null
-                ? "最近信号写入时间"
-                : "当前建议给出的总预算上限"
-            }
+            hint={summary.riskBudgetPct === null ? "最近写入" : "当前上限"}
             tone="neutral"
           />
         </>
@@ -496,7 +478,6 @@ export function TimingClient() {
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <Panel
           title="最新建议"
-          description="优先阅读当前最新一组已落库建议，先回答现在该观察、试仓还是加仓。"
           actions={
             <button
               type="button"
@@ -508,10 +489,7 @@ export function TimingClient() {
           }
         >
           {latestRecommendations.length === 0 ? (
-            <EmptyState
-              title="还没有新的组合建议"
-              description="先保存组合快照，再运行自选股建议流程。完成后这里会优先显示最新一组动作建议。"
-            />
+            <EmptyState title="还没有新的组合建议" />
           ) : (
             <div className="grid gap-3">
               {latestRecommendations.slice(0, 3).map((recommendation) => (
@@ -548,10 +526,7 @@ export function TimingClient() {
           )}
         </Panel>
 
-        <Panel
-          title="风险预算 / 组合语境"
-          description="把市场状态、预算上限与组合快照放在一起看，先约束动作，再决定是否继续生成新信号。"
-        >
+        <Panel title="风险预算 / 组合语境">
           <div className="grid gap-3">
             {latestRecommendations.length > 0 && recommendationContext ? (
               <article className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-4">
@@ -578,10 +553,7 @@ export function TimingClient() {
                 </p>
               </article>
             ) : (
-              <EmptyState
-                title="还没有可用的预算语境"
-                description="组合建议生成后，这里会回填市场状态、预算上限与关键约束。"
-              />
+              <EmptyState title="还没有可用的预算语境" />
             )}
 
             {selectedSnapshot ? (
@@ -610,10 +582,7 @@ export function TimingClient() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-        <Panel
-          title="单股信号"
-          description="快速生成某只股票的规则化技术信号，用于单票观察与验证。"
-        >
+        <Panel title="单股信号">
           <div className="grid gap-4">
             <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
               股票代码
@@ -640,16 +609,13 @@ export function TimingClient() {
                 {startSingleMutation.isPending ? "启动中..." : "生成单股信号"}
               </button>
               <span className="text-xs text-[var(--app-text-soft)]">
-                生成信号后，可继续进入组合建议或查看研究详情。
+                生成后可继续查看建议。
               </span>
             </div>
           </div>
         </Panel>
 
-        <Panel
-          title="批量信号"
-          description="先批量刷新自选股信号，适合在进入组合建议前快速看技术面排序。"
-        >
+        <Panel title="批量信号">
           <div className="grid gap-4">
             <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
               Watchlist
@@ -677,7 +643,7 @@ export function TimingClient() {
                   : "生成批量信号"}
               </button>
               <span className="text-xs text-[var(--app-text-soft)]">
-                适合在进入组合建议前，先判断 watchlist 的信号强弱。
+                批量刷新当前清单。
               </span>
             </div>
           </div>
@@ -686,7 +652,6 @@ export function TimingClient() {
 
       <Panel
         title="信号参数与复盘设定"
-        description="通过参数预设调整权重与阈值，并在合适时机触发复盘流程，验证建议是否兑现。"
         actions={
           <button
             type="button"
@@ -730,14 +695,11 @@ export function TimingClient() {
               </select>
             </label>
             <div className="text-xs leading-6 text-[var(--app-text-soft)]">
-              这个选择会影响后续单股信号、批量信号与组合建议的权重/阈值，以及复盘周期的创建策略。
+              影响后续信号与复盘。
             </div>
             <div className="grid gap-2">
               {presets.length === 0 ? (
-                <EmptyState
-                  title="还没有自定义参数预设"
-                  description="先在右侧保存一个参数预设，之后就能复用。"
-                />
+                <EmptyState title="还没有自定义参数预设" />
               ) : (
                 presets.map((preset) => (
                   <button
@@ -818,8 +780,7 @@ export function TimingClient() {
                   : "保存参数预设"}
               </button>
               <span className="text-xs text-[var(--app-text-soft)]">
-                v1 只影响技术因子权重、动作阈值与复查
-                horizon，不改基础指标公式。
+                仅影响权重、阈值和复查周期。
               </span>
             </div>
           </div>
@@ -829,7 +790,6 @@ export function TimingClient() {
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <Panel
           title="组合快照"
-          description="这里维护现金、持仓和风险偏好，让组合建议始终基于真实仓位语境。"
           actions={
             <>
               <button
@@ -979,7 +939,6 @@ export function TimingClient() {
 
         <Panel
           title="组合语境解读"
-          description="固定顺序是：批量信号 → 市场状态 → 风险计划 → 仓位建议；这里保留约束逻辑与背景说明。"
           actions={
             <button
               type="button"
@@ -1015,7 +974,7 @@ export function TimingClient() {
                 <StatusPill label="组合建议流程" tone="success" />
               </div>
               <p className="text-sm leading-6 text-[var(--app-text-muted)]">
-                在存在组合上下文时，系统可以给出持有、减仓或退出建议，但仓位区间仍然必须受规则与风险预算共同约束。
+                组合建议受仓位与风险预算约束。
               </p>
             </div>
 
@@ -1044,10 +1003,7 @@ export function TimingClient() {
                 </p>
               </div>
             ) : (
-              <EmptyState
-                title="还没有组合建议结果"
-                description="先维护一份组合快照，再生成组合建议。完成后这里会展示市场状态、风险预算和动作排序。"
-              />
+              <EmptyState title="还没有组合建议结果" />
             )}
           </div>
         </Panel>
@@ -1055,7 +1011,6 @@ export function TimingClient() {
 
       <Panel
         title="建议明细"
-        description="所有建议都来自持久化结果表，不依赖运行态回传。默认展示当前筛选下最新一组动作建议。"
         actions={
           <button
             type="button"
@@ -1067,10 +1022,7 @@ export function TimingClient() {
         }
       >
         {latestRecommendations.length === 0 ? (
-          <EmptyState
-            title="暂无组合建议"
-            description="组合建议成功落库后，这里会按优先级展示动作、建议仓位区间、风险标签和解释。"
-          />
+          <EmptyState title="暂无组合建议" />
         ) : (
           <div className="grid gap-4">
             {latestRecommendations.map((recommendation) => (
@@ -1211,7 +1163,6 @@ export function TimingClient() {
 
       <Panel
         title="复盘记录"
-        description="复盘只读取持久化的 `TimingReviewRecord`，用于回看建议是否兑现、逆风区间有多大。"
         actions={
           <button
             type="button"
@@ -1223,10 +1174,7 @@ export function TimingClient() {
         }
       >
         {reviewRecords.length === 0 ? (
-          <EmptyState
-            title="暂无复盘记录"
-            description="筛选联动或组合建议会创建复盘任务，到期后运行复盘流程即可回填结果。"
-          />
+          <EmptyState title="暂无复盘记录" />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             {reviewRecords.map((record) => (
@@ -1315,7 +1263,6 @@ export function TimingClient() {
 
       <Panel
         title="信号库"
-        description="这里保留已落库信号，便于对比基础信号与最终组合建议的差异。"
         actions={
           <button
             type="button"
@@ -1350,21 +1297,14 @@ export function TimingClient() {
             <option value="screening">筛选联动</option>
           </select>
           <div className="text-xs leading-6 text-[var(--app-text-soft)]">
-            基础信号默认只会产出 WATCH / PROBE / ADD；进入组合建议后才允许 HOLD
-            / TRIM / EXIT 出现。
+            基础信号不含 HOLD / TRIM / EXIT。
           </div>
         </div>
 
         {cardsQuery.isLoading ? (
-          <EmptyState
-            title="正在加载信号库"
-            description="持久化结果读取完成后会在这里展示。"
-          />
+          <EmptyState title="正在加载信号库" />
         ) : cards.length === 0 ? (
-          <EmptyState
-            title="还没有信号结果"
-            description="先运行单股信号或批量信号，完成后这里会自动出现卡片。"
-          />
+          <EmptyState title="还没有信号结果" />
         ) : (
           <div className="grid gap-4">
             {cards.map((card) => {

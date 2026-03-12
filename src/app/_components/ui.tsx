@@ -78,7 +78,7 @@ export function WorkspaceShell(props: {
   section: WorkspaceSection;
   eyebrow: string;
   title: string;
-  description: string;
+  description?: string;
   actions?: ReactNode;
   summary?: ReactNode;
   children: ReactNode;
@@ -120,9 +120,6 @@ export function WorkspaceShell(props: {
                     <span className="block text-sm font-medium">
                       {item.label}
                     </span>
-                    <span className="mt-1 block text-xs leading-5 text-[var(--app-text-soft)]">
-                      {item.detail}
-                    </span>
                   </Link>
                 );
               })}
@@ -130,25 +127,10 @@ export function WorkspaceShell(props: {
 
             <div className="mt-auto hidden lg:block">
               <div className="rounded-[16px] border border-[var(--app-border)] bg-[rgba(10,14,19,0.92)] p-4">
-                <p className="market-kicker">当前焦点</p>
-                <p className="mt-2 text-sm leading-6 text-[var(--app-text)]">
+                <p className="market-kicker">当前模块</p>
+                <p className="mt-2 text-sm font-medium text-[var(--app-text)]">
                   {activeItem?.label ?? "研究界面"}
                 </p>
-                <p className="mt-2 text-xs leading-6 text-[var(--app-text-muted)]">
-                  {activeItem?.detail ??
-                    "只保留会影响投资判断的结论、风险与动作。"}
-                </p>
-                <div className="mt-4 grid gap-2 text-xs text-[var(--app-text-soft)]">
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.82)] px-3 py-2">
-                    结论优先
-                  </div>
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.82)] px-3 py-2">
-                    风险单独标注
-                  </div>
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.82)] px-3 py-2">
-                    调试信息退到次级
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -162,9 +144,11 @@ export function WorkspaceShell(props: {
                 <h1 className="app-display mt-3 text-3xl tracking-[-0.03em] text-[var(--app-text)] sm:text-[40px]">
                   {title}
                 </h1>
-                <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--app-text-muted)] sm:text-[15px]">
-                  {description}
-                </p>
+                {description ? (
+                  <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--app-text-muted)] sm:text-[15px]">
+                    {description}
+                  </p>
+                ) : null}
               </div>
               {actions ? (
                 <div className="flex flex-wrap items-center gap-2 lg:justify-end">
@@ -316,7 +300,7 @@ export function ProgressBar(props: {
 
 export function EmptyState(props: {
   title: string;
-  description: string;
+  description?: string;
   actions?: ReactNode;
 }) {
   const { title, description, actions } = props;
@@ -324,7 +308,9 @@ export function EmptyState(props: {
   return (
     <div className="rounded-[16px] border border-dashed border-[var(--app-border)] bg-[rgba(12,16,22,0.82)] p-5 text-sm text-[var(--app-text-muted)]">
       <p className="text-[15px] font-medium text-[var(--app-text)]">{title}</p>
-      <p className="mt-2 max-w-2xl leading-6">{description}</p>
+      {description ? (
+        <p className="mt-2 max-w-2xl leading-6">{description}</p>
+      ) : null}
       {actions ? (
         <div className="mt-4 flex flex-wrap gap-2">{actions}</div>
       ) : null}
@@ -375,7 +361,7 @@ export function KeyPointList(props: {
 
 export function ActionBanner(props: {
   title: ReactNode;
-  description: ReactNode;
+  description?: ReactNode;
   tone?: Tone;
   actions?: ReactNode;
 }) {
@@ -397,9 +383,11 @@ export function ActionBanner(props: {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-lg font-medium text-[var(--app-text)]">{title}</p>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--app-text-muted)]">
-            {description}
-          </p>
+          {description ? (
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--app-text-muted)]">
+              {description}
+            </p>
+          ) : null}
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>

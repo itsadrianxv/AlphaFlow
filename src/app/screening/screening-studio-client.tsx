@@ -94,9 +94,7 @@ export function ScreeningStudioClient() {
   );
 
   const [newWatchListName, setNewWatchListName] = useState("长期跟踪");
-  const [newWatchListDescription, setNewWatchListDescription] = useState(
-    "沉淀命中标的、观察计划与后续验证动作。",
-  );
+  const [newWatchListDescription, setNewWatchListDescription] = useState("");
   const [watchMetaName, setWatchMetaName] = useState("");
   const [watchMetaDescription, setWatchMetaDescription] = useState("");
   const [_newStockCode, setNewStockCode] = useState("");
@@ -192,7 +190,7 @@ export function ScreeningStudioClient() {
       setSelectedSessionId(result.sessionId);
       setNotice({
         tone: "success",
-        text: "策略已加入执行队列，结果面板会持续刷新进度。",
+        text: "策略已加入执行队列。",
       });
       await Promise.all([
         utils.screening.listRecentSessions.invalidate(),
@@ -542,7 +540,6 @@ export function ScreeningStudioClient() {
       section="screening"
       eyebrow="Opportunity Pool"
       title="机会池"
-      description="默认先看最新命中标的、自选清单和最近结果；筛选器设置作为二级区域保留，方便继续优化候选来源。"
       actions={
         <>
           <Link href="/" className="app-button">
@@ -555,24 +552,9 @@ export function ScreeningStudioClient() {
       }
       summary={
         <>
-          <KpiCard
-            label="筛选器"
-            value={strategies.length}
-            hint="当前可复用的筛选器数量"
-            tone="info"
-          />
-          <KpiCard
-            label="刷新中"
-            value={liveSessionCount}
-            hint="排队与执行中的机会池刷新"
-            tone="warning"
-          />
-          <KpiCard
-            label="自选清单"
-            value={watchLists.length}
-            hint="已经建立的长期跟踪视图"
-            tone="success"
-          />
+          <KpiCard label="筛选器" value={strategies.length} tone="info" />
+          <KpiCard label="刷新中" value={liveSessionCount} tone="warning" />
+          <KpiCard label="自选清单" value={watchLists.length} tone="success" />
         </>
       }
     >
@@ -750,7 +732,7 @@ export function ScreeningStudioClient() {
                       colSpan={7}
                       className="px-4 py-8 text-center text-sm text-[var(--app-text-soft)]"
                     >
-                      暂无机会池数据，请先选择会话或观察清单。
+                      暂无机会池数据。
                     </td>
                   </tr>
                 ) : (
@@ -855,7 +837,7 @@ export function ScreeningStudioClient() {
 
         <details className="app-panel p-4 sm:p-5" id="filters-panel">
           <summary className="cursor-pointer text-sm font-medium text-[var(--app-text)]">
-            筛选器库与设置
+            筛选器设置
             <span className="ml-2 text-xs text-[var(--app-text-soft)]">
               {strategies.length} 个筛选器 ·{" "}
               {countConditions(strategyForm.filters)} 条条件
@@ -894,7 +876,7 @@ export function ScreeningStudioClient() {
                           {strategy.name}
                         </p>
                         <p className="mt-1 line-clamp-2 text-xs text-[#97afc7]">
-                          {strategy.description ?? "尚未填写策略说明"}
+                          {strategy.description ?? "未填写"}
                         </p>
                       </button>
                       <div className="mt-4 flex flex-wrap gap-2 text-xs">
@@ -960,7 +942,7 @@ export function ScreeningStudioClient() {
                     }
                     rows={3}
                     className="rounded-xl border border-[#e1eeff]/28 bg-[#0a1a2d] px-3 py-2 text-sm text-[#e1eeff] lg:col-span-2"
-                    placeholder="筛选器说明"
+                    placeholder="备注"
                   />
                 </div>
                 <label className="mt-3 flex items-center gap-2 text-xs text-[#97b0c9]">
@@ -1197,7 +1179,7 @@ export function ScreeningStudioClient() {
                         </div>
                       ) : (
                         <p className="mt-4 rounded-xl border border-[#e1eeff]/14 bg-[#10243a] px-3 py-3 text-sm text-[#97afc7]">
-                          当前还没有可展示的最终结果。任务完成后这里会自动刷新。
+                          暂无最终结果。
                         </p>
                       )}
                     </>
@@ -1241,7 +1223,7 @@ export function ScreeningStudioClient() {
                         setNewWatchListDescription(event.target.value)
                       }
                       className="mt-2 w-full rounded-xl border border-[#e1eeff]/34 bg-[#0a1a2d] px-3 py-2 text-sm"
-                      placeholder="清单说明"
+                      placeholder="备注"
                     />
                     <button
                       type="button"
@@ -1359,7 +1341,7 @@ export function ScreeningStudioClient() {
                       </div>
                     </>
                   ) : (
-                    <p className="text-sm text-[#8ea8c1]">请选择一个清单。</p>
+                    <p className="text-sm text-[#8ea8c1]">未选择清单。</p>
                   )}
                 </div>
               </div>
