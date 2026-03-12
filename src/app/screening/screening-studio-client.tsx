@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ActionBanner, KpiCard, WorkspaceShell } from "~/app/_components/ui";
+import { KpiCard, WorkspaceShell } from "~/app/_components/ui";
 import {
   type CreateStrategyInput,
   type FilterGroupInput,
@@ -35,6 +35,18 @@ import {
 type StrategyListItem = RouterOutputs["screening"]["listStrategies"][number];
 type SessionListItem = RouterOutputs["screening"]["listRecentSessions"][number];
 type WatchListItem = RouterOutputs["watchlist"]["list"][number];
+
+type OpportunityRow = {
+  stockCode: string;
+  stockName: string;
+  source: "筛选" | "清单" | "筛选+清单";
+  score?: number;
+  indicatorPreview?: string;
+  rationale?: string;
+  note?: string;
+  tags?: string[];
+  addedAt?: string;
+};
 
 type NoticeState = {
   tone: "success" | "error" | "info";
@@ -315,6 +327,73 @@ export function ScreeningStudioClient() {
     () => parseWatchedStocks(watchListDetailQuery.data?.stocks),
     [watchListDetailQuery.data?.stocks],
   );
+  const watchStockSet = useMemo(
+    () => new Set(parsedWatchStocks.map((stock) => stock.stockCode)),
+    [parsedWatchStocks],
+  );
+  const opportunityRows = useMemo<OpportunityRow[]>(() => {
+    const map = new Map<string, OpportunityRow>();
+
+    parsedTopStocks.forEach((stock) => {
+      map.set(stock.stockCode, {
+        stockCode: stock.stockCode,
+        stockName: stock.stockName,
+        source: "筛选",
+        score: stock.score,
+        indicatorPreview: stock.indicatorPreview,
+        rationale: stock.explanations[0] ?? stock.indicatorPreview,
+      });
+    });
+
+    parsedWatchStocks.forEach((stock) => {
+      const existing = map.get(stock.stockCode);
+      if (existing) {
+        map.set(stock.stockCode, {
+          ...existing,
+          source: "筛选+清单",
+          note: stock.note,
+          tags: stock.tags,
+          addedAt: stock.addedAt,
+        });
+        return;
+      }
+
+      map.set(stock.stockCode, {
+        stockCode: stock.stockCode,
+        stockName: stock.stockName,
+        source: "清单",
+        note: stock.note,
+        tags: stock.tags,
+        addedAt: stock.addedAt,
+      });
+    });
+
+    const rows = Array.from(map.values());
+    const sourcePriority = (source: OpportunityRow["source"]) =>
+      source === "筛选+清单" ? 0 : source === "筛选" ? 1 : 2;
+
+    rows.sort((left, right) => {
+      const priority =
+        sourcePriority(left.source) - sourcePriority(right.source);
+      if (priority !== 0) {
+        return priority;
+      }
+
+      const leftScore =
+        typeof left.score === "number" ? left.score : Number.NEGATIVE_INFINITY;
+      const rightScore =
+        typeof right.score === "number"
+          ? right.score
+          : Number.NEGATIVE_INFINITY;
+      if (leftScore !== rightScore) {
+        return rightScore - leftScore;
+      }
+
+      return left.stockCode.localeCompare(right.stockCode);
+    });
+
+    return rows;
+  }, [parsedTopStocks, parsedWatchStocks]);
 
   useEffect(() => {
     if (!notice) {
@@ -401,11 +480,6 @@ export function ScreeningStudioClient() {
   const liveSessionCount = sessions.filter((session) =>
     isLiveSession(session.status),
   ).length;
-  const leadOpportunity = parsedTopStocks[0] ?? null;
-  const activeWatchList =
-    watchLists.find((item) => item.id === selectedWatchListId) ??
-    watchLists[0] ??
-    null;
 
   const resetStrategyForm = () => {
     setStrategyMode("create");
@@ -499,518 +573,799 @@ export function ScreeningStudioClient() {
             hint="已经建立的长期跟踪视图"
             tone="success"
           />
-          <KpiCard
-            label="当前条件"
-            value={countConditions(strategyForm.filters)}
-            hint={strategyMode === "create" ? "新建筛选器" : "编辑现有筛选器"}
-            tone="neutral"
-          />
         </>
       }
     >
       <div className="grid gap-6">
-        <ActionBanner
-          title={
-            leadOpportunity
-              ? `${leadOpportunity.stockName} 进入最新机会池`
-              : activeWatchList
-                ? `继续维护清单：${activeWatchList.name}`
-                : "先刷新一轮机会池"
-          }
-          description={
-            leadOpportunity
-              ? `最新命中标的代码 ${leadOpportunity.stockCode}，评分 ${leadOpportunity.score.toFixed(2)}。优先看命中原因，再决定是否加入当前清单。`
-              : activeWatchList
-                ? `当前默认清单为「${activeWatchList.name}」，可直接补充观察标的，或先刷新最近一次筛选结果。`
-                : "当前还没有新的命中结果，建议先执行已有筛选器，再把值得跟踪的标的沉淀到清单。"
-          }
-          tone={leadOpportunity ? "success" : "info"}
-          actions={
-            selectedSessionId ? (
+        <section className="app-panel p-4 sm:p-5">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="min-w-[220px] flex-1">
+              <label
+                htmlFor="screening-strategy"
+                className="text-xs text-[var(--app-text-soft)]"
+              >
+                筛选器
+              </label>
+              <select
+                id="screening-strategy"
+                value={selectedStrategyId ?? ""}
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  setSelectedStrategyId(nextId || null);
+                  setStrategyMode(nextId ? "update" : "create");
+                }}
+                className="app-select mt-2"
+              >
+                {strategies.length === 0 ? (
+                  <option value="">暂无筛选器</option>
+                ) : (
+                  strategies.map((strategy: StrategyListItem) => (
+                    <option key={strategy.id} value={strategy.id}>
+                      {strategy.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div className="min-w-[220px] flex-1">
+              <label
+                htmlFor="screening-session"
+                className="text-xs text-[var(--app-text-soft)]"
+              >
+                会话
+              </label>
+              <select
+                id="screening-session"
+                value={selectedSessionId ?? ""}
+                onChange={(event) =>
+                  setSelectedSessionId(event.target.value || null)
+                }
+                className="app-select mt-2"
+              >
+                {sessions.length === 0 ? (
+                  <option value="">暂无会话</option>
+                ) : (
+                  sessions.map((session: SessionListItem) => (
+                    <option key={session.id} value={session.id}>
+                      {session.strategyName} ·{" "}
+                      {sessionStatusLabelMap[session.status] ?? session.status}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div className="min-w-[220px] flex-1">
+              <label
+                htmlFor="screening-watchlist"
+                className="text-xs text-[var(--app-text-soft)]"
+              >
+                观察清单
+              </label>
+              <select
+                id="screening-watchlist"
+                value={selectedWatchListId ?? ""}
+                onChange={(event) =>
+                  setSelectedWatchListId(event.target.value || null)
+                }
+                className="app-select mt-2"
+              >
+                {watchLists.length === 0 ? (
+                  <option value="">暂无清单</option>
+                ) : (
+                  watchLists.map((item: WatchListItem) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} · {item.stockCount} 支
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => setSelectedSessionId(selectedSessionId)}
+                onClick={() => {
+                  if (selectedStrategyId) {
+                    executeStrategyMutation.mutate({
+                      strategyId: selectedStrategyId,
+                    });
+                  }
+                }}
+                disabled={!selectedStrategyId}
                 className="app-button app-button-primary"
               >
-                查看最新结果
+                执行筛选
               </button>
-            ) : undefined
-          }
-        />
+              <button
+                type="button"
+                onClick={() => {
+                  const panel = document.getElementById("sessions-panel");
+                  if (panel) {
+                    panel.scrollIntoView({
+                      behavior: "smooth",
+                      block: "start",
+                    });
+                  }
+                }}
+                disabled={!selectedSessionId}
+                className="app-button"
+              >
+                查看会话
+              </button>
+            </div>
+          </div>
+        </section>
 
         <Notice notice={notice} />
 
-        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <section className="rounded-[26px] border border-[#35526f]/35 bg-[#0d1e33]/95 p-5 sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
-                筛选器库
+        <section className="app-panel p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-medium text-[var(--app-text)]">
+                机会池总览
               </h2>
-              <button
-                type="button"
-                onClick={resetStrategyForm}
-                className="rounded-full border border-[#d2e5f9]/20 bg-[#0f2137]/88 px-3 py-1.5 text-xs font-medium text-[#d2e5f9]"
-              >
-                新建筛选器
-              </button>
+              <p className="mt-2 text-xs text-[var(--app-text-soft)]">
+                筛选命中 {parsedTopStocks.length} · 清单{" "}
+                {parsedWatchStocks.length} · 合并 {opportunityRows.length}
+              </p>
             </div>
-            <div className="mt-4 grid gap-3">
-              {strategies.map((strategy: StrategyListItem) => (
-                <article
-                  key={strategy.id}
-                  className={`rounded-2xl border p-4 ${strategy.id === selectedStrategyId ? "border-[#49ddb8] bg-[#123f35]" : "border-[#35526f]/35 bg-[#10253c]/90"}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedStrategyId(strategy.id);
-                      setStrategyMode("update");
-                    }}
-                    className="w-full text-left"
-                  >
-                    <p className="truncate text-sm font-semibold text-[#eff8ff]">
-                      {strategy.name}
-                    </p>
-                    <p className="mt-1 line-clamp-2 text-xs text-[#97afc7]">
-                      {strategy.description ?? "尚未填写策略说明"}
-                    </p>
-                  </button>
-                  <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        executeStrategyMutation.mutate({
-                          strategyId: strategy.id,
-                        })
-                      }
-                      className="rounded-full border border-[#2fa889]/25 bg-[#103830] px-3 py-1 text-[#5cefc4]"
+            {selectedSessionSummary ? (
+              <p className="text-xs text-[var(--app-text-muted)]">
+                当前会话：{selectedSessionSummary.strategyName} ·{" "}
+                {sessionStatusLabelMap[selectedSessionSummary.status] ??
+                  selectedSessionSummary.status}
+              </p>
+            ) : null}
+          </div>
+          <div className="mt-4 overflow-auto rounded-2xl border border-[var(--app-border)]">
+            <table className="app-table min-w-[980px]">
+              <thead>
+                <tr>
+                  <th className="sticky top-0 z-10 bg-[rgba(12,17,23,0.98)]">
+                    股票
+                  </th>
+                  <th className="sticky top-0 z-10 bg-[rgba(12,17,23,0.98)]">
+                    来源
+                  </th>
+                  <th className="sticky top-0 z-10 bg-[rgba(12,17,23,0.98)]">
+                    评分
+                  </th>
+                  <th className="sticky top-0 z-10 bg-[rgba(12,17,23,0.98)]">
+                    命中理由 / 指标摘要
+                  </th>
+                  <th className="sticky top-0 z-10 bg-[rgba(12,17,23,0.98)]">
+                    清单备注 / 标签
+                  </th>
+                  <th className="sticky top-0 z-10 bg-[rgba(12,17,23,0.98)]">
+                    加入时间
+                  </th>
+                  <th className="sticky top-0 z-10 bg-[rgba(12,17,23,0.98)]">
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {opportunityRows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-4 py-8 text-center text-sm text-[var(--app-text-soft)]"
                     >
-                      加入执行队列
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        deleteStrategyMutation.mutate({ id: strategy.id })
-                      }
-                      className="rounded-full border border-[#ff8d9b]/25 bg-[#4b2331] px-3 py-1 text-[#ff8d9b]"
-                    >
-                      删除
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
+                      暂无机会池数据，请先选择会话或观察清单。
+                    </td>
+                  </tr>
+                ) : (
+                  opportunityRows.map((row) => {
+                    const sourceTone =
+                      row.source === "筛选+清单"
+                        ? "text-[var(--app-success)]"
+                        : row.source === "筛选"
+                          ? "text-[var(--app-accent-strong)]"
+                          : "text-[var(--app-text-muted)]";
+                    const rationale =
+                      row.rationale ?? row.indicatorPreview ?? "-";
+                    const note = row.note?.trim() ?? "";
+                    const tags =
+                      row.tags && row.tags.length > 0
+                        ? row.tags.join(" · ")
+                        : "";
+                    const score =
+                      typeof row.score === "number"
+                        ? row.score.toFixed(4)
+                        : "-";
 
-          <section className="rounded-[26px] border border-[#35526f]/35 bg-[#0d1e33]/95 p-5 sm:p-6">
-            <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
-              筛选器设置
-            </h2>
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              <input
-                value={strategyForm.name}
-                onChange={(event) =>
-                  setStrategyForm((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
-                }
-                className="rounded-xl border border-[#e1eeff]/28 bg-[#0a1a2d] px-3 py-2 text-sm text-[#e1eeff]"
-                placeholder="筛选器名称"
-              />
-              <input
-                value={strategyForm.tagsText}
-                onChange={(event) =>
-                  setStrategyForm((current) => ({
-                    ...current,
-                    tagsText: event.target.value,
-                  }))
-                }
-                className="rounded-xl border border-[#e1eeff]/28 bg-[#0a1a2d] px-3 py-2 text-sm text-[#e1eeff]"
-                placeholder="标签"
-              />
-              <textarea
-                value={strategyForm.description}
-                onChange={(event) =>
-                  setStrategyForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                rows={3}
-                className="rounded-xl border border-[#e1eeff]/28 bg-[#0a1a2d] px-3 py-2 text-sm text-[#e1eeff] lg:col-span-2"
-                placeholder="筛选器说明"
-              />
-            </div>
-            <label className="mt-3 flex items-center gap-2 text-xs text-[#97b0c9]">
-              <input
-                type="checkbox"
-                checked={strategyForm.isTemplate}
-                onChange={(event) =>
-                  setStrategyForm((current) => ({
-                    ...current,
-                    isTemplate: event.target.checked,
-                  }))
-                }
-                className="h-4 w-4"
-              />
-              设为模板
-            </label>
-            <section className="mt-5">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-semibold text-[#eef6ff]">
-                  筛选规则
-                </h3>
-                <span className="rounded-full border border-[#e1eeff]/20 px-3 py-1 text-[11px] text-[#8fb0cc]">
-                  {countConditions(strategyForm.filters)} 个条件
-                </span>
-              </div>
-              <div className="mt-3">
-                <FilterGroupEditor
-                  group={strategyForm.filters}
-                  isRoot
-                  onChange={(group: FilterGroupInput) =>
-                    setStrategyForm((current) => ({
-                      ...current,
-                      filters: group,
-                    }))
-                  }
-                  onRemove={() => undefined}
-                />
-              </div>
-            </section>
-            <ScoringRulesEditor
-              rules={strategyForm.scoringRules}
-              normalizationMethod={strategyForm.normalizationMethod}
-              onRulesChange={(rules) =>
-                setStrategyForm((current) => ({
-                  ...current,
-                  scoringRules: rules,
-                }))
-              }
-              onNormalizationMethodChange={(method) =>
-                setStrategyForm((current) => ({
-                  ...current,
-                  normalizationMethod: method as NormalizationMethod,
-                }))
-              }
-              onNormalize={() =>
-                setStrategyForm((current) => ({
-                  ...current,
-                  scoringRules: normalizeRuleWeights(current.scoringRules),
-                }))
-              }
-              weightSum={scoringWeightSum}
-            />
-            <button
-              type="button"
-              onClick={handleSubmitStrategy}
-              className="mt-5 rounded-xl border border-[#e1eeff]/34 bg-[#0f8468] px-4 py-2 text-sm font-semibold text-[#eefef8]"
-            >
-              {strategyMode === "create" ? "保存筛选器" : "保存更新"}
-            </button>
-          </section>
-        </section>
-
-        <section className="rounded-[26px] border border-[#35526f]/35 bg-[#0d1e33]/95 p-5 sm:p-6">
-          <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
-            最近结果与候选机会
-          </h2>
-          <div className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-            <div className="space-y-3">
-              {sessions.map((session: SessionListItem) => (
-                <article
-                  key={session.id}
-                  className={`rounded-2xl border p-4 ${session.id === selectedSessionId ? "border-[#3dd3b5] bg-[#113d37]" : "border-[#35526f]/35 bg-[#10253c]/90"}`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSessionId(session.id)}
-                    className="w-full text-left"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm font-medium text-[#e1eeff]">
-                        {session.strategyName}
-                      </p>
-                      <span
-                        className={`text-xs font-semibold ${sessionStatusClassMap[session.status] ?? "text-[#cde0f4]"}`}
+                    return (
+                      <tr
+                        key={row.stockCode}
+                        className="hover:bg-[rgba(15,20,27,0.7)]"
                       >
-                        {sessionStatusLabelMap[session.status] ??
-                          session.status}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-[#92abc3]">
-                      {session.currentStep ?? "等待状态更新"} ·{" "}
-                      {session.progressPercent}%
-                    </p>
-                  </button>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                    {isLiveSession(session.status) ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          cancelSessionMutation.mutate({
-                            sessionId: session.id,
-                          })
-                        }
-                        className="rounded-full border border-[#f6bf63]/70 px-3 py-1 text-[#ffd695]"
-                      >
-                        取消
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          retrySessionMutation.mutate({ sessionId: session.id })
-                        }
-                        className="rounded-full border border-[#5cd5b8]/28 bg-[#12382f] px-3 py-1 text-[#9cf3d9]"
-                      >
-                        重试
-                      </button>
-                    )}
-                    {!isLiveSession(session.status) ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          deleteSessionMutation.mutate({ id: session.id })
-                        }
-                        className="rounded-full border border-[#ff8d9b]/25 bg-[#4b2331] px-3 py-1 text-[#ff8d9b]"
-                      >
-                        删除
-                      </button>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
-            </div>
-            <div className="rounded-2xl border border-[#35526f]/35 bg-[#10263d]/94 p-4">
-              {sessionDetailQuery.data ? (
-                <>
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <article className="rounded-xl border border-[#e1eeff]/18 bg-[#11253b] px-3 py-3 text-xs text-[#a1b8ce]">
-                      <p>状态</p>
-                      <p
-                        className={`mt-2 text-sm font-semibold ${sessionStatusClassMap[sessionDetailQuery.data.status] ?? "text-[#d6e8f7]"}`}
-                      >
-                        {sessionStatusLabelMap[
-                          sessionDetailQuery.data.status
-                        ] ?? sessionDetailQuery.data.status}
-                      </p>
-                      <p className="mt-2 text-[11px] text-[#7d9ab4]">
-                        {sessionDetailQuery.data.currentStep ?? "等待执行"}
-                      </p>
-                    </article>
-                    <article className="rounded-xl border border-[#e1eeff]/18 bg-[#11253b] px-3 py-3 text-xs text-[#a1b8ce]">
-                      <p>执行耗时</p>
-                      <p className="mt-2 text-sm font-semibold text-[#eef6ff]">
-                        {formatDuration(sessionDetailQuery.data.executionTime)}
-                      </p>
-                      <p className="mt-2 text-[11px] text-[#7d9ab4]">
-                        {formatDate(sessionDetailQuery.data.executedAt)}
-                      </p>
-                    </article>
-                  </div>
-                  {sessionDetailQuery.data.status === "SUCCEEDED" ? (
-                    <div className="mt-5 overflow-hidden rounded-2xl border border-[#35526f]/35">
-                      <table className="min-w-full border-collapse text-left text-xs">
-                        <thead className="bg-[#122b42] text-[#b7cee5]">
-                          <tr>
-                            <th className="px-3 py-2 font-medium">代码</th>
-                            <th className="px-3 py-2 font-medium">名称</th>
-                            <th className="px-3 py-2 font-medium">评分</th>
-                            <th className="px-3 py-2 font-medium">动作</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {parsedTopStocks.map((stock: ParsedTopStock) => (
-                            <tr
-                              key={stock.stockCode}
-                              className="border-t border-[#35526f]/35"
+                        <td className="px-4 py-3 text-sm text-[var(--app-text)]">
+                          <div className="font-medium">{row.stockName}</div>
+                          <div className="mt-1 text-xs text-[var(--app-text-soft)]">
+                            {row.stockCode}
+                          </div>
+                        </td>
+                        <td className={`px-4 py-3 text-sm ${sourceTone}`}>
+                          {row.source}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[var(--app-text)]">
+                          {score}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[var(--app-text-muted)]">
+                          <p className="line-clamp-2">{rationale}</p>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[var(--app-text-muted)]">
+                          <p className="line-clamp-2">{note || "-"}</p>
+                          {tags ? (
+                            <p className="mt-1 text-xs text-[var(--app-text-soft)]">
+                              {tags}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-[var(--app-text-muted)]">
+                          {row.addedAt ? formatDate(row.addedAt) : "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          {watchStockSet.has(row.stockCode) ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!selectedWatchListId) {
+                                  return;
+                                }
+                                removeStockMutation.mutate({
+                                  watchListId: selectedWatchListId,
+                                  stockCode: row.stockCode,
+                                });
+                              }}
+                              disabled={!selectedWatchListId}
+                              className="app-button app-button-danger"
                             >
-                              <td className="px-3 py-3 text-[#e1eeff]">
-                                {stock.stockCode}
-                              </td>
-                              <td className="px-3 py-3 text-[#e1eeff]">
-                                {stock.stockName}
-                              </td>
-                              <td className="px-3 py-3 text-[#58e8bf]">
-                                {stock.score.toFixed(4)}
-                              </td>
-                              <td className="px-3 py-3">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    addStockMutation.mutate({
-                                      watchListId: selectedWatchListId ?? "",
-                                      stockCode: stock.stockCode,
-                                      stockName: stock.stockName,
-                                      note: stock.explanations[0],
-                                      tags: parseTags("跟踪, 命中"),
-                                    })
-                                  }
-                                  disabled={!selectedWatchListId}
-                                  className="rounded-full border border-[#5cd5b8]/28 bg-[#12382f] px-3 py-1 text-[11px] text-[#9cf3d9] disabled:opacity-45"
-                                >
-                                  加入当前清单
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="mt-4 rounded-xl border border-[#e1eeff]/14 bg-[#10243a] px-3 py-3 text-sm text-[#97afc7]">
-                      当前还没有可展示的最终结果。任务完成后这里会自动刷新。
-                    </p>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-[#8ea8c1]">
-                  请选择一个会话查看详情。
-                </p>
-              )}
-            </div>
+                              移除
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!selectedWatchListId) {
+                                  return;
+                                }
+                                addStockMutation.mutate({
+                                  watchListId: selectedWatchListId,
+                                  stockCode: row.stockCode,
+                                  stockName: row.stockName,
+                                  note: row.rationale ?? row.indicatorPreview,
+                                  tags: parseTags("跟踪, 命中"),
+                                });
+                              }}
+                              disabled={!selectedWatchListId}
+                              className="app-button app-button-success"
+                            >
+                              加入清单
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
 
-        <section className="rounded-[26px] border border-[#35526f]/35 bg-[#0d1e33]/95 p-5 sm:p-6">
-          <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
-            跟踪清单
-          </h2>
-          <div className="mt-4 grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-            <div className="grid gap-4">
-              <section className="rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
-                <input
-                  value={newWatchListName}
-                  onChange={(event) => setNewWatchListName(event.target.value)}
-                  className="w-full rounded-xl border border-[#e1eeff]/34 bg-[#0a1a2d] px-3 py-2 text-sm"
-                  placeholder="清单名称"
-                />
-                <input
-                  value={newWatchListDescription}
-                  onChange={(event) =>
-                    setNewWatchListDescription(event.target.value)
+        <details className="app-panel p-4 sm:p-5" id="filters-panel">
+          <summary className="cursor-pointer text-sm font-medium text-[var(--app-text)]">
+            筛选器库与设置
+            <span className="ml-2 text-xs text-[var(--app-text-soft)]">
+              {strategies.length} 个筛选器 ·{" "}
+              {countConditions(strategyForm.filters)} 条条件
+            </span>
+          </summary>
+          <div className="mt-4">
+            <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+              <section className="rounded-[26px] border border-[#35526f]/35 bg-[#0d1e33]/95 p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
+                    筛选器库
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={resetStrategyForm}
+                    className="rounded-full border border-[#d2e5f9]/20 bg-[#0f2137]/88 px-3 py-1.5 text-xs font-medium text-[#d2e5f9]"
+                  >
+                    新建筛选器
+                  </button>
+                </div>
+                <div className="mt-4 grid gap-3">
+                  {strategies.map((strategy: StrategyListItem) => (
+                    <article
+                      key={strategy.id}
+                      className={`rounded-2xl border p-4 ${strategy.id === selectedStrategyId ? "border-[#49ddb8] bg-[#123f35]" : "border-[#35526f]/35 bg-[#10253c]/90"}`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedStrategyId(strategy.id);
+                          setStrategyMode("update");
+                        }}
+                        className="w-full text-left"
+                      >
+                        <p className="truncate text-sm font-semibold text-[#eff8ff]">
+                          {strategy.name}
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-xs text-[#97afc7]">
+                          {strategy.description ?? "尚未填写策略说明"}
+                        </p>
+                      </button>
+                      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            executeStrategyMutation.mutate({
+                              strategyId: strategy.id,
+                            })
+                          }
+                          className="rounded-full border border-[#2fa889]/25 bg-[#103830] px-3 py-1 text-[#5cefc4]"
+                        >
+                          加入执行队列
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            deleteStrategyMutation.mutate({ id: strategy.id })
+                          }
+                          className="rounded-full border border-[#ff8d9b]/25 bg-[#4b2331] px-3 py-1 text-[#ff8d9b]"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+              <section className="rounded-[26px] border border-[#35526f]/35 bg-[#0d1e33]/95 p-5 sm:p-6">
+                <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
+                  筛选器设置
+                </h2>
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  <input
+                    value={strategyForm.name}
+                    onChange={(event) =>
+                      setStrategyForm((current) => ({
+                        ...current,
+                        name: event.target.value,
+                      }))
+                    }
+                    className="rounded-xl border border-[#e1eeff]/28 bg-[#0a1a2d] px-3 py-2 text-sm text-[#e1eeff]"
+                    placeholder="筛选器名称"
+                  />
+                  <input
+                    value={strategyForm.tagsText}
+                    onChange={(event) =>
+                      setStrategyForm((current) => ({
+                        ...current,
+                        tagsText: event.target.value,
+                      }))
+                    }
+                    className="rounded-xl border border-[#e1eeff]/28 bg-[#0a1a2d] px-3 py-2 text-sm text-[#e1eeff]"
+                    placeholder="标签"
+                  />
+                  <textarea
+                    value={strategyForm.description}
+                    onChange={(event) =>
+                      setStrategyForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    rows={3}
+                    className="rounded-xl border border-[#e1eeff]/28 bg-[#0a1a2d] px-3 py-2 text-sm text-[#e1eeff] lg:col-span-2"
+                    placeholder="筛选器说明"
+                  />
+                </div>
+                <label className="mt-3 flex items-center gap-2 text-xs text-[#97b0c9]">
+                  <input
+                    type="checkbox"
+                    checked={strategyForm.isTemplate}
+                    onChange={(event) =>
+                      setStrategyForm((current) => ({
+                        ...current,
+                        isTemplate: event.target.checked,
+                      }))
+                    }
+                    className="h-4 w-4"
+                  />
+                  设为模板
+                </label>
+                <section className="mt-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-sm font-semibold text-[#eef6ff]">
+                      筛选规则
+                    </h3>
+                    <span className="rounded-full border border-[#e1eeff]/20 px-3 py-1 text-[11px] text-[#8fb0cc]">
+                      {countConditions(strategyForm.filters)} 个条件
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <FilterGroupEditor
+                      group={strategyForm.filters}
+                      isRoot
+                      onChange={(group: FilterGroupInput) =>
+                        setStrategyForm((current) => ({
+                          ...current,
+                          filters: group,
+                        }))
+                      }
+                      onRemove={() => undefined}
+                    />
+                  </div>
+                </section>
+                <ScoringRulesEditor
+                  rules={strategyForm.scoringRules}
+                  normalizationMethod={strategyForm.normalizationMethod}
+                  onRulesChange={(rules) =>
+                    setStrategyForm((current) => ({
+                      ...current,
+                      scoringRules: rules,
+                    }))
                   }
-                  className="mt-2 w-full rounded-xl border border-[#e1eeff]/34 bg-[#0a1a2d] px-3 py-2 text-sm"
-                  placeholder="清单说明"
+                  onNormalizationMethodChange={(method) =>
+                    setStrategyForm((current) => ({
+                      ...current,
+                      normalizationMethod: method as NormalizationMethod,
+                    }))
+                  }
+                  onNormalize={() =>
+                    setStrategyForm((current) => ({
+                      ...current,
+                      scoringRules: normalizeRuleWeights(current.scoringRules),
+                    }))
+                  }
+                  weightSum={scoringWeightSum}
                 />
                 <button
                   type="button"
-                  onClick={() =>
-                    createWatchListMutation.mutate({
-                      name: newWatchListName,
-                      description: newWatchListDescription,
-                    })
-                  }
-                  className="mt-2 rounded-xl border border-[#e1eeff]/34 bg-[#2582b5] px-4 py-2 text-sm font-medium text-[#e8f6ff]"
+                  onClick={handleSubmitStrategy}
+                  className="mt-5 rounded-xl border border-[#e1eeff]/34 bg-[#0f8468] px-4 py-2 text-sm font-semibold text-[#eefef8]"
                 >
-                  创建清单
+                  {strategyMode === "create" ? "保存筛选器" : "保存更新"}
                 </button>
               </section>
-              <section className="rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
-                {watchLists.map((item: WatchListItem) => (
-                  <article
-                    key={item.id}
-                    className={`mb-2 rounded-xl border p-3 ${item.id === selectedWatchListId ? "border-[#37a8df] bg-[#123346]" : "border-[#35526f]/35 bg-[#0a1a2d]"}`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setSelectedWatchListId(item.id)}
-                      className="w-full text-left"
+            </section>
+          </div>
+        </details>
+
+        <details className="app-panel p-4 sm:p-5" id="sessions-panel">
+          <summary className="cursor-pointer text-sm font-medium text-[var(--app-text)]">
+            会话历史与详情
+            <span className="ml-2 text-xs text-[var(--app-text-soft)]">
+              {sessions.length} 条会话 · {liveSessionCount} 进行中
+            </span>
+          </summary>
+          <div className="mt-4">
+            <section className="rounded-[26px] border border-[#35526f]/35 bg-[#0d1e33]/95 p-5 sm:p-6">
+              <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
+                最近结果与候选机会
+              </h2>
+              <div className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+                <div className="space-y-3">
+                  {sessions.map((session: SessionListItem) => (
+                    <article
+                      key={session.id}
+                      className={`rounded-2xl border p-4 ${session.id === selectedSessionId ? "border-[#3dd3b5] bg-[#113d37]" : "border-[#35526f]/35 bg-[#10253c]/90"}`}
                     >
-                      <p className="truncate text-sm font-medium text-[#e1eeff]">
-                        {item.name}
-                      </p>
-                      <p className="mt-1 text-xs text-[#92abc3]">
-                        {item.stockCount} 支 · {formatDate(item.updatedAt)}
-                      </p>
-                    </button>
-                  </article>
-                ))}
-              </section>
-            </div>
-            <div className="rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
-              {watchListDetailQuery.data ? (
-                <>
-                  <div className="grid gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSessionId(session.id)}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="truncate text-sm font-medium text-[#e1eeff]">
+                            {session.strategyName}
+                          </p>
+                          <span
+                            className={`text-xs font-semibold ${sessionStatusClassMap[session.status] ?? "text-[#cde0f4]"}`}
+                          >
+                            {sessionStatusLabelMap[session.status] ??
+                              session.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-[#92abc3]">
+                          {session.currentStep ?? "等待状态更新"} ·{" "}
+                          {session.progressPercent}%
+                        </p>
+                      </button>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                        {isLiveSession(session.status) ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              cancelSessionMutation.mutate({
+                                sessionId: session.id,
+                              })
+                            }
+                            className="rounded-full border border-[#f6bf63]/70 px-3 py-1 text-[#ffd695]"
+                          >
+                            取消
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              retrySessionMutation.mutate({
+                                sessionId: session.id,
+                              })
+                            }
+                            className="rounded-full border border-[#5cd5b8]/28 bg-[#12382f] px-3 py-1 text-[#9cf3d9]"
+                          >
+                            重试
+                          </button>
+                        )}
+                        {!isLiveSession(session.status) ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              deleteSessionMutation.mutate({ id: session.id })
+                            }
+                            className="rounded-full border border-[#ff8d9b]/25 bg-[#4b2331] px-3 py-1 text-[#ff8d9b]"
+                          >
+                            删除
+                          </button>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="rounded-2xl border border-[#35526f]/35 bg-[#10263d]/94 p-4">
+                  {sessionDetailQuery.data ? (
+                    <>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <article className="rounded-xl border border-[#e1eeff]/18 bg-[#11253b] px-3 py-3 text-xs text-[#a1b8ce]">
+                          <p>状态</p>
+                          <p
+                            className={`mt-2 text-sm font-semibold ${sessionStatusClassMap[sessionDetailQuery.data.status] ?? "text-[#d6e8f7]"}`}
+                          >
+                            {sessionStatusLabelMap[
+                              sessionDetailQuery.data.status
+                            ] ?? sessionDetailQuery.data.status}
+                          </p>
+                          <p className="mt-2 text-[11px] text-[#7d9ab4]">
+                            {sessionDetailQuery.data.currentStep ?? "等待执行"}
+                          </p>
+                        </article>
+                        <article className="rounded-xl border border-[#e1eeff]/18 bg-[#11253b] px-3 py-3 text-xs text-[#a1b8ce]">
+                          <p>执行耗时</p>
+                          <p className="mt-2 text-sm font-semibold text-[#eef6ff]">
+                            {formatDuration(
+                              sessionDetailQuery.data.executionTime,
+                            )}
+                          </p>
+                          <p className="mt-2 text-[11px] text-[#7d9ab4]">
+                            {formatDate(sessionDetailQuery.data.executedAt)}
+                          </p>
+                        </article>
+                      </div>
+                      {sessionDetailQuery.data.status === "SUCCEEDED" ? (
+                        <div className="mt-5 overflow-hidden rounded-2xl border border-[#35526f]/35">
+                          <table className="min-w-full border-collapse text-left text-xs">
+                            <thead className="bg-[#122b42] text-[#b7cee5]">
+                              <tr>
+                                <th className="px-3 py-2 font-medium">代码</th>
+                                <th className="px-3 py-2 font-medium">名称</th>
+                                <th className="px-3 py-2 font-medium">评分</th>
+                                <th className="px-3 py-2 font-medium">动作</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {parsedTopStocks.map((stock: ParsedTopStock) => (
+                                <tr
+                                  key={stock.stockCode}
+                                  className="border-t border-[#35526f]/35"
+                                >
+                                  <td className="px-3 py-3 text-[#e1eeff]">
+                                    {stock.stockCode}
+                                  </td>
+                                  <td className="px-3 py-3 text-[#e1eeff]">
+                                    {stock.stockName}
+                                  </td>
+                                  <td className="px-3 py-3 text-[#58e8bf]">
+                                    {stock.score.toFixed(4)}
+                                  </td>
+                                  <td className="px-3 py-3">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        addStockMutation.mutate({
+                                          watchListId:
+                                            selectedWatchListId ?? "",
+                                          stockCode: stock.stockCode,
+                                          stockName: stock.stockName,
+                                          note: stock.explanations[0],
+                                          tags: parseTags("跟踪, 命中"),
+                                        })
+                                      }
+                                      disabled={!selectedWatchListId}
+                                      className="rounded-full border border-[#5cd5b8]/28 bg-[#12382f] px-3 py-1 text-[11px] text-[#9cf3d9] disabled:opacity-45"
+                                    >
+                                      加入当前清单
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="mt-4 rounded-xl border border-[#e1eeff]/14 bg-[#10243a] px-3 py-3 text-sm text-[#97afc7]">
+                          当前还没有可展示的最终结果。任务完成后这里会自动刷新。
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-[#8ea8c1]">
+                      请选择一个会话查看详情。
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+          </div>
+        </details>
+
+        <details className="app-panel p-4 sm:p-5" id="watchlist-panel">
+          <summary className="cursor-pointer text-sm font-medium text-[var(--app-text)]">
+            观察清单管理
+            <span className="ml-2 text-xs text-[var(--app-text-soft)]">
+              {watchLists.length} 个清单 · {parsedWatchStocks.length} 支股票
+            </span>
+          </summary>
+          <div className="mt-4">
+            <section className="rounded-[26px] border border-[#35526f]/35 bg-[#0d1e33]/95 p-5 sm:p-6">
+              <h2 className="font-[family-name:var(--font-display)] text-2xl text-[#e9f4ff]">
+                跟踪清单
+              </h2>
+              <div className="mt-4 grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
+                <div className="grid gap-4">
+                  <section className="rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
                     <input
-                      value={watchMetaName}
-                      onChange={(event) => setWatchMetaName(event.target.value)}
-                      className="rounded-xl border border-[#e1eeff]/34 bg-[#0a1a2d] px-3 py-2 text-sm"
+                      value={newWatchListName}
+                      onChange={(event) =>
+                        setNewWatchListName(event.target.value)
+                      }
+                      className="w-full rounded-xl border border-[#e1eeff]/34 bg-[#0a1a2d] px-3 py-2 text-sm"
+                      placeholder="清单名称"
                     />
                     <input
-                      value={watchMetaDescription}
+                      value={newWatchListDescription}
                       onChange={(event) =>
-                        setWatchMetaDescription(event.target.value)
+                        setNewWatchListDescription(event.target.value)
                       }
-                      className="rounded-xl border border-[#e1eeff]/34 bg-[#0a1a2d] px-3 py-2 text-sm"
+                      className="mt-2 w-full rounded-xl border border-[#e1eeff]/34 bg-[#0a1a2d] px-3 py-2 text-sm"
+                      placeholder="清单说明"
                     />
                     <button
                       type="button"
                       onClick={() =>
-                        updateWatchMetaMutation.mutate({
-                          id: selectedWatchListId ?? "",
-                          name: watchMetaName,
-                          description: watchMetaDescription,
+                        createWatchListMutation.mutate({
+                          name: newWatchListName,
+                          description: newWatchListDescription,
                         })
                       }
-                      className="rounded-xl border border-[#e1eeff]/34 bg-[#11916f] px-4 py-2 text-sm font-medium text-[#ecfff8]"
+                      className="mt-2 rounded-xl border border-[#e1eeff]/34 bg-[#2582b5] px-4 py-2 text-sm font-medium text-[#e8f6ff]"
                     >
-                      更新清单信息
+                      创建清单
                     </button>
-                  </div>
-                  <div className="mt-4 max-h-[360px] overflow-auto rounded-lg border border-[#35526f]/35">
-                    <table className="min-w-full border-collapse text-left text-xs">
-                      <thead className="bg-[#122b42] text-[#b7cee5]">
-                        <tr>
-                          <th className="px-3 py-2 font-medium">代码</th>
-                          <th className="px-3 py-2 font-medium">名称</th>
-                          <th className="px-3 py-2 font-medium">备注</th>
-                          <th className="px-3 py-2 font-medium">动作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {parsedWatchStocks.map((stock: ParsedWatchedStock) => (
-                          <tr
-                            key={stock.stockCode}
-                            className="border-t border-[#35526f]/35"
-                          >
-                            <td className="px-3 py-2 text-[#e1eeff]">
-                              {stock.stockCode}
-                            </td>
-                            <td className="px-3 py-2 text-[#e1eeff]">
-                              {stock.stockName}
-                            </td>
-                            <td className="px-3 py-2 text-[#92abc3]">
-                              {stock.note || "-"}
-                            </td>
-                            <td className="px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  removeStockMutation.mutate({
-                                    watchListId: selectedWatchListId ?? "",
-                                    stockCode: stock.stockCode,
-                                  })
-                                }
-                                className="rounded-full border border-[#ff8d9b]/25 bg-[#4b2331] px-2.5 py-1 text-[11px] text-[#ff8d9b]"
-                              >
-                                移除
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-[#8ea8c1]">请选择一个清单。</p>
-              )}
-            </div>
+                  </section>
+                  <section className="rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
+                    {watchLists.map((item: WatchListItem) => (
+                      <article
+                        key={item.id}
+                        className={`mb-2 rounded-xl border p-3 ${item.id === selectedWatchListId ? "border-[#37a8df] bg-[#123346]" : "border-[#35526f]/35 bg-[#0a1a2d]"}`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setSelectedWatchListId(item.id)}
+                          className="w-full text-left"
+                        >
+                          <p className="truncate text-sm font-medium text-[#e1eeff]">
+                            {item.name}
+                          </p>
+                          <p className="mt-1 text-xs text-[#92abc3]">
+                            {item.stockCount} 支 · {formatDate(item.updatedAt)}
+                          </p>
+                        </button>
+                      </article>
+                    ))}
+                  </section>
+                </div>
+                <div className="rounded-2xl border border-[#35526f]/35 bg-[#10253c]/90 p-4">
+                  {watchListDetailQuery.data ? (
+                    <>
+                      <div className="grid gap-2">
+                        <input
+                          value={watchMetaName}
+                          onChange={(event) =>
+                            setWatchMetaName(event.target.value)
+                          }
+                          className="rounded-xl border border-[#e1eeff]/34 bg-[#0a1a2d] px-3 py-2 text-sm"
+                        />
+                        <input
+                          value={watchMetaDescription}
+                          onChange={(event) =>
+                            setWatchMetaDescription(event.target.value)
+                          }
+                          className="rounded-xl border border-[#e1eeff]/34 bg-[#0a1a2d] px-3 py-2 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateWatchMetaMutation.mutate({
+                              id: selectedWatchListId ?? "",
+                              name: watchMetaName,
+                              description: watchMetaDescription,
+                            })
+                          }
+                          className="rounded-xl border border-[#e1eeff]/34 bg-[#11916f] px-4 py-2 text-sm font-medium text-[#ecfff8]"
+                        >
+                          更新清单信息
+                        </button>
+                      </div>
+                      <div className="mt-4 max-h-[360px] overflow-auto rounded-lg border border-[#35526f]/35">
+                        <table className="min-w-full border-collapse text-left text-xs">
+                          <thead className="bg-[#122b42] text-[#b7cee5]">
+                            <tr>
+                              <th className="px-3 py-2 font-medium">代码</th>
+                              <th className="px-3 py-2 font-medium">名称</th>
+                              <th className="px-3 py-2 font-medium">备注</th>
+                              <th className="px-3 py-2 font-medium">动作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {parsedWatchStocks.map(
+                              (stock: ParsedWatchedStock) => (
+                                <tr
+                                  key={stock.stockCode}
+                                  className="border-t border-[#35526f]/35"
+                                >
+                                  <td className="px-3 py-2 text-[#e1eeff]">
+                                    {stock.stockCode}
+                                  </td>
+                                  <td className="px-3 py-2 text-[#e1eeff]">
+                                    {stock.stockName}
+                                  </td>
+                                  <td className="px-3 py-2 text-[#92abc3]">
+                                    {stock.note || "-"}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        removeStockMutation.mutate({
+                                          watchListId:
+                                            selectedWatchListId ?? "",
+                                          stockCode: stock.stockCode,
+                                        })
+                                      }
+                                      className="rounded-full border border-[#ff8d9b]/25 bg-[#4b2331] px-2.5 py-1 text-[11px] text-[#ff8d9b]"
+                                    >
+                                      移除
+                                    </button>
+                                  </td>
+                                </tr>
+                              ),
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-[#8ea8c1]">请选择一个清单。</p>
+                  )}
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
+        </details>
       </div>
     </WorkspaceShell>
   );
