@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   EmptyState,
@@ -56,6 +56,8 @@ const statusLabelMap: Record<string, string> = {
   FAILED: "需要重跑",
   CANCELLED: "已取消",
 };
+
+statusLabelMap.PAUSED = "寰呰ˉ鍏呬俊鎭?";
 
 const starterCases = [
   {
@@ -221,6 +223,7 @@ function CompanyRunCard({
 
 export function CompanyResearchClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const utils = api.useUtils();
   const [companyName, setCompanyName] = useState("");
   const [stockCode, setStockCode] = useState("");
@@ -229,6 +232,34 @@ export function CompanyResearchClient() {
   const [keyQuestion, setKeyQuestion] = useState("");
   const [supplementalUrls, setSupplementalUrls] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [researchGoal, setResearchGoal] = useState("");
+  const [mustAnswerQuestions, setMustAnswerQuestions] = useState("");
+  const [forbiddenEvidenceTypes, setForbiddenEvidenceTypes] = useState("");
+  const [preferredSources, setPreferredSources] = useState("");
+  const [freshnessWindowDays, setFreshnessWindowDays] = useState("180");
+
+  useEffect(() => {
+    const mappings = [
+      ["companyName", setCompanyName],
+      ["stockCode", setStockCode],
+      ["officialWebsite", setOfficialWebsite],
+      ["focusConcepts", setFocusConcepts],
+      ["keyQuestion", setKeyQuestion],
+      ["supplementalUrls", setSupplementalUrls],
+      ["researchGoal", setResearchGoal],
+      ["mustAnswerQuestions", setMustAnswerQuestions],
+      ["forbiddenEvidenceTypes", setForbiddenEvidenceTypes],
+      ["preferredSources", setPreferredSources],
+      ["freshnessWindowDays", setFreshnessWindowDays],
+    ] as const;
+
+    for (const [key, setter] of mappings) {
+      const value = searchParams.get(key);
+      if (value) {
+        setter(value);
+      }
+    }
+  }, [searchParams]);
 
   const runsQuery = api.workflow.listRuns.useQuery({
     limit: 20,
@@ -263,7 +294,10 @@ export function CompanyResearchClient() {
   }, [runsQuery.data?.items]);
 
   const liveRuns = sortedRuns.filter(
-    (run) => run.status === "PENDING" || run.status === "RUNNING",
+    (run) =>
+      run.status === "PENDING" ||
+      run.status === "RUNNING" ||
+      run.status === "PAUSED",
   );
   const finishedRuns = sortedRuns.filter((run) => run.status === "SUCCEEDED");
 
@@ -283,6 +317,21 @@ export function CompanyResearchClient() {
       focusConcepts: parseLines(focusConcepts),
       keyQuestion: keyQuestion.trim() || undefined,
       supplementalUrls: normalizedSupplementalUrls,
+      researchPreferences:
+        researchGoal.trim() ||
+        mustAnswerQuestions.trim() ||
+        forbiddenEvidenceTypes.trim() ||
+        preferredSources.trim() ||
+        freshnessWindowDays.trim()
+          ? {
+              researchGoal: researchGoal.trim() || undefined,
+              mustAnswerQuestions: parseLines(mustAnswerQuestions),
+              forbiddenEvidenceTypes: parseLines(forbiddenEvidenceTypes),
+              preferredSources: parseLines(preferredSources),
+              freshnessWindowDays:
+                Number.parseInt(freshnessWindowDays.trim(), 10) || undefined,
+            }
+          : undefined,
       idempotencyKey: idempotencyKey.trim() || undefined,
     });
   };
@@ -374,6 +423,42 @@ export function CompanyResearchClient() {
                   onChange={(event) => setSupplementalUrls(event.target.value)}
                   placeholder="补充 URL，每行一个，可选"
                   className="app-textarea min-h-[140px]"
+                />
+                <textarea
+                  value={researchGoal}
+                  onChange={(event) => setResearchGoal(event.target.value)}
+                  placeholder="鍙€夛細鏈鐮旂┒鐨勭洰鏍?"
+                  className="app-textarea min-h-[120px]"
+                />
+                <textarea
+                  value={mustAnswerQuestions}
+                  onChange={(event) =>
+                    setMustAnswerQuestions(event.target.value)
+                  }
+                  placeholder="鍙€夛細蹇呴』鍥炵瓟鐨勯棶棰橈紝姣忚涓€鏉?"
+                  className="app-textarea min-h-[120px]"
+                />
+                <textarea
+                  value={preferredSources}
+                  onChange={(event) => setPreferredSources(event.target.value)}
+                  placeholder="鍙€夛細浼樺厛淇℃簮锛屾瘡琛屼竴鏉?"
+                  className="app-textarea min-h-[120px]"
+                />
+                <textarea
+                  value={forbiddenEvidenceTypes}
+                  onChange={(event) =>
+                    setForbiddenEvidenceTypes(event.target.value)
+                  }
+                  placeholder="鍙€夛細绂佺敤璇佹嵁绫诲瀷锛屾瘡琛屼竴鏉?"
+                  className="app-textarea min-h-[120px]"
+                />
+                <input
+                  value={freshnessWindowDays}
+                  onChange={(event) =>
+                    setFreshnessWindowDays(event.target.value)
+                  }
+                  placeholder="鍙€夛細鏃舵晥绐楀彛锛堝ぉ锛?"
+                  className="app-input"
                 />
                 <input
                   value={idempotencyKey}

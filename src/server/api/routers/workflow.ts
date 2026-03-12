@@ -94,6 +94,15 @@ async function assertTimingPresetExists(params: {
 }
 
 const startQuickResearchInput = z.object({
+  researchPreferences: z
+    .object({
+      researchGoal: z.string().trim().min(1).optional(),
+      mustAnswerQuestions: z.array(z.string().min(1)).max(8).optional(),
+      forbiddenEvidenceTypes: z.array(z.string().min(1)).max(8).optional(),
+      preferredSources: z.array(z.string().min(1)).max(8).optional(),
+      freshnessWindowDays: z.number().int().min(1).max(3650).optional(),
+    })
+    .optional(),
   query: z.string().min(1, "query 不能为空"),
   templateCode: z.string().default(QUICK_RESEARCH_TEMPLATE_CODE),
   templateVersion: z.number().int().positive().optional(),
@@ -101,6 +110,15 @@ const startQuickResearchInput = z.object({
 });
 
 const startCompanyResearchInput = z.object({
+  researchPreferences: z
+    .object({
+      researchGoal: z.string().trim().min(1).optional(),
+      mustAnswerQuestions: z.array(z.string().min(1)).max(8).optional(),
+      forbiddenEvidenceTypes: z.array(z.string().min(1)).max(8).optional(),
+      preferredSources: z.array(z.string().min(1)).max(8).optional(),
+      freshnessWindowDays: z.number().int().min(1).max(3650).optional(),
+    })
+    .optional(),
   companyName: z.string().min(1, "companyName 不能为空"),
   stockCode: z.string().trim().min(1).optional(),
   officialWebsite: z.string().url().optional(),
@@ -213,6 +231,7 @@ export const workflowRouter = createTRPCRouter({
         return await commandService.startQuickResearch({
           userId: ctx.session.user.id,
           query: input.query,
+          researchPreferences: input.researchPreferences,
           templateCode: input.templateCode,
           templateVersion: input.templateVersion,
           idempotencyKey: input.idempotencyKey,
@@ -237,6 +256,7 @@ export const workflowRouter = createTRPCRouter({
           focusConcepts: input.focusConcepts,
           keyQuestion: input.keyQuestion,
           supplementalUrls: input.supplementalUrls,
+          researchPreferences: input.researchPreferences,
           templateVersion: input.templateVersion,
           idempotencyKey: input.idempotencyKey,
         });

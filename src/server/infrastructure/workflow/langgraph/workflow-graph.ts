@@ -26,6 +26,7 @@ export type WorkflowGraphBuildInitialStateParams = {
   query: string;
   input: Record<string, unknown>;
   progressPercent: number;
+  templateGraphConfig?: unknown;
 };
 
 export interface WorkflowGraphRunner {

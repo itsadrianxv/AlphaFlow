@@ -1,5 +1,7 @@
 import { Annotation, END, StateGraph } from "@langchain/langgraph";
 import type { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
+import type { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
+import { WorkflowPauseError } from "~/server/domain/workflow/errors";
 import type {
   CompanyResearchCollectionSummary,
   CompanyResearchGraphState,
@@ -12,17 +14,21 @@ import {
   COMPANY_RESEARCH_NODE_KEYS,
   COMPANY_RESEARCH_TEMPLATE_CODE,
   COMPANY_RESEARCH_V1_NODE_KEYS,
+  COMPANY_RESEARCH_V3_NODE_KEYS,
+  resolveResearchRuntimeConfig,
 } from "~/server/domain/workflow/types";
 import type { WorkflowGraphBuildInitialStateParams } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
 import { BaseWorkflowLangGraph } from "~/server/infrastructure/workflow/langgraph/workflow-graph-base";
 import {
   addFanOutAndJoinEdges,
   addResumeStart,
+  addSequentialEdges,
   addWorkflowNodes,
 } from "~/server/infrastructure/workflow/langgraph/workflow-graph-builder";
 
 type LegacyNodeKey = (typeof COMPANY_RESEARCH_V1_NODE_KEYS)[number];
 type V2NodeKey = (typeof COMPANY_RESEARCH_NODE_KEYS)[number];
+type V3NodeKey = (typeof COMPANY_RESEARCH_V3_NODE_KEYS)[number];
 type CompanyGraphBuilder = StateGraph<
   unknown,
   CompanyResearchGraphState,
@@ -59,6 +65,16 @@ const WorkflowState = Annotation.Root({
   resumeFromNodeKey: Annotation<WorkflowNodeKey | undefined>,
   currentNodeKey: Annotation<CompanyResearchNodeKey | undefined>,
   researchInput: Annotation<CompanyResearchInput>,
+  clarificationRequest: Annotation<CompanyResearchGraphState["clarificationRequest"]>,
+  researchRuntimeConfig:
+    Annotation<CompanyResearchGraphState["researchRuntimeConfig"]>,
+  researchBrief: Annotation<CompanyResearchGraphState["researchBrief"]>,
+  researchUnits: Annotation<CompanyResearchGraphState["researchUnits"]>,
+  researchUnitRuns: Annotation<CompanyResearchGraphState["researchUnitRuns"]>,
+  researchNotes: Annotation<CompanyResearchGraphState["researchNotes"]>,
+  compressedFindings:
+    Annotation<CompanyResearchGraphState["compressedFindings"]>,
+  gapAnalysis: Annotation<CompanyResearchGraphState["gapAnalysis"]>,
   brief: Annotation<CompanyResearchGraphState["brief"]>,
   conceptInsights: Annotation<CompanyResearchGraphState["conceptInsights"]>,
   deepQuestions: Annotation<CompanyResearchGraphState["deepQuestions"]>,
@@ -130,6 +146,52 @@ function toResearchInput(input: Record<string, unknown>): CompanyResearchInput {
             typeof item === "string" && item.trim().length > 0,
         )
       : undefined,
+    researchPreferences:
+      input.researchPreferences &&
+      typeof input.researchPreferences === "object" &&
+      !Array.isArray(input.researchPreferences)
+        ? {
+            researchGoal:
+              typeof (input.researchPreferences as Record<string, unknown>)
+                .researchGoal === "string"
+                ? ((input.researchPreferences as Record<string, unknown>)
+                    .researchGoal as string)
+                : undefined,
+            mustAnswerQuestions: Array.isArray(
+              (input.researchPreferences as Record<string, unknown>)
+                .mustAnswerQuestions,
+            )
+              ? (
+                  (input.researchPreferences as Record<string, unknown>)
+                    .mustAnswerQuestions as unknown[]
+                ).filter((item): item is string => typeof item === "string")
+              : undefined,
+            forbiddenEvidenceTypes: Array.isArray(
+              (input.researchPreferences as Record<string, unknown>)
+                .forbiddenEvidenceTypes,
+            )
+              ? (
+                  (input.researchPreferences as Record<string, unknown>)
+                    .forbiddenEvidenceTypes as unknown[]
+                ).filter((item): item is string => typeof item === "string")
+              : undefined,
+            preferredSources: Array.isArray(
+              (input.researchPreferences as Record<string, unknown>)
+                .preferredSources,
+            )
+              ? (
+                  (input.researchPreferences as Record<string, unknown>)
+                    .preferredSources as unknown[]
+                ).filter((item): item is string => typeof item === "string")
+              : undefined,
+            freshnessWindowDays:
+              typeof (input.researchPreferences as Record<string, unknown>)
+                .freshnessWindowDays === "number"
+                ? ((input.researchPreferences as Record<string, unknown>)
+                    .freshnessWindowDays as number)
+                : undefined,
+          }
+        : undefined,
   };
 }
 
@@ -179,6 +241,9 @@ abstract class CompanyResearchLangGraphBase<
       resumeFromNodeKey: undefined,
       currentNodeKey: undefined,
       researchInput: toResearchInput(params.input),
+      researchRuntimeConfig: resolveResearchRuntimeConfig(
+        params.templateGraphConfig,
+      ),
       errors: [],
     };
   }
@@ -634,6 +699,258 @@ export class CompanyResearchLangGraph extends CompanyResearchLangGraphBase<V2Nod
       };
     }
     if (nodeKey === "agent11_investment_synthesis") {
+      return {
+        findingCount: companyState.findings?.length ?? 0,
+        confidenceStatus:
+          companyState.finalReport?.confidenceAnalysis?.status ?? "UNAVAILABLE",
+      };
+    }
+
+    return {};
+  }
+}
+
+export class ODRCompanyResearchLangGraph extends CompanyResearchLangGraphBase<V3NodeKey> {
+  readonly templateVersion = 3;
+
+  constructor(workflowService: CompanyResearchWorkflowService) {
+    const nodeExecutors: Record<V3NodeKey, NodeExecutor> = {
+      agent0_clarify_scope: async (state) => {
+        if (!state.researchRuntimeConfig) {
+          return {};
+        }
+
+        const clarification = await workflowService.clarifyScope(
+          state.researchInput,
+          state.researchRuntimeConfig,
+        );
+
+        if (clarification.needClarification) {
+          throw new WorkflowPauseError(
+            clarification.question,
+            "clarification_required",
+            {
+              clarificationRequest: clarification,
+              currentNodeKey: "agent0_clarify_scope",
+            },
+          );
+        }
+
+        return {
+          clarificationRequest: clarification,
+        };
+      },
+      agent1_write_research_brief: async (state) => {
+        if (!state.researchRuntimeConfig) {
+          return {};
+        }
+
+        const researchBrief = await workflowService.buildBrief(
+          state.researchInput,
+          state.researchRuntimeConfig,
+          state.clarificationRequest?.verification,
+        );
+
+        return {
+          researchBrief,
+          brief: {
+            companyName: researchBrief.companyName ?? state.researchInput.companyName,
+            stockCode: researchBrief.stockCode,
+            officialWebsite: researchBrief.officialWebsite,
+            researchGoal: researchBrief.researchGoal,
+            focusConcepts: researchBrief.focusConcepts,
+            keyQuestions: researchBrief.keyQuestions,
+          },
+        };
+      },
+      agent2_plan_research_units: async (state) => {
+        if (!state.researchRuntimeConfig) {
+          return {};
+        }
+
+        return workflowService.planUnits({
+          state,
+          runtimeConfig: state.researchRuntimeConfig,
+        });
+      },
+      agent3_execute_research_units: async (state) => {
+        if (!state.researchRuntimeConfig) {
+          return {};
+        }
+
+        return workflowService.executeUnits({
+          state,
+          runtimeConfig: state.researchRuntimeConfig,
+          units: state.researchUnits ?? [],
+        });
+      },
+      agent4_evidence_curation: async (state) => {
+        const curated = workflowService.curateEvidence(state);
+        return {
+          evidence: curated.evidence,
+          references: curated.references,
+          collectionSummary: curated.collectionSummary,
+          crawlerSummary: curated.crawler,
+        };
+      },
+      agent5_gap_analysis: async (state) => {
+        if (!state.researchRuntimeConfig) {
+          return {};
+        }
+
+        const result = await workflowService.runGapLoop({
+          state,
+          runtimeConfig: state.researchRuntimeConfig,
+        });
+
+        return {
+          ...result.state,
+          gapAnalysis: result.gapAnalysis,
+        };
+      },
+      agent6_compress_findings: async (state) => {
+        if (!state.researchRuntimeConfig) {
+          return {};
+        }
+
+        return {
+          compressedFindings: await workflowService.compressFindings(
+            state,
+            state.researchRuntimeConfig,
+          ),
+        };
+      },
+      agent7_reference_enrichment: async (state) =>
+        workflowService.enrichReferences(state),
+      agent8_investment_synthesis: async (state) => {
+        if (!state.researchRuntimeConfig) {
+          return {};
+        }
+
+        const finalReport = await workflowService.finalizeReport({
+          state,
+          runtimeConfig: state.researchRuntimeConfig,
+        });
+        return {
+          findings: finalReport.findings,
+          finalReport,
+        };
+      },
+    };
+
+    const graphBuilder = new StateGraph(
+      WorkflowState,
+    ) as unknown as CompanyGraphBuilder;
+    addWorkflowNodes(graphBuilder, COMPANY_RESEARCH_V3_NODE_KEYS, nodeExecutors);
+    addResumeStart(graphBuilder, COMPANY_RESEARCH_V3_NODE_KEYS);
+    addSequentialEdges(graphBuilder, COMPANY_RESEARCH_V3_NODE_KEYS);
+
+    super({
+      graph: graphBuilder.compile(),
+      nodeOrder: COMPANY_RESEARCH_V3_NODE_KEYS,
+    });
+  }
+
+  getNodeOutput(nodeKey: WorkflowNodeKey, state: WorkflowGraphState) {
+    const companyState = state as CompanyResearchGraphState;
+
+    if (nodeKey === "agent0_clarify_scope") {
+      return {
+        clarificationRequest: companyState.clarificationRequest,
+      };
+    }
+    if (nodeKey === "agent1_write_research_brief") {
+      return {
+        researchBrief: companyState.researchBrief,
+        brief: companyState.brief,
+      };
+    }
+    if (nodeKey === "agent2_plan_research_units") {
+      return {
+        plannedUnitCount: companyState.researchUnits?.length ?? 0,
+        questionCount: companyState.deepQuestions?.length ?? 0,
+      };
+    }
+    if (nodeKey === "agent3_execute_research_units") {
+      return {
+        noteCount: companyState.researchNotes?.length ?? 0,
+        unitRunCount: companyState.researchUnitRuns?.length ?? 0,
+        rawCollectors: Object.keys(companyState.collectedEvidenceByCollector ?? {})
+          .length,
+      };
+    }
+    if (nodeKey === "agent4_evidence_curation") {
+      return {
+        evidenceCount: companyState.evidence?.length ?? 0,
+        referenceCount: companyState.references?.length ?? 0,
+        collectionSummary: companyState.collectionSummary,
+      };
+    }
+    if (nodeKey === "agent5_gap_analysis") {
+      return {
+        gapAnalysis: companyState.gapAnalysis,
+      };
+    }
+    if (nodeKey === "agent6_compress_findings") {
+      return {
+        compressedFindings: companyState.compressedFindings,
+      };
+    }
+    if (nodeKey === "agent7_reference_enrichment") {
+      return {
+        referenceCount: companyState.references?.length ?? 0,
+      };
+    }
+
+    return {
+      findingCount: companyState.findings?.length ?? 0,
+      finalReport: companyState.finalReport,
+    };
+  }
+
+  getNodeEventPayload(nodeKey: WorkflowNodeKey, state: WorkflowGraphState) {
+    const companyState = state as CompanyResearchGraphState;
+
+    if (nodeKey === "agent0_clarify_scope") {
+      return {
+        clarificationRequired:
+          companyState.clarificationRequest?.needClarification ?? false,
+        missingScopeFields:
+          companyState.clarificationRequest?.missingScopeFields ?? [],
+        question: companyState.clarificationRequest?.question,
+        verification: companyState.clarificationRequest?.verification,
+        suggestedInputPatch:
+          companyState.clarificationRequest?.suggestedInputPatch ?? {},
+      };
+    }
+    if (nodeKey === "agent2_plan_research_units") {
+      return {
+        plannedUnitCount: companyState.researchUnits?.length ?? 0,
+        questionCount: companyState.deepQuestions?.length ?? 0,
+      };
+    }
+    if (nodeKey === "agent3_execute_research_units") {
+      return {
+        noteCount: companyState.researchNotes?.length ?? 0,
+        collectorCount:
+          Object.keys(companyState.collectedEvidenceByCollector ?? {}).length,
+      };
+    }
+    if (nodeKey === "agent4_evidence_curation") {
+      return {
+        rawCount: companyState.collectionSummary?.totalRawCount ?? 0,
+        curatedCount: companyState.collectionSummary?.totalCuratedCount ?? 0,
+        referenceCount:
+          companyState.collectionSummary?.totalReferenceCount ?? 0,
+      };
+    }
+    if (nodeKey === "agent5_gap_analysis") {
+      return {
+        requiresFollowup: companyState.gapAnalysis?.requiresFollowup ?? false,
+        missingAreaCount: companyState.gapAnalysis?.missingAreas.length ?? 0,
+      };
+    }
+    if (nodeKey === "agent8_investment_synthesis") {
       return {
         findingCount: companyState.findings?.length ?? 0,
         confidenceStatus:

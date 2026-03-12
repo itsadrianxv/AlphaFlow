@@ -24,6 +24,7 @@ export class WorkflowQueryService {
       status: run.status,
       progressPercent: run.progressPercent,
       currentNodeKey: run.currentNodeKey,
+      input: run.input,
       errorCode: run.errorCode,
       errorMessage: run.errorMessage,
       result: run.result,

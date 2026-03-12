@@ -22,6 +22,13 @@ import type {
   CompanyResearchSourceType,
   CompanyResearchVerdict,
 } from "~/server/domain/workflow/types";
+import type {
+  CompressedFindings,
+  ResearchGapAnalysis,
+  ResearchNote,
+  ResearchRuntimeConfig,
+  ResearchUnitPlan,
+} from "~/server/domain/workflow/research";
 import type { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import type {
   FirecrawlClient,
@@ -1455,6 +1462,7 @@ export class CompanyResearchAgentService {
     brief: CompanyResearchBrief;
     questions: CompanyResearchQuestion[];
     evidence: CompanyEvidenceNote[];
+    compressedFindings?: CompressedFindings;
   }): Promise<CompanyQuestionFinding[]> {
     const fallback = buildFallbackFindings(params.questions, params.evidence);
 
@@ -1507,6 +1515,10 @@ export class CompanyResearchAgentService {
           role: "user",
           content: `Research brief:\n${JSON.stringify(
             params.brief,
+            null,
+            2,
+          )}\n\nCompressed findings:\n${JSON.stringify(
+            params.compressedFindings ?? null,
             null,
             2,
           )}\n\nQuestion packs:\n${promptBody}`,
@@ -1583,6 +1595,18 @@ export class CompanyResearchAgentService {
     confidenceAnalysis?: CompanyResearchResultDto["confidenceAnalysis"];
     references?: CompanyResearchReferenceItem[];
     collectionSummary?: CompanyResearchCollectionSummary;
+    researchPlan?: ResearchUnitPlan[];
+    researchNotes?: ResearchNote[];
+    compressedFindings?: CompressedFindings;
+    gapAnalysis?: ResearchGapAnalysis;
+    runtimeConfigSummary?: Pick<
+      ResearchRuntimeConfig,
+      | "allowClarification"
+      | "maxConcurrentResearchUnits"
+      | "maxGapIterations"
+      | "maxUnitsPerPlan"
+      | "maxEvidencePerUnit"
+    >;
   }): CompanyResearchResultDto {
     return {
       brief: params.brief,
@@ -1607,6 +1631,11 @@ export class CompanyResearchAgentService {
         } satisfies CompanyResearchCollectionSummary),
       crawler: params.crawler,
       confidenceAnalysis: params.confidenceAnalysis,
+      researchPlan: params.researchPlan ?? [],
+      researchNotes: params.researchNotes ?? [],
+      compressedFindings: params.compressedFindings,
+      gapAnalysis: params.gapAnalysis,
+      runtimeConfigSummary: params.runtimeConfigSummary,
       generatedAt: new Date().toISOString(),
     };
   }

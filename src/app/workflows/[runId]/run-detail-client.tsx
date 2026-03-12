@@ -113,6 +113,102 @@ function getSection(templateCode?: string) {
     : "workflows";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function listParam(value: unknown) {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const normalized = value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return normalized.length > 0 ? normalized.join("\n") : undefined;
+}
+
+function buildContinuationHref(params: {
+  templateCode?: string;
+  input?: unknown;
+  clarificationPayload?: Record<string, unknown>;
+}) {
+  if (!isRecord(params.input)) {
+    return null;
+  }
+
+  const search = new URLSearchParams();
+  const suggestedInputPatch = isRecord(params.clarificationPayload?.suggestedInputPatch)
+    ? params.clarificationPayload.suggestedInputPatch
+    : {};
+  const mergedInput = {
+    ...params.input,
+    ...suggestedInputPatch,
+  } as Record<string, unknown>;
+
+  if (params.templateCode === COMPANY_RESEARCH_TEMPLATE_CODE) {
+    if (typeof mergedInput.companyName === "string") {
+      search.set("companyName", mergedInput.companyName);
+    }
+    if (typeof mergedInput.stockCode === "string") {
+      search.set("stockCode", mergedInput.stockCode);
+    }
+    if (typeof mergedInput.officialWebsite === "string") {
+      search.set("officialWebsite", mergedInput.officialWebsite);
+    }
+    const focusConcepts = listParam(mergedInput.focusConcepts);
+    if (focusConcepts) {
+      search.set("focusConcepts", focusConcepts);
+    }
+    if (typeof mergedInput.keyQuestion === "string") {
+      search.set("keyQuestion", mergedInput.keyQuestion);
+    }
+    const supplementalUrls = listParam(mergedInput.supplementalUrls);
+    if (supplementalUrls) {
+      search.set("supplementalUrls", supplementalUrls);
+    }
+  } else {
+    if (typeof mergedInput.query === "string") {
+      search.set("query", mergedInput.query);
+    }
+  }
+
+  const researchPreferences = isRecord(mergedInput.researchPreferences)
+    ? mergedInput.researchPreferences
+    : {};
+  if (typeof researchPreferences.researchGoal === "string") {
+    search.set("researchGoal", researchPreferences.researchGoal);
+  }
+  const mustAnswerQuestions = listParam(researchPreferences.mustAnswerQuestions);
+  if (mustAnswerQuestions) {
+    search.set("mustAnswerQuestions", mustAnswerQuestions);
+  }
+  const forbiddenEvidenceTypes = listParam(
+    researchPreferences.forbiddenEvidenceTypes,
+  );
+  if (forbiddenEvidenceTypes) {
+    search.set("forbiddenEvidenceTypes", forbiddenEvidenceTypes);
+  }
+  const preferredSources = listParam(researchPreferences.preferredSources);
+  if (preferredSources) {
+    search.set("preferredSources", preferredSources);
+  }
+  if (typeof researchPreferences.freshnessWindowDays === "number") {
+    search.set(
+      "freshnessWindowDays",
+      String(researchPreferences.freshnessWindowDays),
+    );
+  }
+
+  const basePath =
+    params.templateCode === COMPANY_RESEARCH_TEMPLATE_CODE
+      ? "/company-research"
+      : "/workflows";
+  const query = search.toString();
+  return query ? `${basePath}?${query}` : basePath;
+}
+
 const statusLabels: Record<string, string> = {
   PENDING: "排队中",
   RUNNING: "进行中",
@@ -121,7 +217,7 @@ const statusLabels: Record<string, string> = {
   CANCELLED: "已取消",
 };
 
-statusLabels.PAUSED = "Paused";
+statusLabels.PAUSED = "寰呰ˉ鍏呬俊鎭?";
 
 export function RunDetailClient({ runId }: RunDetailClientProps) {
   const utils = api.useUtils();
@@ -253,6 +349,24 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
   );
   const backLink = getBackLink(run?.template.code);
   const section = getSection(run?.template.code);
+  const latestPauseEvent = useMemo(
+    () =>
+      [...(run?.events ?? [])]
+        .reverse()
+        .find((event) => event.eventType === "RUN_PAUSED"),
+    [run?.events],
+  );
+  const clarificationPayload =
+    latestPauseEvent &&
+    isRecord(latestPauseEvent.payload) &&
+    latestPauseEvent.payload.reason === "clarification_required"
+      ? latestPauseEvent.payload
+      : null;
+  const continuationHref = buildContinuationHref({
+    templateCode: run?.template.code,
+    input: run?.input,
+    clarificationPayload: clarificationPayload ?? undefined,
+  });
 
   return (
     <WorkspaceShell
@@ -265,6 +379,11 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
           <Link href={backLink} className="app-button">
             返回任务列表
           </Link>
+          {clarificationPayload && continuationHref ? (
+            <Link href={continuationHref} className="app-button app-button-primary">
+              琛ュ厖淇℃伅鍚庨噸鏂板彂璧?
+            </Link>
+          ) : null}
           {canApprove ? (
             <button
               type="button"
@@ -402,6 +521,60 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
             </div>
           </Panel>
 
+          {clarificationPayload ? (
+            <Panel
+              title="寰呰ˉ鍏呬俊鎭?"
+              description="杩欐 research 鍦?clarify_scope 闃舵鏆傚仠锛岃ˉ鍏呰寖鍥村悗鍙洿鎺ラ噸鏂板彂璧峰悓绫讳换鍔°€?"
+            >
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                  <p className="text-sm leading-7 text-[var(--app-text)]">
+                    {typeof clarificationPayload.question === "string"
+                      ? clarificationPayload.question
+                      : "璇峰鐮旂┒鑼冨洿鍋氳ˉ鍏呭悗鍐嶆鍙戣捣銆?"}
+                  </p>
+                  {Array.isArray(clarificationPayload.missingScopeFields) &&
+                  clarificationPayload.missingScopeFields.length > 0 ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {clarificationPayload.missingScopeFields.map((field) => (
+                        <StatusPill
+                          key={String(field)}
+                          label={String(field)}
+                          tone="warning"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  {clarificationPayload.suggestedInputPatch ? (
+                    <pre className="mt-4 overflow-x-auto rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] p-3 text-xs text-[var(--app-text-soft)]">
+                      {JSON.stringify(
+                        clarificationPayload.suggestedInputPatch,
+                        null,
+                        2,
+                      )}
+                    </pre>
+                  ) : null}
+                </div>
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4 text-sm text-[var(--app-text-muted)]">
+                  <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
+                    Next step
+                  </p>
+                  <p className="mt-3 leading-6">
+                    琛ュ厖鍏抽敭鍙橀噺鍚庯紝绯荤粺浼氫繚鐣欏師杈撳叆骞惰嚜鍔ㄩ濉缓璁瓧娈点€?
+                  </p>
+                  {continuationHref ? (
+                    <Link
+                      href={continuationHref}
+                      className="app-button app-button-primary mt-4 inline-flex"
+                    >
+                      杩涘叆琛ュ厖琛ㄥ崟
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+            </Panel>
+          ) : null}
+
           {companyResult ? (
             <>
               <Panel
@@ -461,6 +634,111 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                   </div>
                 </div>
               </Panel>
+
+              {(companyResult.researchPlan?.length ||
+                companyResult.researchNotes?.length ||
+                companyResult.compressedFindings ||
+                companyResult.gapAnalysis) && (
+                <Panel
+                  title="Research Orchestration"
+                  description="杩欓噷鏄柊 research workflow 鐨勮鍒掋€佺瑪璁般€佸帇缂╃粨璁哄拰琛ュ姩鍐冲畾銆?"
+                >
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
+                        Research brief
+                      </p>
+                      <pre className="mt-3 overflow-x-auto text-xs leading-6 text-[var(--app-text-soft)]">
+                        {JSON.stringify(
+                          {
+                            brief: companyResult.brief,
+                            runtime: companyResult.runtimeConfigSummary ?? null,
+                          },
+                          null,
+                          2,
+                        )}
+                      </pre>
+                    </article>
+                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
+                        Planned units
+                      </p>
+                      <div className="mt-3 space-y-2 text-sm text-[var(--app-text-muted)]">
+                        {(companyResult.researchPlan ?? []).length === 0 ? (
+                          <p>鏆傛棤 research unit 淇℃伅</p>
+                        ) : (
+                          companyResult.researchPlan?.map((unit) => (
+                            <div
+                              key={unit.id}
+                              className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.72)] px-3 py-2"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-[13px] text-[var(--app-text)]">
+                                  {unit.title}
+                                </p>
+                                <StatusPill label={unit.capability} tone="info" />
+                              </div>
+                              <p className="mt-2 text-xs leading-5">
+                                {unit.objective}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </article>
+                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
+                        Compressed findings
+                      </p>
+                      <div className="mt-3 space-y-2 text-sm text-[var(--app-text-muted)]">
+                        <p className="text-[var(--app-text)]">
+                          {companyResult.compressedFindings?.summary ?? "鏆傛棤鍘嬬缉缁撹"}
+                        </p>
+                        {(companyResult.compressedFindings?.highlights ?? []).map(
+                          (item) => (
+                            <p key={item}>- {item}</p>
+                          ),
+                        )}
+                      </div>
+                    </article>
+                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
+                        Gap analysis
+                      </p>
+                      <div className="mt-3 space-y-2 text-sm text-[var(--app-text-muted)]">
+                        <p className="text-[var(--app-text)]">
+                          {companyResult.gapAnalysis?.summary ?? "鏆傛棤琛ュ姩璇勪及"}
+                        </p>
+                        {(companyResult.gapAnalysis?.missingAreas ?? []).map(
+                          (item) => (
+                            <p key={item}>- {item}</p>
+                          ),
+                        )}
+                      </div>
+                    </article>
+                  </div>
+                  {(companyResult.researchNotes ?? []).length > 0 ? (
+                    <div className="mt-4 grid gap-3">
+                      {(companyResult.researchNotes ?? []).slice(0, 6).map((note) => (
+                        <article
+                          key={note.noteId}
+                          className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm text-[var(--app-text)]">
+                              {note.title}
+                            </p>
+                            <StatusPill label={note.unitId} tone="neutral" />
+                          </div>
+                          <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
+                            {note.summary}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </Panel>
+              )}
 
               <div className="grid gap-6 xl:grid-cols-3">
                 <Panel

@@ -5,6 +5,21 @@ import type {
   ThemeNewsItem,
 } from "~/server/domain/intelligence/types";
 import type {
+  CompressedFindings,
+  ResearchBriefV2,
+  ResearchClarificationRequest,
+  ResearchGapAnalysis,
+  ResearchNote,
+  ResearchPreferenceInput,
+  ResearchRuntimeConfig,
+  ResearchUnitPlan,
+  ResearchUnitRun,
+} from "~/server/domain/workflow/research";
+import {
+  getWorkflowNodeKeysFromParsedGraphConfig,
+  resolveResearchRuntimeConfig,
+} from "~/server/domain/workflow/research";
+import type {
   MarketRegimeAnalysis,
   MarketRegimeSnapshot,
   PortfolioRiskPlan,
@@ -43,6 +58,16 @@ export const QUICK_RESEARCH_NODE_KEYS = [
   "agent5_competition_summary",
 ] as const;
 
+export const QUICK_RESEARCH_V2_NODE_KEYS = [
+  "agent0_clarify_scope",
+  "agent1_write_research_brief",
+  "agent2_plan_research_units",
+  "agent3_execute_research_units",
+  "agent4_gap_analysis",
+  "agent5_compress_findings",
+  "agent6_finalize_report",
+] as const;
+
 export const COMPANY_RESEARCH_V1_NODE_KEYS = [
   "agent1_company_briefing",
   "agent2_concept_mapping",
@@ -63,6 +88,18 @@ export const COMPANY_RESEARCH_NODE_KEYS = [
   "agent9_evidence_curation",
   "agent10_reference_enrichment",
   "agent11_investment_synthesis",
+] as const;
+
+export const COMPANY_RESEARCH_V3_NODE_KEYS = [
+  "agent0_clarify_scope",
+  "agent1_write_research_brief",
+  "agent2_plan_research_units",
+  "agent3_execute_research_units",
+  "agent4_evidence_curation",
+  "agent5_gap_analysis",
+  "agent6_compress_findings",
+  "agent7_reference_enrichment",
+  "agent8_investment_synthesis",
 ] as const;
 
 export const SCREENING_INSIGHT_PIPELINE_NODE_KEYS = [
@@ -123,7 +160,10 @@ export const TIMING_REVIEW_LOOP_NODE_KEYS = [
 export type QuickResearchNodeKey = (typeof QUICK_RESEARCH_NODE_KEYS)[number];
 export type CompanyResearchNodeKey =
   | (typeof COMPANY_RESEARCH_V1_NODE_KEYS)[number]
-  | (typeof COMPANY_RESEARCH_NODE_KEYS)[number];
+  | (typeof COMPANY_RESEARCH_NODE_KEYS)[number]
+  | (typeof COMPANY_RESEARCH_V3_NODE_KEYS)[number];
+export type QuickResearchV2NodeKey =
+  (typeof QUICK_RESEARCH_V2_NODE_KEYS)[number];
 export type ScreeningInsightPipelineNodeKey =
   (typeof SCREENING_INSIGHT_PIPELINE_NODE_KEYS)[number];
 export type TimingSignalPipelineNodeKey =
@@ -138,6 +178,7 @@ export type TimingReviewLoopNodeKey =
   (typeof TIMING_REVIEW_LOOP_NODE_KEYS)[number];
 export type WorkflowNodeKey =
   | QuickResearchNodeKey
+  | QuickResearchV2NodeKey
   | CompanyResearchNodeKey
   | ScreeningInsightPipelineNodeKey
   | TimingSignalPipelineNodeKey
@@ -178,10 +219,19 @@ export type WorkflowGraphState = Record<string, unknown> & {
   lastCompletedNodeKey?: WorkflowNodeKey;
   resumeFromNodeKey?: WorkflowNodeKey;
   errors: string[];
+  clarificationRequest?: ResearchClarificationRequest;
+  researchRuntimeConfig?: ResearchRuntimeConfig;
+  researchBrief?: ResearchBriefV2;
+  researchUnits?: ResearchUnitPlan[];
+  researchUnitRuns?: ResearchUnitRun[];
+  researchNotes?: ResearchNote[];
+  compressedFindings?: CompressedFindings;
+  gapAnalysis?: ResearchGapAnalysis;
 };
 
 export type QuickResearchInput = {
   query: string;
+  researchPreferences?: ResearchPreferenceInput;
 };
 
 export type QuickResearchCandidate = {
@@ -214,6 +264,11 @@ export type QuickResearchResultDto = {
   topPicks: QuickResearchTopPick[];
   competitionSummary: string;
   confidenceAnalysis?: ConfidenceAnalysis;
+  brief?: ResearchBriefV2;
+  researchPlan?: ResearchUnitPlan[];
+  researchNotes?: ResearchNote[];
+  compressedFindings?: CompressedFindings;
+  gapAnalysis?: ResearchGapAnalysis;
   generatedAt: string;
 };
 
@@ -228,7 +283,8 @@ export type WorkflowStreamEvent = {
 };
 
 export type QuickResearchGraphState = WorkflowGraphState & {
-  currentNodeKey?: QuickResearchNodeKey;
+  currentNodeKey?: QuickResearchNodeKey | QuickResearchV2NodeKey;
+  researchInput?: QuickResearchInput;
   intent?: string;
   industryOverview?: string;
   news?: ThemeNewsItem[];
@@ -250,6 +306,7 @@ export type CompanyResearchInput = {
   focusConcepts?: string[];
   keyQuestion?: string;
   supplementalUrls?: string[];
+  researchPreferences?: ResearchPreferenceInput;
 };
 
 export type CompanyResearchBrief = {
@@ -390,6 +447,18 @@ export type CompanyResearchResultDto = {
     notes: string[];
   };
   confidenceAnalysis?: ConfidenceAnalysis;
+  researchPlan?: ResearchUnitPlan[];
+  researchNotes?: ResearchNote[];
+  compressedFindings?: CompressedFindings;
+  gapAnalysis?: ResearchGapAnalysis;
+  runtimeConfigSummary?: Pick<
+    ResearchRuntimeConfig,
+    | "allowClarification"
+    | "maxConcurrentResearchUnits"
+    | "maxGapIterations"
+    | "maxUnitsPerPlan"
+    | "maxEvidencePerUnit"
+  >;
   generatedAt: string;
 };
 
@@ -654,19 +723,7 @@ export type TimingReviewLoopGraphState = WorkflowGraphState & {
 export function getWorkflowNodeKeysFromGraphConfig(
   graphConfig: unknown,
 ): string[] {
-  if (
-    !graphConfig ||
-    typeof graphConfig !== "object" ||
-    Array.isArray(graphConfig)
-  ) {
-    return [];
-  }
-
-  const nodes = (graphConfig as { nodes?: unknown }).nodes;
-
-  if (!Array.isArray(nodes)) {
-    return [];
-  }
-
-  return nodes.filter((node): node is string => typeof node === "string");
+  return getWorkflowNodeKeysFromParsedGraphConfig(graphConfig);
 }
+
+export { resolveResearchRuntimeConfig };

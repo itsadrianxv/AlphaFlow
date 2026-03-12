@@ -16,12 +16,14 @@ import {
   type WorkflowEventStreamType,
   type WorkflowGraphState,
 } from "~/server/domain/workflow/types";
+import type { ResearchPreferenceInput } from "~/server/domain/workflow/research";
 import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
 
 export type StartQuickResearchCommand = {
   userId: string;
   query: string;
+  researchPreferences?: ResearchPreferenceInput;
   templateCode?: string;
   templateVersion?: number;
   idempotencyKey?: string;
@@ -35,6 +37,7 @@ export type StartCompanyResearchCommand = {
   focusConcepts?: string[];
   keyQuestion?: string;
   supplementalUrls?: string[];
+  researchPreferences?: ResearchPreferenceInput;
   templateVersion?: number;
   idempotencyKey?: string;
 };
@@ -172,6 +175,7 @@ export class WorkflowCommandService {
       templateVersion: command.templateVersion,
       input: {
         query: command.query,
+        researchPreferences: command.researchPreferences,
       },
       idempotencyKey: command.idempotencyKey,
     });
@@ -190,6 +194,7 @@ export class WorkflowCommandService {
         focusConcepts: command.focusConcepts,
         keyQuestion: command.keyQuestion,
         supplementalUrls: command.supplementalUrls,
+        researchPreferences: command.researchPreferences,
       },
       idempotencyKey: command.idempotencyKey,
     });
@@ -435,9 +440,17 @@ export class WorkflowCommandService {
     );
 
     if (
-      command.templateCode === COMPANY_RESEARCH_TEMPLATE_CODE &&
+      command.templateCode === QUICK_RESEARCH_TEMPLATE_CODE &&
       command.templateVersion === undefined &&
       (!template || template.version < 2)
+    ) {
+      template = await this.repository.ensureQuickResearchTemplate();
+    }
+
+    if (
+      command.templateCode === COMPANY_RESEARCH_TEMPLATE_CODE &&
+      command.templateVersion === undefined &&
+      (!template || template.version < 3)
     ) {
       template = await this.repository.ensureCompanyResearchTemplate();
     }

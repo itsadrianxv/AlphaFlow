@@ -1,8 +1,11 @@
 import { WorkflowEventType, WorkflowNodeRunStatus } from "~/generated/prisma";
 import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
+import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
 import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
+import { QuickResearchWorkflowService } from "~/server/application/intelligence/quick-research-workflow-service";
+import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { InsightQualityService } from "~/server/domain/intelligence/services/insight-quality-service";
 import { ReviewPlanPolicy } from "~/server/domain/intelligence/services/review-plan-policy";
@@ -26,9 +29,13 @@ import { PrismaScreeningSessionRepository } from "~/server/infrastructure/screen
 import {
   CompanyResearchLangGraph,
   LegacyCompanyResearchLangGraph,
+  ODRCompanyResearchLangGraph,
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
 import { WorkflowGraphRegistry } from "~/server/infrastructure/workflow/langgraph/graph-registry";
-import { QuickResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
+import {
+  QuickResearchLangGraph,
+  QuickResearchODRLangGraph,
+} from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
 import { ScreeningInsightPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph";
 import type { WorkflowGraphRunner } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
 import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
@@ -90,6 +97,7 @@ export function createWorkflowExecutionService(
   const prisma = repository.getPrismaClient();
   const deepSeekClient = new DeepSeekClient();
   const intelligenceDataClient = new PythonIntelligenceDataClient();
+  const firecrawlClient = new FirecrawlClient();
   const confidenceAnalysisService = new ConfidenceAnalysisService({
     client: new PythonConfidenceAnalysisClient(),
   });
@@ -100,9 +108,23 @@ export function createWorkflowExecutionService(
   });
   const companyResearchService = new CompanyResearchAgentService({
     deepSeekClient,
-    firecrawlClient: new FirecrawlClient(),
+    firecrawlClient,
     pythonIntelligenceDataClient: intelligenceDataClient,
     confidenceAnalysisService,
+  });
+  const researchToolRegistry = new ResearchToolRegistry({
+    deepSeekClient,
+    firecrawlClient,
+    pythonIntelligenceDataClient: intelligenceDataClient,
+  });
+  const quickResearchWorkflowService = new QuickResearchWorkflowService({
+    client: deepSeekClient,
+    intelligenceService,
+  });
+  const companyResearchWorkflowService = new CompanyResearchWorkflowService({
+    client: deepSeekClient,
+    companyResearchService,
+    researchToolRegistry,
   });
   const reminderRepository = new PrismaResearchReminderRepository(prisma);
   const reminderSchedulingService = new ReminderSchedulingService({
@@ -119,8 +141,10 @@ export function createWorkflowExecutionService(
     runtimeStore: options?.runtimeStore ?? new RedisWorkflowRuntimeStore(),
     graphs: options?.graphs ?? [
       new QuickResearchLangGraph(intelligenceService),
+      new QuickResearchODRLangGraph(quickResearchWorkflowService),
       new LegacyCompanyResearchLangGraph(companyResearchService),
       new CompanyResearchLangGraph(companyResearchService),
+      new ODRCompanyResearchLangGraph(companyResearchWorkflowService),
       new ScreeningInsightPipelineLangGraph({
         screeningSessionRepository: new PrismaScreeningSessionRepository(
           prisma,
@@ -226,6 +250,7 @@ export class WorkflowExecutionService {
         query: run.query,
         input: ((run.input ?? {}) as Record<string, unknown>) ?? {},
         progressPercent: run.progressPercent,
+        templateGraphConfig: run.template.graphConfig,
       });
 
     state = this.restoreStateFromCompletedNodeRuns(graph, state, run.nodeRuns);

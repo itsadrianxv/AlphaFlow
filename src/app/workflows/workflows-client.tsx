@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   EmptyState,
@@ -42,6 +42,8 @@ const statusLabelMap: Record<string, string> = {
   FAILED: "需要重跑",
   CANCELLED: "已取消",
 };
+
+statusLabelMap.PAUSED = "寰呰ˉ鍏呬俊鎭?";
 
 const quickPrompts = [
   "半导体设备国产替代，未来 12 个月最关键的兑现节点是什么？",
@@ -184,9 +186,43 @@ function InvestorRunCard({
 
 export function WorkflowsClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const utils = api.useUtils();
   const [query, setQuery] = useState("");
   const [idempotencyKey, setIdempotencyKey] = useState("");
+  const [researchGoal, setResearchGoal] = useState("");
+  const [mustAnswerQuestions, setMustAnswerQuestions] = useState("");
+  const [forbiddenEvidenceTypes, setForbiddenEvidenceTypes] = useState("");
+  const [preferredSources, setPreferredSources] = useState("");
+  const [freshnessWindowDays, setFreshnessWindowDays] = useState("180");
+
+  useEffect(() => {
+    const nextQuery = searchParams.get("query");
+    const nextResearchGoal = searchParams.get("researchGoal");
+    const nextMustAnswerQuestions = searchParams.get("mustAnswerQuestions");
+    const nextForbiddenEvidenceTypes = searchParams.get("forbiddenEvidenceTypes");
+    const nextPreferredSources = searchParams.get("preferredSources");
+    const nextFreshnessWindowDays = searchParams.get("freshnessWindowDays");
+
+    if (nextQuery) {
+      setQuery(nextQuery);
+    }
+    if (nextResearchGoal) {
+      setResearchGoal(nextResearchGoal);
+    }
+    if (nextMustAnswerQuestions) {
+      setMustAnswerQuestions(nextMustAnswerQuestions);
+    }
+    if (nextForbiddenEvidenceTypes) {
+      setForbiddenEvidenceTypes(nextForbiddenEvidenceTypes);
+    }
+    if (nextPreferredSources) {
+      setPreferredSources(nextPreferredSources);
+    }
+    if (nextFreshnessWindowDays) {
+      setFreshnessWindowDays(nextFreshnessWindowDays);
+    }
+  }, [searchParams]);
 
   const runsQuery = api.workflow.listRuns.useQuery({
     limit: 20,
@@ -221,7 +257,10 @@ export function WorkflowsClient() {
   }, [runsQuery.data?.items]);
 
   const liveRuns = sortedRuns.filter(
-    (run) => run.status === "PENDING" || run.status === "RUNNING",
+    (run) =>
+      run.status === "PENDING" ||
+      run.status === "RUNNING" ||
+      run.status === "PAUSED",
   );
   const finishedRuns = sortedRuns.filter((run) => run.status === "SUCCEEDED");
 
@@ -232,6 +271,30 @@ export function WorkflowsClient() {
 
     await startMutation.mutateAsync({
       query: query.trim(),
+      researchPreferences:
+        researchGoal.trim() ||
+        mustAnswerQuestions.trim() ||
+        forbiddenEvidenceTypes.trim() ||
+        preferredSources.trim() ||
+        freshnessWindowDays.trim()
+          ? {
+              researchGoal: researchGoal.trim() || undefined,
+              mustAnswerQuestions: mustAnswerQuestions
+                .split(/\n+/)
+                .map((item) => item.trim())
+                .filter(Boolean),
+              forbiddenEvidenceTypes: forbiddenEvidenceTypes
+                .split(/\n+/)
+                .map((item) => item.trim())
+                .filter(Boolean),
+              preferredSources: preferredSources
+                .split(/\n+/)
+                .map((item) => item.trim())
+                .filter(Boolean),
+              freshnessWindowDays:
+                Number.parseInt(freshnessWindowDays.trim(), 10) || undefined,
+            }
+          : undefined,
       idempotencyKey: idempotencyKey.trim() || undefined,
     });
   };
@@ -297,6 +360,42 @@ export function WorkflowsClient() {
                 高级选项
               </summary>
               <div className="mt-4 grid gap-3">
+                <textarea
+                  value={researchGoal}
+                  onChange={(event) => setResearchGoal(event.target.value)}
+                  placeholder="鍙€夛細鏈鐮旂┒鐨勭洰鏍?"
+                  className="app-textarea min-h-[88px]"
+                />
+                <textarea
+                  value={mustAnswerQuestions}
+                  onChange={(event) =>
+                    setMustAnswerQuestions(event.target.value)
+                  }
+                  placeholder="鍙€夛細蹇呴』鍥炵瓟鐨勯棶棰橈紝姣忚涓€鏉?"
+                  className="app-textarea min-h-[88px]"
+                />
+                <textarea
+                  value={preferredSources}
+                  onChange={(event) => setPreferredSources(event.target.value)}
+                  placeholder="鍙€夛細浼樺厛淇℃簮锛屾瘡琛屼竴鏉?"
+                  className="app-textarea min-h-[80px]"
+                />
+                <textarea
+                  value={forbiddenEvidenceTypes}
+                  onChange={(event) =>
+                    setForbiddenEvidenceTypes(event.target.value)
+                  }
+                  placeholder="鍙€夛細闇€閬垮紑鐨勮瘉鎹被鍨嬶紝姣忚涓€鏉?"
+                  className="app-textarea min-h-[80px]"
+                />
+                <input
+                  value={freshnessWindowDays}
+                  onChange={(event) =>
+                    setFreshnessWindowDays(event.target.value)
+                  }
+                  placeholder="鍙€夛細鏃舵晥绐楀彛锛堝ぉ锛?"
+                  className="app-input"
+                />
                 <input
                   value={idempotencyKey}
                   onChange={(event) => setIdempotencyKey(event.target.value)}

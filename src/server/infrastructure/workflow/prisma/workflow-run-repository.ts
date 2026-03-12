@@ -8,8 +8,10 @@ import {
 import {
   COMPANY_RESEARCH_NODE_KEYS,
   COMPANY_RESEARCH_TEMPLATE_CODE,
+  COMPANY_RESEARCH_V3_NODE_KEYS,
   COMPANY_RESEARCH_V1_NODE_KEYS,
   QUICK_RESEARCH_NODE_KEYS,
+  QUICK_RESEARCH_V2_NODE_KEYS,
   QUICK_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_NODE_KEYS,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
@@ -24,12 +26,22 @@ import {
   WATCHLIST_TIMING_PIPELINE_NODE_KEYS,
   WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
 } from "~/server/domain/workflow/types";
+import { DEFAULT_RESEARCH_RUNTIME_CONFIG } from "~/server/domain/workflow/research";
 
 const toJson = (value: unknown): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
 
 function buildCheckpointKey(runId: string) {
   return `workflow:checkpoint:${runId}`;
+}
+
+function buildResearchGraphConfig(nodes: readonly string[]) {
+  return {
+    nodes,
+    researchDefaults: {
+      ...DEFAULT_RESEARCH_RUNTIME_CONFIG,
+    },
+  };
 }
 
 export type WorkflowRunDetailRecord = Awaited<
@@ -67,7 +79,38 @@ export class PrismaWorkflowRunRepository {
   }
 
   async ensureQuickResearchTemplate() {
-    return this.prisma.workflowTemplate.upsert({
+    const inputSchema = {
+      type: "object",
+      required: ["query"],
+      properties: {
+        query: {
+          type: "string",
+        },
+        researchPreferences: {
+          type: "object",
+          properties: {
+            researchGoal: { type: "string" },
+            mustAnswerQuestions: {
+              type: "array",
+              items: { type: "string" },
+            },
+            forbiddenEvidenceTypes: {
+              type: "array",
+              items: { type: "string" },
+            },
+            preferredSources: {
+              type: "array",
+              items: { type: "string" },
+            },
+            freshnessWindowDays: {
+              type: "integer",
+            },
+          },
+        },
+      },
+    } as const;
+
+    await this.prisma.workflowTemplate.upsert({
       where: {
         code_version: {
           code: QUICK_RESEARCH_TEMPLATE_CODE,
@@ -77,24 +120,34 @@ export class PrismaWorkflowRunRepository {
       create: {
         code: QUICK_RESEARCH_TEMPLATE_CODE,
         version: 1,
-        graphConfig: {
-          nodes: QUICK_RESEARCH_NODE_KEYS,
-        },
-        inputSchema: {
-          type: "object",
-          required: ["query"],
-          properties: {
-            query: {
-              type: "string",
-            },
-          },
-        },
+        graphConfig: buildResearchGraphConfig(QUICK_RESEARCH_NODE_KEYS),
+        inputSchema,
         isActive: true,
       },
       update: {
-        graphConfig: {
-          nodes: QUICK_RESEARCH_NODE_KEYS,
+        graphConfig: buildResearchGraphConfig(QUICK_RESEARCH_NODE_KEYS),
+        inputSchema,
+        isActive: true,
+      },
+    });
+
+    return this.prisma.workflowTemplate.upsert({
+      where: {
+        code_version: {
+          code: QUICK_RESEARCH_TEMPLATE_CODE,
+          version: 2,
         },
+      },
+      create: {
+        code: QUICK_RESEARCH_TEMPLATE_CODE,
+        version: 2,
+        graphConfig: buildResearchGraphConfig(QUICK_RESEARCH_V2_NODE_KEYS),
+        inputSchema,
+        isActive: true,
+      },
+      update: {
+        graphConfig: buildResearchGraphConfig(QUICK_RESEARCH_V2_NODE_KEYS),
+        inputSchema,
         isActive: true,
       },
     });
@@ -129,6 +182,27 @@ export class PrismaWorkflowRunRepository {
             type: "string",
           },
         },
+        researchPreferences: {
+          type: "object",
+          properties: {
+            researchGoal: { type: "string" },
+            mustAnswerQuestions: {
+              type: "array",
+              items: { type: "string" },
+            },
+            forbiddenEvidenceTypes: {
+              type: "array",
+              items: { type: "string" },
+            },
+            preferredSources: {
+              type: "array",
+              items: { type: "string" },
+            },
+            freshnessWindowDays: {
+              type: "integer",
+            },
+          },
+        },
       },
     } as const;
 
@@ -142,20 +216,18 @@ export class PrismaWorkflowRunRepository {
       create: {
         code: COMPANY_RESEARCH_TEMPLATE_CODE,
         version: 1,
-        graphConfig: {
-          nodes: COMPANY_RESEARCH_V1_NODE_KEYS,
-        },
+        graphConfig: buildResearchGraphConfig(COMPANY_RESEARCH_V1_NODE_KEYS),
         inputSchema,
         isActive: true,
       },
       update: {
-        graphConfig: {
-          nodes: COMPANY_RESEARCH_V1_NODE_KEYS,
-        },
+        graphConfig: buildResearchGraphConfig(COMPANY_RESEARCH_V1_NODE_KEYS),
+        inputSchema,
+        isActive: false,
       },
     });
 
-    return this.prisma.workflowTemplate.upsert({
+    await this.prisma.workflowTemplate.upsert({
       where: {
         code_version: {
           code: COMPANY_RESEARCH_TEMPLATE_CODE,
@@ -165,16 +237,34 @@ export class PrismaWorkflowRunRepository {
       create: {
         code: COMPANY_RESEARCH_TEMPLATE_CODE,
         version: 2,
-        graphConfig: {
-          nodes: COMPANY_RESEARCH_NODE_KEYS,
-        },
+        graphConfig: buildResearchGraphConfig(COMPANY_RESEARCH_NODE_KEYS),
         inputSchema,
         isActive: true,
       },
       update: {
-        graphConfig: {
-          nodes: COMPANY_RESEARCH_NODE_KEYS,
+        graphConfig: buildResearchGraphConfig(COMPANY_RESEARCH_NODE_KEYS),
+        inputSchema,
+        isActive: false,
+      },
+    });
+
+    return this.prisma.workflowTemplate.upsert({
+      where: {
+        code_version: {
+          code: COMPANY_RESEARCH_TEMPLATE_CODE,
+          version: 3,
         },
+      },
+      create: {
+        code: COMPANY_RESEARCH_TEMPLATE_CODE,
+        version: 3,
+        graphConfig: buildResearchGraphConfig(COMPANY_RESEARCH_V3_NODE_KEYS),
+        inputSchema,
+        isActive: true,
+      },
+      update: {
+        graphConfig: buildResearchGraphConfig(COMPANY_RESEARCH_V3_NODE_KEYS),
+        inputSchema,
         isActive: true,
       },
     });

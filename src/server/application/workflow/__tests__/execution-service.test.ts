@@ -8,6 +8,7 @@ import { WorkflowCommandService } from "~/server/application/workflow/command-se
 import { WorkflowExecutionService } from "~/server/application/workflow/execution-service";
 import { WorkflowPauseError } from "~/server/domain/workflow/errors";
 import {
+  QUICK_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   type WorkflowGraphState,
 } from "~/server/domain/workflow/types";
@@ -269,6 +270,88 @@ class ReviewPauseGraph implements WorkflowGraphRunner {
     }
 
     return state;
+  }
+}
+
+class ClarificationPauseGraph implements WorkflowGraphRunner {
+  readonly templateCode = QUICK_RESEARCH_TEMPLATE_CODE;
+  readonly templateVersion = 2;
+
+  getNodeOrder() {
+    return ["agent0_clarify_scope", "agent1_write_research_brief"];
+  }
+
+  buildInitialState(): WorkflowGraphState {
+    return {
+      runId: "run_1",
+      userId: "user_1",
+      query: "AI infra",
+      progressPercent: 0,
+      currentNodeKey: undefined,
+      lastCompletedNodeKey: undefined,
+      errors: [],
+    };
+  }
+
+  getNodeOutput() {
+    return {};
+  }
+
+  getNodeEventPayload(nodeKey: string, state: WorkflowGraphState) {
+    if (nodeKey !== "agent0_clarify_scope") {
+      return {};
+    }
+
+    return {
+      clarificationRequired: true,
+      question:
+        (state as WorkflowGraphState & {
+          clarificationRequest?: { question?: string };
+        }).clarificationRequest?.question ?? "Need more detail",
+      missingScopeFields: ["query"],
+      suggestedInputPatch: {
+        researchPreferences: {
+          researchGoal: "Narrow the scope",
+        },
+      },
+    };
+  }
+
+  mergeNodeOutput(
+    state: WorkflowGraphState,
+    nodeKey: string,
+    output: Record<string, unknown>,
+  ) {
+    return {
+      ...state,
+      ...output,
+      currentNodeKey: nodeKey,
+      lastCompletedNodeKey: nodeKey,
+    };
+  }
+
+  getRunResult() {
+    return {};
+  }
+
+  async execute(_params: {
+    initialState: WorkflowGraphState;
+    startNodeIndex?: number;
+  }): Promise<WorkflowGraphState> {
+    throw new WorkflowPauseError("Need more detail", "clarification_required", {
+      currentNodeKey: "agent0_clarify_scope",
+      clarificationRequest: {
+        needClarification: true,
+        question: "Need more detail",
+        verification: "",
+        missingScopeFields: ["query"],
+        suggestedInputPatch: {
+          researchPreferences: {
+            researchGoal: "Narrow the scope",
+          },
+        },
+      },
+    });
   }
 }
 
@@ -719,6 +802,46 @@ describe("WorkflowExecutionService", () => {
       reviewApproved: false,
     });
     expect(runtimeStoreHarness.publishedEvents.at(-1)?.type).toBe("RUN_PAUSED");
+  });
+
+  it("preserves clarification payload when a research run pauses for missing scope", async () => {
+    const graph = new ClarificationPauseGraph();
+    const { repository, run } = createRepositoryHarness({
+      graph,
+      status: WorkflowRunStatus.PENDING,
+      nodeRuns: graph.getNodeOrder().map((nodeKey) => ({
+        nodeKey,
+        status: WorkflowNodeRunStatus.PENDING,
+      })),
+    });
+    const runtimeStoreHarness = createRuntimeStoreHarness(null);
+
+    const service = new WorkflowExecutionService({
+      repository,
+      runtimeStore: runtimeStoreHarness.runtimeStore,
+      graphs: [graph],
+    });
+
+    const picked = await service.executeNextPendingRun("worker_1");
+
+    expect(picked).toBe(true);
+    expect(run.status).toBe(WorkflowRunStatus.PAUSED);
+    expect(repository.markRunPaused).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reason: "clarification_required",
+        currentNodeKey: "agent0_clarify_scope",
+        eventPayload: expect.objectContaining({
+          question: "Need more detail",
+          clarificationRequired: true,
+        }),
+      }),
+    );
+    expect(runtimeStoreHarness.getCheckpoint()).toMatchObject({
+      currentNodeKey: "agent0_clarify_scope",
+      clarificationRequest: {
+        question: "Need more detail",
+      },
+    });
   });
 
   it("approves a paused screening run and lets the worker finish it", async () => {
