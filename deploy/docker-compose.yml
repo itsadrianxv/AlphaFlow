@@ -107,7 +107,12 @@
       FIRECRAWL_TIMEOUT_MS: ${FIRECRAWL_TIMEOUT_MS:-15000}
     ports:
       - "${WEB_PORT:-3000}:3000"
-    command: ["sh", "-c", "npm run db:push && npm run start"]
+    command:
+      [
+        "sh",
+        "-c",
+        "npm run validate:runtime && npm run db:push && npm run start",
+      ]
 
   workflow-worker:
     build:
@@ -140,7 +145,8 @@
       FIRECRAWL_BASE_URL: ${FIRECRAWL_BASE_URL:-https://api.firecrawl.dev}
       FIRECRAWL_TIMEOUT_MS: ${FIRECRAWL_TIMEOUT_MS:-15000}
       WORKFLOW_WORKER_POLL_INTERVAL_MS: ${WORKFLOW_WORKER_POLL_INTERVAL_MS:-2000}
-    command: ["npm", "run", "worker:workflow"]
+    command:
+      ["sh", "-c", "npm run validate:runtime && npm run worker:workflow"]
 
   screening-worker:
     build:
@@ -167,7 +173,8 @@
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       PYTHON_SERVICE_URL: ${PYTHON_SERVICE_URL:-http://python-service:8000}
       SCREENING_WORKER_POLL_INTERVAL_MS: ${SCREENING_WORKER_POLL_INTERVAL_MS:-2000}
-    command: ["npm", "run", "worker:screening"]
+    command:
+      ["sh", "-c", "npm run validate:runtime && npm run worker:screening"]
 
 volumes:
   postgres_data:

@@ -1,10 +1,14 @@
 ﻿import type { OAuthConfig } from "@auth/core/providers";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import type { DefaultSession, NextAuthConfig } from "next-auth";
+import { AuthError, type DefaultSession, type NextAuthConfig } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import WeChatProvider from "next-auth/providers/wechat";
 
 import { env } from "~/env";
+import {
+  collectAuthSecrets,
+  isSecretRotationErrorMessage,
+} from "~/server/auth/secret-utils";
 import { db } from "~/server/db";
 
 /**
@@ -37,26 +41,71 @@ const localCredentialsUsername = env.AUTH_CREDENTIALS_USERNAME ?? "admin";
 const localCredentialsPassword = env.AUTH_CREDENTIALS_PASSWORD ?? "admin123456";
 const localCredentialsEmail = "local-user@stock-screening-boost.local";
 
-const authSecrets = (() => {
-  const orderedCandidates = [
-    env.AUTH_SECRET,
-    env.AUTH_SECRET_1,
-    env.AUTH_SECRET_2,
-    env.AUTH_SECRET_3,
-    env.NEXTAUTH_SECRET,
-  ];
+const authSecrets = collectAuthSecrets({
+  authSecret: env.AUTH_SECRET,
+  authSecret1: env.AUTH_SECRET_1,
+  authSecret2: env.AUTH_SECRET_2,
+  authSecret3: env.AUTH_SECRET_3,
+  nextAuthSecret: env.NEXTAUTH_SECRET,
+});
 
-  const secrets: string[] = [];
-  for (const candidate of orderedCandidates) {
-    if (!candidate || secrets.includes(candidate)) {
-      continue;
-    }
+let hasLoggedSecretRotationWarning = false;
 
-    secrets.push(candidate);
+const getAuthCause = (error: AuthError) => {
+  if (
+    !error.cause ||
+    typeof error.cause !== "object" ||
+    !("err" in error.cause)
+  ) {
+    return null;
   }
 
-  return secrets;
-})();
+  const cause = error.cause.err;
+
+  return cause instanceof Error ? cause : null;
+};
+
+const logAuthError = (error: Error) => {
+  const name = error instanceof AuthError ? error.type : error.name;
+  console.error(`[auth][error] ${name}: ${error.message}`);
+
+  if (error instanceof AuthError) {
+    const cause = getAuthCause(error);
+
+    if (cause) {
+      console.error("[auth][cause]:", cause.stack ?? cause.message);
+    }
+
+    return;
+  }
+
+  if (error.stack) {
+    console.error(error.stack);
+  }
+};
+
+const authLogger: NonNullable<NextAuthConfig["logger"]> = {
+  error(error) {
+    if (error instanceof AuthError) {
+      const cause = getAuthCause(error);
+      if (
+        error.type === "JWTSessionError" &&
+        isSecretRotationErrorMessage(cause?.message)
+      ) {
+        if (!hasLoggedSecretRotationWarning) {
+          console.warn(
+            "[auth][warn] Detected a stale session cookie encrypted with a previous AUTH_SECRET. Auth.js will clear it automatically. After a Docker deploy, keep AUTH_SECRET stable or copy the previous secret into AUTH_SECRET_1 during rotation.",
+          );
+          hasLoggedSecretRotationWarning = true;
+        }
+
+        return;
+      }
+    }
+
+    logAuthError(error);
+  },
+};
 
 type WeChatProfile = {
   unionid?: string;
@@ -229,6 +278,7 @@ if (env.AUTH_QQ_ID && env.AUTH_QQ_SECRET) {
 export const authConfig = {
   providers,
   secret: authSecrets.length > 0 ? authSecrets : undefined,
+  logger: authLogger,
   adapter: PrismaAdapter(db),
   session: {
     strategy: "jwt",
@@ -250,4 +300,3 @@ export const authConfig = {
     }),
   },
 } satisfies NextAuthConfig;
-

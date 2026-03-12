@@ -17,6 +17,7 @@
     "postinstall": "prisma generate",
     "preview": "next build && next start",
     "start": "next start",
+    "validate:runtime": "tsx tooling/validate-runtime-env.ts",
     "worker:screening": "tsx tooling/workers/screening-worker.ts",
     "worker:workflow": "tsx tooling/workers/workflow-worker.ts",
     "test": "vitest run --config tooling/vitest.config.ts",
