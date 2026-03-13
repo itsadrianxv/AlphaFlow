@@ -187,12 +187,10 @@ export class IntelligenceAgentService {
     query: string,
     heatScore: number,
   ): Promise<QuickResearchCandidate[]> {
-    const sourcedCandidates = await this.dataClient
-      .getCandidates({
-        theme: query,
-        limit: 8,
-      })
-      .catch(() => []);
+    const sourcedCandidates = await this.dataClient.getCandidates({
+      theme: query,
+      limit: 8,
+    });
 
     return sourcedCandidates
       .slice(0, 6)
@@ -205,12 +203,10 @@ export class IntelligenceAgentService {
     concept: string,
     candidates: QuickResearchCandidate[],
   ): Promise<CandidateCredibilityResult> {
-    const evidenceList = await this.dataClient
-      .getEvidenceBatch({
-        concept,
-        stockCodes: candidates.map((candidate) => candidate.stockCode),
-      })
-      .catch(() => []);
+    const evidenceList = await this.dataClient.getEvidenceBatch({
+      concept,
+      stockCodes: candidates.map((candidate) => candidate.stockCode),
+    });
 
     const mapped = new Map(
       evidenceList.map((evidence) => [

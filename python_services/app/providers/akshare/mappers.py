@@ -1,4 +1,4 @@
-"""Mapping helpers from legacy adapter payloads to standardized contracts."""
+"""Mapping helpers from provider payloads to standardized contracts."""
 
 from __future__ import annotations
 

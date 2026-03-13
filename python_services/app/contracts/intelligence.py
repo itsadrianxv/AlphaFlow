@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.contracts.common import BatchItemError
 from app.contracts.meta import GatewayResponse
 
 
@@ -55,6 +56,16 @@ class StockEvidenceData(BaseModel):
     stockCode: str
     concept: str
     evidence: CompanyEvidence
+
+
+class StockEvidenceBatchRequest(BaseModel):
+    stockCodes: list[str] = Field(..., min_length=1, max_length=100)
+    concept: str
+
+
+class StockEvidenceBatchData(BaseModel):
+    items: list[CompanyEvidence] = Field(default_factory=list)
+    errors: list[BatchItemError] = Field(default_factory=list)
 
 
 class CompanyResearchPackReferenceItem(BaseModel):
@@ -151,6 +162,10 @@ class ThemeConceptsResponse(GatewayResponse[ThemeConceptsData]):
 
 
 class StockEvidenceResponse(GatewayResponse[StockEvidenceData]):
+    pass
+
+
+class StockEvidenceBatchResponse(GatewayResponse[StockEvidenceBatchData]):
     pass
 
 

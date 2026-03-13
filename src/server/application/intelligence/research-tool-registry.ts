@@ -79,7 +79,9 @@ export class ResearchToolRegistry {
       runtimeConfig.maxContentCharsPerSource,
     );
 
-    if (trimmed.length < Math.min(900, runtimeConfig.maxContentCharsPerSource)) {
+    if (
+      trimmed.length < Math.min(900, runtimeConfig.maxContentCharsPerSource)
+    ) {
       return trimmed;
     }
 
@@ -214,12 +216,10 @@ export class ResearchToolRegistry {
       return null;
     }
 
-    return this.pythonIntelligenceDataClient
-      .getCompanyResearchPack({
-        stockCode: params.stockCode,
-        concept: params.concept,
-      })
-      .catch(() => null);
+    return this.pythonIntelligenceDataClient.getCompanyResearchPack({
+      stockCode: params.stockCode,
+      concept: params.concept,
+    });
   }
 
   async getThemeNews(params: {
@@ -232,13 +232,11 @@ export class ResearchToolRegistry {
       return [];
     }
 
-    return this.pythonIntelligenceDataClient
-      .getThemeNews({
-        theme: params.theme,
-        days: params.days,
-        limit: params.limit,
-      })
-      .catch(() => []);
+    return this.pythonIntelligenceDataClient.getThemeNews({
+      theme: params.theme,
+      days: params.days,
+      limit: params.limit,
+    });
   }
 
   async getCandidateScreening(params: {
@@ -250,12 +248,10 @@ export class ResearchToolRegistry {
       return [];
     }
 
-    return this.pythonIntelligenceDataClient
-      .getCandidates({
-        theme: params.theme,
-        limit: params.limit,
-      })
-      .catch(() => []);
+    return this.pythonIntelligenceDataClient.getCandidates({
+      theme: params.theme,
+      limit: params.limit,
+    });
   }
 
   async getCredibilityEvidence(params: {
@@ -267,11 +263,9 @@ export class ResearchToolRegistry {
       return [];
     }
 
-    return this.pythonIntelligenceDataClient
-      .getEvidenceBatch({
-        concept: params.theme,
-        stockCodes: params.stockCodes,
-      })
-      .catch(() => []);
+    return this.pythonIntelligenceDataClient.getEvidenceBatch({
+      concept: params.theme,
+      stockCodes: params.stockCodes,
+    });
   }
 }

@@ -10,6 +10,39 @@ import {
   WorkflowDomainError,
 } from "~/server/domain/workflow/errors";
 
+type GatewayErrorResponse = {
+  error?: {
+    code?: string;
+    message?: string;
+  };
+};
+
+type ThemeNewsGatewayData = {
+  theme: string;
+  newsItems: ThemeNewsItem[];
+};
+
+type ThemeCandidatesGatewayData = {
+  theme: string;
+  candidates: IntelligenceCandidateItem[];
+};
+
+type StockEvidenceGatewayData = {
+  stockCode: string;
+  concept: string;
+  evidence: CompanyEvidence;
+};
+
+type StockEvidenceBatchGatewayData = {
+  items: CompanyEvidence[];
+};
+
+type StockResearchPackGatewayData = {
+  stockCode: string;
+  concept: string;
+  researchPack: CompanyResearchPack;
+};
+
 export type IntelligenceCandidateItem = {
   stockCode: string;
   stockName: string;
@@ -23,15 +56,65 @@ export type PythonIntelligenceDataClientConfig = {
   timeoutMs?: number;
 };
 
+function resolveIntelligenceServiceBasePath(rawBaseUrl: string) {
+  const normalizedBaseUrl = rawBaseUrl.replace(/\/$/, "");
+
+  if (normalizedBaseUrl.endsWith("/api/v1/intelligence")) {
+    const baseUrl = normalizedBaseUrl.replace(/\/intelligence$/, "");
+    return {
+      baseUrl,
+      intelligenceBasePath: "/intelligence",
+      marketBasePath: "/market",
+    };
+  }
+
+  if (normalizedBaseUrl.endsWith("/api/v1")) {
+    return {
+      baseUrl: normalizedBaseUrl,
+      intelligenceBasePath: "/intelligence",
+      marketBasePath: "/market",
+    };
+  }
+
+  if (normalizedBaseUrl.endsWith("/api")) {
+    return {
+      baseUrl: normalizedBaseUrl,
+      intelligenceBasePath: "/v1/intelligence",
+      marketBasePath: "/v1/market",
+    };
+  }
+
+  return {
+    baseUrl: normalizedBaseUrl,
+    intelligenceBasePath: "/api/v1/intelligence",
+    marketBasePath: "/api/v1/market",
+  };
+}
+
 export class PythonIntelligenceDataClient {
   private readonly baseUrl: string;
+  private readonly intelligenceBasePath: string;
+  private readonly marketBasePath: string;
   private readonly timeoutMs: number;
 
   constructor(config?: PythonIntelligenceDataClientConfig) {
-    this.baseUrl = (
-      config?.baseUrl ?? env.PYTHON_INTELLIGENCE_SERVICE_URL
-    ).replace(/\/$/, "");
-    this.timeoutMs = config?.timeoutMs ?? 10_000;
+    const resolvedBaseUrl = resolveIntelligenceServiceBasePath(
+      config?.baseUrl ?? env.PYTHON_INTELLIGENCE_SERVICE_URL,
+    );
+
+    this.baseUrl = resolvedBaseUrl.baseUrl;
+    this.intelligenceBasePath = resolvedBaseUrl.intelligenceBasePath;
+    this.marketBasePath = resolvedBaseUrl.marketBasePath;
+    this.timeoutMs =
+      config?.timeoutMs ?? env.PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS;
+  }
+
+  private intelligencePath(path: string) {
+    return `${this.intelligenceBasePath}${path}`;
+  }
+
+  private marketPath(path: string) {
+    return `${this.marketBasePath}${path}`;
   }
 
   async getThemeNews(params: {
@@ -40,14 +123,17 @@ export class PythonIntelligenceDataClient {
     limit?: number;
   }): Promise<ThemeNewsItem[]> {
     const search = new URLSearchParams({
-      theme: params.theme,
       days: String(params.days ?? 7),
       limit: String(params.limit ?? 20),
     });
 
-    return this.request<ThemeNewsItem[]>(
-      `/api/intelligence/news?${search.toString()}`,
+    const payload = await this.request<ThemeNewsGatewayData>(
+      this.intelligencePath(
+        `/themes/${encodeURIComponent(params.theme)}/news?${search.toString()}`,
+      ),
     );
+
+    return payload.newsItems;
   }
 
   async getCandidates(params: {
@@ -55,13 +141,16 @@ export class PythonIntelligenceDataClient {
     limit?: number;
   }): Promise<IntelligenceCandidateItem[]> {
     const search = new URLSearchParams({
-      theme: params.theme,
       limit: String(params.limit ?? 6),
     });
 
-    return this.request<IntelligenceCandidateItem[]>(
-      `/api/intelligence/candidates?${search.toString()}`,
+    const payload = await this.request<ThemeCandidatesGatewayData>(
+      this.marketPath(
+        `/themes/${encodeURIComponent(params.theme)}/candidates?${search.toString()}`,
+      ),
     );
+
+    return payload.candidates;
   }
 
   async getEvidence(
@@ -74,18 +163,27 @@ export class PythonIntelligenceDataClient {
     }
 
     const query = search.toString();
-    return this.request<CompanyEvidence>(
-      `/api/intelligence/evidence/${stockCode}${query ? `?${query}` : ""}`,
+    const payload = await this.request<StockEvidenceGatewayData>(
+      this.intelligencePath(
+        `/stocks/${stockCode}/evidence${query ? `?${query}` : ""}`,
+      ),
     );
+
+    return payload.evidence;
   }
 
   async getEvidenceBatch(
     request: CompanyEvidenceBatchRequest,
   ): Promise<CompanyEvidence[]> {
-    return this.request<CompanyEvidence[]>("/api/intelligence/evidence/batch", {
-      method: "POST",
-      body: JSON.stringify(request),
-    });
+    const payload = await this.request<StockEvidenceBatchGatewayData>(
+      this.intelligencePath("/stocks/evidence/batch"),
+      {
+        method: "POST",
+        body: JSON.stringify(request),
+      },
+    );
+
+    return payload.items ?? [];
   }
 
   async getCompanyResearchPack(params: {
@@ -98,9 +196,13 @@ export class PythonIntelligenceDataClient {
     }
 
     const query = search.toString();
-    return this.request<CompanyResearchPack>(
-      `/api/v1/intelligence/stocks/${params.stockCode}/research-pack${query ? `?${query}` : ""}`,
+    const payload = await this.request<StockResearchPackGatewayData>(
+      this.intelligencePath(
+        `/stocks/${params.stockCode}/research-pack${query ? `?${query}` : ""}`,
+      ),
     );
+
+    return payload.researchPack;
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -119,9 +221,18 @@ export class PythonIntelligenceDataClient {
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "未知错误");
+        let errorMessage = errorText;
+
+        try {
+          const payload = JSON.parse(errorText) as GatewayErrorResponse;
+          errorMessage = payload.error?.message ?? errorText;
+        } catch {
+          errorMessage = errorText;
+        }
+
         throw new WorkflowDomainError(
           WORKFLOW_ERROR_CODES.INTELLIGENCE_DATA_UNAVAILABLE,
-          `Intelligence 数据服务异常(${response.status}): ${errorText}`,
+          `Intelligence 数据服务异常(${response.status}): ${errorMessage}`,
         );
       }
 

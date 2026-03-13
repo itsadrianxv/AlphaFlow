@@ -25,6 +25,7 @@ class MarketGateway:
     def __init__(self, provider_client: AkShareProviderClient | None = None) -> None:
         self._provider_client = provider_client or AkShareProviderClient()
         self._retry_policy = RetryPolicy()
+        self._theme_retry_policy = RetryPolicy(max_attempts=1)
         self._cache = gateway_cache
 
     def get_stock(
@@ -140,9 +141,10 @@ class MarketGateway:
                 for item in self._provider_client.get_theme_candidates(theme=theme, limit=limit)
             ],
             cache_policy=get_cache_policy("theme_candidates"),
-            retry_policy=self._retry_policy,
+            retry_policy=self._theme_retry_policy,
             cache=self._cache,
             force_refresh=force_refresh,
+            allow_stale=False,
         )
 
         return ThemeCandidatesResponse(

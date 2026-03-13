@@ -1,6 +1,8 @@
-"""Provider client backed by existing AkShare adapters."""
+"""Provider client backed by AkShare adapters and strict intelligence loaders."""
 
 from __future__ import annotations
+
+import re
 
 import akshare as ak
 import pandas as pd
@@ -46,8 +48,8 @@ class AkShareProviderClient:
             frame = ak.stock_zh_a_hist(
                 symbol=stock_code,
                 period="daily",
-                start_date=start_date,
-                end_date=end_date.replace("-", "") if end_date else None,
+                start_date=_normalize_ymd(start_date) or "19700101",
+                end_date=_normalize_ymd(end_date) or "20500101",
                 adjust=adjust,
             )
         except Exception as exc:  # noqa: BLE001
@@ -69,22 +71,26 @@ class AkShareProviderClient:
         return frame
 
     def get_theme_candidates(self, theme: str, limit: int) -> list[dict]:
-        return IntelligenceDataAdapter.get_candidates(theme=theme, limit=limit)
+        return IntelligenceDataAdapter.get_candidates_strict(theme=theme, limit=limit)
 
     def get_theme_news(self, theme: str, days: int, limit: int) -> list[dict]:
-        return IntelligenceDataAdapter.get_theme_news(theme=theme, days=days, limit=limit)
+        return IntelligenceDataAdapter.get_theme_news_strict(
+            theme=theme,
+            days=days,
+            limit=limit,
+        )
 
     def get_theme_concepts(self, theme: str, limit: int) -> dict:
         return IntelligenceDataAdapter.match_theme_concepts(theme=theme, limit=limit)
 
     def get_stock_evidence(self, stock_code: str, concept: str | None) -> dict:
-        return IntelligenceDataAdapter.get_company_evidence(
+        return IntelligenceDataAdapter.get_company_evidence_strict(
             stock_code=stock_code,
             concept=concept,
         )
 
     def get_stock_research_pack(self, stock_code: str, concept: str | None) -> dict:
-        return IntelligenceDataAdapter.get_company_research_pack(
+        return IntelligenceDataAdapter.get_company_research_pack_strict(
             stock_code=stock_code,
             concept=concept,
         )
@@ -114,9 +120,15 @@ class AkShareProviderClient:
             )
         return [item for item in items if item["conceptName"]]
 
-    def get_concept_constituents(self, concept_name: str) -> list[dict]:
+    def get_concept_constituents(
+        self,
+        concept_name: str,
+        concept_code: str | None = None,
+    ) -> list[dict]:
+        symbol = concept_code.strip() if concept_code else concept_name
+
         try:
-            df = ak.stock_board_concept_cons_em(symbol=concept_name)
+            df = ak.stock_board_concept_cons_em(symbol=symbol)
         except Exception as exc:  # noqa: BLE001
             raise GatewayError(
                 code="concept_constituents_unavailable",
@@ -138,6 +150,17 @@ class AkShareProviderClient:
                 }
             )
         return [item for item in items if item["stockCode"]]
+
+
+def _normalize_ymd(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    matched = re.search(r"(\d{4})-?(\d{2})-?(\d{2})", value)
+    if not matched:
+        return None
+
+    return "".join(matched.groups())
 
 
 def _safe_float(value: object) -> float | None:

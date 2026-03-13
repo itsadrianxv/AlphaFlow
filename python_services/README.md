@@ -2,6 +2,8 @@
 
 Python FastAPI 微服务，向主应用提供 iFinD 主用、AkShare 兜底的数据接口。
 
+默认推荐通过 `deploy/docker-compose.yml` 运行本服务，保证与 Web / Worker 使用一致的 Python 3.11 容器环境；本地 `.venv` 更适合做单独调试和测试。
+
 ## 能力概览
 
 - 股票基础数据：代码列表、批量行情、历史指标、行业列表
@@ -97,6 +99,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `GET /api/v1/intelligence/themes/{theme}/news`
 - `GET /api/v1/intelligence/themes/{theme}/concepts`
 - `GET /api/v1/intelligence/stocks/{stockCode}/evidence`
+- `POST /api/v1/intelligence/stocks/evidence/batch`
+- `GET /api/v1/intelligence/stocks/{stockCode}/research-pack`
 
 ## 概念匹配优先级
 
@@ -130,6 +134,10 @@ Screening provider：
 - `ZHIPU_WEB_SEARCH_MODEL`：模型名（可选，默认 `glm-4-plus`）
 - `ZHIPU_WEB_SEARCH_TIMEOUT_SECONDS`：请求超时秒数（可选，默认 `8`）
 - `ZHIPU_WEB_SEARCH_RETRIES`：失败重试次数（可选，默认 `2`）
+
+Web / Worker 调用预算：
+
+- `PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS`：T3 侧 intelligence 数据接口超时预算（默认 `30000`）
 
 可信度分析：
 

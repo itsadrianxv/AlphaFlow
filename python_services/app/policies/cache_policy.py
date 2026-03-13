@@ -25,6 +25,7 @@ _DATASET_POLICIES: dict[str, CachePolicy] = {
     "concept_catalog": CachePolicy(fresh_ttl_seconds=86400, stale_ttl_seconds=259200),
     "concept_constituents": CachePolicy(fresh_ttl_seconds=86400, stale_ttl_seconds=259200),
     "company_evidence": CachePolicy(fresh_ttl_seconds=21600, stale_ttl_seconds=86400),
+    "company_research_pack": CachePolicy(fresh_ttl_seconds=21600, stale_ttl_seconds=86400),
 }
 
 

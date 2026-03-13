@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, Request
 
 from app.contracts.intelligence import (
+    StockEvidenceBatchRequest,
+    StockEvidenceBatchResponse,
     StockEvidenceResponse,
     StockResearchPackResponse,
     ThemeConceptsResponse,
@@ -77,6 +79,26 @@ async def get_stock_evidence(
         request_id=request.state.request_id,
         stock_code=stock_code,
         concept=concept.strip() if concept else None,
+    )
+
+
+@router.post("/stocks/evidence/batch", response_model=StockEvidenceBatchResponse)
+async def get_stock_evidence_batch(
+    request: Request,
+    body: StockEvidenceBatchRequest,
+):
+    invalid_codes = [code for code in body.stockCodes if not is_valid_stock_code(code)]
+    if invalid_codes:
+        raise GatewayError(
+            code="invalid_stock_code",
+            message=f"存在无效股票代码: {', '.join(invalid_codes)}",
+            status_code=400,
+        )
+
+    return intelligence_gateway.get_stock_evidence_batch(
+        request_id=request.state.request_id,
+        stock_codes=body.stockCodes,
+        concept=body.concept,
     )
 
 

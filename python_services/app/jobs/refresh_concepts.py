@@ -35,11 +35,17 @@ class RefreshConceptsJob:
             concept_name = str(
                 item.get("conceptName") or item.get("name") or item.get("板块名称") or ""
             ).strip()
+            concept_code = str(
+                item.get("conceptCode") or item.get("code") or item.get("板块代码") or ""
+            ).strip()
             if not concept_name:
                 continue
 
             try:
-                constituents = self._provider_client.get_concept_constituents(concept_name)
+                constituents = self._provider_client.get_concept_constituents(
+                    concept_name,
+                    concept_code=concept_code or None,
+                )
                 set_cached_value(
                     dataset="concept_constituents",
                     provider=self._provider_client.provider_name,
@@ -63,4 +69,3 @@ class RefreshConceptsJob:
                 "failedConcepts": failures[:10],
             },
         )
-

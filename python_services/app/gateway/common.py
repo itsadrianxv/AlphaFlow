@@ -89,6 +89,7 @@ def execute_cached(
     cache: CacheStore | None = None,
     fallback_fn: Callable[[], _T] | None = None,
     force_refresh: bool = False,
+    allow_stale: bool = True,
 ) -> GatewayFetchResult[_T]:
     effective_cache = cache or gateway_cache
     cache_key = build_cache_key(dataset=dataset, provider=provider, params=params)
@@ -166,7 +167,7 @@ def execute_cached(
             provider=provider,
             code=type(exc).__name__,
         )
-        if stale_entry is not None:
+        if stale_entry is not None and allow_stale:
             metrics_recorder.record_cache_result(
                 dataset=dataset,
                 provider=provider,

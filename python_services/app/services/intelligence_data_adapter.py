@@ -5,6 +5,7 @@ Provides AkShare-backed data with cache and graceful degradation.
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import hashlib
@@ -110,7 +111,11 @@ class IntelligenceDataAdapter:
 
         return _read_with_cache(
             cache_key=cache_key,
-            fetch_fn=lambda: _fetch_theme_news_from_akshare(normalized_theme, limit),
+            fetch_fn=lambda: _fetch_theme_news_from_akshare(
+                theme=normalized_theme,
+                days=days,
+                limit=limit,
+            ),
             fallback_fn=lambda: _build_mock_theme_news(normalized_theme, days, limit),
         )
 
@@ -124,9 +129,43 @@ class IntelligenceDataAdapter:
 
         return _read_with_cache(
             cache_key=cache_key,
-            fetch_fn=lambda: _fetch_candidates_from_akshare(normalized_theme, normalized_limit),
+            fetch_fn=lambda: _fetch_candidates_from_akshare(
+                normalized_theme,
+                normalized_limit,
+            ),
             fallback_fn=lambda: _build_mock_candidates(normalized_theme, normalized_limit),
         )
+
+    @staticmethod
+    def get_theme_news_strict(theme: str, days: int = 7, limit: int = 20) -> list[dict]:
+        normalized_theme = theme.strip()
+        normalized_days = max(1, min(days, 30))
+        normalized_limit = max(1, min(limit, 50))
+
+        news_items = _fetch_theme_news_from_akshare(
+            theme=normalized_theme,
+            days=normalized_days,
+            limit=normalized_limit,
+            allow_candidate_spot_fallback=False,
+        )
+        if news_items:
+            return news_items
+
+        raise ValueError(f"主题“{normalized_theme}”暂无可用资讯数据")
+
+    @staticmethod
+    def get_candidates_strict(theme: str, limit: int = 6) -> list[dict]:
+        normalized_theme = theme.strip()
+        normalized_limit = max(1, min(limit, 30))
+        candidates = _fetch_candidates_from_akshare(
+            normalized_theme,
+            normalized_limit,
+            allow_spot_fallback=False,
+        )
+        if candidates:
+            return candidates
+
+        raise ValueError(f"主题“{normalized_theme}”暂无可用候选股数据")
 
     @staticmethod
     def match_theme_concepts(theme: str, limit: int = 5) -> dict:
@@ -174,6 +213,12 @@ class IntelligenceDataAdapter:
         )
 
     @staticmethod
+    def get_company_evidence_strict(stock_code: str, concept: str | None = None) -> dict:
+        normalized_code = _normalize_stock_code(stock_code)
+        concept_name = concept.strip() if concept else "通用赛道"
+        return _fetch_company_evidence_from_akshare(normalized_code, concept_name)
+
+    @staticmethod
     def get_company_research_pack(stock_code: str, concept: str | None = None) -> dict:
         normalized_code = _normalize_stock_code(stock_code)
         concept_name = concept.strip() if concept else "通用赛道"
@@ -188,6 +233,12 @@ class IntelligenceDataAdapter:
                 normalized_code, concept_name
             ),
         )
+
+    @staticmethod
+    def get_company_research_pack_strict(stock_code: str, concept: str | None = None) -> dict:
+        normalized_code = _normalize_stock_code(stock_code)
+        concept_name = concept.strip() if concept else "通用赛道"
+        return _fetch_company_research_pack_from_akshare(normalized_code, concept_name)
 
     @staticmethod
     def get_company_evidence_batch(stock_codes: list[str], concept: str) -> list[dict]:
@@ -298,22 +349,41 @@ def _get_spot_snapshot() -> pd.DataFrame:
     return latest
 
 
-def _fetch_candidates_from_akshare(theme: str, limit: int) -> list[dict]:
+def _fetch_candidates_from_akshare(
+    theme: str,
+    limit: int,
+    *,
+    allow_spot_fallback: bool = True,
+) -> list[dict]:
     concept_rows = _select_concepts(theme, top_n=3)
 
     candidates_by_code: dict[str, dict] = {}
 
-    for concept in concept_rows:
-        concept_symbol = concept["conceptCode"] or concept["concept"]
+    concept_frames: list[tuple[dict, pd.DataFrame]] = []
+    max_workers = max(1, min(3, len(concept_rows)))
+    if concept_rows:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {
+                executor.submit(_load_concept_constituents, concept): concept
+                for concept in concept_rows
+            }
+            for future in as_completed(future_map):
+                concept = future_map[future]
+                try:
+                    members_df = future.result()
+                except Exception as exc:  # noqa: BLE001
+                    LOGGER.warning(
+                        "Failed to load concept constituents %s: %s",
+                        concept.get("conceptCode") or concept.get("concept"),
+                        exc,
+                    )
+                    continue
 
-        try:
-            members_df = ak.stock_board_concept_cons_em(symbol=concept_symbol)
-        except Exception as exc:  # noqa: BLE001
-            LOGGER.warning("Failed to load concept constituents %s: %s", concept_symbol, exc)
-            continue
+                if members_df.empty:
+                    continue
+                concept_frames.append((concept, members_df))
 
-        if members_df.empty:
-            continue
+    for concept, members_df in concept_frames:
 
         code_column = _find_column(members_df, ("代码", "code"))
         name_column = _find_column(members_df, ("名称", "name"))
@@ -368,7 +438,15 @@ def _fetch_candidates_from_akshare(theme: str, limit: int) -> list[dict]:
     if top_candidates:
         return top_candidates
 
+    if not allow_spot_fallback:
+        return []
+
     return _build_candidates_from_spot(theme, limit)
+
+
+def _load_concept_constituents(concept: dict) -> pd.DataFrame:
+    concept_symbol = concept.get("conceptCode") or concept.get("concept")
+    return ak.stock_board_concept_cons_em(symbol=str(concept_symbol))
 
 
 def _build_candidates_from_spot(theme: str, limit: int) -> list[dict]:
@@ -443,17 +521,61 @@ def _build_candidates_from_spot(theme: str, limit: int) -> list[dict]:
     return sorted(deduped.values(), key=lambda item: item["heat"], reverse=True)[:limit]
 
 
-def _fetch_theme_news_from_akshare(theme: str, limit: int) -> list[dict]:
-    candidate_stocks = IntelligenceDataAdapter.get_candidates(theme=theme, limit=min(5, limit))
+def _fetch_theme_news_from_akshare(
+    theme: str,
+    days: int,
+    limit: int,
+    *,
+    allow_candidate_spot_fallback: bool = True,
+) -> list[dict]:
+    candidate_stocks: list[dict] = []
+    try:
+        candidate_stocks = _fetch_candidates_from_akshare(
+            theme=theme,
+            limit=min(3, max(1, limit)),
+            allow_spot_fallback=allow_candidate_spot_fallback,
+        )
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("Failed to fetch theme candidates for %s: %s", theme, exc)
 
     news_items: list[dict] = []
-    for candidate in candidate_stocks:
-        stock_code = candidate["stockCode"]
-        stock_news = _fetch_stock_news(stock_code=stock_code, theme=theme, limit=4)
-        news_items.extend(stock_news)
+    max_workers = max(1, min(4, len(candidate_stocks)))
+    if candidate_stocks:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {
+                executor.submit(
+                    _fetch_stock_news,
+                    stock_code=candidate["stockCode"],
+                    theme=theme,
+                    days=days,
+                    limit=4,
+                ): candidate
+                for candidate in candidate_stocks
+            }
+            for future in as_completed(future_map):
+                try:
+                    news_items.extend(future.result())
+                except Exception as exc:  # noqa: BLE001
+                    candidate = future_map[future]
+                    LOGGER.warning(
+                        "Failed to fetch stock news for %s: %s",
+                        candidate.get("stockCode"),
+                        exc,
+                    )
 
     if not news_items:
-        news_items.extend(_build_concept_snapshot_news(theme=theme, limit=limit))
+        related_stocks = [
+            str(candidate.get("stockCode") or "").strip()
+            for candidate in candidate_stocks
+            if str(candidate.get("stockCode") or "").strip()
+        ]
+        news_items.extend(
+            _build_concept_snapshot_news(
+                theme=theme,
+                limit=limit,
+                related_stocks=related_stocks,
+            )
+        )
 
     if not news_items:
         return []
@@ -467,7 +589,7 @@ def _fetch_theme_news_from_akshare(theme: str, limit: int) -> list[dict]:
     return result[:limit]
 
 
-def _fetch_stock_news(stock_code: str, theme: str, limit: int) -> list[dict]:
+def _fetch_stock_news(stock_code: str, theme: str, days: int, limit: int) -> list[dict]:
     try:
         news_df = ak.stock_news_em(symbol=stock_code)
     except Exception as exc:  # noqa: BLE001
@@ -494,6 +616,8 @@ def _fetch_stock_news(stock_code: str, theme: str, limit: int) -> list[dict]:
             continue
 
         published_at = _to_iso_datetime(row.get(time_column))
+        if not _is_news_within_days(published_at, days):
+            continue
         source = _safe_text(row.get(source_column)) if source_column else "akshare:stock_news"
         link = _safe_text(row.get(link_column)) if link_column else ""
         merged_text = f"{title} {summary}".strip()
@@ -520,7 +644,11 @@ def _fetch_stock_news(stock_code: str, theme: str, limit: int) -> list[dict]:
     return results
 
 
-def _build_concept_snapshot_news(theme: str, limit: int) -> list[dict]:
+def _build_concept_snapshot_news(
+    theme: str,
+    limit: int,
+    related_stocks: list[str] | None = None,
+) -> list[dict]:
     concept_rows = _select_concepts(theme, top_n=max(3, limit))
     now = datetime.now(UTC)
 
@@ -557,7 +685,7 @@ def _build_concept_snapshot_news(theme: str, limit: int) -> list[dict]:
                 "publishedAt": published_at,
                 "sentiment": sentiment,
                 "relevanceScore": _compute_relevance_score(theme, summary, None),
-                "relatedStocks": _guess_related_stocks(theme),
+                "relatedStocks": related_stocks or [],
             }
         )
 
@@ -591,7 +719,12 @@ def _fetch_company_evidence_from_akshare(stock_code: str, concept: str) -> dict:
     pe_ratio = _to_float(row.get(pe_column))
     market_cap = _to_float(row.get(market_cap_column))
 
-    stock_news = _fetch_stock_news(stock_code=stock_code, theme=concept, limit=3)
+    stock_news = _fetch_stock_news(
+        stock_code=stock_code,
+        theme=concept,
+        days=30,
+        limit=3,
+    )
     positive_news = sum(1 for item in stock_news if item["sentiment"] == "positive")
     negative_news = sum(1 for item in stock_news if item["sentiment"] == "negative")
     neutral_news = sum(1 for item in stock_news if item["sentiment"] == "neutral")
@@ -753,7 +886,7 @@ def _load_concept_rows_from_akshare(theme: str) -> list[dict]:
 
     name_column = _find_column(concept_df, ("板块名称", "概念名称", "名称"))
     code_column = _find_column(concept_df, ("板块代码", "代码"))
-    change_column = _find_column(concept_df, ("???", "??", "change"))
+    change_column = _find_column(concept_df, ("涨跌幅", "涨跌", "change"))
     leader_column = _find_column(concept_df, ("领涨股票", "领涨"))
     up_count_column = _find_column(concept_df, ("上涨家数", "上涨"))
     down_count_column = _find_column(concept_df, ("下跌家数", "下跌"))
@@ -1092,23 +1225,51 @@ def _find_column(df: pd.DataFrame, keywords: tuple[str, ...]) -> str | None:
 
 
 def _to_iso_datetime(raw_value: Any) -> str:
-    if raw_value is None:
+    parsed = _parse_datetime(raw_value)
+    if parsed is None:
         return datetime.now(UTC).isoformat()
+    return parsed.isoformat()
+
+
+def _parse_datetime(raw_value: Any) -> datetime | None:
+    if raw_value is None:
+        return None
 
     if isinstance(raw_value, datetime):
         dt = raw_value
     else:
         value = str(raw_value).strip()
         if not value:
-            return datetime.now(UTC).isoformat()
+            return None
+
         try:
             dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
-            dt = datetime.now(UTC)
+            dt = None
+
+        if dt is None:
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%Y/%m/%d %H:%M:%S", "%Y/%m/%d"):
+                try:
+                    dt = datetime.strptime(value, fmt)
+                    break
+                except ValueError:
+                    continue
+
+        if dt is None:
+            return None
 
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC).isoformat()
+    return dt.astimezone(UTC)
+
+
+def _is_news_within_days(published_at: str, days: int) -> bool:
+    parsed = _parse_datetime(published_at)
+    if parsed is None:
+        return False
+
+    cutoff = datetime.now(UTC) - timedelta(days=max(1, days))
+    return parsed >= cutoff
 
 
 def _to_float(raw_value: Any) -> float | None:

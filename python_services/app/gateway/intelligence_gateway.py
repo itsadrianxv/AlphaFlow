@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import time
 
+from app.contracts.common import BatchItemError
 from app.contracts.intelligence import (
+    StockEvidenceBatchData,
+    StockEvidenceBatchResponse,
     StockEvidenceData,
     StockEvidenceResponse,
     StockResearchPackData,
@@ -14,7 +17,8 @@ from app.contracts.intelligence import (
     ThemeNewsData,
     ThemeNewsResponse,
 )
-from app.gateway.common import build_meta, execute_cached, gateway_cache
+from app.contracts.meta import GatewayWarning
+from app.gateway.common import GatewayError, build_meta, execute_cached, gateway_cache
 from app.infrastructure.metrics.recorder import metrics_recorder
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
@@ -30,7 +34,7 @@ from app.providers.akshare.mappers import (
 class IntelligenceGateway:
     def __init__(self, provider_client: AkShareProviderClient | None = None) -> None:
         self._provider_client = provider_client or AkShareProviderClient()
-        self._retry_policy = RetryPolicy()
+        self._retry_policy = RetryPolicy(max_attempts=1)
         self._cache = gateway_cache
 
     def get_theme_news(
@@ -49,12 +53,17 @@ class IntelligenceGateway:
             params={"theme": theme, "days": days, "limit": limit},
             fetcher=lambda: [
                 to_theme_news_item(item)
-                for item in self._provider_client.get_theme_news(theme=theme, days=days, limit=limit)
+                for item in self._provider_client.get_theme_news(
+                    theme=theme,
+                    days=days,
+                    limit=limit,
+                )
             ],
             cache_policy=get_cache_policy("theme_news"),
             retry_policy=self._retry_policy,
             cache=self._cache,
             force_refresh=force_refresh,
+            allow_stale=False,
         )
 
         return ThemeNewsResponse(
@@ -88,6 +97,7 @@ class IntelligenceGateway:
             retry_policy=self._retry_policy,
             cache=self._cache,
             force_refresh=force_refresh,
+            allow_stale=False,
         )
 
         data = ThemeConceptsData(
@@ -120,16 +130,9 @@ class IntelligenceGateway:
         force_refresh: bool = False,
     ) -> StockEvidenceResponse:
         started_at = time.perf_counter()
-        result = execute_cached(
-            dataset="company_evidence",
-            provider=self._provider_client.provider_name,
-            params={"stockCode": stock_code, "concept": concept or ""},
-            fetcher=lambda: to_company_evidence(
-                self._provider_client.get_stock_evidence(stock_code=stock_code, concept=concept)
-            ),
-            cache_policy=get_cache_policy("company_evidence"),
-            retry_policy=self._retry_policy,
-            cache=self._cache,
+        result = self._get_stock_evidence_result(
+            stock_code=stock_code,
+            concept=concept,
             force_refresh=force_refresh,
         )
 
@@ -150,6 +153,71 @@ class IntelligenceGateway:
             ),
         )
 
+    def get_stock_evidence_batch(
+        self,
+        request_id: str,
+        stock_codes: list[str],
+        concept: str,
+        force_refresh: bool = False,
+    ) -> StockEvidenceBatchResponse:
+        started_at = time.perf_counter()
+        items = []
+        errors: list[BatchItemError] = []
+        warnings: list[GatewayWarning] = []
+        cache_hits: list[bool] = []
+        stale_hits: list[bool] = []
+        as_of_values: list[str] = []
+
+        for stock_code in stock_codes:
+            try:
+                result = self._get_stock_evidence_result(
+                    stock_code=stock_code,
+                    concept=concept,
+                    force_refresh=force_refresh,
+                )
+                items.append(result.data)
+                cache_hits.append(result.cache_hit)
+                stale_hits.append(result.is_stale)
+                as_of_values.append(result.as_of)
+                warnings.extend(result.warnings)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(
+                    BatchItemError(
+                        stockCode=stock_code,
+                        code=str(getattr(exc, "code", "company_evidence_unavailable")),
+                        message=str(getattr(exc, "message", exc)),
+                    )
+                )
+
+        if not items and errors:
+            raise GatewayError(
+                code="company_evidence_unavailable",
+                message=errors[0].message,
+                status_code=503,
+                provider=self._provider_client.provider_name,
+            )
+
+        if errors:
+            warnings.append(
+                GatewayWarning(
+                    code="partial_results",
+                    message="批量公司证据存在部分失败，详情见 data.errors",
+                )
+            )
+
+        return StockEvidenceBatchResponse(
+            meta=build_meta(
+                request_id=request_id,
+                provider=self._provider_client.provider_name,
+                started_at=started_at,
+                cache_hit=bool(items) and all(cache_hits),
+                is_stale=any(stale_hits),
+                warnings=self._dedupe_warnings(warnings),
+                as_of=max(as_of_values) if as_of_values else None,
+            ),
+            data=StockEvidenceBatchData(items=items, errors=errors),
+        )
+
     def get_stock_research_pack(
         self,
         request_id: str,
@@ -168,10 +236,11 @@ class IntelligenceGateway:
                     concept=concept,
                 )
             ),
-            cache_policy=get_cache_policy("company_evidence"),
+            cache_policy=get_cache_policy("company_research_pack"),
             retry_policy=self._retry_policy,
             cache=self._cache,
             force_refresh=force_refresh,
+            allow_stale=False,
         )
 
         return StockResearchPackResponse(
@@ -190,6 +259,44 @@ class IntelligenceGateway:
                 researchPack=result.data,
             ),
         )
+
+    def _get_stock_evidence_result(
+        self,
+        *,
+        stock_code: str,
+        concept: str | None,
+        force_refresh: bool,
+    ):
+        return execute_cached(
+            dataset="company_evidence",
+            provider=self._provider_client.provider_name,
+            params={"stockCode": stock_code, "concept": concept or ""},
+            fetcher=lambda: to_company_evidence(
+                self._provider_client.get_stock_evidence(
+                    stock_code=stock_code,
+                    concept=concept,
+                )
+            ),
+            cache_policy=get_cache_policy("company_evidence"),
+            retry_policy=self._retry_policy,
+            cache=self._cache,
+            force_refresh=force_refresh,
+            allow_stale=False,
+        )
+
+    @staticmethod
+    def _dedupe_warnings(warnings: list[GatewayWarning]) -> list[GatewayWarning]:
+        seen: set[tuple[str, str]] = set()
+        deduped: list[GatewayWarning] = []
+
+        for warning in warnings:
+            key = (warning.code, warning.message)
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(warning)
+
+        return deduped
 
 
 intelligence_gateway = IntelligenceGateway()
