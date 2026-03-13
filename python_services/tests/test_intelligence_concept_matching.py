@@ -115,5 +115,6 @@ def test_fallback_to_auto_when_zhipu_returns_empty():
         result = IntelligenceDataAdapter.match_theme_concepts(theme="算力", limit=2)
 
     assert result["matchedBy"] == "auto"
-    assert len(result["concepts"]) == 2
+    assert len(result["concepts"]) == 1
+    assert result["concepts"][0]["name"] == "算力租赁"
     assert all(item["source"] == "auto" for item in result["concepts"])

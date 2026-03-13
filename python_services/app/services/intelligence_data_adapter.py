@@ -904,14 +904,16 @@ def _load_concept_rows_from_akshare(theme: str) -> list[dict]:
             continue
 
         match_score = 0.0
+        text_match_score = 0.0
         lower_name = concept_name.lower()
         if lower_theme and (lower_theme in lower_name or lower_name in lower_theme):
-            match_score += 8
+            text_match_score += 8
         for token in tokens:
             if token and token in lower_name:
-                match_score += 2.2
+                text_match_score += 2.2
 
         change_pct = _to_float(row.get(change_column)) or 0.0
+        match_score += text_match_score
         match_score += max(-3, min(3, change_pct / 2.5))
         confidence = max(0.4, min(0.9, 0.5 + match_score / 22))
 
@@ -929,6 +931,7 @@ def _load_concept_rows_from_akshare(theme: str) -> list[dict]:
                 else 0,
                 "heat": max(35.0, min(95.0, 58.0 + change_pct * 4)),
                 "matchScore": match_score,
+                "textMatchScore": text_match_score,
                 "confidence": round(confidence, 2),
                 "aliases": [],
                 "reason": "",
@@ -1017,8 +1020,14 @@ def _match_by_zhipu(theme: str, all_rows: list[dict], limit: int) -> list[dict]:
 
 
 def _match_by_auto(theme: str, all_rows: list[dict], limit: int) -> list[dict]:
+    relevant_rows = [
+        row for row in all_rows if float(row.get("textMatchScore") or 0.0) > 0
+    ]
+    if not relevant_rows:
+        return []
+
     ranked = sorted(
-        all_rows,
+        relevant_rows,
         key=lambda item: (float(item.get("matchScore") or 0.0), float(item.get("changePct") or 0.0)),
         reverse=True,
     )
