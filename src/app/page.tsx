@@ -146,7 +146,7 @@ export default async function Home() {
               打开择时组合
             </Link>
             <Link
-              href={signedIn ? "/api/auth/signout" : "/api/auth/signin"}
+              href={signedIn ? "/api/auth/signout" : "/login"}
               className="app-button"
             >
               {signedIn ? "退出登录" : "登录研究空间"}
@@ -168,10 +168,7 @@ export default async function Home() {
           }
           actions={
             !signedIn ? (
-              <Link
-                href="/api/auth/signin"
-                className="app-button app-button-primary"
-              >
+              <Link href="/login" className="app-button app-button-primary">
                 立即登录
               </Link>
             ) : priorityRecommendation?.workflowRunId ? (
@@ -202,10 +199,7 @@ export default async function Home() {
               <EmptyState
                 title="登录后查看投资看板"
                 actions={
-                  <Link
-                    href="/api/auth/signin"
-                    className="app-button app-button-primary"
-                  >
+                  <Link href="/login" className="app-button app-button-primary">
                     登录研究空间
                   </Link>
                 }

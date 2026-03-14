@@ -277,6 +277,9 @@ if (env.AUTH_QQ_ID && env.AUTH_QQ_SECRET) {
 
 export const authConfig = {
   providers,
+  pages: {
+    signIn: "/login",
+  },
   secret: authSecrets.length > 0 ? authSecrets : undefined,
   logger: authLogger,
   adapter: PrismaAdapter(db),
