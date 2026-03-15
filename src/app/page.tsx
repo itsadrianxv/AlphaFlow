@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import {
   ActionStrip,
+  BentoCard,
+  BentoGrid,
   EmptyState,
   InlineNotice,
   MetricTile,
@@ -250,9 +252,9 @@ export default async function Home() {
           <InlineNotice tone="warning" description={loadError} />
         ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_360px]">
-          <div className="grid gap-6">
-            <SectionCard
+        <BentoGrid cols={4} className="grid-flow-dense gap-6">
+            <BentoCard
+              span={3}
               title="机会排序"
               description="聚焦当前建议区间和动作理由，快速筛出今天最值得继续跟进的标的。"
             >
@@ -344,9 +346,10 @@ export default async function Home() {
                   })}
                 </div>
               )}
-            </SectionCard>
+            </BentoCard>
 
-            <SectionCard
+            <BentoCard
+              span={3}
               title="研究执行队列"
               description="统一查看运行中的行业研究和机会池会话，避免在多个页面之间切换。"
             >
@@ -446,11 +449,10 @@ export default async function Home() {
                   </div>
                 </div>
               )}
-            </SectionCard>
-          </div>
+            </BentoCard>
 
-          <div className="grid gap-6">
-            <SectionCard
+            <BentoCard
+              span={1}
               title="风险框架"
               description="把当前组合约束和最新市场语境收进同一块，方便判断是否值得立刻行动。"
             >
@@ -537,9 +539,10 @@ export default async function Home() {
                   }
                 />
               )}
-            </SectionCard>
+            </BentoCard>
 
-            <SectionCard
+            <BentoCard
+              span={1}
               title="今日优先处理"
               description="把下一步动作压缩到最少，降低切换成本。"
             >
@@ -603,9 +606,8 @@ export default async function Home() {
                   </div>
                 </div>
               )}
-            </SectionCard>
-          </div>
-        </div>
+            </BentoCard>
+        </BentoGrid>
       </WorkspaceShell>
     </HydrateClient>
   );

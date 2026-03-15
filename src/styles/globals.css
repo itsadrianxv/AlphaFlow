@@ -10,39 +10,54 @@
 
 :root {
   color-scheme: dark;
-  --app-bg-base: #0c1117;
-  --app-bg-inset: #10161e;
-  --app-bg-raised: #141c26;
-  --app-bg-floating: #1a2431;
-  --app-bg-overlay: rgba(8, 12, 18, 0.76);
-  --app-text-strong: #f4f7fb;
-  --app-text: #d3dbe6;
-  --app-text-muted: #aab6c7;
-  --app-text-subtle: #7f8ca1;
-  --app-border-soft: rgba(140, 156, 177, 0.18);
-  --app-border-strong: rgba(159, 179, 205, 0.34);
-  --app-brand: #4b76d1;
-  --app-brand-strong: #78a0f3;
-  --app-info: #5f88dd;
-  --app-success: #3f8b70;
-  --app-warning: #c59242;
-  --app-danger: #be6d6b;
-  --app-focus: rgba(96, 132, 215, 0.38);
-  --app-shadow-sm: 0 1px 2px rgba(3, 8, 18, 0.28);
-  --app-shadow-md: 0 10px 24px rgba(3, 8, 18, 0.22);
-  --app-shadow-lg: 0 18px 38px rgba(3, 8, 18, 0.2);
+  
+  /* Midnight Trust Palette - Financial Intelligence Terminal */
+  --app-bg-base: #0B1120; /* Deep Navy */
+  --app-bg-surface: rgba(15, 23, 42, 0.6); /* Glass Surface */
+  --app-bg-elevated: rgba(30, 41, 59, 0.7); /* Elevated Glass */
+  
+  /* Brand & Accents */
+  --app-brand: #3B82F6; /* Electric Blue */
+  --app-brand-subtle: rgba(59, 130, 246, 0.15);
+  --app-brand-strong: #60A5FA;
+  --app-accent-gold: #F59E0B; /* Trust Gold */
+  
+  /* Status */
+  --app-success: #10B981;
+  --app-warning: #F59E0B;
+  --app-danger: #EF4444;
+  --app-info: #3B82F6;
 
-  /* Backward-compatible aliases for existing pages/components */
+  /* Text */
+  --app-text-strong: #F8FAFC; /* Primary White */
+  --app-text: #E2E8F0; /* Standard Text */
+  --app-text-muted: #94A3B8; /* Muted Blue-Grey */
+  --app-text-subtle: #64748B; /* Subtle/Disabled */
+  
+  /* Borders & Effects */
+  --app-border: rgba(148, 163, 184, 0.1);
+  --app-border-soft: rgba(148, 163, 184, 0.1);
+  --app-border-strong: rgba(148, 163, 184, 0.2);
+  --app-focus: rgba(59, 130, 246, 0.5);
+  --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --app-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.18);
+  --app-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.18);
+
+  /* Backward Compatibility Aliases */
   --app-bg: var(--app-bg-base);
-  --app-bg-soft: var(--app-bg-inset);
-  --app-bg-elevated: var(--app-bg-floating);
-  --app-panel: var(--app-bg-raised);
+  --app-bg-soft: var(--app-bg-surface); /* Mapped to surface for glass effect */
+  --app-bg-raised: var(--app-bg-surface);
+  --app-bg-floating: var(--app-bg-elevated);
+  --app-bg-inset: rgba(2, 6, 23, 0.4); /* Darker inset for inputs/tables */
+  --app-bg-overlay: rgba(11, 17, 32, 0.85);
+
+  --app-panel: var(--app-bg-surface);
   --app-panel-muted: var(--app-bg-inset);
-  --app-border: var(--app-border-soft);
   --app-text-soft: var(--app-text-subtle);
   --app-accent: var(--app-brand);
   --app-accent-strong: var(--app-brand-strong);
   --app-shadow: var(--app-shadow-md);
+  
   --font-display: var(--font-ui-sans);
   --font-body: var(--font-ui-sans);
   --font-data: var(--font-data-mono);
@@ -60,10 +75,27 @@ html {
 body {
   margin: 0;
   background: var(--app-bg-base);
+  background-image: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.08), transparent 40%);
+  background-attachment: fixed;
   color: var(--app-text);
   font-family: var(--font-ui-sans), "Noto Sans SC", "PingFang SC",
     "Microsoft YaHei", sans-serif;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--app-bg-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow-md);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(30, 41, 59, 0.7);
+  border-color: var(--app-border-strong);
 }
 
 a {

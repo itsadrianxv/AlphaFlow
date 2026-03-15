@@ -72,9 +72,9 @@ const toneClassMap: Record<Tone, string> = {
 
 const surfaceClassMap: Record<Surface, string> = {
   base: "bg-[var(--app-bg-inset)]",
-  inset: "bg-[var(--app-bg-inset)]",
-  raised: "bg-[var(--app-bg-raised)]",
-  floating: "bg-[var(--app-bg-floating)]",
+  inset: "bg-[var(--app-bg-inset)] border border-[var(--app-border-soft)]",
+  raised: "glass-panel",
+  floating: "glass-panel shadow-[var(--app-shadow-lg)]",
 };
 
 const densityClassMap: Record<Density, string> = {
@@ -321,7 +321,7 @@ export function MetricTile(props: {
     <SectionCard
       surface={surface}
       density="compact"
-      className="min-h-[124px]"
+      className="min-h-[124px] transition-all hover:bg-[var(--app-bg-elevated)]"
       description={
         hint ? (
           <span className="text-xs leading-5 text-[var(--app-text-muted)]">
@@ -332,8 +332,10 @@ export function MetricTile(props: {
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs text-[var(--app-text-subtle)]">{label}</div>
-          <div className="app-data mt-3 text-[28px] text-[var(--app-text-strong)]">
+          <div className="text-xs font-medium uppercase tracking-wider text-[var(--app-text-subtle)]">
+            {label}
+          </div>
+          <div className="app-data mt-2 text-[32px] font-semibold leading-none text-[var(--app-text-strong)] tracking-tight">
             {value}
           </div>
         </div>
@@ -636,6 +638,59 @@ export function MiniTrendChart(props: {
         points={points}
       />
     </svg>
+  );
+}
+
+export function BentoGrid(props: {
+  children: ReactNode;
+  className?: string;
+  cols?: number;
+}) {
+  const { children, className, cols = 4 } = props;
+  return (
+    <div
+      className={cn(
+        "grid gap-4 auto-rows-[minmax(180px,auto)]",
+        cols === 4 && "grid-cols-1 md:grid-cols-2 xl:grid-cols-4",
+        cols === 3 && "grid-cols-1 md:grid-cols-3",
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function BentoCard(props: {
+  children: ReactNode;
+  className?: string;
+  span?: 1 | 2 | 3 | 4;
+  title?: ReactNode;
+  description?: ReactNode;
+  actions?: ReactNode;
+}) {
+  const { children, className, span = 1, title, description, actions } = props;
+  return (
+    <div
+      className={cn(
+        "glass-panel relative flex flex-col overflow-hidden rounded-xl p-6 transition-all duration-300 hover:border-[var(--app-border-strong)] hover:shadow-lg",
+        span === 2 && "md:col-span-2",
+        span === 3 && "md:col-span-3",
+        span === 4 && "md:col-span-2 xl:col-span-4",
+        className
+      )}
+    >
+      {(title || actions) && (
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+             {title && <h3 className="text-lg font-semibold text-[var(--app-text-strong)]">{title}</h3>}
+             {description && <p className="mt-1 text-xs text-[var(--app-text-muted)]">{description}</p>}
+          </div>
+          {actions && <div className="flex gap-2">{actions}</div>}
+        </div>
+      )}
+      <div className="flex-1 min-h-0">{children}</div>
+    </div>
   );
 }
 
