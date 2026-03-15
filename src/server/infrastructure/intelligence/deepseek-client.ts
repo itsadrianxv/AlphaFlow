@@ -97,7 +97,7 @@ export class DeepSeekClient {
     this.apiKey = config?.apiKey ?? env.DEEPSEEK_API_KEY;
     this.baseUrl = config?.baseUrl ?? env.DEEPSEEK_BASE_URL;
     this.model = config?.model ?? "deepseek-chat";
-    this.timeoutMs = config?.timeoutMs ?? 15_000;
+    this.timeoutMs = config?.timeoutMs ?? env.DEEPSEEK_TIMEOUT_MS;
   }
 
   isConfigured() {
@@ -259,7 +259,7 @@ export class DeepSeekClient {
 
           throw new WorkflowDomainError(
             WORKFLOW_ERROR_CODES.INTELLIGENCE_DATA_UNAVAILABLE,
-            `DeepSeek 璇锋眰澶辫触: ${response.status} ${response.statusText}${responseText ? ` - ${responseText}` : ""}`,
+            `DeepSeek 请求失败: ${response.status} ${response.statusText}${responseText ? ` - ${responseText}` : ""}`,
           );
         }
 
@@ -269,7 +269,7 @@ export class DeepSeekClient {
         if (!content) {
           throw new WorkflowDomainError(
             WORKFLOW_ERROR_CODES.INTELLIGENCE_LLM_PARSE_FAILED,
-            data.error?.message || "DeepSeek 杩斿洖绌哄唴瀹?",
+            data.error?.message || "DeepSeek 返回空内容",
           );
         }
 
@@ -292,13 +292,13 @@ export class DeepSeekClient {
         if ((error as Error).name === "AbortError") {
           throw new WorkflowDomainError(
             WORKFLOW_ERROR_CODES.INTELLIGENCE_DATA_UNAVAILABLE,
-            `DeepSeek 璇锋眰瓒呮椂 (${timeoutMs}ms)`,
+            `DeepSeek 请求超时 (${timeoutMs}ms)`,
           );
         }
 
         throw new WorkflowDomainError(
           WORKFLOW_ERROR_CODES.INTELLIGENCE_DATA_UNAVAILABLE,
-          `DeepSeek 璇锋眰寮傚父: ${(error as Error).message}`,
+          `DeepSeek 请求异常: ${(error as Error).message}`,
         );
       } finally {
         clearTimeout(timer);
