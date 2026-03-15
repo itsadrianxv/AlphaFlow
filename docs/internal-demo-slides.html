@@ -1,0 +1,2497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stock Screening Boost | 内部演示</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;700;800&family=Noto+Serif+SC:wght@500;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ===========================================
+         === THEME TOKENS ===
+         Centralized colors, type, spacing, and radii.
+         Edit these variables to retheme the whole deck.
+         =========================================== */
+      :root {
+        --bg-primary: #091218;
+        --bg-secondary: rgba(11, 22, 31, 0.8);
+        --surface-dark: rgba(14, 28, 39, 0.72);
+        --surface-strong: rgba(19, 35, 48, 0.92);
+        --surface-paper: rgba(243, 236, 223, 0.95);
+        --line-soft: rgba(141, 198, 187, 0.16);
+        --text-primary: #f5efe4;
+        --text-secondary: rgba(245, 239, 228, 0.72);
+        --text-dark: #10181f;
+        --accent-mint: #74f5d0;
+        --accent-orange: #ff9b54;
+        --accent-gold: #d9b171;
+        --danger-soft: #ff6c5b;
+        --success-soft: #86d69b;
+
+        --font-display: "Noto Serif SC", serif;
+        --font-body: "Noto Sans SC", sans-serif;
+        --font-mono: "IBM Plex Mono", monospace;
+
+        --radius-md: clamp(0.95rem, 1.4vw, 1.35rem);
+        --radius-lg: clamp(1.2rem, 2vw, 1.9rem);
+        --shadow-soft: 0 clamp(1rem, 2vw, 2rem) clamp(2.5rem, 4vw, 4rem)
+          rgba(0, 0, 0, 0.18);
+        --shadow-paper: 0 clamp(1rem, 2vw, 2.2rem) clamp(3rem, 4vw, 5rem)
+          rgba(4, 10, 16, 0.34);
+
+        --title-size: clamp(2.3rem, 5.4vw, 5.4rem);
+        --hero-subtitle-size: clamp(0.95rem, 1.75vw, 1.35rem);
+        --section-title-size: clamp(1.65rem, 3vw, 3rem);
+        --section-subtitle-size: clamp(0.85rem, 1.5vw, 1.12rem);
+        --body-size: clamp(0.78rem, 1.18vw, 1rem);
+        --small-size: clamp(0.68rem, 0.92vw, 0.84rem);
+        --micro-size: clamp(0.56rem, 0.72vw, 0.72rem);
+
+        --slide-padding: clamp(1rem, 4vw, 4rem);
+        --frame-padding: clamp(1.1rem, 2.3vw, 2.3rem);
+        --section-gap: clamp(0.8rem, 1.7vh, 1.5rem);
+        --grid-gap: clamp(0.75rem, 1.4vw, 1.25rem);
+        --card-padding: clamp(0.85rem, 1.5vw, 1.25rem);
+        --tight-gap: clamp(0.35rem, 0.7vw, 0.65rem);
+        --transition-smooth: 0.75s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      /* ===========================================
+         === GLOBAL RESET ===
+         Keep the deck predictable across browsers.
+         =========================================== */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* ===========================================
+         VIEWPORT FITTING: MANDATORY BASE STYLES
+         Include this ENTIRE file in every presentation.
+         These styles ensure slides fit exactly in the viewport.
+         =========================================== */
+
+      /* 1. Lock html/body to viewport */
+      html,
+      body {
+        height: 100%;
+        overflow-x: hidden;
+      }
+
+      html {
+        scroll-snap-type: y mandatory;
+        scroll-behavior: smooth;
+      }
+
+      /* 2. Each slide = exact viewport height */
+      .slide {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh; /* Dynamic viewport height for mobile browsers */
+        overflow: hidden; /* CRITICAL: Prevent ANY overflow */
+        scroll-snap-align: start;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+
+      /* 3. Content container with flex for centering */
+      .slide-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        max-height: 100%;
+        overflow: hidden; /* Double-protection against overflow */
+        padding: var(--slide-padding);
+      }
+
+      /* 4. ALL typography uses clamp() for responsive scaling */
+      :root {
+        /* Titles scale from mobile to desktop */
+        --title-size: clamp(1.5rem, 5vw, 4rem);
+        --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+        --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+
+        /* Body text */
+        --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+        --small-size: clamp(0.65rem, 1vw, 0.875rem);
+
+        /* Spacing scales with viewport */
+        --slide-padding: clamp(1rem, 4vw, 4rem);
+        --content-gap: clamp(0.5rem, 2vw, 2rem);
+        --element-gap: clamp(0.25rem, 1vw, 1rem);
+      }
+
+      /* 5. Cards/containers use viewport-relative max sizes */
+      .card,
+      .container,
+      .content-box {
+        max-width: min(90vw, 1000px);
+        max-height: min(80vh, 700px);
+      }
+
+      /* 6. Lists auto-scale with viewport */
+      .feature-list,
+      .bullet-list {
+        gap: clamp(0.4rem, 1vh, 1rem);
+      }
+
+      .feature-list li,
+      .bullet-list li {
+        font-size: var(--body-size);
+        line-height: 1.4;
+      }
+
+      /* 7. Grids adapt to available space */
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+        gap: clamp(0.5rem, 1.5vw, 1rem);
+      }
+
+      /* 8. Images constrained to viewport */
+      img,
+      .image-container {
+        max-width: 100%;
+        max-height: min(50vh, 400px);
+        object-fit: contain;
+      }
+
+      /* ===========================================
+         RESPONSIVE BREAKPOINTS
+         Aggressive scaling for smaller viewports
+         =========================================== */
+
+      /* Short viewports (< 700px height) */
+      @media (max-height: 700px) {
+        :root {
+          --slide-padding: clamp(0.75rem, 3vw, 2rem);
+          --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+          --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+          --h2-size: clamp(1rem, 3vw, 1.75rem);
+        }
+      }
+
+      /* Very short viewports (< 600px height) */
+      @media (max-height: 600px) {
+        :root {
+          --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+          --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+          --title-size: clamp(1.1rem, 4vw, 2rem);
+          --body-size: clamp(0.7rem, 1.2vw, 0.95rem);
+        }
+
+        /* Hide non-essential elements */
+        .nav-dots,
+        .keyboard-hint,
+        .decorative {
+          display: none;
+        }
+      }
+
+      /* Extremely short (landscape phones, < 500px height) */
+      @media (max-height: 500px) {
+        :root {
+          --slide-padding: clamp(0.4rem, 2vw, 1rem);
+          --title-size: clamp(1rem, 3.5vw, 1.5rem);
+          --h2-size: clamp(0.9rem, 2.5vw, 1.25rem);
+          --body-size: clamp(0.65rem, 1vw, 0.85rem);
+        }
+      }
+
+      /* Narrow viewports (< 600px width) */
+      @media (max-width: 600px) {
+        :root {
+          --title-size: clamp(1.25rem, 7vw, 2.5rem);
+        }
+
+        /* Stack grids vertically */
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ===========================================
+         REDUCED MOTION
+         Respect user preferences
+         =========================================== */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.2s !important;
+        }
+
+        html {
+          scroll-behavior: auto;
+        }
+      }
+
+      /* ===========================================
+         === PAGE FOUNDATION ===
+         Background atmosphere, overlays, and body setup.
+         =========================================== */
+      body {
+        font-family: var(--font-body);
+        font-size: var(--body-size);
+        color: var(--text-primary);
+        background:
+          radial-gradient(
+            circle at 15% 15%,
+            rgba(116, 245, 208, 0.16),
+            transparent 25%
+          ),
+          radial-gradient(
+            circle at 82% 24%,
+            rgba(255, 155, 84, 0.14),
+            transparent 22%
+          ),
+          radial-gradient(
+            circle at 55% 88%,
+            rgba(217, 177, 113, 0.12),
+            transparent 24%
+          ),
+          linear-gradient(180deg, #071016 0%, #09141a 45%, #0c171f 100%);
+        line-height: 1.55;
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      body::before {
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: clamp(2rem, 4vw, 3.8rem) clamp(2rem, 4vw, 3.8rem);
+        mask-image: linear-gradient(
+          180deg,
+          rgba(0, 0, 0, 0.45),
+          rgba(0, 0, 0, 0.12)
+        );
+        opacity: 0.32;
+      }
+
+      body::after {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Ccircle cx='16' cy='16' r='1'/%3E%3Ccircle cx='88' cy='32' r='1'/%3E%3Ccircle cx='64' cy='112' r='1'/%3E%3Ccircle cx='136' cy='88' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        opacity: 0.7;
+      }
+
+      main {
+        position: relative;
+        z-index: 1;
+      }
+
+      a {
+        color: inherit;
+      }
+
+      button {
+        font: inherit;
+      }
+      /* ===========================================
+         === FIXED NAVIGATION UI ===
+         Progress bar, dots, hints, and editor controls.
+         =========================================== */
+      .progress-shell {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: clamp(0.16rem, 0.3vw, 0.24rem);
+        background: rgba(255, 255, 255, 0.08);
+        z-index: 40;
+      }
+
+      .progress-bar {
+        height: 100%;
+        width: 0;
+        background: linear-gradient(
+          90deg,
+          var(--accent-orange),
+          var(--accent-gold),
+          var(--accent-mint)
+        );
+        box-shadow: 0 0 clamp(1rem, 2vw, 2rem) rgba(116, 245, 208, 0.35);
+        transition: width 0.2s ease-out;
+      }
+
+      .nav-dots {
+        position: fixed;
+        right: clamp(0.65rem, 1.5vw, 1.5rem);
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: clamp(0.45rem, 0.8vw, 0.7rem);
+        z-index: 30;
+      }
+
+      .nav-dot {
+        width: clamp(0.7rem, 1vw, 0.88rem);
+        height: clamp(0.7rem, 1vw, 0.88rem);
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.08);
+        cursor: pointer;
+        transition:
+          transform var(--transition-smooth),
+          background var(--transition-smooth),
+          border-color var(--transition-smooth);
+      }
+
+      .nav-dot:hover,
+      .nav-dot:focus-visible {
+        transform: scale(1.08);
+        background: rgba(255, 255, 255, 0.14);
+        outline: none;
+      }
+
+      .nav-dot.active {
+        background: var(--accent-mint);
+        border-color: rgba(116, 245, 208, 0.8);
+        box-shadow: 0 0 clamp(0.75rem, 1.6vw, 1.3rem) rgba(116, 245, 208, 0.42);
+      }
+
+      .keyboard-hint {
+        position: fixed;
+        left: clamp(0.8rem, 1.8vw, 1.6rem);
+        bottom: clamp(0.75rem, 1.6vw, 1.35rem);
+        padding: clamp(0.4rem, 0.9vw, 0.7rem) clamp(0.55rem, 1vw, 0.85rem);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: rgba(5, 12, 18, 0.68);
+        color: rgba(245, 239, 228, 0.72);
+        font-family: var(--font-mono);
+        font-size: var(--micro-size);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        backdrop-filter: blur(12px);
+        z-index: 30;
+      }
+
+      .control-stack {
+        position: fixed;
+        top: clamp(0.8rem, 1.8vw, 1.5rem);
+        left: clamp(0.8rem, 1.8vw, 1.5rem);
+        display: flex;
+        flex-direction: column;
+        gap: clamp(0.4rem, 0.8vw, 0.65rem);
+        z-index: 35;
+      }
+
+      .edit-hotzone {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: clamp(3rem, 8vw, 5rem);
+        height: clamp(3rem, 8vw, 5rem);
+        z-index: 34;
+        cursor: pointer;
+      }
+
+      .control-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(0.25rem, 0.4vw, 0.35rem);
+        min-width: clamp(4rem, 7vw, 5rem);
+        padding: clamp(0.42rem, 0.8vw, 0.68rem) clamp(0.7rem, 1.1vw, 0.95rem);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 999px;
+        background: rgba(7, 13, 18, 0.78);
+        color: var(--text-primary);
+        font-size: var(--micro-size);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+        opacity: 0;
+        pointer-events: none;
+        backdrop-filter: blur(16px);
+        transition:
+          opacity 0.3s ease,
+          transform 0.3s ease,
+          background 0.3s ease,
+          border-color 0.3s ease;
+      }
+
+      .control-button:hover,
+      .control-button:focus-visible {
+        background: rgba(18, 31, 41, 0.92);
+        border-color: rgba(116, 245, 208, 0.42);
+        transform: translateY(calc(-1 * clamp(0.08rem, 0.2vw, 0.16rem)));
+        outline: none;
+      }
+
+      .control-button.show,
+      .control-button.active,
+      .control-button.export-visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .control-button.active {
+        background: rgba(116, 245, 208, 0.18);
+        border-color: rgba(116, 245, 208, 0.62);
+      }
+
+      .status-toast {
+        max-width: min(45vw, 18rem);
+        min-height: clamp(1.8rem, 4vw, 2.3rem);
+        padding: clamp(0.42rem, 0.8vw, 0.68rem) clamp(0.6rem, 1vw, 0.9rem);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: var(--radius-md);
+        background: rgba(7, 13, 18, 0.78);
+        color: rgba(245, 239, 228, 0.74);
+        font-size: var(--micro-size);
+        line-height: 1.45;
+        opacity: 0;
+        transform: translateY(clamp(0.4rem, 0.8vw, 0.7rem));
+        transition:
+          opacity 0.3s ease,
+          transform 0.3s ease;
+        backdrop-filter: blur(16px);
+      }
+
+      .status-toast.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      body.editing .keyboard-hint::after {
+        content: " | 编辑模式";
+        color: var(--accent-mint);
+      }
+
+      /* ===========================================
+         === TYPOGRAPHY HELPERS ===
+         Shared text treatments used across slides.
+         =========================================== */
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: clamp(0.35rem, 0.65vw, 0.5rem);
+        width: fit-content;
+        padding: clamp(0.24rem, 0.45vw, 0.34rem) clamp(0.55rem, 0.9vw, 0.78rem);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-secondary);
+        font-family: var(--font-mono);
+        font-size: var(--micro-size);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: clamp(0.3rem, 0.45vw, 0.42rem);
+        height: clamp(0.3rem, 0.45vw, 0.42rem);
+        border-radius: 999px;
+        background: var(--accent-mint);
+        box-shadow: 0 0 clamp(0.65rem, 1vw, 0.9rem) rgba(116, 245, 208, 0.4);
+      }
+
+      .section-kicker {
+        color: var(--accent-gold);
+        font-family: var(--font-mono);
+        font-size: var(--small-size);
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .slide-title {
+        font-family: var(--font-display);
+        font-size: var(--section-title-size);
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .slide-title strong {
+        color: var(--accent-gold);
+        font-weight: 700;
+      }
+
+      .slide-lead {
+        max-width: min(62ch, 100%);
+        color: var(--text-secondary);
+        font-size: var(--section-subtitle-size);
+        line-height: 1.65;
+      }
+
+      .mono-note {
+        color: rgba(245, 239, 228, 0.62);
+        font-family: var(--font-mono);
+        font-size: var(--micro-size);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      /* ===========================================
+         === SHARED LAYOUT COMPONENTS ===
+         Frame, grids, cards, and reusable component shells.
+         =========================================== */
+      .frame {
+        width: min(100%, 1240px);
+        max-height: min(84vh, 790px);
+        margin: 0 auto;
+        padding: var(--frame-padding);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-lg);
+        background:
+          linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.03),
+            rgba(255, 255, 255, 0)
+          ),
+          var(--surface-dark);
+        box-shadow: var(--shadow-soft);
+        backdrop-filter: blur(18px);
+      }
+
+      .frame--paper {
+        background:
+          linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.28),
+            rgba(255, 255, 255, 0)
+          ),
+          var(--surface-paper);
+        color: var(--text-dark);
+        border-color: rgba(16, 24, 31, 0.12);
+        box-shadow: var(--shadow-paper);
+      }
+
+      .frame--paper .slide-lead,
+      .frame--paper .mono-note,
+      .frame--paper .eyebrow,
+      .frame--paper .section-kicker {
+        color: rgba(16, 24, 31, 0.74);
+      }
+
+      .frame--paper .eyebrow {
+        background: rgba(16, 24, 31, 0.05);
+        border-color: rgba(16, 24, 31, 0.08);
+      }
+
+      .frame--paper .eyebrow::before {
+        background: var(--accent-orange);
+        box-shadow: 0 0 clamp(0.65rem, 1vw, 0.9rem) rgba(255, 155, 84, 0.34);
+      }
+
+      .stack {
+        display: flex;
+        flex-direction: column;
+        gap: var(--section-gap);
+      }
+
+      .stack-tight {
+        display: flex;
+        flex-direction: column;
+        gap: var(--tight-gap);
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+        gap: var(--grid-gap);
+        align-items: stretch;
+      }
+
+      .split-even {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--grid-gap);
+      }
+
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--grid-gap);
+      }
+
+      .card-grid--three {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: var(--grid-gap);
+      }
+
+      .panel {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: clamp(0.45rem, 0.9vw, 0.75rem);
+        padding: var(--card-padding);
+        border: 1px solid var(--line-soft);
+        border-radius: var(--radius-md);
+        background: rgba(19, 35, 48, 0.92);
+        overflow: hidden;
+      }
+
+      .panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          135deg,
+          rgba(116, 245, 208, 0.1),
+          transparent 38%,
+          rgba(255, 155, 84, 0.08) 100%
+        );
+        opacity: 0.8;
+        pointer-events: none;
+      }
+
+      .panel > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .panel--paper {
+        background: rgba(248, 244, 236, 0.96);
+        border-color: rgba(16, 24, 31, 0.1);
+        color: var(--text-dark);
+      }
+
+      .panel--paper::before {
+        background: linear-gradient(
+          135deg,
+          rgba(255, 155, 84, 0.12),
+          transparent 42%,
+          rgba(217, 177, 113, 0.1) 100%
+        );
+      }
+
+      .panel-title {
+        font-size: clamp(1rem, 1.55vw, 1.26rem);
+        font-weight: 700;
+        line-height: 1.3;
+      }
+
+      .panel-body {
+        color: var(--text-secondary);
+        font-size: var(--body-size);
+        line-height: 1.6;
+      }
+
+      .panel--paper .panel-body,
+      .panel--paper .chip {
+        color: rgba(16, 24, 31, 0.72);
+      }
+
+      .chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: clamp(0.4rem, 0.8vw, 0.65rem);
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: clamp(0.28rem, 0.45vw, 0.4rem);
+        width: fit-content;
+        padding: clamp(0.32rem, 0.55vw, 0.45rem) clamp(0.52rem, 0.86vw, 0.72rem);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: rgba(245, 239, 228, 0.78);
+        font-family: var(--font-mono);
+        font-size: var(--micro-size);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .chip strong {
+        color: var(--accent-mint);
+        font-weight: 600;
+      }
+
+      .metric-strip {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(0.55rem, 0.9vw, 0.85rem);
+      }
+
+      .metric-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: clamp(0.3rem, 0.6vw, 0.45rem);
+        min-height: clamp(5.2rem, 10vw, 7rem);
+        padding: var(--card-padding);
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .metric-value {
+        font-family: var(--font-display);
+        font-size: clamp(1.5rem, 2.7vw, 2.4rem);
+        line-height: 1;
+      }
+
+      .metric-label {
+        color: var(--text-secondary);
+        font-size: var(--small-size);
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: clamp(0.24rem, 0.45vw, 0.38rem);
+        width: fit-content;
+        padding: clamp(0.24rem, 0.45vw, 0.34rem) clamp(0.48rem, 0.8vw, 0.68rem);
+        border-radius: 999px;
+        font-family: var(--font-mono);
+        font-size: var(--micro-size);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .status-pill::before {
+        content: "";
+        width: clamp(0.28rem, 0.4vw, 0.36rem);
+        height: clamp(0.28rem, 0.4vw, 0.36rem);
+        border-radius: 999px;
+      }
+
+      .status-pill--live {
+        background: rgba(134, 214, 155, 0.12);
+        color: var(--success-soft);
+      }
+
+      .status-pill--live::before {
+        background: var(--success-soft);
+      }
+
+      .status-pill--build {
+        background: rgba(255, 155, 84, 0.12);
+        color: var(--accent-orange);
+      }
+
+      .status-pill--build::before {
+        background: var(--accent-orange);
+      }
+
+      .status-pill--gap {
+        background: rgba(255, 108, 91, 0.12);
+        color: var(--danger-soft);
+      }
+
+      .status-pill--gap::before {
+        background: var(--danger-soft);
+      }
+
+      .quote-card {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: var(--section-gap);
+        padding: clamp(1rem, 1.8vw, 1.6rem);
+        border-radius: var(--radius-lg);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background:
+          radial-gradient(
+            circle at top right,
+            rgba(255, 155, 84, 0.18),
+            transparent 34%
+          ),
+          rgba(7, 13, 18, 0.6);
+      }
+
+      .quote-card blockquote {
+        font-family: var(--font-display);
+        font-size: clamp(1.45rem, 2.8vw, 2.55rem);
+        line-height: 1.18;
+      }
+
+      .quote-card footer {
+        color: var(--text-secondary);
+        font-size: var(--small-size);
+      }
+
+      .list-clean {
+        display: flex;
+        flex-direction: column;
+        gap: clamp(0.6rem, 1vh, 0.9rem);
+        list-style: none;
+      }
+
+      .list-clean li {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: clamp(0.55rem, 0.9vw, 0.8rem);
+        align-items: start;
+      }
+
+      .list-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: clamp(1.55rem, 2vw, 1.95rem);
+        height: clamp(1.55rem, 2vw, 1.95rem);
+        border-radius: 999px;
+        background: rgba(116, 245, 208, 0.14);
+        color: var(--accent-mint);
+        font-family: var(--font-mono);
+        font-size: var(--micro-size);
+      }
+
+      .list-clean strong {
+        display: block;
+        margin-bottom: clamp(0.15rem, 0.3vw, 0.25rem);
+        font-size: var(--body-size);
+      }
+
+      .list-clean span {
+        color: var(--text-secondary);
+        font-size: var(--small-size);
+        line-height: 1.5;
+      }
+      /* ===========================================
+         === HERO SLIDE ===
+         Title + signal board.
+         =========================================== */
+      .hero-frame {
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+        gap: clamp(0.9rem, 1.8vw, 1.5rem);
+        align-items: stretch;
+      }
+
+      .hero-copy {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: var(--section-gap);
+      }
+
+      .hero-title {
+        font-family: var(--font-display);
+        font-size: clamp(2.5rem, 6vw, 5.95rem);
+        line-height: 0.95;
+        letter-spacing: -0.05em;
+      }
+
+      .hero-title span {
+        display: block;
+        color: var(--accent-gold);
+      }
+
+      .hero-subtitle {
+        max-width: 16em;
+        color: rgba(245, 239, 228, 0.9);
+        font-size: var(--hero-subtitle-size);
+        line-height: 1.55;
+      }
+
+      .hero-tagline {
+        max-width: 26em;
+        color: var(--text-secondary);
+        font-size: var(--section-subtitle-size);
+      }
+
+      .hero-board {
+        position: relative;
+        padding: clamp(1rem, 1.8vw, 1.5rem);
+        border-radius: calc(var(--radius-lg) + clamp(0.2rem, 0.5vw, 0.35rem));
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background:
+          linear-gradient(
+            145deg,
+            rgba(116, 245, 208, 0.14),
+            transparent 44%
+          ),
+          linear-gradient(
+            0deg,
+            rgba(255, 155, 84, 0.16),
+            transparent 52%
+          ),
+          rgba(8, 16, 22, 0.82);
+        overflow: hidden;
+      }
+
+      .hero-board::before,
+      .hero-board::after {
+        content: "";
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(clamp(1.4rem, 3vw, 2.4rem));
+        opacity: 0.7;
+      }
+
+      .hero-board::before {
+        top: clamp(0.9rem, 1.8vw, 1.4rem);
+        right: clamp(0.8rem, 1.6vw, 1.25rem);
+        width: clamp(6rem, 14vw, 10rem);
+        height: clamp(6rem, 14vw, 10rem);
+        background: rgba(116, 245, 208, 0.24);
+      }
+
+      .hero-board::after {
+        bottom: clamp(0.6rem, 1.2vw, 1rem);
+        left: clamp(0.6rem, 1.2vw, 1rem);
+        width: clamp(4.5rem, 10vw, 7rem);
+        height: clamp(4.5rem, 10vw, 7rem);
+        background: rgba(255, 155, 84, 0.2);
+      }
+
+      .board-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+        gap: clamp(0.75rem, 1.2vw, 1rem);
+        height: 100%;
+      }
+
+      .board-signal {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: clamp(0.65rem, 1vw, 0.8rem);
+        padding: clamp(0.8rem, 1.4vw, 1.1rem);
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .board-plot {
+        display: flex;
+        align-items: end;
+        gap: clamp(0.35rem, 0.55vw, 0.5rem);
+        min-height: clamp(10rem, 24vh, 15rem);
+      }
+
+      .plot-bar {
+        flex: 1;
+        min-height: 20%;
+        border-radius: 999px 999px 0 0;
+        background: linear-gradient(
+          180deg,
+          rgba(116, 245, 208, 0.95),
+          rgba(255, 155, 84, 0.7)
+        );
+        box-shadow: 0 0 clamp(0.8rem, 1.4vw, 1rem) rgba(116, 245, 208, 0.18);
+      }
+
+      .plot-bar:nth-child(1) { height: 34%; }
+      .plot-bar:nth-child(2) { height: 52%; }
+      .plot-bar:nth-child(3) { height: 64%; }
+      .plot-bar:nth-child(4) { height: 82%; }
+      .plot-bar:nth-child(5) { height: 76%; }
+      .plot-bar:nth-child(6) { height: 92%; }
+
+      .board-aside {
+        display: grid;
+        gap: clamp(0.65rem, 1vw, 0.85rem);
+      }
+
+      .signal-tile {
+        display: flex;
+        flex-direction: column;
+        gap: clamp(0.25rem, 0.5vw, 0.38rem);
+        padding: clamp(0.72rem, 1.2vw, 0.92rem);
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .signal-tile strong {
+        font-family: var(--font-display);
+        font-size: clamp(1.3rem, 2vw, 1.9rem);
+        line-height: 1;
+      }
+
+      .signal-tile span {
+        color: var(--text-secondary);
+        font-size: var(--small-size);
+      }
+
+      /* ===========================================
+         === PROCESS / FLOW COMPONENTS ===
+         Workflow steps, architecture cells, and milestone rails.
+         =========================================== */
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: clamp(0.5rem, 0.85vw, 0.75rem);
+      }
+
+      .timeline-step {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        gap: clamp(0.45rem, 0.8vw, 0.65rem);
+        padding: clamp(0.75rem, 1.1vw, 0.95rem);
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .timeline-step::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        right: calc(-1 * clamp(0.42rem, 0.75vw, 0.62rem));
+        width: clamp(0.8rem, 1vw, 1rem);
+        height: 1px;
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      .timeline-step:last-child::after { display: none; }
+
+      .timeline-index {
+        color: var(--accent-gold);
+        font-family: var(--font-mono);
+        font-size: var(--micro-size);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .timeline-title {
+        font-size: clamp(0.95rem, 1.35vw, 1.12rem);
+        font-weight: 700;
+      }
+
+      .timeline-copy {
+        color: var(--text-secondary);
+        font-size: var(--small-size);
+        line-height: 1.5;
+      }
+
+      .workflow-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(0.65rem, 1vw, 0.85rem);
+      }
+
+      .workflow-node {
+        display: flex;
+        flex-direction: column;
+        gap: clamp(0.42rem, 0.8vw, 0.65rem);
+        padding: clamp(0.75rem, 1.2vw, 0.95rem);
+        min-height: clamp(7rem, 12vw, 8rem);
+        border-radius: var(--radius-md);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .workflow-node strong {
+        font-family: var(--font-mono);
+        font-size: var(--micro-size);
+        color: var(--accent-orange);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .workflow-node h3 {
+        font-size: clamp(0.95rem, 1.35vw, 1.16rem);
+        line-height: 1.3;
+      }
+
+      .workflow-node p {
+        color: var(--text-secondary);
+        font-size: var(--small-size);
+      }
+
+      .module-card {
+        min-height: clamp(8rem, 14vw, 9.8rem);
+      }
+
+      .module-card .panel-title {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: clamp(0.5rem, 0.8vw, 0.65rem);
+      }
+
+      .milestone-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: clamp(0.65rem, 1vw, 0.85rem);
+      }
+
+      .milestone-card {
+        min-height: clamp(10rem, 18vw, 12rem);
+      }
+
+      .milestone-step {
+        color: var(--accent-orange);
+        font-family: var(--font-mono);
+        font-size: var(--small-size);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .milestone-card ul {
+        display: flex;
+        flex-direction: column;
+        gap: clamp(0.35rem, 0.6vw, 0.5rem);
+        padding-left: clamp(0.95rem, 1.4vw, 1.1rem);
+        color: var(--text-secondary);
+        font-size: var(--small-size);
+      }
+
+      .architecture-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(0.65rem, 1vw, 0.85rem);
+      }
+
+      .architecture-card {
+        min-height: clamp(8rem, 14vw, 9.6rem);
+      }
+
+      /* ===========================================
+         === INLINE EDITING ===
+         Highlight editable elements when edit mode is active.
+         =========================================== */
+      [data-editable] {
+        transition:
+          box-shadow 0.2s ease,
+          background 0.2s ease;
+      }
+
+      body.editing [data-editable] {
+        outline: 1px dashed rgba(116, 245, 208, 0.55);
+        outline-offset: clamp(0.15rem, 0.3vw, 0.22rem);
+        box-shadow: 0 0 0 clamp(0.08rem, 0.14vw, 0.12rem) rgba(116, 245, 208, 0.12);
+        cursor: text;
+      }
+
+      body.editing [data-editable]:focus {
+        outline-style: solid;
+        background: rgba(116, 245, 208, 0.08);
+      }
+
+      /* ===========================================
+         === ANIMATIONS ===
+         Scroll-triggered reveal patterns for the deck.
+         =========================================== */
+      .reveal {
+        opacity: 0;
+        transform: translateY(clamp(0.9rem, 1.8vw, 1.35rem));
+        transition:
+          opacity var(--transition-smooth),
+          transform var(--transition-smooth);
+      }
+
+      .reveal-left {
+        opacity: 0;
+        transform: translateX(calc(-1 * clamp(1rem, 2vw, 1.5rem)));
+        transition:
+          opacity var(--transition-smooth),
+          transform var(--transition-smooth);
+      }
+
+      .reveal-scale {
+        opacity: 0;
+        transform: scale(0.96);
+        transition:
+          opacity var(--transition-smooth),
+          transform var(--transition-smooth);
+      }
+
+      .reveal-blur {
+        opacity: 0;
+        filter: blur(clamp(0.4rem, 0.7vw, 0.6rem));
+        transition:
+          opacity var(--transition-smooth),
+          filter var(--transition-smooth);
+      }
+
+      .slide.visible .reveal,
+      .slide.visible .reveal-left,
+      .slide.visible .reveal-scale,
+      .slide.visible .reveal-blur {
+        opacity: 1;
+        transform: none;
+        filter: blur(0);
+      }
+
+      .delay-2 { transition-delay: 0.12s; }
+      .delay-3 { transition-delay: 0.22s; }
+      .delay-4 { transition-delay: 0.32s; }
+      .delay-5 { transition-delay: 0.42s; }
+      /* ===========================================
+         === RESPONSIVE OVERRIDES ===
+         Reflow complex grids for tablets and phones.
+         =========================================== */
+      @media (max-width: 1080px) {
+        .hero-frame,
+        .split,
+        .split-even {
+          grid-template-columns: 1fr;
+        }
+
+        .card-grid--three,
+        .architecture-grid,
+        .workflow-grid,
+        .milestone-grid,
+        .timeline {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .timeline-step:nth-child(2n)::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .card-grid,
+        .card-grid--three,
+        .architecture-grid,
+        .workflow-grid,
+        .milestone-grid,
+        .timeline,
+        .metric-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .nav-dots {
+          right: clamp(0.35rem, 1vw, 0.7rem);
+        }
+
+        .keyboard-hint {
+          max-width: calc(100vw - clamp(1rem, 6vw, 2rem));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="progress-shell" aria-hidden="true">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="edit-hotzone" aria-hidden="true"></div>
+
+    <div class="control-stack" aria-live="polite">
+      <button
+        class="control-button edit-toggle"
+        id="editToggle"
+        type="button"
+        title="编辑模式（E）"
+      >
+        编辑
+      </button>
+      <button
+        class="control-button export-toggle"
+        id="exportToggle"
+        type="button"
+        title="导出当前 HTML"
+      >
+        导出
+      </button>
+      <div class="status-toast" id="statusToast"></div>
+    </div>
+
+    <nav class="nav-dots" id="navDots" aria-label="幻灯片导航"></nav>
+    <div class="keyboard-hint">Arrow / Space / Swipe</div>
+
+    <main>
+      <section class="slide visible" data-title="封面">
+        <div class="slide-content">
+          <div class="frame hero-frame">
+            <div class="hero-copy">
+              <div class="stack">
+                <div class="eyebrow reveal" data-editable="hero-eyebrow">
+                  Internal Demo | March 2026
+                </div>
+                <div class="stack-tight">
+                  <h1 class="hero-title reveal delay-2" data-editable="hero-title">
+                    Stock Screening
+                    <span>Boost</span>
+                  </h1>
+                  <p
+                    class="hero-subtitle reveal delay-3"
+                    data-editable="hero-subtitle"
+                  >
+                    把 95% 市场噪音挡在工作流之外，把研究时间留给最值得看的 5%
+                    标的。
+                  </p>
+                </div>
+                <p class="hero-tagline reveal delay-4" data-editable="hero-tagline">
+                  面向私募投资者的股票投研工作流定制化平台。以
+                  LangGraph 为编排中枢，用筛选、快研、验证与择时把判断链路串起来。
+                </p>
+              </div>
+
+              <div class="chip-row reveal delay-5">
+                <span class="chip"><strong>Next.js 15</strong> App Router</span>
+                <span class="chip"><strong>LangGraph</strong> 多 Agent 编排</span>
+                <span class="chip"><strong>FastAPI</strong> AkShare 数据网关</span>
+              </div>
+            </div>
+
+            <div class="hero-board reveal-scale delay-3" aria-hidden="true">
+              <div class="board-grid">
+                <div class="board-signal">
+                  <div class="chip-row">
+                    <span class="chip">signal deck</span>
+                    <span class="chip">noise filter</span>
+                  </div>
+                  <div class="board-plot">
+                    <span class="plot-bar"></span>
+                    <span class="plot-bar"></span>
+                    <span class="plot-bar"></span>
+                    <span class="plot-bar"></span>
+                    <span class="plot-bar"></span>
+                    <span class="plot-bar"></span>
+                  </div>
+                  <div class="mono-note">research pipeline confidence ↑</div>
+                </div>
+
+                <div class="board-aside">
+                  <div class="signal-tile">
+                    <span class="mono-note">Focus Ratio</span>
+                    <strong>05%</strong>
+                    <span>把注意力收敛到值得深挖的极少数标的</span>
+                  </div>
+                  <div class="signal-tile">
+                    <span class="mono-note">Workflow</span>
+                    <strong>05 节点</strong>
+                    <span>行业概览、热度、候选股、可信度、竞争格局</span>
+                  </div>
+                  <div class="signal-tile">
+                    <span class="mono-note">Runtime</span>
+                    <strong>02 Workers</strong>
+                    <span>筛选与工作流后台解耦运行，可追踪可回放</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-title="问题">
+        <div class="slide-content">
+          <div class="frame split">
+            <div class="stack">
+              <span class="section-kicker reveal">Problem Framing</span>
+              <h2 class="slide-title reveal delay-2" data-editable="problem-title">
+                用户真正缺的不是更多数据，
+                <strong>而是更快形成判断的路径。</strong>
+              </h2>
+              <p class="slide-lead reveal delay-3" data-editable="problem-lead">
+                目标用户是“今天看新能源，明天看医疗器械”的私募投资者。他们已经有
+                Wind / iFinD，但仍然需要在几小时内建立陌生行业的 80 分认知。
+              </p>
+              <div class="quote-card reveal-blur delay-4">
+                <blockquote data-editable="problem-quote">
+                  “我不需要你替我研究透，我需要你快速帮我排除 95%
+                  的噪音。”
+                </blockquote>
+                <footer data-editable="problem-quote-footer">
+                  核心诉求：让精力集中到最有价值的下一步动作上，而不是被信息洪水拖慢。
+                </footer>
+              </div>
+            </div>
+
+            <div class="panel reveal-left delay-3">
+              <div class="eyebrow">Pain Signals</div>
+              <ul class="list-clean">
+                <li>
+                  <span class="list-index">01</span>
+                  <div>
+                    <strong data-editable="pain-1-title">行业切换极快</strong>
+                    <span data-editable="pain-1-body">
+                      需要跨赛道迅速建立上下游、技术路线和风险认知，不能靠慢阅读。
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <span class="list-index">02</span>
+                  <div>
+                    <strong data-editable="pain-2-title">概念噪音过多</strong>
+                    <span data-editable="pain-2-body">
+                      小作文、热点蹭概念、产业链误读频繁出现，可信度验证必须前置。
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <span class="list-index">03</span>
+                  <div>
+                    <strong data-editable="pain-3-title">工具分散而不连贯</strong>
+                    <span data-editable="pain-3-body">
+                      数据、研究、执行建议分散在不同工具里，缺少从问题到动作的一条链。
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <span class="list-index">04</span>
+                  <div>
+                    <strong data-editable="pain-4-title">真正稀缺的是时间</strong>
+                    <span data-editable="pain-4-body">
+                      决策窗口很短，平台必须把“排除无效标的”的速度做得足够快。
+                    </span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-title="定位">
+        <div class="slide-content">
+          <div class="frame frame--paper stack">
+            <div class="stack-tight">
+              <span class="section-kicker reveal">Product Thesis</span>
+              <h2 class="slide-title reveal delay-2" data-editable="thesis-title">
+                这不是另一个“股票列表页”，
+                <strong>而是一套投研工作流操作系统。</strong>
+              </h2>
+              <p class="slide-lead reveal delay-3" data-editable="thesis-lead">
+                项目目标不是替代全能终端，而是成为私募投资者的效率加速器，用自然语言、
+                多 Agent 编排和证据验证系统把动作链路缩短。
+              </p>
+            </div>
+
+            <div class="card-grid">
+              <article class="panel panel--paper reveal-scale delay-2">
+                <span class="eyebrow">Not a Terminal</span>
+                <h3 class="panel-title" data-editable="thesis-card-1-title">
+                  不做全能数据终端
+                </h3>
+                <p class="panel-body" data-editable="thesis-card-1-body">
+                  不复制 Wind / iFinD 的全量功能，而是把“下一步该看什么”收束得更明确。
+                </p>
+              </article>
+
+              <article class="panel panel--paper reveal-scale delay-3">
+                <span class="eyebrow">Natural Language</span>
+                <h3 class="panel-title" data-editable="thesis-card-2-title">
+                  自然语言驱动筛选
+                </h3>
+                <p class="panel-body" data-editable="thesis-card-2-body">
+                  用户说“ROE 连续增长且高负债剔除”，系统落到
+                  `FilterGroup` 与 `ScoringConfig`。
+                </p>
+              </article>
+
+              <article class="panel panel--paper reveal-scale delay-4">
+                <span class="eyebrow">LangGraph Runtime</span>
+                <h3 class="panel-title" data-editable="thesis-card-3-title">
+                  多 Agent 不是黑盒
+                </h3>
+                <p class="panel-body" data-editable="thesis-card-3-body">
+                  每个节点都有状态、进度和事件流，用户知道现在卡在哪、结果怎么来的。
+                </p>
+              </article>
+
+              <article class="panel panel--paper reveal-scale delay-5">
+                <span class="eyebrow">Evidence First</span>
+                <h3 class="panel-title" data-editable="thesis-card-4-title">
+                  先验证，再兴奋
+                </h3>
+                <p class="panel-body" data-editable="thesis-card-4-body">
+                  概念可信度拆成主营匹配、订单专利、历史蹭热点和产业链逻辑四个维度。
+                </p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-title="闭环">
+        <div class="slide-content">
+          <div class="frame stack">
+            <div class="stack-tight">
+              <span class="section-kicker reveal">End-to-End Loop</span>
+              <h2 class="slide-title reveal delay-2" data-editable="loop-title">
+                输出不是一篇更长的报告，
+                <strong>而是一次可执行的下一步动作。</strong>
+              </h2>
+              <p class="slide-lead reveal delay-3" data-editable="loop-lead">
+                平台围绕投资者当天的判断链路展开：先把问题结构化，再缩小候选池，最后给出研究结果与组合动作。
+              </p>
+            </div>
+
+            <div class="timeline">
+              <article class="timeline-step reveal-left delay-2">
+                <span class="timeline-index">01 Define</span>
+                <h3 class="timeline-title" data-editable="loop-step-1-title">
+                  描述问题
+                </h3>
+                <p class="timeline-copy" data-editable="loop-step-1-body">
+                  从行业、题材或财务条件出发，先把今天要解决的问题说清楚。
+                </p>
+              </article>
+
+              <article class="timeline-step reveal-left delay-3">
+                <span class="timeline-index">02 Screen</span>
+                <h3 class="timeline-title" data-editable="loop-step-2-title">
+                  缩小候选池
+                </h3>
+                <p class="timeline-copy" data-editable="loop-step-2-body">
+                  让筛选策略把广市场快速压缩成可研究的机会池和评分列表。
+                </p>
+              </article>
+
+              <article class="timeline-step reveal-left delay-4">
+                <span class="timeline-index">03 Research</span>
+                <h3 class="timeline-title" data-editable="loop-step-3-title">
+                  行业快研
+                </h3>
+                <p class="timeline-copy" data-editable="loop-step-3-body">
+                  用标准 5 节点工作流产出行业概览、热度判断、候选股和风险催化剂。
+                </p>
+              </article>
+
+              <article class="timeline-step reveal-left delay-5">
+                <span class="timeline-index">04 Verify</span>
+                <h3 class="timeline-title" data-editable="loop-step-4-title">
+                  公司深挖与验证
+                </h3>
+                <p class="timeline-copy" data-editable="loop-step-4-body">
+                  对少量核心标的做概念可信度和证据强度校验，避免被热点带节奏。
+                </p>
+              </article>
+
+              <article class="timeline-step reveal-left delay-5">
+                <span class="timeline-index">05 Act</span>
+                <h3 class="timeline-title" data-editable="loop-step-5-title">
+                  给出组合动作
+                </h3>
+                <p class="timeline-copy" data-editable="loop-step-5-body">
+                  将推荐动作、风险预算和建议仓位放回投资决策工作台里完成闭环。
+                </p>
+              </article>
+            </div>
+
+            <div class="panel reveal delay-4">
+              <div class="chip-row">
+                <span class="chip"><strong>Output</strong> 候选池</span>
+                <span class="chip"><strong>Output</strong> 研究报告</span>
+                <span class="chip"><strong>Output</strong> 可信度评分</span>
+                <span class="chip"><strong>Output</strong> 组合建议</span>
+              </div>
+              <p class="panel-body" data-editable="loop-footer">
+                整个平台围绕“下一步要看什么、为什么看、看完以后做什么”来组织，而不是把更多信息堆到用户面前。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-title="现状">
+        <div class="slide-content">
+          <div class="frame stack">
+            <div class="stack-tight">
+              <span class="section-kicker reveal">Current Product Surface</span>
+              <h2 class="slide-title reveal delay-2" data-editable="surface-title">
+                仓库里的产品面已经不止一页，
+                <strong>而是一组可以串起来演示的工作台。</strong>
+              </h2>
+              <p class="slide-lead reveal delay-3" data-editable="surface-lead">
+                下面是当前代码里已经落地的主要表面。我们把“可演示”和“仍在补齐”的状态明确标出来，内部同步更清楚。
+              </p>
+            </div>
+
+            <div class="card-grid--three">
+              <article class="panel module-card reveal-scale delay-2">
+                <div class="panel-title">
+                  <span data-editable="module-1-title">投资决策工作台</span>
+                  <span class="status-pill status-pill--live">可演示</span>
+                </div>
+                <p class="panel-body" data-editable="module-1-body">
+                  首页聚合进行中的研究、筛选会话、组合建议和风险预算，适合做内部总览入口。
+                </p>
+              </article>
+
+              <article class="panel module-card reveal-scale delay-3">
+                <div class="panel-title">
+                  <span data-editable="module-2-title">股票筛选工作台</span>
+                  <span class="status-pill status-pill--live">可演示</span>
+                </div>
+                <p class="panel-body" data-editable="module-2-body">
+                  策略 CRUD、评分规则、筛选执行与近期会话已接入，是当前最完整的业务闭环之一。
+                </p>
+              </article>
+
+              <article class="panel module-card reveal-scale delay-4">
+                <div class="panel-title">
+                  <span data-editable="module-3-title">行业工作流</span>
+                  <span class="status-pill status-pill--live">可演示</span>
+                </div>
+                <p class="panel-body" data-editable="module-3-body">
+                  工作流运行、详情页、节点进度和事件查看都已有入口，适合展示 LangGraph 编排价值。
+                </p>
+              </article>
+
+              <article class="panel module-card reveal-scale delay-3">
+                <div class="panel-title">
+                  <span data-editable="module-4-title">择时与组合建议</span>
+                  <span class="status-pill status-pill--live">可演示</span>
+                </div>
+                <p class="panel-body" data-editable="module-4-body">
+                  建议动作、风险预算和组合快照已经能回到同一个工作台上完成判断。
+                </p>
+              </article>
+
+              <article class="panel module-card reveal-scale delay-4">
+                <div class="panel-title">
+                  <span data-editable="module-5-title">公司研究页面</span>
+                  <span class="status-pill status-pill--build">在建</span>
+                </div>
+                <p class="panel-body" data-editable="module-5-body">
+                  页面和客户端骨架已经接入，适合作为“少量核心标的深挖”的下一段落。
+                </p>
+              </article>
+
+              <article class="panel module-card reveal-scale delay-5">
+                <div class="panel-title">
+                  <span data-editable="module-6-title">自选股与会话复用</span>
+                  <span class="status-pill status-pill--gap">待补齐</span>
+                </div>
+                <p class="panel-body" data-editable="module-6-body">
+                  领域与仓储能力已在，前端闭环、历史会话一键复用和重跑仍是近期重点。
+                </p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-title="工作流">
+        <div class="slide-content">
+          <div class="frame split-even">
+            <div class="stack">
+              <span class="section-kicker reveal">LangGraph Orchestration</span>
+              <h2 class="slide-title reveal delay-2" data-editable="workflow-title">
+                `quick_industry_research`
+                已经是一个可讲故事的标准模板。
+              </h2>
+              <p class="slide-lead reveal delay-3" data-editable="workflow-lead">
+                当前仓库中已落地的标准工作流包含 5 个顺序节点，把“快速了解一个陌生行业”的动作拆成可观察、可扩展的链路。
+              </p>
+
+              <div class="workflow-grid">
+                <article class="workflow-node reveal-left delay-2">
+                  <strong>Agent 01</strong>
+                  <h3 data-editable="workflow-node-1-title">行业概览</h3>
+                  <p data-editable="workflow-node-1-body">
+                    先建立产业链、技术路线和市场规模的共同上下文。
+                  </p>
+                </article>
+
+                <article class="workflow-node reveal-left delay-3">
+                  <strong>Agent 02</strong>
+                  <h3 data-editable="workflow-node-2-title">市场热度分析</h3>
+                  <p data-editable="workflow-node-2-body">
+                    判断题材热度、催化剂与资金关注方向，不让情绪信息失控。
+                  </p>
+                </article>
+
+                <article class="workflow-node reveal-left delay-4">
+                  <strong>Agent 03</strong>
+                  <h3 data-editable="workflow-node-3-title">候选股筛选</h3>
+                  <p data-editable="workflow-node-3-body">
+                    用数据与规则缩出 5 到 10 个值得继续看的标的。
+                  </p>
+                </article>
+
+                <article class="workflow-node reveal-left delay-3">
+                  <strong>Agent 04</strong>
+                  <h3 data-editable="workflow-node-4-title">可信度评估</h3>
+                  <p data-editable="workflow-node-4-body">
+                    对热点概念逐一做证据检查和风险提示，避免“概念即逻辑”。
+                  </p>
+                </article>
+
+                <article class="workflow-node reveal-left delay-4">
+                  <strong>Agent 05</strong>
+                  <h3 data-editable="workflow-node-5-title">竞争格局总结</h3>
+                  <p data-editable="workflow-node-5-body">
+                    形成 Top Picks、竞争位置和最终研究摘要。
+                  </p>
+                </article>
+
+                <article class="workflow-node reveal-left delay-5">
+                  <strong>Runtime</strong>
+                  <h3 data-editable="workflow-node-6-title">可回放的运行明细</h3>
+                  <p data-editable="workflow-node-6-body">
+                    `WorkflowRun`、`WorkflowNodeRun` 与 `WorkflowEvent`
+                    让过程和结果都能被查看。
+                  </p>
+                </article>
+              </div>
+            </div>
+
+            <div class="stack">
+              <div class="panel reveal-scale delay-4">
+                <span class="eyebrow">What it Produces</span>
+                <h3 class="panel-title" data-editable="workflow-output-title">
+                  30 分钟内拿到一份能继续判断的行业快研包
+                </h3>
+                <div class="chip-row">
+                  <span class="chip"><strong>01</strong> 行业概览</span>
+                  <span class="chip"><strong>02</strong> 热度结论</span>
+                  <span class="chip"><strong>03</strong> 候选股</span>
+                  <span class="chip"><strong>04</strong> 风险标签</span>
+                </div>
+                <p class="panel-body" data-editable="workflow-output-body">
+                  和纯问答助手的差异在于：任务被拆成有状态的节点，平台知道自己现在执行到哪一步，用户也能看到。
+                </p>
+              </div>
+
+              <div class="panel reveal-scale delay-5">
+                <span class="eyebrow">Why it Matters</span>
+                <ul class="list-clean">
+                  <li>
+                    <span class="list-index">A</span>
+                    <div>
+                      <strong data-editable="workflow-side-1-title">适合做模板化沉淀</strong>
+                      <span data-editable="workflow-side-1-body">
+                        工作流配置存数据库后，后续可以由用户自定义、复制和微调。
+                      </span>
+                    </div>
+                  </li>
+                  <li>
+                    <span class="list-index">B</span>
+                    <div>
+                      <strong data-editable="workflow-side-2-title">适合做运行时治理</strong>
+                      <span data-editable="workflow-side-2-body">
+                        取消任务、查看进度、回看节点事件这些能力都自然成立。
+                      </span>
+                    </div>
+                  </li>
+                  <li>
+                    <span class="list-index">C</span>
+                    <div>
+                      <strong data-editable="workflow-side-3-title">适合向外扩展</strong>
+                      <span data-editable="workflow-side-3-body">
+                        后续新增公司研究、择时等链路时，结构上已经准备好了。
+                      </span>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-title="架构">
+        <div class="slide-content">
+          <div class="frame stack">
+            <div class="stack-tight">
+              <span class="section-kicker reveal">Architecture Snapshot</span>
+              <h2 class="slide-title reveal delay-2" data-editable="architecture-title">
+                技术选型不是堆叠名词，
+                <strong>而是在为“快而可控”的工作流让路。</strong>
+              </h2>
+              <p class="slide-lead reveal delay-3" data-editable="architecture-lead">
+                当前实现遵循 T3 Stack + Python FastAPI 微服务的混合架构，DDD 分层负责边界清晰，异步 Worker 负责长任务解耦。
+              </p>
+            </div>
+
+            <div class="architecture-grid">
+              <article class="panel architecture-card reveal-scale delay-2">
+                <span class="eyebrow">Surface</span>
+                <h3 class="panel-title" data-editable="arch-card-1-title">
+                  Next.js 15 + App Router
+                </h3>
+                <p class="panel-body" data-editable="arch-card-1-body">
+                  负责 UI、页面编排和登录态，首页已汇总研究、筛选和组合建议。
+                </p>
+              </article>
+
+              <article class="panel architecture-card reveal-scale delay-3">
+                <span class="eyebrow">Application</span>
+                <h3 class="panel-title" data-editable="arch-card-2-title">
+                  tRPC 作为应用层入口
+                </h3>
+                <p class="panel-body" data-editable="arch-card-2-body">
+                  Router 只做输入校验、编排和错误映射，业务逻辑不直接堆在接口层。
+                </p>
+              </article>
+
+              <article class="panel architecture-card reveal-scale delay-4">
+                <span class="eyebrow">Domain</span>
+                <h3 class="panel-title" data-editable="arch-card-3-title">
+                  DDD 限界上下文
+                </h3>
+                <p class="panel-body" data-editable="arch-card-3-body">
+                  `screening`、`workflow`、`intelligence`
+                  等边界上下文把规则、聚合和领域服务分开。
+                </p>
+              </article>
+
+              <article class="panel architecture-card reveal-scale delay-3">
+                <span class="eyebrow">Persistence</span>
+                <h3 class="panel-title" data-editable="arch-card-4-title">
+                  Prisma + PostgreSQL
+                </h3>
+                <p class="panel-body" data-editable="arch-card-4-body">
+                  已覆盖 `ScreeningStrategy`、`ScreeningSession`、`WorkflowRun`
+                  等核心模型。
+                </p>
+              </article>
+
+              <article class="panel architecture-card reveal-scale delay-4">
+                <span class="eyebrow">Runtime</span>
+                <h3 class="panel-title" data-editable="arch-card-5-title">
+                  Redis + 双 Worker
+                </h3>
+                <p class="panel-body" data-editable="arch-card-5-body">
+                  `screening-worker` 与 `workflow-worker`
+                  分别处理筛选任务和长时工作流执行。
+                </p>
+              </article>
+
+              <article class="panel architecture-card reveal-scale delay-5">
+                <span class="eyebrow">Data Gateway</span>
+                <h3 class="panel-title" data-editable="arch-card-6-title">
+                  FastAPI + AkShare
+                </h3>
+                <p class="panel-body" data-editable="arch-card-6-body">
+                  外部金融数据被收敛到基础设施层 HTTP Client，领域层不直接依赖第三方服务。
+                </p>
+              </article>
+            </div>
+
+            <div class="panel reveal delay-4">
+              <div class="chip-row">
+                <span class="chip"><strong>Rule</strong> 领域层保持纯净</span>
+                <span class="chip"><strong>Rule</strong> 应用层无状态</span>
+                <span class="chip"><strong>Rule</strong> 数据源可替换</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-title="成熟度">
+        <div class="slide-content">
+          <div class="frame split">
+            <div class="stack">
+              <span class="section-kicker reveal">Delivery Reality</span>
+              <h2 class="slide-title reveal delay-2" data-editable="readiness-title">
+                现在的状态适合内部演示，
+                <strong>下一步重心是“稳定可交付”。</strong>
+              </h2>
+              <p class="slide-lead reveal delay-3" data-editable="readiness-lead">
+                主链路已经打通，但我们对成熟度的判断保持诚实：先保证正确性和闭环，再补齐前端完备度和观测能力。
+              </p>
+
+              <div class="metric-strip reveal delay-4">
+                <div class="metric-card">
+                  <span class="metric-value">15</span>
+                  <span class="metric-label">Next.js 版本</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-value">19</span>
+                  <span class="metric-label">React 版本</span>
+                </div>
+                <div class="metric-card">
+                  <span class="metric-value">02</span>
+                  <span class="metric-label">后台 Worker</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel reveal-left delay-4">
+              <div class="eyebrow">Evidence Board</div>
+              <ul class="list-clean">
+                <li>
+                  <span class="list-index">01</span>
+                  <div>
+                    <strong data-editable="readiness-1-title">主链路已经有演示入口</strong>
+                    <span data-editable="readiness-1-body">
+                      筛选、工作流、组合建议、首页总览都已有页面与客户端实现。
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <span class="list-index">02</span>
+                  <div>
+                    <strong data-editable="readiness-2-title">工程约束已经成型</strong>
+                    <span data-editable="readiness-2-body">
+                      TypeScript 严格模式、Biome、Prisma、tRPC、NextAuth 和 Docker Compose 都已进入主仓库。
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <span class="list-index">03</span>
+                  <div>
+                    <strong data-editable="readiness-3-title">验证脚本具备基础保障</strong>
+                    <span data-editable="readiness-3-body">
+                      `npm run check`、`npm run typecheck`、`npm test`
+                      已存在，后续重点是把 TS / Python 流程统一进 CI。
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <span class="list-index">04</span>
+                  <div>
+                    <strong data-editable="readiness-4-title">短板也很明确</strong>
+                    <span data-editable="readiness-4-body">
+                      自选股前端、历史会话复用、历史指标扩展与可观测性仍是近期必须补齐的板块。
+                    </span>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-title="路线图">
+        <div class="slide-content">
+          <div class="frame stack">
+            <div class="stack-tight">
+              <span class="section-kicker reveal">Near-Term Roadmap</span>
+              <h2 class="slide-title reveal delay-2" data-editable="roadmap-title">
+                接下来的重心不是“做更多页”，
+                <strong>而是把关键闭环做扎实。</strong>
+              </h2>
+              <p class="slide-lead reveal delay-3" data-editable="roadmap-lead">
+                现有计划已经把里程碑拆得比较清楚。内部演示后，我们可以按“正确性 → 可用性 → 稳定交付”的顺序推进。
+              </p>
+            </div>
+
+            <div class="milestone-grid">
+              <article class="panel milestone-card reveal-scale delay-2">
+                <span class="milestone-step">M1 | 已完成</span>
+                <h3 class="panel-title" data-editable="milestone-1-title">
+                  正确性修复
+                </h3>
+                <ul>
+                  <li data-editable="milestone-1-item-1">执行链路同步 / 异步契约修正</li>
+                  <li data-editable="milestone-1-item-2">`null -&gt; 0` 映射失真修复</li>
+                  <li data-editable="milestone-1-item-3">失败测试恢复通过</li>
+                </ul>
+              </article>
+
+              <article class="panel milestone-card reveal-scale delay-3">
+                <span class="milestone-step">M2</span>
+                <h3 class="panel-title" data-editable="milestone-2-title">
+                  前端首版可用
+                </h3>
+                <ul>
+                  <li data-editable="milestone-2-item-1">技术指标第一批落地</li>
+                  <li data-editable="milestone-2-item-2">评分方向配置完善</li>
+                  <li data-editable="milestone-2-item-3">策略执行与会话页可稳定演示</li>
+                </ul>
+              </article>
+
+              <article class="panel milestone-card reveal-scale delay-4">
+                <span class="milestone-step">M3</span>
+                <h3 class="panel-title" data-editable="milestone-3-title">
+                  复用与批量化
+                </h3>
+                <ul>
+                  <li data-editable="milestone-3-item-1">历史会话一键复用 / 重跑</li>
+                  <li data-editable="milestone-3-item-2">自选股管理增强</li>
+                  <li data-editable="milestone-3-item-3">历史指标批量接口</li>
+                </ul>
+              </article>
+
+              <article class="panel milestone-card reveal-scale delay-5">
+                <span class="milestone-step">M4</span>
+                <h3 class="panel-title" data-editable="milestone-4-title">
+                  稳定交付
+                </h3>
+                <ul>
+                  <li data-editable="milestone-4-item-1">性能与缓存优化</li>
+                  <li data-editable="milestone-4-item-2">日志、错误码、可观测性</li>
+                  <li data-editable="milestone-4-item-3">文档完善与验收回归</li>
+                </ul>
+              </article>
+            </div>
+
+            <div class="panel reveal delay-4">
+              <p class="panel-body" data-editable="roadmap-footer">
+                内部汇报建议主线：先演示“筛选 → 行业快研 → 组合建议”的单日判断闭环，再讨论自选股和历史会话复用的优先级。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide" data-title="收束">
+        <div class="slide-content">
+          <div class="frame frame--paper stack">
+            <div class="stack-tight">
+              <span class="section-kicker reveal">Alignment</span>
+              <h2 class="slide-title reveal delay-2" data-editable="close-title">
+                这次内部演示想验证的不是“炫技”，
+                <strong>而是产品是否跑在对的轨道上。</strong>
+              </h2>
+              <p class="slide-lead reveal delay-3" data-editable="close-lead">
+                如果这条链路成立，我们就继续把平台做成投资决策的工作台；如果不成立，就尽快收缩范围，聚焦最有价值的闭环。
+              </p>
+            </div>
+
+            <div class="card-grid">
+              <article class="panel panel--paper reveal-scale delay-2">
+                <span class="eyebrow">Check 01</span>
+                <h3 class="panel-title" data-editable="close-card-1-title">
+                  演示主线是否足够清晰
+                </h3>
+                <p class="panel-body" data-editable="close-card-1-body">
+                  团队是否认同“筛选 → 快研 → 择时建议”就是目前最值得押注的演示路径。
+                </p>
+              </article>
+
+              <article class="panel panel--paper reveal-scale delay-3">
+                <span class="eyebrow">Check 02</span>
+                <h3 class="panel-title" data-editable="close-card-2-title">
+                  数据源优先级是否确定
+                </h3>
+                <p class="panel-body" data-editable="close-card-2-body">
+                  继续以 AkShare 为主打底，同时保留未来接入 iFinD / Wind 的接口反转能力。
+                </p>
+              </article>
+
+              <article class="panel panel--paper reveal-scale delay-4">
+                <span class="eyebrow">Check 03</span>
+                <h3 class="panel-title" data-editable="close-card-3-title">
+                  下一阶段要不要继续扩面
+                </h3>
+                <p class="panel-body" data-editable="close-card-3-body">
+                  先把自选股前端、会话复用和历史指标批量做扎实，再决定是否扩大更多模块。
+                </p>
+              </article>
+
+              <article class="panel panel--paper reveal-scale delay-5">
+                <span class="eyebrow">Takeaway</span>
+                <h3 class="panel-title" data-editable="close-card-4-title">
+                  让投研判断更像运营工作流
+                </h3>
+                <p class="panel-body" data-editable="close-card-4-body">
+                  而不是继续在信息洪水里冲浪。平台的价值，最终体现在“更快地知道该看什么”。
+                </p>
+              </article>
+            </div>
+
+            <div class="chip-row reveal delay-4">
+              <span class="chip"><strong>E</strong> 开启编辑模式</span>
+              <span class="chip"><strong>Ctrl+S</strong> 保存本地改字</span>
+              <span class="chip"><strong>Export</strong> 导出当前版本</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <script>
+      class SlidePresentation {
+        constructor() {
+          this.slides = Array.from(document.querySelectorAll(".slide"));
+          this.progressBar = document.getElementById("progressBar");
+          this.navDotsRoot = document.getElementById("navDots");
+          this.currentSlide = 0;
+          this.isWheelLocked = false;
+          this.prefersReducedMotion = window.matchMedia(
+            "(prefers-reduced-motion: reduce)",
+          ).matches;
+          this.touchStartY = 0;
+          this.touchEndY = 0;
+
+          this.setupIntersectionObserver();
+          this.setupNavDots();
+          this.setupKeyboardNav();
+          this.setupWheelNav();
+          this.setupTouchNav();
+          this.setupScrollTracking();
+          this.updateUI();
+        }
+
+        scrollToSlide(index) {
+          const boundedIndex = Math.max(0, Math.min(index, this.slides.length - 1));
+          this.slides[boundedIndex].scrollIntoView({
+            behavior: this.prefersReducedMotion ? "auto" : "smooth",
+            block: "start",
+          });
+        }
+
+        setupIntersectionObserver() {
+          const observer = new IntersectionObserver(
+            (entries) => {
+              for (const entry of entries) {
+                if (!entry.isIntersecting) {
+                  continue;
+                }
+
+                const index = this.slides.indexOf(entry.target);
+                if (index >= 0) {
+                  this.currentSlide = index;
+                  entry.target.classList.add("visible");
+                  this.updateUI();
+                }
+              }
+            },
+            {
+              threshold: 0.6,
+            },
+          );
+
+          this.slides.forEach((slide) => observer.observe(slide));
+        }
+
+        setupNavDots() {
+          const fragment = document.createDocumentFragment();
+
+          this.slides.forEach((slide, index) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "nav-dot";
+            button.setAttribute(
+              "aria-label",
+              `跳转到第 ${index + 1} 页：${slide.dataset.title ?? "未命名"}`,
+            );
+            button.title = slide.dataset.title ?? `第 ${index + 1} 页`;
+            button.addEventListener("click", () => this.scrollToSlide(index));
+            fragment.appendChild(button);
+          });
+
+          this.navDotsRoot.appendChild(fragment);
+          this.navDots = Array.from(this.navDotsRoot.querySelectorAll(".nav-dot"));
+        }
+
+        setupKeyboardNav() {
+          document.addEventListener("keydown", (event) => {
+            const target = event.target;
+            const isEditingText =
+              target instanceof HTMLElement &&
+              target.getAttribute("contenteditable") === "true";
+
+            if (isEditingText) {
+              return;
+            }
+
+            const key = event.key;
+            if (["ArrowDown", "ArrowRight", "PageDown", " "].includes(key)) {
+              event.preventDefault();
+              this.scrollToSlide(this.currentSlide + 1);
+            }
+
+            if (["ArrowUp", "ArrowLeft", "PageUp"].includes(key)) {
+              event.preventDefault();
+              this.scrollToSlide(this.currentSlide - 1);
+            }
+
+            if (key === "Home") {
+              event.preventDefault();
+              this.scrollToSlide(0);
+            }
+
+            if (key === "End") {
+              event.preventDefault();
+              this.scrollToSlide(this.slides.length - 1);
+            }
+          });
+        }
+
+        setupWheelNav() {
+          window.addEventListener(
+            "wheel",
+            (event) => {
+              const editableTarget = event.target;
+              const isEditingText =
+                editableTarget instanceof HTMLElement &&
+                editableTarget.closest("[contenteditable='true']");
+
+              if (isEditingText || this.isWheelLocked || Math.abs(event.deltaY) < 35) {
+                return;
+              }
+
+              this.isWheelLocked = true;
+              window.setTimeout(() => {
+                this.isWheelLocked = false;
+              }, 720);
+
+              if (event.deltaY > 0) {
+                this.scrollToSlide(this.currentSlide + 1);
+              } else {
+                this.scrollToSlide(this.currentSlide - 1);
+              }
+            },
+            { passive: true },
+          );
+        }
+
+        setupTouchNav() {
+          window.addEventListener(
+            "touchstart",
+            (event) => {
+              this.touchStartY = event.changedTouches[0]?.screenY ?? 0;
+            },
+            { passive: true },
+          );
+
+          window.addEventListener(
+            "touchend",
+            (event) => {
+              this.touchEndY = event.changedTouches[0]?.screenY ?? 0;
+              const distance = this.touchStartY - this.touchEndY;
+
+              if (Math.abs(distance) < 60) {
+                return;
+              }
+
+              if (distance > 0) {
+                this.scrollToSlide(this.currentSlide + 1);
+              } else {
+                this.scrollToSlide(this.currentSlide - 1);
+              }
+            },
+            { passive: true },
+          );
+        }
+
+        setupScrollTracking() {
+          window.addEventListener(
+            "scroll",
+            () => {
+              this.updateProgress();
+              this.updateActiveSlideByViewport();
+            },
+            { passive: true },
+          );
+
+          window.addEventListener("resize", () => {
+            this.updateProgress();
+            this.updateActiveSlideByViewport();
+          });
+        }
+
+        updateActiveSlideByViewport() {
+          const viewportMiddle = window.innerHeight * 0.5;
+          let bestIndex = 0;
+          let bestDistance = Number.POSITIVE_INFINITY;
+
+          this.slides.forEach((slide, index) => {
+            const rect = slide.getBoundingClientRect();
+            const distance = Math.abs(rect.top + rect.height / 2 - viewportMiddle);
+
+            if (distance < bestDistance) {
+              bestDistance = distance;
+              bestIndex = index;
+            }
+          });
+
+          this.currentSlide = bestIndex;
+          this.updateUI();
+        }
+
+        updateProgress() {
+          const maxScroll = document.body.scrollHeight - window.innerHeight;
+          const ratio = maxScroll > 0 ? window.scrollY / maxScroll : 0;
+          this.progressBar.style.width = `${Math.min(Math.max(ratio, 0), 1) * 100}%`;
+        }
+
+        updateUI() {
+          this.updateProgress();
+
+          if (!this.navDots) {
+            return;
+          }
+
+          this.navDots.forEach((dot, index) => {
+            dot.classList.toggle("active", index === this.currentSlide);
+          });
+        }
+      }
+
+      class InlineEditor {
+        constructor() {
+          this.storageKey = "stock-screening-boost-internal-demo-slides";
+          this.editables = Array.from(document.querySelectorAll("[data-editable]"));
+          this.editToggle = document.getElementById("editToggle");
+          this.exportToggle = document.getElementById("exportToggle");
+          this.hotzone = document.querySelector(".edit-hotzone");
+          this.statusToast = document.getElementById("statusToast");
+          this.isActive = false;
+          this.hideTimeout = null;
+          this.toastTimeout = null;
+
+          this.ensureEditableIds();
+          this.load();
+          this.setupToggle();
+          this.setupEditHandlers();
+          this.setupKeyboardShortcut();
+          this.setupExport();
+        }
+
+        ensureEditableIds() {
+          this.editables.forEach((element, index) => {
+            if (!element.dataset.editableId) {
+              element.dataset.editableId =
+                element.getAttribute("data-editable") ?? `editable-${index + 1}`;
+            }
+          });
+        }
+        setupToggle() {
+          this.editToggle.addEventListener("click", () => this.toggleEditMode());
+
+          this.hotzone.addEventListener("mouseenter", () => {
+            window.clearTimeout(this.hideTimeout);
+            this.editToggle.classList.add("show");
+          });
+
+          this.hotzone.addEventListener("mouseleave", () => {
+            this.queueHideControls();
+          });
+
+          this.editToggle.addEventListener("mouseenter", () => {
+            window.clearTimeout(this.hideTimeout);
+          });
+
+          this.editToggle.addEventListener("mouseleave", () => {
+            this.queueHideControls();
+          });
+
+          this.exportToggle.addEventListener("mouseenter", () => {
+            window.clearTimeout(this.hideTimeout);
+          });
+
+          this.exportToggle.addEventListener("mouseleave", () => {
+            this.queueHideControls();
+          });
+
+          this.hotzone.addEventListener("click", () => this.toggleEditMode());
+        }
+
+        queueHideControls() {
+          this.hideTimeout = window.setTimeout(() => {
+            if (!this.isActive) {
+              this.editToggle.classList.remove("show");
+              this.exportToggle.classList.remove("export-visible");
+            }
+          }, 400);
+        }
+
+        setupEditHandlers() {
+          this.editables.forEach((element) => {
+            element.addEventListener("input", () => this.save());
+            element.addEventListener("blur", () => this.save());
+          });
+        }
+
+        setupKeyboardShortcut() {
+          document.addEventListener("keydown", (event) => {
+            const target = event.target;
+            const isEditableTarget =
+              target instanceof HTMLElement &&
+              target.getAttribute("contenteditable") === "true";
+
+            if ((event.key === "e" || event.key === "E") && !isEditableTarget) {
+              event.preventDefault();
+              this.toggleEditMode();
+            }
+
+            if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+              event.preventDefault();
+              this.save();
+              this.showToast("文案已保存到浏览器本地存储。");
+            }
+          });
+        }
+
+        setupExport() {
+          this.exportToggle.addEventListener("click", () => {
+            this.exportHtml();
+          });
+        }
+
+        toggleEditMode() {
+          this.isActive = !this.isActive;
+          document.body.classList.toggle("editing", this.isActive);
+          this.editToggle.classList.toggle("active", this.isActive);
+          this.editToggle.classList.add("show");
+          this.exportToggle.classList.toggle("export-visible", this.isActive);
+
+          this.editables.forEach((element) => {
+            element.setAttribute("contenteditable", this.isActive ? "true" : "false");
+          });
+
+          if (this.isActive) {
+            this.showToast("编辑模式已开启。直接点文案改字，Ctrl+S 保存。");
+          } else {
+            this.editables.forEach((element) => element.blur());
+            this.save();
+            this.showToast("编辑模式已关闭。");
+          }
+        }
+
+        save() {
+          const payload = {};
+          this.editables.forEach((element) => {
+            payload[element.dataset.editableId] = element.innerHTML;
+          });
+          localStorage.setItem(this.storageKey, JSON.stringify(payload));
+        }
+
+        load() {
+          const saved = localStorage.getItem(this.storageKey);
+          if (!saved) {
+            return;
+          }
+
+          try {
+            const payload = JSON.parse(saved);
+            this.editables.forEach((element) => {
+              const key = element.dataset.editableId;
+              if (payload[key]) {
+                element.innerHTML = payload[key];
+              }
+            });
+          } catch {
+            this.showToast("本地缓存读取失败，已忽略旧数据。");
+          }
+        }
+
+        exportHtml() {
+          this.save();
+
+          const clone = document.documentElement.cloneNode(true);
+          clone.querySelectorAll("[contenteditable]").forEach((element) => {
+            element.removeAttribute("contenteditable");
+          });
+          clone.querySelector("body")?.classList.remove("editing");
+
+          const html = `<!DOCTYPE html>\n${clone.outerHTML}`;
+          const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "internal-demo-slides.custom.html";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          this.showToast("已导出当前修改后的 HTML。");
+        }
+
+        showToast(message) {
+          this.statusToast.textContent = message;
+          this.statusToast.classList.add("visible");
+          window.clearTimeout(this.toastTimeout);
+          this.toastTimeout = window.setTimeout(() => {
+            this.statusToast.classList.remove("visible");
+          }, 2200);
+        }
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        new SlidePresentation();
+        new InlineEditor();
+      });
+    </script>
+  </body>
+</html>
