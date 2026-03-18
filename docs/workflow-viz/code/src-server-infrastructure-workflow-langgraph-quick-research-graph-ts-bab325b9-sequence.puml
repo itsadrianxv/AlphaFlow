@@ -1,0 +1,19 @@
+@startuml
+title quick-research-graph.ts - Sequence
+autonumber
+
+actor Caller
+participant "buildInitialState" as Entry
+participant "QuickResearchWorkflowService" as WorkflowService
+participant "Runtime Config" as RuntimeConfig
+
+Caller -> Entry : normalize input(query, preferences, taskContract)
+Entry -> RuntimeConfig : resolveResearchRuntimeConfig(graphConfig)
+Entry --> Caller : QuickResearchGraphState
+Caller -> WorkflowService : buildTaskContract / buildBrief / planUnits
+WorkflowService --> Caller : researchUnits + brief + contract
+Caller -> WorkflowService : executeUnits / runGapAnalysis
+WorkflowService --> Caller : findings + gap snapshot
+Caller -> WorkflowService : finalizeReport
+WorkflowService --> Caller : finalReport + reflection
+@enduml

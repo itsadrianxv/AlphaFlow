@@ -1,0 +1,16 @@
+@startuml
+title graph-registry.ts - Sequence
+autonumber
+
+actor Caller
+participant "WorkflowGraphRegistry.get" as Entry
+participant "graphsByVersion" as VersionMap
+participant "graphsByCode" as DefaultMap
+
+Caller -> Entry : get(templateCode, templateVersion)
+Entry -> VersionMap : lookup explicit version
+VersionMap --> Entry : graph or miss
+Entry -> DefaultMap : fallback by templateCode
+DefaultMap --> Entry : latest graph for code
+Entry --> Caller : WorkflowGraphRunner
+@enduml

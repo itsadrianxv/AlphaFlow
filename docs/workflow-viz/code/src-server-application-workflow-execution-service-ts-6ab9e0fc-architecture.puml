@@ -1,0 +1,26 @@
+@startuml
+title execution-service.ts - Architecture
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+package "Runtime Executor" {
+  component "executeRun" as entrypoint
+}
+
+package "Key Collaborators" {
+  component "PrismaWorkflowRunRepository" as dep_a
+  component "RedisWorkflowRuntimeStore" as dep_b
+  component "WorkflowGraphRegistry" as dep_c
+  component "WorkflowGraphRunner" as dep_d
+}
+
+entrypoint --> dep_a : read / update run state
+entrypoint --> dep_b : load / save checkpoint
+entrypoint --> dep_c : resolve graph
+entrypoint --> dep_d : execute nodes with hooks
+
+note bottom of entrypoint
+Source: src/server/application/workflow/execution-service.ts
+Focus: claim, recover, execute, pause, cancel, finish
+end note
+@enduml

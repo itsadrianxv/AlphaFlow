@@ -1,0 +1,26 @@
+@startuml
+title quick-research-graph.ts - Architecture
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+package "Graph Entry" {
+  component "QuickResearchContractLangGraph" as entrypoint
+}
+
+package "Key Collaborators" {
+  component "QuickResearchWorkflowService" as dep_a
+  component "IntelligenceAgentService" as dep_b
+  component "resolveResearchRuntimeConfig" as dep_c
+  component "BaseWorkflowLangGraph" as dep_d
+}
+
+entrypoint --> dep_a : plan / execute / finalize
+entrypoint --> dep_b : support legacy v1 graph
+entrypoint --> dep_c : derive runtime config
+entrypoint --> dep_d : inherit graph lifecycle helpers
+
+note bottom of entrypoint
+Source: src/server/infrastructure/workflow/langgraph/quick-research-graph.ts
+Focus: state model plus v1/v2/v3 research graphs
+end note
+@enduml

@@ -1,0 +1,16 @@
+@startuml
+title workflow.ts - Sequence
+autonumber
+
+actor Caller
+participant "startQuickResearch" as Entry
+participant "PrismaWorkflowRunRepository" as Repository
+participant "WorkflowCommandService" as CommandService
+
+Caller -> Entry : mutate(query, researchPreferences, taskContract)
+Entry -> Repository : new(ctx.db)
+Entry -> CommandService : new(repository)
+Entry -> CommandService : startQuickResearch(command)
+CommandService --> Entry : runId / status / createdAt
+Entry --> Caller : mutation result
+@enduml

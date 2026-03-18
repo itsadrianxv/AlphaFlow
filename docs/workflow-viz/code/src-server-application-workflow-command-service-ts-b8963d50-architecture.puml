@@ -1,0 +1,24 @@
+@startuml
+title command-service.ts - Architecture
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+package "Application Service" {
+  component "startWorkflow" as entrypoint
+}
+
+package "Key Collaborators" {
+  component "PrismaWorkflowRunRepository" as dep_a
+  component "RedisWorkflowRuntimeStore" as dep_b
+  component "getWorkflowNodeKeysFromGraphConfig" as dep_c
+}
+
+entrypoint --> dep_a : load template / create run
+entrypoint --> dep_c : extract node keys
+entrypoint --> dep_b : publish latest event on resume
+
+note bottom of entrypoint
+Source: src/server/application/workflow/command-service.ts
+Focus: idempotency, template fallback, run creation
+end note
+@enduml

@@ -1,0 +1,13 @@
+@startuml
+title quick-research-graph.ts - 数据/依赖流图
+skinparam shadowing false
+
+rectangle "Input" as Input
+rectangle "toResearchPreferences" as Core
+rectangle "Intermediate transform" as Mid
+rectangle "Output" as Output
+
+Input --> Core : consume
+Core --> Mid : transform
+Mid --> Output : emit / persist
+@enduml

@@ -1,0 +1,19 @@
+@startuml
+title command-service.ts - Sequence
+autonumber
+
+actor Caller
+participant "startQuickResearch" as Entry
+participant "startWorkflow" as WorkflowCore
+participant "PrismaWorkflowRunRepository" as Repository
+participant "GraphConfig Parser" as GraphConfig
+
+Caller -> Entry : startQuickResearch(command)
+Entry -> WorkflowCore : startWorkflow(normalized command)
+WorkflowCore -> Repository : findPendingOrRunningByIdempotency(...)
+WorkflowCore -> Repository : ensureQuickResearchTemplate()
+WorkflowCore -> GraphConfig : getWorkflowNodeKeysFromGraphConfig(graphConfig)
+WorkflowCore -> Repository : createRun(...)
+WorkflowCore --> Entry : runId / status / createdAt
+Entry --> Caller : workflow accepted
+@enduml

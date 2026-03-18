@@ -1,0 +1,9 @@
+@startuml
+title command-service.ts - 状态图
+[*] --> Initial
+Initial --> Active : start / activate
+Active --> Waiting : pause / await
+Waiting --> Active : resume / retry
+Active --> Completed : finish / stop
+Completed --> [*]
+@enduml

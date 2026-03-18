@@ -1,0 +1,14 @@
+@startuml
+title graph-registry.ts - 主流程活动图
+start
+:enter buildGraphKey;
+:load input/context;
+:run main orchestration steps;
+if (guard or branch?) then (yes)
+  :take conditional path;
+else (no)
+  :continue main path;
+endif
+:return result or side effect;
+stop
+@enduml

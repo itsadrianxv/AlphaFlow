@@ -1,0 +1,24 @@
+@startuml
+title workflow.ts - Architecture
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+package "Entry Layer" {
+  component "startQuickResearch" as entrypoint
+}
+
+package "Key Collaborators" {
+  component "WorkflowCommandService" as dep_a
+  component "PrismaWorkflowRunRepository" as dep_b
+  component "mapWorkflowError" as dep_c
+}
+
+entrypoint --> dep_b : create repository
+entrypoint --> dep_a : delegate command
+entrypoint --> dep_c : normalize failures
+
+note bottom of entrypoint
+Source: src/server/api/routers/workflow.ts
+Focus: auth, input validation, service wiring
+end note
+@enduml

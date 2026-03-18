@@ -1,0 +1,21 @@
+@startuml
+title execution-service.ts - Sequence
+autonumber
+
+actor Worker
+participant "executeRun" as Entry
+participant "PrismaWorkflowRunRepository" as Repository
+participant "RedisWorkflowRuntimeStore" as RuntimeStore
+participant "WorkflowGraphRegistry" as Registry
+participant "WorkflowGraphRunner" as Graph
+
+Worker -> Entry : executeRun(runId, workerId, recovering)
+Entry -> Repository : getRunById(runId)
+Entry -> Registry : get(templateCode, templateVersion)
+Entry -> RuntimeStore : loadCheckpoint(runId)
+Entry -> Graph : buildInitialState(...) or reuse checkpoint
+Entry -> Graph : execute(initialState, hooks)
+Entry -> Repository : mark node / run transitions
+Entry -> RuntimeStore : save or clear checkpoint
+Entry --> Worker : execution completed
+@enduml

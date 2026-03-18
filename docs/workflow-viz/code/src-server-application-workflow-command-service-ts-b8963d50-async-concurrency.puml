@@ -1,0 +1,17 @@
+@startuml
+title command-service.ts - 异步/并发图
+autonumber
+
+participant "Trigger" as Trigger
+participant "cancelRun" as Workflow
+participant "Async worker / queue" as Worker
+
+Trigger -> Workflow : fire / enqueue
+activate Workflow
+Workflow -> Worker : dispatch async job
+activate Worker
+Worker --> Workflow : callback / result / signal
+deactivate Worker
+Workflow --> Trigger : complete / ack
+deactivate Workflow
+@enduml

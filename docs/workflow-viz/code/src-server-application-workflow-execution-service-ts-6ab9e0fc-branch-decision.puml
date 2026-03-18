@@ -1,0 +1,13 @@
+@startuml
+title execution-service.ts - 分支判定图
+start
+:enter branching logic;
+if (primary guard?) then (yes)
+  :run guarded path;
+elseif (secondary condition?)
+  :run fallback or alternate path;
+else
+  :exit early or continue default path;
+endif
+stop
+@enduml

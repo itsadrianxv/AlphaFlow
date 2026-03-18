@@ -1,0 +1,24 @@
+@startuml
+title graph-registry.ts - Architecture
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+package "Registry" {
+  component "get" as entrypoint
+}
+
+package "Key Collaborators" {
+  component "graphsByVersion" as dep_a
+  component "graphsByCode" as dep_b
+  component "WorkflowDomainError" as dep_c
+}
+
+entrypoint --> dep_a : explicit version lookup
+entrypoint --> dep_b : fallback to latest by code
+entrypoint --> dep_c : fail when code is missing
+
+note bottom of entrypoint
+Source: src/server/infrastructure/workflow/langgraph/graph-registry.ts
+Focus: code/version to graph runner resolution
+end note
+@enduml
