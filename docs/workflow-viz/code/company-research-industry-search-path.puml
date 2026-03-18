@@ -1,0 +1,46 @@
+@startuml
+!theme materia
+skinparam defaultFontColor #FFFFFF
+skinparam ArrowColor #FFFFFF
+skinparam LineColor #FFFFFF
+skinparam PackageBorderColor #FFFFFF
+skinparam RectangleBorderColor #FFFFFF
+skinparam ComponentBorderColor #FFFFFF
+skinparam SequenceArrowColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #FFFFFF
+skinparam SequenceParticipantBorderColor #FFFFFF
+skinparam SequenceParticipantFontColor #FFFFFF
+skinparam ActivityBorderColor #FFFFFF
+skinparam ActivityFontColor #FFFFFF
+skinparam ActivityDiamondBorderColor #FFFFFF
+skinparam ActivityDiamondFontColor #FFFFFF
+skinparam StateBorderColor #FFFFFF
+skinparam StateFontColor #FFFFFF
+title industry_search 实际执行链路
+
+autonumber
+
+participant "research-workflow-kernel\nplanResearchUnits" as Kernel
+participant "CompanyResearchContractLangGraph\ncollector_industry_sources" as Graph
+participant "CompanyResearchWorkflowService\nexecuteCollectorUnit" as Workflow
+participant "ResearchToolRegistry\nsearchWeb" as Registry
+participant "CompanyResearchAgentService\ncurateEvidence" as Agent
+
+Kernel -> Graph : 返回 researchUnits\n包含 industry_landscape / industry_search
+Graph -> Workflow : executeCollectorUnit(unit=industry_search)
+activate Workflow
+Workflow -> Workflow : runCollectorUnit()
+Workflow -> Workflow : buildCollectorQueries()\n映射为 collectorKey=industry_sources
+Workflow -> Registry : searchWeb(queries, runtimeConfig)
+activate Registry
+Registry --> Workflow : ResearchWebDocument[]
+deactivate Registry
+Workflow --> Graph : collectedEvidenceByCollector.industry_sources
+deactivate Workflow
+
+Graph -> Agent : curateEvidence(collectedEvidenceByCollector,\ncollectorRunInfo, collectionNotes)
+activate Agent
+Agent -> Agent : 去重、打分、裁剪、生成 references
+Agent --> Graph : evidence + references + collectionSummary
+deactivate Agent
+@enduml

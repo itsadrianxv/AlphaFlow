@@ -1,0 +1,60 @@
+@startuml
+!theme materia
+skinparam defaultFontColor #FFFFFF
+skinparam ArrowColor #FFFFFF
+skinparam LineColor #FFFFFF
+skinparam PackageBorderColor #FFFFFF
+skinparam RectangleBorderColor #FFFFFF
+skinparam ComponentBorderColor #FFFFFF
+skinparam SequenceArrowColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #FFFFFF
+skinparam SequenceParticipantBorderColor #FFFFFF
+skinparam SequenceParticipantFontColor #FFFFFF
+skinparam ActivityBorderColor #FFFFFF
+skinparam ActivityFontColor #FFFFFF
+skinparam ActivityDiamondBorderColor #FFFFFF
+skinparam ActivityDiamondFontColor #FFFFFF
+skinparam StateBorderColor #FFFFFF
+skinparam StateFontColor #FFFFFF
+title 公司研究 V4 主路径
+
+start
+:execution-service 注册多代图;
+:优先关注 CompanyResearchContractLangGraph (V4);
+:agent0_clarify_scope;
+if (需要补充研究范围?) then (是)
+  :抛出 WorkflowPauseError;
+  stop
+else (否)
+endif
+:agent1_write_research_brief\n生成 taskContract + researchBrief;
+:agent2_plan_research_units\n规划 researchUnits / deepQuestions;
+:agent3_source_grounding\n准备 groundedSources;
+
+fork
+  :collector_official_sources;
+  :executeCollectorUnit(official_search);
+fork again
+  :collector_financial_sources;
+  :executeCollectorUnit(financial_pack);
+fork again
+  :collector_news_sources;
+  :executeCollectorUnit(news_search);
+fork again
+  :collector_industry_sources;
+  :executeCollectorUnit(industry_search);
+end fork
+
+:agent4_synthesis\ncurateEvidence 汇总证据;
+:agent5_gap_analysis_and_replan;
+if (还有材料空洞?) then (是)
+  :runGapLoop 追加 follow-up units;
+  :再次执行 executeUnits;
+else (否)
+endif
+:agent6_compress_findings;
+:agent7_reference_enrichment;
+:agent8_finalize_report;
+:agent9_reflection;
+stop
+@enduml

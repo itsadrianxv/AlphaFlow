@@ -1,0 +1,35 @@
+@startuml
+!theme materia
+skinparam defaultFontColor #FFFFFF
+skinparam ArrowColor #FFFFFF
+skinparam LineColor #FFFFFF
+skinparam PackageBorderColor #FFFFFF
+skinparam RectangleBorderColor #FFFFFF
+skinparam ComponentBorderColor #FFFFFF
+skinparam SequenceArrowColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #FFFFFF
+skinparam SequenceParticipantBorderColor #FFFFFF
+skinparam SequenceParticipantFontColor #FFFFFF
+skinparam ActivityBorderColor #FFFFFF
+skinparam ActivityFontColor #FFFFFF
+skinparam ActivityDiamondBorderColor #FFFFFF
+skinparam ActivityDiamondFontColor #FFFFFF
+skinparam StateBorderColor #FFFFFF
+skinparam StateFontColor #FFFFFF
+title 依赖职责图
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+rectangle "主入口 scoreStocks" as entry
+rectangle "输入校验依赖" as validate
+rectangle "流程编排依赖" as orchestrate
+rectangle "状态记录依赖" as state
+rectangle "输出组装依赖" as output
+
+entry --> validate : 校验输入
+entry --> orchestrate : 触发主流程
+entry --> state : 记录状态
+entry --> output : 组装输出
+orchestrate --> state : 同步进度
+output --> entry : 返回结果
+@enduml

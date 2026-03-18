@@ -1,0 +1,30 @@
+@startuml
+!theme materia
+skinparam defaultFontColor #FFFFFF
+skinparam ArrowColor #FFFFFF
+skinparam LineColor #FFFFFF
+skinparam PackageBorderColor #FFFFFF
+skinparam RectangleBorderColor #FFFFFF
+skinparam ComponentBorderColor #FFFFFF
+skinparam SequenceArrowColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #FFFFFF
+skinparam SequenceParticipantBorderColor #FFFFFF
+skinparam SequenceParticipantFontColor #FFFFFF
+skinparam ActivityBorderColor #FFFFFF
+skinparam ActivityFontColor #FFFFFF
+skinparam ActivityDiamondBorderColor #FFFFFF
+skinparam ActivityDiamondFontColor #FFFFFF
+skinparam StateBorderColor #FFFFFF
+skinparam StateFontColor #FFFFFF
+title 数据/依赖流图
+skinparam shadowing false
+
+rectangle "输入数据" as Input
+rectangle "入口处理 canonicalizeUrl" as Core
+rectangle "中间变换" as Mid
+rectangle "输出结果" as Output
+
+Input --> Core : 接收
+Core --> Mid : 转换
+Mid --> Output : 产出
+@enduml

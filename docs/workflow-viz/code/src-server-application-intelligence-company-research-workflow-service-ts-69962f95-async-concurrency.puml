@@ -1,0 +1,34 @@
+@startuml
+!theme materia
+skinparam defaultFontColor #FFFFFF
+skinparam ArrowColor #FFFFFF
+skinparam LineColor #FFFFFF
+skinparam PackageBorderColor #FFFFFF
+skinparam RectangleBorderColor #FFFFFF
+skinparam ComponentBorderColor #FFFFFF
+skinparam SequenceArrowColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #FFFFFF
+skinparam SequenceParticipantBorderColor #FFFFFF
+skinparam SequenceParticipantFontColor #FFFFFF
+skinparam ActivityBorderColor #FFFFFF
+skinparam ActivityFontColor #FFFFFF
+skinparam ActivityDiamondBorderColor #FFFFFF
+skinparam ActivityDiamondFontColor #FFFFFF
+skinparam StateBorderColor #FFFFFF
+skinparam StateFontColor #FFFFFF
+title 异步/并发图
+autonumber
+
+participant "触发方" as Trigger
+participant "入口函数 uniqueStrings" as Workflow
+participant "异步执行单元" as Worker
+
+Trigger -> Workflow : 发起异步任务
+activate Workflow
+Workflow -> Worker : 分派并发动作
+activate Worker
+Worker --> Workflow : 回传结果或信号
+deactivate Worker
+Workflow --> Trigger : 返回确认结果
+deactivate Workflow
+@enduml

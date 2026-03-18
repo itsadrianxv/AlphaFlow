@@ -1,0 +1,34 @@
+@startuml
+!theme materia
+skinparam defaultFontColor #FFFFFF
+skinparam ArrowColor #FFFFFF
+skinparam LineColor #FFFFFF
+skinparam PackageBorderColor #FFFFFF
+skinparam RectangleBorderColor #FFFFFF
+skinparam ComponentBorderColor #FFFFFF
+skinparam SequenceArrowColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #FFFFFF
+skinparam SequenceParticipantBorderColor #FFFFFF
+skinparam SequenceParticipantFontColor #FFFFFF
+skinparam ActivityBorderColor #FFFFFF
+skinparam ActivityFontColor #FFFFFF
+skinparam ActivityDiamondBorderColor #FFFFFF
+skinparam ActivityDiamondFontColor #FFFFFF
+skinparam StateBorderColor #FFFFFF
+skinparam StateFontColor #FFFFFF
+title 架构总览图
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+rectangle "外部调用方" as caller
+rectangle "入口函数 enqueueStrategyExecution" as entrypoint
+rectangle "上游上下文" as upstream
+rectangle "下游协作者" as downstream
+rectangle "外部资源" as external
+
+caller --> entrypoint : 发起请求
+upstream --> entrypoint : 提供上下文
+entrypoint --> downstream : 分派关键动作
+entrypoint --> external : 读写外部资源
+entrypoint --> caller : 返回结果
+@enduml
