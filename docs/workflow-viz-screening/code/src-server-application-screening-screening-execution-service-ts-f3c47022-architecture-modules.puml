@@ -1,0 +1,34 @@
+@startuml
+!theme materia
+skinparam defaultFontColor #FFFFFF
+skinparam ArrowColor #FFFFFF
+skinparam LineColor #FFFFFF
+skinparam PackageBorderColor #FFFFFF
+skinparam RectangleBorderColor #FFFFFF
+skinparam ComponentBorderColor #FFFFFF
+skinparam SequenceArrowColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #FFFFFF
+skinparam SequenceParticipantBorderColor #FFFFFF
+skinparam SequenceParticipantFontColor #FFFFFF
+skinparam ActivityBorderColor #FFFFFF
+skinparam ActivityFontColor #FFFFFF
+skinparam ActivityDiamondBorderColor #FFFFFF
+skinparam ActivityDiamondFontColor #FFFFFF
+skinparam StateBorderColor #FFFFFF
+skinparam StateFontColor #FFFFFF
+title 模块拆解图
+skinparam shadowing false
+skinparam componentStyle rectangle
+
+package "热点文件内部模块" {
+  component "入口协调 enqueueStrategyExecution" as entry
+  component "规则判定层" as rules
+  component "协作编排层" as orchestration
+  component "结果收束层" as result
+}
+
+entry --> rules : 读取输入
+rules --> orchestration : 选择路径
+orchestration --> result : 汇总结果
+result --> entry : 回传结论
+@enduml

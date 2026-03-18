@@ -1,0 +1,33 @@
+@startuml
+!theme materia
+skinparam defaultFontColor #FFFFFF
+skinparam ArrowColor #FFFFFF
+skinparam LineColor #FFFFFF
+skinparam PackageBorderColor #FFFFFF
+skinparam RectangleBorderColor #FFFFFF
+skinparam ComponentBorderColor #FFFFFF
+skinparam SequenceArrowColor #FFFFFF
+skinparam SequenceLifeLineBorderColor #FFFFFF
+skinparam SequenceParticipantBorderColor #FFFFFF
+skinparam SequenceParticipantFontColor #FFFFFF
+skinparam ActivityBorderColor #FFFFFF
+skinparam ActivityFontColor #FFFFFF
+skinparam ActivityDiamondBorderColor #FFFFFF
+skinparam ActivityDiamondFontColor #FFFFFF
+skinparam StateBorderColor #FFFFFF
+skinparam StateFontColor #FFFFFF
+title 协作顺序图
+autonumber
+
+actor "发起方" as Caller
+participant "入口函数 enqueueStrategyExecution" as Entry
+participant "关键协作者甲" as DepA
+participant "关键协作者乙" as DepB
+
+Caller -> Entry : 发起调用
+Entry -> DepA : 请求步骤一
+DepA --> Entry : 返回阶段结果
+Entry -> DepB : 请求步骤二
+DepB --> Entry : 返回阶段结果
+Entry --> Caller : 返回完成结果
+@enduml
