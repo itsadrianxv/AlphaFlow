@@ -73,6 +73,8 @@ _TRANSIENT_AKSHARE_ERROR_MARKERS = (
     "chunkedencodingerror",
     "protocolerror",
 )
+_GENERIC_AUTO_MATCH_KEYS = {"ai", "人工智能", "aigc"}
+_CONCEPT_KEY_SPLIT_PATTERN = re.compile(r"[\s()（）\[\]【】,，、;；:：/\\|+&\-]+")
 
 
 @dataclass
@@ -197,7 +199,7 @@ class IntelligenceDataAdapter:
         candidates = _fetch_candidates_from_akshare(
             normalized_theme,
             normalized_limit,
-            allow_spot_fallback=True,
+            allow_spot_fallback=False,
         )
         if candidates:
             return candidates
@@ -904,6 +906,11 @@ def _select_concepts_with_source(theme: str, top_n: int) -> tuple[list[dict], st
         if whitelist_rows:
             return whitelist_rows[:normalized_top_n], _CONCEPT_MATCH_SOURCE_WHITELIST
 
+    auto_rows = _match_by_auto(theme=theme, all_rows=all_rows, limit=max(6, normalized_top_n))
+    auto_rows = _apply_blacklist_filter(auto_rows, blacklist)
+    if auto_rows:
+        return auto_rows[:normalized_top_n], _CONCEPT_MATCH_SOURCE_AUTO
+
     zhipu_rows = _match_by_zhipu(
         theme=theme,
         all_rows=all_rows,
@@ -913,9 +920,7 @@ def _select_concepts_with_source(theme: str, top_n: int) -> tuple[list[dict], st
     if zhipu_rows:
         return zhipu_rows[:normalized_top_n], _CONCEPT_MATCH_SOURCE_ZHIPU
 
-    auto_rows = _match_by_auto(theme=theme, all_rows=all_rows, limit=max(6, normalized_top_n))
-    auto_rows = _apply_blacklist_filter(auto_rows, blacklist)
-    return auto_rows[:normalized_top_n], _CONCEPT_MATCH_SOURCE_AUTO
+    return [], _CONCEPT_MATCH_SOURCE_AUTO
 
 
 def _load_concept_rows_from_akshare(theme: str) -> list[dict]:
@@ -933,52 +938,125 @@ def _load_concept_rows_from_akshare(theme: str) -> list[dict]:
     if not name_column:
         return []
 
-    tokens = _tokenize(theme)
+    normalized_theme = _normalize_text(theme)
     rows: list[dict] = []
-    lower_theme = theme.lower()
-
-    for _, row in concept_df.iterrows():
-        concept_name = _safe_text(row.get(name_column))
+    for index, row in enumerate(concept_df.iterrows()):
+        _, series = row
+        concept_name = _safe_text(series.get(name_column))
         if not concept_name:
             continue
 
-        match_score = 0.0
-        text_match_score = 0.0
-        lower_name = concept_name.lower()
-        if lower_theme and (lower_theme in lower_name or lower_name in lower_theme):
-            text_match_score += 8
-        for token in tokens:
-            if token and token in lower_name:
-                text_match_score += 2.2
+        concept_keys = _build_concept_match_keys(concept_name)
+        matched_keys = [
+            key
+            for key in concept_keys
+            if key and normalized_theme and key in normalized_theme
+        ]
+        specific_matched_keys = [
+            key for key in matched_keys if not _is_generic_auto_key(key)
+        ]
+        max_matched_length = max((len(key) for key in matched_keys), default=0)
+        max_specific_length = max((len(key) for key in specific_matched_keys), default=0)
+        match_score = max_specific_length * 10 + len(specific_matched_keys) * 3
+        if match_score <= 0:
+            match_score = max_matched_length * 6 + len(matched_keys) * 2
 
-        change_pct = _to_float(row.get(change_column)) or 0.0
-        match_score += text_match_score
-        match_score += max(-3, min(3, change_pct / 2.5))
-        confidence = max(0.4, min(0.9, 0.5 + match_score / 22))
+        confidence_base = 0.45
+        if max_specific_length > 0:
+            confidence_base += min(0.35, max_specific_length / 18)
+        elif max_matched_length > 0:
+            confidence_base += min(0.2, max_matched_length / 24)
+        confidence_base += min(0.08, len(specific_matched_keys) * 0.03)
+        change_pct = _to_float(series.get(change_column)) or 0.0
 
         rows.append(
             {
                 "concept": concept_name,
-                "conceptCode": _safe_text(row.get(code_column)) if code_column else "",
+                "conceptCode": _safe_text(series.get(code_column)) if code_column else "",
                 "changePct": change_pct,
-                "leaderStock": _safe_text(row.get(leader_column)) if leader_column else "",
-                "upCount": int(_to_float(row.get(up_count_column)) or 0)
+                "leaderStock": _safe_text(series.get(leader_column)) if leader_column else "",
+                "upCount": int(_to_float(series.get(up_count_column)) or 0)
                 if up_count_column
                 else 0,
-                "downCount": int(_to_float(row.get(down_count_column)) or 0)
+                "downCount": int(_to_float(series.get(down_count_column)) or 0)
                 if down_count_column
                 else 0,
                 "heat": max(35.0, min(95.0, 58.0 + change_pct * 4)),
-                "matchScore": match_score,
-                "textMatchScore": text_match_score,
-                "confidence": round(confidence, 2),
+                "matchScore": float(match_score),
+                "textMatchScore": float(max_matched_length),
+                "confidence": round(max(0.4, min(0.9, confidence_base)), 2),
                 "aliases": [],
                 "reason": "",
                 "source": _CONCEPT_MATCH_SOURCE_AUTO,
+                "conceptKeys": concept_keys,
+                "matchedKeys": matched_keys,
+                "matchedSpecificKeys": specific_matched_keys,
+                "matchedKeyMaxLength": max_matched_length,
+                "matchedSpecificKeyMaxLength": max_specific_length,
+                "matchedKeyCount": len(matched_keys),
+                "matchedSpecificKeyCount": len(specific_matched_keys),
+                "catalogOrder": index,
             }
         )
 
     return rows
+
+
+def _build_concept_match_keys(concept_name: str) -> list[str]:
+    normalized_full_name = _normalize_text(concept_name)
+    keys: list[str] = []
+    if normalized_full_name:
+        keys.append(normalized_full_name)
+
+    for fragment in _CONCEPT_KEY_SPLIT_PATTERN.split(concept_name):
+        normalized_fragment = _normalize_text(fragment)
+        if normalized_fragment:
+            keys.append(normalized_fragment)
+
+    for fragment in re.findall(r"[A-Za-z0-9]+|[\u4e00-\u9fff]+", concept_name):
+        normalized_fragment = _normalize_text(fragment)
+        if normalized_fragment:
+            keys.append(normalized_fragment)
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for key in keys:
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(key)
+
+    return deduped
+
+
+def _is_generic_auto_key(value: str) -> bool:
+    normalized_value = _normalize_text(value)
+    return normalized_value in _GENERIC_AUTO_MATCH_KEYS
+
+
+def _theme_has_non_generic_signal(theme: str) -> bool:
+    normalized_theme = _normalize_text(theme)
+    if not normalized_theme:
+        return False
+
+    remainder = normalized_theme
+    for generic_key in sorted(_GENERIC_AUTO_MATCH_KEYS, key=len, reverse=True):
+        remainder = remainder.replace(_normalize_text(generic_key), "")
+
+    return len(remainder) >= 2
+
+
+def _ranked_match_lengths(row: dict, *, prefer_specific: bool) -> tuple[int, int]:
+    if prefer_specific:
+        return (
+            int(row.get("matchedSpecificKeyMaxLength") or 0),
+            int(row.get("matchedSpecificKeyCount") or 0),
+        )
+
+    return (
+        int(row.get("matchedKeyMaxLength") or 0),
+        int(row.get("matchedKeyCount") or 0),
+    )
 
 
 def _call_akshare_with_retry(operation_name: str, fetch_fn: Callable[[], _T]) -> _T:
@@ -1123,15 +1201,12 @@ def _match_by_zhipu(theme: str, all_rows: list[dict], limit: int) -> list[dict]:
             continue
 
         aliases = candidate.get("aliases") if isinstance(candidate.get("aliases"), list) else []
-        concept_code = _safe_text(candidate.get("code"))
-
-        matched_row = _find_row_by_code(concept_code, all_rows) if concept_code else None
-        if not matched_row:
-            search_terms = [candidate_name, *[str(alias) for alias in aliases]]
-            for term in search_terms:
-                matched_row = _match_term_to_concept(term=term, all_rows=all_rows)
-                if matched_row:
-                    break
+        matched_row = None
+        search_terms = [candidate_name, *[str(alias) for alias in aliases]]
+        for term in search_terms:
+            matched_row = _match_term_to_concept(term=term, all_rows=all_rows)
+            if matched_row:
+                break
 
         if not matched_row:
             continue
@@ -1151,34 +1226,55 @@ def _match_by_zhipu(theme: str, all_rows: list[dict], limit: int) -> list[dict]:
     ranked = sorted(
         deduped.values(),
         key=lambda item: (
-            float(item.get("confidence") or 0.0),
-            float(item.get("matchScore") or 0.0),
-            float(item.get("changePct") or 0.0),
+            -float(item.get("confidence") or 0.0),
+            -float(item.get("matchScore") or 0.0),
+            int(item.get("catalogOrder") or 0),
         ),
-        reverse=True,
     )
     return ranked[:limit]
 
 
 def _match_by_auto(theme: str, all_rows: list[dict], limit: int) -> list[dict]:
     relevant_rows = [
-        row for row in all_rows if float(row.get("textMatchScore") or 0.0) > 0
+        row for row in all_rows if int(row.get("matchedKeyCount") or 0) > 0
     ]
     if not relevant_rows:
         return []
 
+    prefer_specific = any(
+        int(row.get("matchedSpecificKeyCount") or 0) > 0 for row in relevant_rows
+    )
+    if prefer_specific:
+        relevant_rows = [
+            row for row in relevant_rows if int(row.get("matchedSpecificKeyCount") or 0) > 0
+        ]
+        if not relevant_rows:
+            return []
+    elif _theme_has_non_generic_signal(theme):
+        return []
+
     ranked = sorted(
         relevant_rows,
-        key=lambda item: (float(item.get("matchScore") or 0.0), float(item.get("changePct") or 0.0)),
-        reverse=True,
+        key=lambda item: (
+            -_ranked_match_lengths(item, prefer_specific=prefer_specific)[0],
+            -_ranked_match_lengths(item, prefer_specific=prefer_specific)[1],
+            int(item.get("catalogOrder") or 0),
+        ),
     )
 
     results: list[dict] = []
     for row in ranked[:limit]:
         enriched = dict(row)
         enriched["source"] = _CONCEPT_MATCH_SOURCE_AUTO
-        enriched["reason"] = _build_auto_reason(theme=theme, concept_name=_safe_text(row.get("concept")))
-        confidence = max(0.55, min(0.88, 0.52 + float(enriched.get("matchScore") or 0.0) / 18))
+        enriched["reason"] = _build_auto_reason(theme=theme, row=row)
+        top_match_length, matched_count = _ranked_match_lengths(
+            enriched,
+            prefer_specific=prefer_specific,
+        )
+        confidence = 0.5 + min(0.24, top_match_length / 18) + min(0.1, matched_count * 0.04)
+        if prefer_specific:
+            confidence += 0.05
+        confidence = max(0.55, min(0.88, confidence))
         enriched["confidence"] = round(confidence, 2)
         results.append(enriched)
 
@@ -1194,20 +1290,20 @@ def _match_term_to_concept(term: str, all_rows: list[dict]) -> dict | None:
     best_row: dict | None = None
 
     for row in all_rows:
-        concept_name = _safe_text(row.get("concept"))
-        normalized_name = _normalize_text(concept_name)
-        if not normalized_name:
+        concept_keys = row.get("conceptKeys") if isinstance(row.get("conceptKeys"), list) else []
+        if not concept_keys:
             continue
 
-        if normalized_name == normalized_term:
-            score = 120.0
-        elif normalized_term in normalized_name or normalized_name in normalized_term:
-            score = 90.0
-        else:
-            token_hits = sum(1 for token in _tokenize(term) if token in normalized_name)
-            if token_hits == 0:
+        score = float("-inf")
+        for concept_key in concept_keys:
+            if concept_key == normalized_term:
+                score = max(score, 140.0 + len(concept_key))
                 continue
-            score = 70.0 + token_hits * 6.0
+            if normalized_term in concept_key or concept_key in normalized_term:
+                score = max(score, 100.0 + min(len(concept_key), len(normalized_term)))
+
+        if score == float("-inf"):
+            continue
 
         score += float(row.get("matchScore") or 0.0)
         if score > best_score:
@@ -1284,14 +1380,28 @@ def _to_concept_match_item(row: dict) -> dict:
     }
 
 
-def _build_auto_reason(theme: str, concept_name: str) -> str:
+def _build_auto_reason(theme: str, row: dict) -> str:
+    concept_name = _safe_text(row.get("concept"))
+    matched_specific_keys = [
+        str(item)
+        for item in row.get("matchedSpecificKeys", [])
+        if str(item).strip()
+    ]
+    matched_keys = [str(item) for item in row.get("matchedKeys", []) if str(item).strip()]
+    effective_keys = matched_specific_keys or matched_keys
+    if effective_keys:
+        return (
+            f"本地自动匹配：主题“{theme}”命中概念子串“{effective_keys[0]}”，"
+            f"关联到概念“{concept_name}”"
+        )
     return f"本地自动匹配：主题“{theme}”与概念“{concept_name}”文本相关性较高"
 
 
 def _normalize_text(text: Any) -> str:
     if text is None:
         return ""
-    return re.sub(r"[\s_]+", "", str(text).strip().lower())
+    lowered = str(text).strip().casefold()
+    return re.sub(r"[^\w\u4e00-\u9fff]+", "", lowered)
 
 
 def _score_candidate_heat(
@@ -1489,7 +1599,7 @@ def _normalize_stock_code(raw_value: Any) -> str:
 
 
 def _tokenize(text: str) -> list[str]:
-    tokens = [segment.strip().lower() for segment in re.split(r"[\s,，、;；/]+", text)]
+    tokens = [segment.strip().casefold() for segment in re.split(r"[^\w\u4e00-\u9fff]+", text)]
     return [token for token in tokens if len(token) >= 2]
 
 

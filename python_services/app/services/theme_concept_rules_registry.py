@@ -1,4 +1,4 @@
-﻿"""Theme concept rules registry backed by local JSON file."""
+"""Theme concept rules registry backed by local JSON file."""
 
 from __future__ import annotations
 
@@ -6,18 +6,29 @@ from datetime import UTC, datetime
 import json
 import os
 from pathlib import Path
+import re
 import threading
 from typing import Any
+
+_DEFAULT_RULES_FILENAME = "theme_concept_rules.json"
+_DEFAULT_RULES_SEED_FILENAME = "theme_concept_rules.seed.json"
 
 
 class ThemeConceptRulesRegistry:
     """Store and query theme -> concept rule records."""
 
-    def __init__(self, file_path: str | None = None) -> None:
+    def __init__(
+        self,
+        file_path: str | None = None,
+        *,
+        seed_path: str | None = None,
+    ) -> None:
         env_path = os.getenv("INTELLIGENCE_THEME_CONCEPT_RULES_FILE", "").strip()
-        default_path = Path(__file__).resolve().parent / "data" / "theme_concept_rules.json"
+        data_dir = Path(__file__).resolve().parent / "data"
+        default_path = data_dir / _DEFAULT_RULES_FILENAME
         target_path = file_path or env_path or str(default_path)
         self.file_path = Path(target_path)
+        self.seed_path = Path(seed_path) if seed_path else data_dir / _DEFAULT_RULES_SEED_FILENAME
         self._lock = threading.Lock()
 
     def get_rules(self, theme: str) -> dict:
@@ -76,31 +87,71 @@ class ThemeConceptRulesRegistry:
             return _sanitize_record(record)
 
     def _find_record(self, records: list[dict], normalized_theme: str) -> dict | None:
-        for record in records:
-            theme_name = _normalize_theme(record.get("theme"))
-            if theme_name == normalized_theme:
-                return record
+        best_matched_record: dict | None = None
+        best_matched_length = -1
 
         for record in records:
-            aliases = record.get("aliases")
-            if not isinstance(aliases, list):
+            normalized_terms = _collect_record_terms(record)
+            if normalized_theme in normalized_terms:
+                return record
+
+            matched_lengths = [
+                len(term)
+                for term in normalized_terms
+                if term and term in normalized_theme
+            ]
+            if not matched_lengths:
                 continue
-            normalized_aliases = {_normalize_theme(alias) for alias in aliases}
-            if normalized_theme in normalized_aliases:
-                return record
 
-        return None
+            current_best_length = max(matched_lengths)
+            if current_best_length > best_matched_length:
+                best_matched_length = current_best_length
+                best_matched_record = record
+
+        return best_matched_record
 
     def _load_records(self) -> list[dict]:
         with self._lock:
             return self._load_records_unlocked()
 
     def _load_records_unlocked(self) -> list[dict]:
-        if not self.file_path.exists():
+        records = self._read_records_from_path(self.file_path)
+        if records:
+            return records
+
+        seed_records = self._read_records_from_path(self.seed_path)
+        if seed_records:
+            self._save_records_to_path_unlocked(self.file_path, seed_records)
+            return self._read_records_from_path(self.file_path)
+
+        return []
+
+    def _save_records_unlocked(self, records: list[dict]) -> None:
+        self._save_records_to_path_unlocked(self.file_path, records)
+
+    def _save_records_to_path_unlocked(
+        self,
+        file_path: Path,
+        records: list[dict],
+    ) -> None:
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "version": 1,
+            "items": [_sanitize_record(record) for record in records if record],
+        }
+        tmp_path = file_path.with_suffix(".tmp")
+        tmp_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        tmp_path.replace(file_path)
+
+    def _read_records_from_path(self, file_path: Path) -> list[dict]:
+        if not file_path.exists():
             return []
 
         try:
-            payload = json.loads(self.file_path.read_text(encoding="utf-8"))
+            payload = json.loads(file_path.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
             return []
 
@@ -117,19 +168,6 @@ class ThemeConceptRulesRegistry:
                 normalized_items.append(sanitized)
 
         return normalized_items
-
-    def _save_records_unlocked(self, records: list[dict]) -> None:
-        self.file_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "version": 1,
-            "items": [_sanitize_record(record) for record in records if record],
-        }
-        tmp_path = self.file_path.with_suffix(".tmp")
-        tmp_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        tmp_path.replace(self.file_path)
 
 
 def _empty_rule(theme: str) -> dict:
@@ -179,7 +217,16 @@ def _clean_name_list(raw_value: Any) -> list[str]:
     return cleaned
 
 
+def _collect_record_terms(record: dict[str, Any]) -> set[str]:
+    normalized_terms = {_normalize_theme(record.get("theme"))}
+    aliases = record.get("aliases")
+    if isinstance(aliases, list):
+        normalized_terms.update(_normalize_theme(alias) for alias in aliases)
+    return {term for term in normalized_terms if term}
+
+
 def _normalize_theme(text: Any) -> str:
     if text is None:
         return ""
-    return str(text).strip().lower().replace(" ", "")
+    lowered = str(text).strip().casefold()
+    return re.sub(r"[^\w\u4e00-\u9fff]+", "", lowered)

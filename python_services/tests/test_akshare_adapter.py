@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
+import requests
 
 from app.services.akshare_adapter import AkShareAdapter, _safe_float
 
@@ -294,6 +295,50 @@ class TestAkShareAdapter:
         assert df["最新价"].tolist() == [22.28, 5.6, 41.2]
         assert "换手率" in df.columns
 
+    def test_concept_constituents_loader_keeps_partial_rows_when_followup_page_fails(self):
+        page_one_html = """
+        <html>
+          <span class="page_info">1 / 3</span>
+          <table>
+            <thead>
+              <tr><th>序号</th><th>代码</th><th>名称</th><th>现价</th><th>涨跌幅(%)</th><th>换手(%)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>1</td><td>2015</td><td>协鑫能科</td><td>22.28</td><td>4.31</td><td>22.36</td></tr>
+              <tr><td>2</td><td>300324</td><td>旋极信息</td><td>5.60</td><td>5.66</td><td>7.36</td></tr>
+            </tbody>
+          </table>
+        </html>
+        """
+
+        with patch(
+            "app.services.akshare_adapter._fetch_ths_concept_detail_html",
+            side_effect=[
+                page_one_html,
+                requests.exceptions.SSLError("EOF occurred in violation of protocol"),
+            ],
+        ) as mock_fetch:
+            df = AkShareAdapter.get_concept_constituents_frame(
+                "算力租赁",
+                concept_code="309068",
+            )
+
+        assert mock_fetch.call_count == 2
+        assert df["代码"].tolist() == ["002015", "300324"]
+
+    def test_concept_constituents_loader_fails_when_first_page_has_no_tables(self):
+        page_one_html = "<html><span class=\"page_info\">1 / 1</span><div>empty</div></html>"
+
+        with patch(
+            "app.services.akshare_adapter._fetch_ths_concept_detail_html",
+            return_value=page_one_html,
+        ):
+            with pytest.raises(Exception, match="No tables found"):
+                AkShareAdapter.get_concept_constituents_frame(
+                    "算力租赁",
+                    concept_code="309068",
+                )
+
     @patch("app.services.akshare_adapter.ak.stock_zh_a_spot")
     @patch("app.services.akshare_adapter.ak.stock_zh_a_spot_em")
     def test_get_a_share_spot_frame_falls_back_to_sina_with_partial_metadata(
@@ -326,6 +371,35 @@ class TestAkShareAdapter:
         assert frame.iloc[0]["代码"] == "600519"
         assert frame.attrs["data_quality"] == "partial"
         assert "spot_snapshot_sina_fallback" in frame.attrs["warnings"]
+
+    @patch("app.services.akshare_adapter.ak.stock_zh_a_spot")
+    @patch("app.services.akshare_adapter.ak.stock_zh_a_spot_em")
+    def test_get_a_share_spot_frame_suppresses_sina_stdout_noise(
+        self,
+        mock_em_spot,
+        mock_sina_spot,
+        capsys,
+    ):
+        mock_em_spot.side_effect = Exception("em down")
+
+        def noisy_sina() -> pd.DataFrame:
+            print("Please wait for a moment")
+            return pd.DataFrame(
+                {
+                    "代码": ["sh600519"],
+                    "名称": ["贵州茅台"],
+                    "现价": [1678.0],
+                }
+            )
+
+        mock_sina_spot.side_effect = noisy_sina
+
+        frame = AkShareAdapter.get_a_share_spot_frame()
+        captured = capsys.readouterr()
+
+        assert frame.iloc[0]["代码"] == "600519"
+        assert captured.out == ""
+        assert captured.err == ""
 
     @patch.object(AkShareAdapter, "get_latest_financial_snapshot_frame")
     @patch.object(AkShareAdapter, "get_stock_code_name_frame")

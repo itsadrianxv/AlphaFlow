@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from datetime import date, datetime
 from http.client import RemoteDisconnected
@@ -69,6 +70,12 @@ _TRANSIENT_THS_ERROR_MARKERS = (
     "temporary failure",
     "chunkedencodingerror",
     "protocolerror",
+)
+_PARTIAL_THS_PAGE_ERROR_MARKERS = (
+    "no tables found",
+    "ssl",
+    "eof occurred in violation of protocol",
+    "unexpected eof",
 )
 
 
@@ -717,7 +724,8 @@ def _load_em_a_share_spot_frame() -> pd.DataFrame:
 
 
 def _load_sina_a_share_spot_frame() -> pd.DataFrame:
-    frame = ak.stock_zh_a_spot()
+    with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+        frame = ak.stock_zh_a_spot()
     if frame.empty:
         raise ValueError("stock_zh_a_spot returned empty frame")
     return _normalize_sina_a_share_spot_frame(frame)
@@ -811,38 +819,55 @@ def _load_concept_constituents_frame_ths(
     if not resolved_code:
         raise ValueError(f"未找到概念板块代码: {concept_name}")
 
-    def fetch_all_pages() -> pd.DataFrame:
-        frames: list[pd.DataFrame] = []
-        page = 1
-        page_count = 1
+    operation_name = f"ths_concept_constituents:{concept_name}"
+    first_page_html = _retry_ths_concept_fetch(
+        operation_name=f"{operation_name}:page:1",
+        fetch_fn=lambda: _fetch_ths_concept_detail_html(
+            concept_code=resolved_code,
+            page=1,
+        ),
+    )
+    first_page_table = _parse_ths_concept_constituent_table(first_page_html)
+    if first_page_table.empty:
+        raise ValueError(
+            f"No tables found for THS concept constituents page 1: {concept_name}"
+        )
 
-        while page <= page_count:
+    page_count = _extract_ths_page_count(first_page_html)
+    frames = [first_page_table]
+    failed_page: int | None = None
+
+    for page in range(2, page_count + 1):
+        try:
             html = _fetch_ths_concept_detail_html(
                 concept_code=resolved_code,
                 page=page,
             )
-            if page == 1:
-                page_count = _extract_ths_page_count(html)
-
             table = _parse_ths_concept_constituent_table(html)
             if table.empty:
-                page += 1
-                continue
-            frames.append(table)
-            page += 1
+                raise ValueError("No tables found")
+        except Exception as exc:  # noqa: BLE001
+            if not _is_tolerable_followup_ths_page_error(exc):
+                raise
+            failed_page = page
+            break
 
-        if not frames:
-            return pd.DataFrame()
+        frames.append(table)
 
-        combined = pd.concat(frames, ignore_index=True)
-        if "代码" in combined.columns:
-            combined = combined.drop_duplicates(subset=["代码"], keep="first")
-        return combined.reset_index(drop=True)
+    combined = pd.concat(frames, ignore_index=True)
+    if "代码" in combined.columns:
+        combined = combined.drop_duplicates(subset=["代码"], keep="first")
+    combined = combined.reset_index(drop=True)
 
-    return _retry_ths_concept_fetch(
-        operation_name=f"ths_concept_constituents:{concept_name}",
-        fetch_fn=fetch_all_pages,
-    )
+    if failed_page is not None:
+        LOGGER.warning(
+            "THS concept constituents partial result for %s: stop at page %s, kept %s rows",
+            concept_name,
+            failed_page,
+            len(combined),
+        )
+
+    return combined
 
 
 def _resolve_ths_concept_code(
@@ -912,8 +937,8 @@ def _parse_ths_concept_constituent_table(html: str) -> pd.DataFrame:
 def _retry_ths_concept_fetch(
     *,
     operation_name: str,
-    fetch_fn: Callable[[], pd.DataFrame],
-) -> pd.DataFrame:
+    fetch_fn: Callable[[], _T],
+) -> _T:
     return retry_sync(
         operation=fetch_fn,
         policy=_THS_CONCEPT_RETRY_POLICY,
@@ -927,6 +952,18 @@ def _retry_ths_concept_fetch(
             sleep_ms,
         ),
     )
+
+
+def _is_tolerable_followup_ths_page_error(exc: Exception) -> bool:
+    if _is_transient_ths_error(exc):
+        return True
+
+    for current in _iter_exception_chain(exc):
+        message = str(current).lower()
+        if any(marker in message for marker in _PARTIAL_THS_PAGE_ERROR_MARKERS):
+            return True
+
+    return False
 
 
 def _is_transient_ths_error(exc: Exception) -> bool:

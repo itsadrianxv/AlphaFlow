@@ -15,8 +15,8 @@ LOGGER = logging.getLogger(__name__)
 
 _DEFAULT_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 _DEFAULT_MODEL = "glm-4-plus"
-_DEFAULT_TIMEOUT_SECONDS = 8.0
-_DEFAULT_RETRIES = 2
+_DEFAULT_TIMEOUT_SECONDS = 3.0
+_DEFAULT_RETRIES = 0
 _MIN_CONFIDENCE = 0.55
 
 _GENERIC_EXACT_NAMES = {
@@ -103,13 +103,22 @@ class ZhipuSearchClient:
                 response.raise_for_status()
                 return self._parse_response_payload(response.json(), normalized_limit)
             except Exception as exc:  # noqa: BLE001
-                LOGGER.warning(
-                    "Zhipu web search failed for '%s' (attempt %s/%s): %s",
-                    normalized_theme,
-                    attempt + 1,
-                    self.retries + 1,
-                    exc,
-                )
+                if attempt < self.retries:
+                    LOGGER.debug(
+                        "Zhipu web search failed for '%s' (attempt %s/%s): %s",
+                        normalized_theme,
+                        attempt + 1,
+                        self.retries + 1,
+                        exc,
+                    )
+                else:
+                    LOGGER.warning(
+                        "Zhipu web search failed for '%s' (attempt %s/%s): %s",
+                        normalized_theme,
+                        attempt + 1,
+                        self.retries + 1,
+                        exc,
+                    )
                 if attempt < self.retries:
                     time.sleep(min(1.2 * (attempt + 1), 2.5))
 

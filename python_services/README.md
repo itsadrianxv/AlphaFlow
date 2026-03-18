@@ -106,8 +106,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 1. 白名单优先（命中即优先返回）
 2. 黑名单强过滤（对白名单、智谱、本地匹配都生效）
-3. 无白名单命中时，调用智谱 Web Search
-4. 智谱失败或无结果时，回退本地自动匹配
+3. 无白名单命中时，优先走本地自动匹配（基于概念词典子串抽取）
+4. 只有白名单与本地自动匹配都不可用时，才调用智谱 Web Search
+5. 规则文件缺失或 `items=[]` 时，会用 repo 内默认 seed 自动 bootstrap 一次
 
 ## 环境变量
 
@@ -132,8 +133,8 @@ Screening provider：
 
 - `ZHIPU_API_KEY`：智谱 API Key（启用外部搜索时必需）
 - `ZHIPU_WEB_SEARCH_MODEL`：模型名（可选，默认 `glm-4-plus`）
-- `ZHIPU_WEB_SEARCH_TIMEOUT_SECONDS`：请求超时秒数（可选，默认 `8`）
-- `ZHIPU_WEB_SEARCH_RETRIES`：失败重试次数（可选，默认 `2`）
+- `ZHIPU_WEB_SEARCH_TIMEOUT_SECONDS`：请求超时秒数（可选，默认 `3`）
+- `ZHIPU_WEB_SEARCH_RETRIES`：失败重试次数（可选，默认 `0`）
 
 Web / Worker 调用预算：
 
@@ -151,6 +152,7 @@ Web / Worker 调用预算：
 规则存储：
 
 - `INTELLIGENCE_THEME_CONCEPT_RULES_FILE`：规则 JSON 文件路径（可选，默认 `app/services/data/theme_concept_rules.json`）
+- repo 默认 seed：`app/services/data/theme_concept_rules.seed.json`
 
 ## 接口示例
 

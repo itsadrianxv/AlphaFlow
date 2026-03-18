@@ -49,7 +49,7 @@ def test_get_candidates_strict_raises_when_no_theme_specific_candidates():
         patch(
             "app.services.intelligence_data_adapter._build_candidates_from_spot",
             return_value=[],
-        ),
+        ) as mock_spot_fallback,
         patch(
             "app.services.intelligence_data_adapter._RULES_REGISTRY.get_rules",
             return_value={"theme": "AI", "whitelist": [], "blacklist": [], "aliases": []},
@@ -61,6 +61,8 @@ def test_get_candidates_strict_raises_when_no_theme_specific_candidates():
     ):
         with pytest.raises(ValueError):
             IntelligenceDataAdapter.get_candidates_strict(theme="AI", limit=5)
+
+    mock_spot_fallback.assert_not_called()
 
 
 def test_get_candidates_strict_uses_local_catalog_snapshot():
@@ -93,12 +95,13 @@ def test_get_candidates_strict_uses_local_catalog_snapshot():
                     "source": "zhipu_web_search",
                 }
             ],
-        ),
+        ) as mock_zhipu,
     ):
         payload = IntelligenceDataAdapter.get_candidates_strict(theme="AI", limit=5)
 
     assert len(payload) == 1
     assert payload[0]["stockCode"] == "300308"
+    mock_zhipu.assert_not_called()
 
 
 @patch("app.services.intelligence_data_adapter._fetch_candidates_from_akshare")
