@@ -128,7 +128,7 @@
       [
         "sh",
         "-c",
-        "npm run validate:runtime && npm run db:push && npm run start",
+        "npm run validate:runtime && npm run db:push -- --accept-data-loss && npm run start",
       ]
 
   workflow-worker:
