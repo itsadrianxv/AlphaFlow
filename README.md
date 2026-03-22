@@ -97,6 +97,10 @@ python -m venv .venv
 # Windows
 .venv\Scripts\activate
 pip install -r requirements.txt
+# Optional: Python tests
+# pip install -r requirements-dev.txt
+# Optional: RefChecker runtime
+# pip install -r requirements-refchecker.txt
 cd ..
 ```
 

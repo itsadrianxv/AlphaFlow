@@ -54,6 +54,8 @@ python_services/
       theme_concept_rules_registry.py
   tests/
   requirements.txt
+  requirements-dev.txt
+  requirements-refchecker.txt
 ```
 
 ## 启动
@@ -69,6 +71,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 说明：
 
 - `iFinDPy` 如需手工安装，可在运行环境中额外安装；未安装或登录失败时，screening legacy 接口会按配置自动回退到 AkShare。
+- 如需运行 Python 测试，可额外执行 `pip install -r requirements-dev.txt`。
+- 如需启用 RefChecker 运行时，可额外执行 `pip install -r requirements-refchecker.txt`；未安装时，可信度分析接口会自动回退到内置 heuristic fallback。
 
 ## 关键接口
 
@@ -256,5 +260,6 @@ curl "http://localhost:8000/api/admin/metrics"
 
 ```bash
 cd python_services
+pip install -r requirements-dev.txt
 pytest
 ```

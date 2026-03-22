@@ -1,0 +1,4 @@
+# Optional RefChecker runtime for confidence analysis.
+# Docker images skip this dependency by default because the dependency graph is
+# large and can be sensitive to upstream package mirror changes.
+refchecker==0.2.17

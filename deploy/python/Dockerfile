@@ -5,14 +5,26 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+ARG INSTALL_REFCHECKER=false
+
 RUN apt-get update \
   && apt-get install -y --no-install-recommends libidn12 \
   && ln -sf /usr/lib/x86_64-linux-gnu/libidn.so.12 /usr/lib/x86_64-linux-gnu/libidn.so.11 \
   && rm -rf /var/lib/apt/lists/*
 
 COPY python_services/requirements.txt ./requirements.txt
+COPY python_services/requirements-refchecker.txt ./requirements-refchecker.txt
 COPY deploy/python/vendor ./vendor
 RUN pip install --default-timeout=1200 --no-cache-dir -r requirements.txt \
+  && case "${INSTALL_REFCHECKER}" in \
+    1|true|TRUE|yes|YES|on|ON) \
+      echo "Installing optional RefChecker dependencies."; \
+      pip install --default-timeout=1200 --no-cache-dir -r requirements-refchecker.txt; \
+      ;; \
+    *) \
+      echo "Skipping optional RefChecker dependencies."; \
+      ;; \
+    esac \
   && site_packages="$(python -c 'import site; print(site.getsitepackages()[0])')" \
   && found=0 \
   && for pkg in vendor/*.whl vendor/*.tar.gz vendor/*.zip; do \
@@ -39,7 +51,7 @@ RUN pip install --default-timeout=1200 --no-cache-dir -r requirements.txt \
     echo "No vendor iFinD package provided; continuing without iFinDPy."; \
   fi \
   && python -c "import importlib.util; print('iFinDPy spec:', importlib.util.find_spec('iFinDPy'))" \
-  && rm -rf vendor
+  && rm -rf vendor requirements-refchecker.txt
 
 COPY python_services/app ./app
 COPY python_services/scripts ./scripts

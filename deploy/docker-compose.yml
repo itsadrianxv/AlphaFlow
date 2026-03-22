@@ -36,6 +36,8 @@
     build:
       context: ..
       dockerfile: deploy/python/Dockerfile
+      args:
+        INSTALL_REFCHECKER: ${REFCHECKER_ENABLED:-false}
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: "1"

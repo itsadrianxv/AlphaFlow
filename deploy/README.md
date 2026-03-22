@@ -36,6 +36,11 @@ cp deploy/.env.example deploy/.env
 - `IFIND_USERNAME` / `IFIND_PASSWORD`: 启用 iFinD 作为主筛选数据源
 - `REFCHECKER_*`: 启用 RefChecker 可信度分析
 
+说明：
+
+- `REFCHECKER_ENABLED=false` 时，`python-service` 镜像默认只安装基础依赖，可信度分析接口会继续使用内置 heuristic fallback。
+- 如果要启用 RefChecker，请先在 `deploy/.env` 中将 `REFCHECKER_ENABLED=true`，再执行 `docker compose ... up -d --build` 重新构建镜像。
+
 ## 2. 可选的 iFinD 厂商包
 
 公共 PyPI 当前没有可直接安装的 `iFinDPy` 发行版。如果需要在 Linux 容器内启用 iFinD，请将厂商提供的安装包放到：
