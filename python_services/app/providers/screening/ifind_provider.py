@@ -55,13 +55,19 @@ _HISTORY_FIELD_SPECS: dict[str, tuple[str, str]] = {
 }
 
 
-def _ensure_ifind_symbols_loaded() -> None:
+def _ensure_ifind_symbols_loaded(*required_symbols: str) -> None:
     global THS_BD, THS_DR, THS_DS, THS_RQ, THS_iFinDLogin, IFIND_AVAILABLE
 
-    if all(
-        symbol is not None
-        for symbol in (THS_BD, THS_DR, THS_DS, THS_RQ, THS_iFinDLogin)
-    ):
+    current_symbols = {
+        "THS_BD": THS_BD,
+        "THS_DR": THS_DR,
+        "THS_DS": THS_DS,
+        "THS_RQ": THS_RQ,
+        "THS_iFinDLogin": THS_iFinDLogin,
+    }
+    symbols_to_check = required_symbols or tuple(current_symbols.keys())
+
+    if all(current_symbols[symbol_name] is not None for symbol_name in symbols_to_check):
         return
 
     if not IFIND_AVAILABLE:
@@ -171,6 +177,7 @@ class IFindScreeningProvider(ScreeningDataProvider):
             return cached_codes
 
         self._ensure_login()
+        _ensure_ifind_symbols_loaded("THS_DR")
         result = THS_DR(_UNIVERSE_BLOCK_ID, _UNIVERSE_FIELDS, f"block:{_UNIVERSE_BLOCK_ID}")
         frame = self._extract_frame(self._ensure_success(result, "THS_DR"))
 
@@ -306,6 +313,7 @@ class IFindScreeningProvider(ScreeningDataProvider):
             raise ValueError(f"iFinD 暂不支持指标历史数据: {indicator}")
 
         self._ensure_login()
+        _ensure_ifind_symbols_loaded("THS_DS")
         field_name, field_param = field_spec
         today = self._today()
         start_date = date(today.year - years - 1, 1, 1).strftime("%Y-%m-%d")
@@ -367,14 +375,11 @@ class IFindScreeningProvider(ScreeningDataProvider):
                     industries.add(industry)
         return sorted(industries)
 
-    def _ensure_ifind_api_loaded(self) -> None:
-        _ensure_ifind_symbols_loaded()
-
     def _ensure_login(self) -> None:
         if self._is_logged_in:
             return
 
-        self._ensure_ifind_api_loaded()
+        _ensure_ifind_symbols_loaded("THS_iFinDLogin")
 
         if THS_iFinDLogin is None:
             raise RuntimeError("iFinDPy 未安装，无法启用 iFinD 数据源")
@@ -399,6 +404,7 @@ class IFindScreeningProvider(ScreeningDataProvider):
         indicator: str,
         params: str,
     ) -> dict[str, Any]:
+        _ensure_ifind_symbols_loaded("THS_BD")
         codes = ",".join(self._to_ifind_code(code) for code in stock_codes)
         result = THS_BD(codes, indicator, params)
         return self._extract_code_value_map(
@@ -412,6 +418,7 @@ class IFindScreeningProvider(ScreeningDataProvider):
         stock_codes: list[str],
         indicator: str,
     ) -> dict[str, Any]:
+        _ensure_ifind_symbols_loaded("THS_RQ")
         codes = ",".join(self._to_ifind_code(code) for code in stock_codes)
         try:
             result = THS_RQ(codes, indicator)
