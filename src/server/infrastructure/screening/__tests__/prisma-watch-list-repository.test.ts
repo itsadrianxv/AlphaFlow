@@ -12,8 +12,23 @@ import { WatchList } from "../../../domain/screening/aggregates/watch-list";
 import { StockCode } from "../../../domain/screening/value-objects/stock-code";
 import { PrismaWatchListRepository } from "../prisma-watch-list-repository";
 
+type MockPrismaClient = {
+  watchList: {
+    upsert: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+    findFirst: ReturnType<typeof vi.fn>;
+  };
+};
+
+function expectPresent<T>(value: T | null | undefined): T {
+  expect(value).toBeDefined();
+  return value as T;
+}
+
 describe("PrismaWatchListRepository", () => {
-  let mockPrisma: any;
+  let mockPrisma: MockPrismaClient;
   let repository: PrismaWatchListRepository;
   const testUserId = "test-user-id";
 
@@ -83,12 +98,16 @@ describe("PrismaWatchListRepository", () => {
 
       await repository.save(watchList);
 
-      const call = mockPrisma.watchList.upsert.mock.calls[0][0];
+      const firstCall = expectPresent(
+        mockPrisma.watchList.upsert.mock.calls[0],
+      );
+      const call = expectPresent(firstCall[0]);
+      const firstStock = expectPresent(call.create.stocks[0]);
       expect(Array.isArray(call.create.stocks)).toBe(true);
       expect(call.create.stocks.length).toBe(2);
-      expect(call.create.stocks[0]).toHaveProperty("stockCode");
-      expect(call.create.stocks[0]).toHaveProperty("stockName");
-      expect(call.create.stocks[0]).toHaveProperty("addedAt");
+      expect(firstStock).toHaveProperty("stockCode");
+      expect(firstStock).toHaveProperty("stockName");
+      expect(firstStock).toHaveProperty("addedAt");
     });
 
     it("应该处理空描述", async () => {
@@ -100,7 +119,10 @@ describe("PrismaWatchListRepository", () => {
 
       await repository.save(watchList);
 
-      const call = mockPrisma.watchList.upsert.mock.calls[0][0];
+      const firstCall = expectPresent(
+        mockPrisma.watchList.upsert.mock.calls[0],
+      );
+      const call = expectPresent(firstCall[0]);
       expect(call.create.description).toBeNull();
     });
   });
@@ -122,9 +144,9 @@ describe("PrismaWatchListRepository", () => {
       const found = await repository.findById(watchList.id);
 
       expect(found).not.toBeNull();
-      expect(found!.id).toBe(watchList.id);
-      expect(found!.name).toBe(watchList.name);
-      expect(found!.stocks.length).toBe(2);
+      expect(found?.id).toBe(watchList.id);
+      expect(found?.name).toBe(watchList.name);
+      expect(found?.stocks.length).toBe(2);
     });
 
     it("应该对不存在的 ID 返回 null", async () => {
@@ -151,10 +173,10 @@ describe("PrismaWatchListRepository", () => {
       const found = await repository.findById(watchList.id);
 
       expect(found).not.toBeNull();
-      expect(found!.stocks[0]!.stockCode.value).toBe("600519");
-      expect(found!.stocks[0]!.stockName).toBe("贵州茅台");
-      expect(found!.stocks[0]!.note).toBe("白酒龙头");
-      expect(found!.stocks[0]!.tags).toEqual(["白酒", "消费"]);
+      expect(found?.stocks[0]?.stockCode.value).toBe("600519");
+      expect(found?.stocks[0]?.stockName).toBe("贵州茅台");
+      expect(found?.stocks[0]?.note).toBe("白酒龙头");
+      expect(found?.stocks[0]?.tags).toEqual(["白酒", "消费"]);
     });
   });
 
@@ -200,8 +222,8 @@ describe("PrismaWatchListRepository", () => {
       const all = await repository.findAll();
 
       expect(all.length).toBe(2);
-      expect(all[0]!.name).toBe("列表1");
-      expect(all[1]!.name).toBe("列表2");
+      expect(all[0]?.name).toBe("列表1");
+      expect(all[1]?.name).toBe("列表2");
     });
 
     it("应该按创建时间降序排列", async () => {
@@ -240,7 +262,7 @@ describe("PrismaWatchListRepository", () => {
       const found = await repository.findByName("唯一名称列表");
 
       expect(found).not.toBeNull();
-      expect(found!.name).toBe("唯一名称列表");
+      expect(found?.name).toBe("唯一名称列表");
       expect(mockPrisma.watchList.findFirst).toHaveBeenCalledWith({
         where: { name: "唯一名称列表" },
       });
@@ -362,33 +384,33 @@ describe("PrismaWatchListRepository", () => {
       expect(found).not.toBeNull();
 
       // 验证基本信息
-      expect(found!.name).toBe("完整测试列表");
-      expect(found!.description).toBe("包含多种股票的测试列表");
-      expect(found!.userId).toBe(testUserId);
+      expect(found?.name).toBe("完整测试列表");
+      expect(found?.description).toBe("包含多种股票的测试列表");
+      expect(found?.userId).toBe(testUserId);
 
       // 验证股票列表
-      expect(found!.stocks.length).toBe(3);
+      expect(found?.stocks.length).toBe(3);
 
       // 验证第一只股票（完整信息）
-      const stock1 = found!.stocks.find((s) => s.stockCode.value === "600519");
+      const stock1 = found?.stocks.find((s) => s.stockCode.value === "600519");
       expect(stock1).toBeDefined();
-      expect(stock1!.stockName).toBe("贵州茅台");
-      expect(stock1!.note).toBe("白酒龙头，长期持有");
-      expect(stock1!.tags).toEqual(["白酒", "消费", "核心资产"]);
+      expect(stock1?.stockName).toBe("贵州茅台");
+      expect(stock1?.note).toBe("白酒龙头，长期持有");
+      expect(stock1?.tags).toEqual(["白酒", "消费", "核心资产"]);
 
       // 验证第二只股票（无备注）
-      const stock2 = found!.stocks.find((s) => s.stockCode.value === "000858");
+      const stock2 = found?.stocks.find((s) => s.stockCode.value === "000858");
       expect(stock2).toBeDefined();
-      expect(stock2!.stockName).toBe("五粮液");
-      expect(stock2!.note).toBeUndefined();
-      expect(stock2!.tags).toEqual(["白酒"]);
+      expect(stock2?.stockName).toBe("五粮液");
+      expect(stock2?.note).toBeUndefined();
+      expect(stock2?.tags).toEqual(["白酒"]);
 
       // 验证第三只股票
-      const stock3 = found!.stocks.find((s) => s.stockCode.value === "600036");
+      const stock3 = found?.stocks.find((s) => s.stockCode.value === "600036");
       expect(stock3).toBeDefined();
-      expect(stock3!.stockName).toBe("招商银行");
-      expect(stock3!.note).toBe("银行股首选");
-      expect(stock3!.tags).toEqual(["银行", "金融"]);
+      expect(stock3?.stockName).toBe("招商银行");
+      expect(stock3?.note).toBe("银行股首选");
+      expect(stock3?.tags).toEqual(["银行", "金融"]);
     });
 
     it("应该正确处理空股票列表", async () => {
@@ -415,7 +437,7 @@ describe("PrismaWatchListRepository", () => {
       const found = await repository.findById(watchList.id);
 
       expect(found).not.toBeNull();
-      expect(found!.stocks.length).toBe(0);
+      expect(found?.stocks.length).toBe(0);
     });
   });
 });

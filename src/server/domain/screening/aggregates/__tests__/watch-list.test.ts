@@ -10,6 +10,11 @@ import { StockCode } from "../../value-objects/stock-code";
 import { WatchedStock } from "../../value-objects/watched-stock";
 import { WatchList } from "../watch-list";
 
+function _expectPresent<T>(value: T | null | undefined): T {
+  expect(value).toBeDefined();
+  return value as T;
+}
+
 describe("WatchList", () => {
   describe("create", () => {
     it("应该创建空的自选股列表", () => {
@@ -83,8 +88,8 @@ describe("WatchList", () => {
 
       const stocks = watchList.stocks;
       expect(stocks).toHaveLength(1);
-      expect(stocks[0]!.note).toBe("长期看好");
-      expect(stocks[0]!.tags).toEqual(["白酒", "高roe"]);
+      expect(stocks[0]?.note).toBe("长期看好");
+      expect(stocks[0]?.tags).toEqual(["白酒", "高roe"]);
     });
 
     it("应该在添加重复股票时抛出 DuplicateStockError", () => {
@@ -145,7 +150,7 @@ describe("WatchList", () => {
       watchList.updateStockNote(code, "更新后的备注");
 
       const stocks = watchList.stocks;
-      expect(stocks[0]!.note).toBe("更新后的备注");
+      expect(stocks[0]?.note).toBe("更新后的备注");
     });
 
     it("应该在更新不存在的股票备注时抛出 StockNotFoundError", () => {
@@ -175,7 +180,7 @@ describe("WatchList", () => {
       watchList.updateStockTags(code, ["白酒", "高ROE", "消费"]);
 
       const stocks = watchList.stocks;
-      expect(stocks[0]!.tags).toEqual(["白酒", "高roe", "消费"]);
+      expect(stocks[0]?.tags).toEqual(["白酒", "高roe", "消费"]);
     });
 
     it("应该在更新不存在的股票标签时抛出 StockNotFoundError", () => {
@@ -355,7 +360,7 @@ describe("WatchList", () => {
       ]);
 
       const stocks = watchList.stocks;
-      expect(stocks[0]!.tags).toEqual(["白酒", "value"]);
+      expect(stocks[0]?.tags).toEqual(["白酒", "value"]);
     });
   });
 
