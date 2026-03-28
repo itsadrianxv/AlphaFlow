@@ -1,7 +1,15 @@
-import { existsSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -35,7 +43,10 @@ function createSandbox(options?: {
     mkdirSync(deployMainDeployDir, { recursive: true });
   }
 
-  if ((options?.includeDeployMain ?? true) && (options?.includeCompose ?? true)) {
+  if (
+    (options?.includeDeployMain ?? true) &&
+    (options?.includeCompose ?? true)
+  ) {
     writeFileSync(
       path.join(deployMainDeployDir, "docker-compose.yml"),
       "services:\n  web:\n    image: alpine:3.20\n",
@@ -133,7 +144,9 @@ describe("deploy-main.ps1", () => {
     const result = runDeployScript(root, binDir, ["-Services", "web"]);
 
     expect(result.status).not.toBe(0);
-    expect(`${result.stdout}\n${result.stderr}`).toContain(".worktrees/deploy-main");
+    expect(`${result.stdout}\n${result.stderr}`).toContain(
+      ".worktrees/deploy-main",
+    );
   });
 
   it("fails fast when the deploy-main env file is missing", () => {
@@ -143,7 +156,9 @@ describe("deploy-main.ps1", () => {
     const result = runDeployScript(root, binDir, ["-Services", "web"]);
 
     expect(result.status).not.toBe(0);
-    expect(`${result.stdout}\n${result.stderr}`).toContain(".worktrees/deploy-main/.env");
+    expect(`${result.stdout}\n${result.stderr}`).toContain(
+      ".worktrees/deploy-main/.env",
+    );
   });
 
   it("uses the deploy-main compose paths and validates required env vars", () => {
@@ -160,9 +175,19 @@ describe("deploy-main.ps1", () => {
     expect(result.status).toBe(0);
 
     const log = readFileSync(dockerLog, "utf8");
-    expect(log).toContain(path.join(root, ".worktrees", "deploy-main", "deploy", "docker-compose.yml"));
+    expect(log).toContain(
+      path.join(
+        root,
+        ".worktrees",
+        "deploy-main",
+        "deploy",
+        "docker-compose.yml",
+      ),
+    );
     expect(log).toContain(path.join(root, ".worktrees", "deploy-main", ".env"));
-    expect(log).toContain(path.join(root, ".worktrees", "deploy-main", "deploy"));
+    expect(log).toContain(
+      path.join(root, ".worktrees", "deploy-main", "deploy"),
+    );
     expect(log).toContain("up -d web");
     expect(log).toContain("exec -T web");
   });
