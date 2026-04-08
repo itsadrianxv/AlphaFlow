@@ -49,6 +49,10 @@ const MODEL_CONTEXT_LIMIT_HINTS: Record<string, number> = {
   "deepseek-reasoner": 64_000,
 };
 
+const MODEL_TIMEOUT_MINIMUMS: Partial<Record<string, number>> = {
+  "deepseek-reasoner": 45_000,
+};
+
 function extractJsonCandidate(content: string): string {
   const fencedMatch = content.match(/```json\s*([\s\S]*?)```/i);
 
@@ -113,6 +117,18 @@ export class DeepSeekClient {
     }
 
     return MODEL_CONTEXT_LIMIT_HINTS[modelName];
+  }
+
+  private resolveTimeoutMs(modelName: string, explicitTimeoutMs?: number) {
+    if (
+      typeof explicitTimeoutMs === "number" &&
+      Number.isFinite(explicitTimeoutMs) &&
+      explicitTimeoutMs > 0
+    ) {
+      return explicitTimeoutMs;
+    }
+
+    return Math.max(this.timeoutMs, MODEL_TIMEOUT_MINIMUMS[modelName] ?? 0);
   }
 
   private truncateMessages(
@@ -219,7 +235,7 @@ export class DeepSeekClient {
     }
 
     const modelName = options?.model ?? this.model;
-    const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
+    const timeoutMs = this.resolveTimeoutMs(modelName, options?.timeoutMs);
     const maxRetries = options?.budgetPolicy?.maxRetries ?? 0;
     let nextMessages = [...messages];
     let currentAttempt = 0;
