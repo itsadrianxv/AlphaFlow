@@ -68,7 +68,7 @@ export class PythonTimingDataClient {
 
     this.baseUrl = resolvedBaseUrl.baseUrl;
     this.timingBasePath = resolvedBaseUrl.timingBasePath;
-    this.timeoutMs = config?.timeoutMs ?? 10_000;
+    this.timeoutMs = config?.timeoutMs ?? env.PYTHON_SERVICE_TIMEOUT_MS;
   }
 
   private timingPath(path: string) {

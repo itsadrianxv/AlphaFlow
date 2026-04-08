@@ -1,11 +1,24 @@
-import { describe, expect, it, vi } from "vitest";
-import { WorkflowDomainError } from "~/server/domain/workflow/errors";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { WORKFLOW_ERROR_CODES } from "~/server/domain/workflow/errors";
 
-async function loadClient() {
+const originalPythonServiceTimeoutMs = process.env.PYTHON_SERVICE_TIMEOUT_MS;
+
+async function loadClient(options?: {
+  pythonServiceTimeoutMs?: string;
+  reloadModules?: boolean;
+}) {
+  if (options?.reloadModules) {
+    vi.resetModules();
+  }
   process.env.SKIP_ENV_VALIDATION = "1";
   process.env.DATABASE_URL ??= "https://example.com/db";
   process.env.REDIS_URL ??= "redis://127.0.0.1:6379";
   process.env.PYTHON_SERVICE_URL ??= "http://127.0.0.1:8000";
+  if (options?.pythonServiceTimeoutMs === undefined) {
+    delete process.env.PYTHON_SERVICE_TIMEOUT_MS;
+  } else {
+    process.env.PYTHON_SERVICE_TIMEOUT_MS = options.pythonServiceTimeoutMs;
+  }
 
   const module = await import(
     "~/server/infrastructure/timing/python-timing-data-client"
@@ -13,6 +26,17 @@ async function loadClient() {
 
   return module.PythonTimingDataClient;
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+
+  if (originalPythonServiceTimeoutMs === undefined) {
+    delete process.env.PYTHON_SERVICE_TIMEOUT_MS;
+  } else {
+    process.env.PYTHON_SERVICE_TIMEOUT_MS = originalPythonServiceTimeoutMs;
+  }
+});
 
 function sampleSignalPayload() {
   return {
@@ -56,6 +80,58 @@ function sampleSignalPayload() {
 }
 
 describe("PythonTimingDataClient", () => {
+  it("uses PYTHON_SERVICE_TIMEOUT_MS for request timeout", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_input, init) => {
+        const signal = init?.signal as AbortSignal;
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener("abort", () => {
+            const abortError = new Error("aborted");
+            abortError.name = "AbortError";
+            reject(abortError);
+          });
+        });
+      }),
+    );
+
+    const PythonTimingDataClient = await loadClient({
+      pythonServiceTimeoutMs: "1234",
+      reloadModules: true,
+    });
+    const client = new PythonTimingDataClient({
+      baseUrl: "http://127.0.0.1:8000",
+    });
+
+    let settled = false;
+    let rejection: unknown;
+    const request = client.getSignal({ stockCode: "600519" }).then(
+      () => {
+        settled = true;
+      },
+      (error) => {
+        settled = true;
+        rejection = error;
+      },
+    );
+
+    try {
+      await vi.advanceTimersByTimeAsync(1234);
+
+      expect(settled).toBe(true);
+      expect(rejection).toMatchObject({
+        name: "WorkflowDomainError",
+        message: expect.stringContaining("1234ms"),
+        code: WORKFLOW_ERROR_CODES.TIMING_DATA_UNAVAILABLE,
+      });
+    } finally {
+      await vi.runAllTimersAsync();
+      await request;
+      vi.useRealTimers();
+    }
+  });
+
   it("unwraps gateway response payloads", async () => {
     vi.stubGlobal(
       "fetch",
@@ -127,7 +203,10 @@ describe("PythonTimingDataClient", () => {
 
     await expect(
       client.getSignal({ stockCode: "600519" }),
-    ).rejects.toBeInstanceOf(WorkflowDomainError);
+    ).rejects.toMatchObject({
+      name: "WorkflowDomainError",
+      code: WORKFLOW_ERROR_CODES.TIMING_DATA_UNAVAILABLE,
+    });
   });
 
   it("unwraps market context payloads", async () => {
