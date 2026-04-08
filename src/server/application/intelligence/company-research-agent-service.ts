@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import { EvidenceReference } from "~/server/domain/intelligence/entities/evidence-reference";
 import type {
@@ -31,12 +32,12 @@ import type {
   CompanyResearchSourceType,
   CompanyResearchVerdict,
 } from "~/server/domain/workflow/types";
+import type { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import type { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import type {
   FirecrawlScrapeDocument,
   FirecrawlSearchResult,
 } from "~/server/infrastructure/intelligence/firecrawl-client";
-import type { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import type { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
 
 export type CompanyResearchAgentServiceDependencies = {
@@ -73,6 +74,11 @@ const VALIDATION_MATURITY: CompanyConceptInsight["maturity"] = "验证阶段";
 const MAX_CURATED_REFERENCES = 15;
 const MAX_ENRICHED_REFERENCES = 15;
 const MAX_QUESTION_EVIDENCE = 3;
+const QUESTION_CONTAINER_KEYS = [
+  "questions",
+  "items",
+  "deepQuestions",
+] as const;
 
 const COLLECTOR_LABELS: Record<CompanyResearchCollectorKey, string> = {
   official_sources: "官网 / IR",
@@ -90,6 +96,45 @@ const DISCLOSURE_HOSTS = new Set([
   "www.szse.cn",
   "hkexnews.hkex.com.hk",
 ]);
+
+type UnknownRecord = Record<string, unknown>;
+
+const companyResearchQuestionSchema = z.object({
+  question: z.string().trim().min(1),
+  whyImportant: z.string().trim().min(1),
+  targetMetric: z.string().trim().min(1),
+  dataHint: z.string().trim().min(1),
+});
+
+const companyResearchQuestionListSchema = z
+  .array(companyResearchQuestionSchema)
+  .max(8);
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function normalizeCompanyResearchQuestions(
+  value: unknown,
+): CompanyResearchQuestion[] {
+  const direct = companyResearchQuestionListSchema.safeParse(value);
+  if (direct.success) {
+    return direct.data;
+  }
+
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  for (const key of QUESTION_CONTAINER_KEYS) {
+    const nested = companyResearchQuestionListSchema.safeParse(value[key]);
+    if (nested.success) {
+      return nested.data;
+    }
+  }
+
+  return [];
+}
 
 function normalizeUrl(url?: string) {
   if (!url) {
@@ -284,7 +329,7 @@ function buildFallbackFindings(
   questions: CompanyResearchQuestion[],
   evidence: CompanyEvidenceNote[],
 ): CompanyQuestionFinding[] {
-  return questions.map((question, index) => {
+  return normalizeCompanyResearchQuestions(questions).map((question, index) => {
     const selectedEvidence = evidence[index] ? [evidence[index]] : [];
 
     return {
@@ -815,11 +860,12 @@ function buildNewsQueries(
   brief: CompanyResearchBrief,
   questions: CompanyResearchQuestion[],
 ) {
+  const normalizedQuestions = normalizeCompanyResearchQuestions(questions);
   const leadConcept = brief.focusConcepts[0] ?? "新业务";
 
   return uniqueStrings([
     `${brief.companyName} ${leadConcept} 最新新闻 订单 产能`,
-    `${brief.companyName} 公告 纪要 ${questions[0]?.targetMetric ?? "利润"}`,
+    `${brief.companyName} 公告 纪要 ${normalizedQuestions[0]?.targetMetric ?? "利润"}`,
     `${brief.companyName} ${leadConcept} 盈利 进展`,
   ]);
 }
@@ -828,12 +874,13 @@ function buildIndustryQueries(
   brief: CompanyResearchBrief,
   questions: CompanyResearchQuestion[],
 ) {
+  const normalizedQuestions = normalizeCompanyResearchQuestions(questions);
   const leadConcept = brief.focusConcepts[0] ?? "新业务";
 
   return uniqueStrings([
     `${brief.companyName} ${leadConcept} 行业格局 竞争对手`,
     `${brief.companyName} 产业链 地位 ${leadConcept}`,
-    `${brief.companyName} ${questions[0]?.targetMetric ?? "收入占比"} 行业对比`,
+    `${brief.companyName} ${normalizedQuestions[0]?.targetMetric ?? "收入占比"} 行业对比`,
   ]);
 }
 
@@ -841,12 +888,13 @@ function buildLegacySearchQueries(
   brief: CompanyResearchBrief,
   questions: CompanyResearchQuestion[],
 ) {
+  const normalizedQuestions = normalizeCompanyResearchQuestions(questions);
   const leadConcept = brief.focusConcepts[0] ?? "新业务";
 
   return uniqueStrings([
     `${brief.companyName} ${leadConcept} 收入占比 利润占比 财报`,
     `${brief.companyName} ${leadConcept} 研发投入 资本开支 利润`,
-    `${brief.companyName} 投资者关系 ${questions[0]?.targetMetric ?? "新业务收入占比"}`,
+    `${brief.companyName} 投资者关系 ${normalizedQuestions[0]?.targetMetric ?? "新业务收入占比"}`,
   ]);
 }
 
@@ -970,7 +1018,7 @@ export class CompanyResearchAgentService {
       params.conceptInsights,
     );
 
-    return this.deepSeekClient.completeJson<CompanyResearchQuestion[]>(
+    return this.deepSeekClient.completeContract<CompanyResearchQuestion[]>(
       [
         {
           role: "system",
@@ -983,6 +1031,7 @@ export class CompanyResearchAgentService {
         },
       ],
       fallback,
+      companyResearchQuestionListSchema,
     );
   }
 
@@ -1334,6 +1383,9 @@ export class CompanyResearchAgentService {
     >;
     collectionNotes: string[];
   }): CuratedEvidenceResult {
+    const normalizedQuestions = normalizeCompanyResearchQuestions(
+      params.questions,
+    );
     const allEvidence = Object.values(
       params.collectedEvidenceByCollector,
     ).flatMap((items) => items ?? []);
@@ -1345,7 +1397,7 @@ export class CompanyResearchAgentService {
         computeEvidenceScore({
           brief: params.brief,
           evidence,
-          questions: params.questions,
+          questions: normalizedQuestions,
         }),
       );
     }
@@ -1466,14 +1518,15 @@ export class CompanyResearchAgentService {
     evidence: CompanyEvidenceNote[];
     compressedFindings?: CompressedFindings;
   }): Promise<CompanyQuestionFinding[]> {
-    const fallback = buildFallbackFindings(params.questions, params.evidence);
+    const questions = normalizeCompanyResearchQuestions(params.questions);
+    const fallback = buildFallbackFindings(questions, params.evidence);
 
     if (params.evidence.length === 0) {
       return fallback;
     }
 
     const selectedByQuestion = new Map<string, CompanyEvidenceNote[]>();
-    for (const question of params.questions) {
+    for (const question of questions) {
       const selected = [...params.evidence]
         .sort(
           (left, right) =>
@@ -1484,7 +1537,7 @@ export class CompanyResearchAgentService {
       selectedByQuestion.set(question.question, selected);
     }
 
-    const promptBody = params.questions
+    const promptBody = questions
       .map((question) => {
         const evidenceList = selectedByQuestion.get(question.question) ?? [];
         return [
@@ -1535,7 +1588,7 @@ export class CompanyResearchAgentService {
     );
 
     return parsed.map((item, index) => {
-      const question = params.questions[index];
+      const question = questions[index];
       const selectedEvidence = question
         ? (selectedByQuestion.get(question.question) ?? [])
         : [];
@@ -1612,10 +1665,14 @@ export class CompanyResearchAgentService {
       | "maxEvidencePerUnit"
     >;
   }): CompanyResearchResultDto {
+    const deepQuestions = normalizeCompanyResearchQuestions(
+      params.deepQuestions,
+    );
+
     return {
       brief: params.brief,
       conceptInsights: params.conceptInsights,
-      deepQuestions: params.deepQuestions,
+      deepQuestions,
       findings: params.findings,
       evidence: params.evidence,
       references: params.references ?? [],

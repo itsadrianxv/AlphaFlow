@@ -1,5 +1,8 @@
 import { v4 as uuidv4 } from "uuid";
-import type { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
+import {
+  type CompanyResearchAgentService,
+  normalizeCompanyResearchQuestions,
+} from "~/server/application/intelligence/company-research-agent-service";
 import { reflectCompanyResearch } from "~/server/application/intelligence/research-reflection";
 import type { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
 import {
@@ -191,13 +194,14 @@ function buildCollectorQueries(params: {
   deepQuestions: CompanyResearchQuestion[];
   officialHosts: Set<string>;
 }) {
+  const deepQuestions = normalizeCompanyResearchQuestions(params.deepQuestions);
   const companyName = params.companyBrief.companyName;
   const leadConcept =
     params.brief?.focusConcepts[0] ??
     params.companyBrief.focusConcepts[0] ??
     "核心业务";
   const leadQuestion =
-    params.deepQuestions[0]?.targetMetric ??
+    deepQuestions[0]?.targetMetric ??
     params.companyBrief.keyQuestions[0] ??
     params.brief?.mustAnswerQuestions[0] ??
     "利润兑现";
@@ -385,7 +389,7 @@ export class CompanyResearchWorkflowService {
     return {
       brief: companyBrief,
       conceptInsights,
-      deepQuestions,
+      deepQuestions: normalizeCompanyResearchQuestions(deepQuestions),
       researchUnits: units,
     };
   }
@@ -971,13 +975,16 @@ export class CompanyResearchWorkflowService {
     state: CompanyResearchGraphState;
     runtimeConfig: ResearchRuntimeConfig;
   }): Promise<CompanyResearchResultDto> {
+    const deepQuestions = normalizeCompanyResearchQuestions(
+      params.state.deepQuestions,
+    );
     const taskContract = resolveTaskContract(params.state);
     const brief =
       params.state.brief ??
       toCompanyBrief(params.state.researchInput, params.state.researchBrief);
     const findings = await this.companyResearchService.answerQuestions({
       brief,
-      questions: params.state.deepQuestions ?? [],
+      questions: deepQuestions,
       evidence: params.state.evidence ?? [],
       compressedFindings: params.state.compressedFindings,
     });
@@ -998,7 +1005,7 @@ export class CompanyResearchWorkflowService {
     const report = this.companyResearchService.buildFinalReport({
       brief,
       conceptInsights: params.state.conceptInsights ?? [],
-      deepQuestions: params.state.deepQuestions ?? [],
+      deepQuestions,
       findings,
       evidence: params.state.evidence ?? [],
       references: params.state.references ?? [],

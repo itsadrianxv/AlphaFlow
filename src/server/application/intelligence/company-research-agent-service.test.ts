@@ -5,6 +5,10 @@ import { createUnavailableConfidenceAnalysis } from "~/server/domain/intelligenc
 function createService(overrides?: {
   scrapeUrl?: ReturnType<typeof vi.fn>;
   search?: ReturnType<typeof vi.fn>;
+  deepSeekClient?: {
+    completeJson?: ReturnType<typeof vi.fn>;
+    completeContract?: ReturnType<typeof vi.fn>;
+  };
 }) {
   const scrapeUrl =
     overrides?.scrapeUrl ??
@@ -14,12 +18,18 @@ function createService(overrides?: {
       markdown: "supplemental markdown content with richer factual detail",
     }));
   const search = overrides?.search ?? vi.fn(async () => []);
+  const deepSeekClient = {
+    completeJson:
+      overrides?.deepSeekClient?.completeJson ??
+      vi.fn(async (_messages, fallback) => fallback),
+    completeContract:
+      overrides?.deepSeekClient?.completeContract ??
+      vi.fn(async (_messages, fallback) => fallback),
+  };
 
   return {
     service: new CompanyResearchAgentService({
-      deepSeekClient: {
-        completeJson: vi.fn(async (_messages, fallback) => fallback),
-      } as never,
+      deepSeekClient: deepSeekClient as never,
       pythonCapabilityGatewayClient: {
         isConfigured: vi.fn(() => true),
         scrapeUrl,
@@ -213,5 +223,79 @@ describe("CompanyResearchAgentService", () => {
     expect(scrapeUrl).toHaveBeenCalledWith("https://example.com/ir");
     expect(enriched.references[0]?.extractedFact).toContain("supplemental");
     expect(enriched.references[1]?.extractedFact).toBe("short");
+  });
+
+  it("falls back to a question array when deep-question output is malformed", async () => {
+    const completeJson = vi.fn(async () => ({
+      questions: [
+        {
+          question: "Wrapped question",
+          whyImportant: "important",
+          targetMetric: "metric",
+          dataHint: "hint",
+        },
+      ],
+    }));
+    const completeContract = vi.fn(async (_messages, fallback) => fallback);
+    const { service } = createService({
+      deepSeekClient: {
+        completeJson,
+        completeContract,
+      },
+    });
+
+    const result = await service.designDeepQuestions({
+      brief: {
+        companyName: "Example Co",
+        officialWebsite: "https://example.com",
+        researchGoal: "Validate earnings conversion",
+        focusConcepts: ["compute"],
+        keyQuestions: ["Can profits scale?"],
+      },
+      conceptInsights: [
+        {
+          concept: "compute",
+          whyItMatters: "important",
+          companyFit: "fit",
+          monetizationPath: "path",
+          maturity: "核心成熟",
+        },
+      ],
+    });
+
+    expect(completeContract).toHaveBeenCalledOnce();
+    expect(Array.isArray(result)).toBe(true);
+    expect(result[0]?.question).toBeTruthy();
+  });
+
+  it("recovers wrapped question payloads when answering questions", async () => {
+    const { service } = createService();
+
+    await expect(
+      service.answerQuestions({
+        brief: {
+          companyName: "Example Co",
+          officialWebsite: "https://example.com",
+          researchGoal: "Validate earnings conversion",
+          focusConcepts: ["compute"],
+          keyQuestions: ["Can profits scale?"],
+        },
+        questions: {
+          questions: [
+            {
+              question: "Can profits scale?",
+              whyImportant: "This decides whether the theme monetizes.",
+              targetMetric: "profit contribution",
+              dataHint: "read notes",
+            },
+          ],
+        } as never,
+        evidence: [],
+      }),
+    ).resolves.toMatchObject([
+      {
+        question: "Can profits scale?",
+      },
+    ]);
   });
 });
