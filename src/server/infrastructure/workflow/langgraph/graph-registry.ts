@@ -43,6 +43,11 @@ export class WorkflowGraphRegistry {
       if (versionedGraph) {
         return versionedGraph;
       }
+
+      throw new WorkflowDomainError(
+        WORKFLOW_ERROR_CODES.WORKFLOW_TEMPLATE_NOT_FOUND,
+        `未注册的工作流模板版本: ${templateCode}@${templateVersion}`,
+      );
     }
 
     const graph = this.graphsByCode.get(templateCode);

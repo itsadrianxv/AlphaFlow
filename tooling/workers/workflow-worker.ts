@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { env } from "~/env";
 import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
+import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
 import { WorkflowExecutionService } from "~/server/application/workflow/execution-service";
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
+import { QuickResearchWorkflowService } from "~/server/application/intelligence/quick-research-workflow-service";
+import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
 import { MarketRegimeService } from "~/server/application/timing/market-regime-service";
 import { TimingAnalysisService } from "~/server/application/timing/timing-analysis-service";
 import { TimingFeedbackService } from "~/server/application/timing/timing-feedback-service";
@@ -36,10 +39,16 @@ import { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timi
 import { PrismaTimingRecommendationRepository } from "~/server/infrastructure/timing/prisma-timing-recommendation-repository";
 import { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
 import {
+  CompanyResearchContractLangGraph,
   CompanyResearchLangGraph,
   LegacyCompanyResearchLangGraph,
+  ODRCompanyResearchLangGraph,
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
-import { QuickResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
+import {
+  QuickResearchContractLangGraph,
+  QuickResearchLangGraph,
+  QuickResearchODRLangGraph,
+} from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
 import { TimingSignalPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-signal-graph";
 import { TimingReviewLoopLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-review-loop-graph";
 import { WatchlistTimingPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/watchlist-timing-graph";
@@ -53,6 +62,30 @@ const pythonDataClient = new PythonIntelligenceDataClient();
 const capabilityGatewayClient = new PythonCapabilityGatewayClient();
 const confidenceAnalysisService = new ConfidenceAnalysisService({
   client: new PythonConfidenceAnalysisClient(),
+});
+const companyResearchService = new CompanyResearchAgentService({
+  deepSeekClient,
+  pythonCapabilityGatewayClient: capabilityGatewayClient,
+  pythonIntelligenceDataClient: pythonDataClient,
+  confidenceAnalysisService,
+});
+const researchToolRegistry = new ResearchToolRegistry({
+  deepSeekClient,
+  pythonCapabilityGatewayClient: capabilityGatewayClient,
+  pythonIntelligenceDataClient: pythonDataClient,
+});
+const quickResearchWorkflowService = new QuickResearchWorkflowService({
+  client: deepSeekClient,
+  intelligenceService: new IntelligenceAgentService({
+    deepSeekClient,
+    dataClient: pythonDataClient,
+    confidenceAnalysisService,
+  }),
+});
+const companyResearchWorkflowService = new CompanyResearchWorkflowService({
+  client: deepSeekClient,
+  companyResearchService,
+  researchToolRegistry,
 });
 const reminderRepository = new PrismaResearchReminderRepository(db);
 const watchListRepository = new PrismaWatchListRepository(db);
@@ -107,22 +140,12 @@ const executionService = new WorkflowExecutionService({
         confidenceAnalysisService,
       }),
     ),
-    new CompanyResearchLangGraph(
-      new CompanyResearchAgentService({
-        deepSeekClient,
-        pythonCapabilityGatewayClient: capabilityGatewayClient,
-        pythonIntelligenceDataClient: pythonDataClient,
-        confidenceAnalysisService,
-      }),
-    ),
-    new LegacyCompanyResearchLangGraph(
-      new CompanyResearchAgentService({
-        deepSeekClient,
-        pythonCapabilityGatewayClient: capabilityGatewayClient,
-        pythonIntelligenceDataClient: pythonDataClient,
-        confidenceAnalysisService,
-      }),
-    ),
+    new QuickResearchODRLangGraph(quickResearchWorkflowService),
+    new QuickResearchContractLangGraph(quickResearchWorkflowService),
+    new CompanyResearchLangGraph(companyResearchService),
+    new LegacyCompanyResearchLangGraph(companyResearchService),
+    new ODRCompanyResearchLangGraph(companyResearchWorkflowService),
+    new CompanyResearchContractLangGraph(companyResearchWorkflowService),
     new TimingSignalPipelineLangGraph({
       timingDataClient: pythonTimingDataClient,
       analysisService: timingAnalysisService,
