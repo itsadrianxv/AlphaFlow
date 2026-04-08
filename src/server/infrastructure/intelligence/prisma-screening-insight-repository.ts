@@ -52,6 +52,25 @@ type InsightVersionRecord = {
   createdAt: Date;
 };
 
+type ScreeningInsightClient = {
+  screeningInsight: {
+    findUnique(args: unknown): Promise<InsightRecord | null>;
+    create(args: unknown): Promise<InsightRecord>;
+    update(args: unknown): Promise<InsightRecord>;
+    findMany(args: unknown): Promise<InsightRecord[]>;
+  };
+  screeningInsightVersion: {
+    create(args: unknown): Promise<InsightVersionRecord>;
+    findUnique(args: unknown): Promise<InsightVersionRecord | null>;
+    findFirst(args: unknown): Promise<InsightVersionRecord | null>;
+    findMany(args: unknown): Promise<InsightVersionRecord[]>;
+  };
+};
+
+function asScreeningInsightClient(client: unknown): ScreeningInsightClient {
+  return client as ScreeningInsightClient;
+}
+
 function serializeInsightVersion(
   insightId: string,
   version: number,
@@ -184,7 +203,8 @@ export class PrismaScreeningInsightRepository
 
   async save(insight: ScreeningInsight): Promise<ScreeningInsight> {
     return this.prisma.$transaction(async (tx) => {
-      const existing = await tx.screeningInsight.findUnique({
+      const txClient = asScreeningInsightClient(tx);
+      const existing = await txClient.screeningInsight.findUnique({
         where: {
           screeningSessionId_stockCode: {
             screeningSessionId: insight.screeningSessionId,
@@ -194,7 +214,7 @@ export class PrismaScreeningInsightRepository
       });
 
       if (!existing) {
-        const createdInsight = await tx.screeningInsight.create({
+        const createdInsight = await txClient.screeningInsight.create({
           data: {
             id: insight.id,
             userId: insight.userId,
@@ -218,14 +238,14 @@ export class PrismaScreeningInsightRepository
             updatedAt: insight.updatedAt,
           },
         });
-        const createdVersion = await tx.screeningInsightVersion.create({
+        const createdVersion = await txClient.screeningInsightVersion.create({
           data: {
             id: insight.latestVersionId ?? insight.createVersionSnapshot(1).id,
             ...serializeInsightVersion(createdInsight.id, 1, insight),
             createdAt: insight.updatedAt,
           },
         });
-        const persisted = await tx.screeningInsight.update({
+        const persisted = await txClient.screeningInsight.update({
           where: { id: createdInsight.id },
           data: { latestVersionId: createdVersion.id },
         });
@@ -237,10 +257,10 @@ export class PrismaScreeningInsightRepository
       }
 
       const latestVersion = existing.latestVersionId
-        ? await tx.screeningInsightVersion.findUnique({
+        ? await txClient.screeningInsightVersion.findUnique({
             where: { id: existing.latestVersionId },
           })
-        : await tx.screeningInsightVersion.findFirst({
+        : await txClient.screeningInsightVersion.findFirst({
             where: { insightId: existing.id },
             orderBy: { version: "desc" },
           });
@@ -249,7 +269,7 @@ export class PrismaScreeningInsightRepository
         latestVersion &&
         versionContentEquals(latestVersion as InsightVersionRecord, insight)
       ) {
-        const updatedRecord = await tx.screeningInsight.update({
+        const updatedRecord = await txClient.screeningInsight.update({
           where: { id: existing.id },
           data: {
             watchListId: insight.watchListId,
@@ -278,14 +298,14 @@ export class PrismaScreeningInsightRepository
       const nextVersion =
         (latestVersion?.version ?? existing.currentVersion) + 1;
       const versionSnapshot = insight.createVersionSnapshot(nextVersion);
-      const createdVersion = await tx.screeningInsightVersion.create({
+      const createdVersion = await txClient.screeningInsightVersion.create({
         data: {
           id: versionSnapshot.id,
           ...serializeInsightVersion(existing.id, nextVersion, insight),
           createdAt: insight.updatedAt,
         },
       });
-      const updatedInsight = await tx.screeningInsight.update({
+      const updatedInsight = await txClient.screeningInsight.update({
         where: { id: existing.id },
         data: {
           watchListId: insight.watchListId,
@@ -315,7 +335,8 @@ export class PrismaScreeningInsightRepository
   }
 
   async findById(id: string): Promise<ScreeningInsight | null> {
-    const record = await this.prisma.screeningInsight.findUnique({
+    const prismaClient = asScreeningInsightClient(this.prisma);
+    const record = await prismaClient.screeningInsight.findUnique({
       where: { id },
     });
 
@@ -340,7 +361,8 @@ export class PrismaScreeningInsightRepository
     limit = 20,
     offset = 0,
   ): Promise<ScreeningInsight[]> {
-    const records = await this.prisma.screeningInsight.findMany({
+    const prismaClient = asScreeningInsightClient(this.prisma);
+    const records = await prismaClient.screeningInsight.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
       take: limit,
@@ -353,7 +375,8 @@ export class PrismaScreeningInsightRepository
   async findByScreeningSessionId(
     screeningSessionId: string,
   ): Promise<ScreeningInsight[]> {
-    const records = await this.prisma.screeningInsight.findMany({
+    const prismaClient = asScreeningInsightClient(this.prisma);
+    const records = await prismaClient.screeningInsight.findMany({
       where: { screeningSessionId },
       orderBy: [{ score: "desc" }, { updatedAt: "desc" }],
     });
@@ -365,7 +388,8 @@ export class PrismaScreeningInsightRepository
     screeningSessionId: string,
     stockCode: string,
   ): Promise<ScreeningInsight | null> {
-    const record = await this.prisma.screeningInsight.findUnique({
+    const prismaClient = asScreeningInsightClient(this.prisma);
+    const record = await prismaClient.screeningInsight.findUnique({
       where: {
         screeningSessionId_stockCode: {
           screeningSessionId,
@@ -391,7 +415,8 @@ export class PrismaScreeningInsightRepository
   }
 
   async findVersions(insightId: string): Promise<ScreeningInsightVersion[]> {
-    const records = await this.prisma.screeningInsightVersion.findMany({
+    const prismaClient = asScreeningInsightClient(this.prisma);
+    const records = await prismaClient.screeningInsightVersion.findMany({
       where: { insightId },
       orderBy: { version: "desc" },
     });
@@ -406,10 +431,11 @@ export class PrismaScreeningInsightRepository
       return [];
     }
 
+    const prismaClient = asScreeningInsightClient(this.prisma);
     const versionIds = records
       .map((record) => record.latestVersionId)
       .filter((id): id is string => Boolean(id));
-    const versions = await this.prisma.screeningInsightVersion.findMany({
+    const versions = await prismaClient.screeningInsightVersion.findMany({
       where: {
         id: {
           in: versionIds,
@@ -433,13 +459,15 @@ export class PrismaScreeningInsightRepository
     insightId: string,
     latestVersionId: string | null,
   ) {
+    const prismaClient = asScreeningInsightClient(this.prisma);
+
     if (latestVersionId) {
-      return (await this.prisma.screeningInsightVersion.findUnique({
+      return (await prismaClient.screeningInsightVersion.findUnique({
         where: { id: latestVersionId },
       })) as InsightVersionRecord | null;
     }
 
-    return (await this.prisma.screeningInsightVersion.findFirst({
+    return (await prismaClient.screeningInsightVersion.findFirst({
       where: { insightId },
       orderBy: { version: "desc" },
     })) as InsightVersionRecord | null;
