@@ -1,15 +1,8 @@
-<div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f172a,50:0f766e,100:14b8a6&height=240&section=header&text=Stock%20Screening%20Boost&fontSize=40&fontColor=f8fafc&animation=fadeIn&desc=%E8%82%A1%E7%A5%A8%E6%8A%95%E7%A0%94%E5%B7%A5%E4%BD%9C%E6%B5%81%E5%AE%9A%E5%88%B6%E5%8C%96%E5%B9%B3%E5%8F%B0&descSize=18&descAlignY=68" alt="Stock Screening Boost hero" />
+# AlphaFlow
 
-  <p>
-    <strong>集成股票海选、行业研究、公司研究与择时组合工作流的股票投研平台</strong>
-  </p>
+面向股票投研场景的智能工作流平台。
 
-  <p>
-
-    
-  </p>
-</div>
+AlphaFlow 将选股筛选、行业研究、公司研究与异步任务编排整合到一个可配置、可追踪的系统中，帮助研究者减少信息噪音，更快聚焦高价值标的，并沉淀可复用的投研流程。
 
 <!-- readme-gen:start:badges -->
 <div align="center">
@@ -32,7 +25,7 @@
 <!-- readme-gen:start:overview -->
 ## 为什么是它
 
-`stock-screening-boost` 不是单纯的“股票列表页”，而是一套围绕 **投研工作流** 设计的工程化平台：
+`AlphaFlow` 不是单纯的“股票列表页”，而是一套围绕 **投研工作流** 设计的工程化平台：
 
 - **策略沉淀**：将筛选条件与评分规则建模为领域对象，可复用、可版本化、可重复执行。
 - **研究提速**：通过 `quick_industry_research` 模板把行业概览、热度分析、候选股筛选与可信度评估串成一个五节点工作流。
@@ -246,7 +239,7 @@ Prisma 当前已覆盖这些核心模型：
 ## 项目结构
 
 ```text
-stock-screening-boost/
+AlphaFlow/
 ├─ src/
 │  ├─ app/                          # Next.js App Router 页面与客户端组件
 │  ├─ contracts/                    # 前后端共享输入输出约束
