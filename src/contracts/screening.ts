@@ -35,7 +35,6 @@ export const indicatorCatalogItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   categoryId: z.string().min(1),
-  providerField: z.string().min(1).optional(),
   valueType: indicatorValueTypeSchema,
   periodScope: indicatorPeriodScopeSchema,
   retrievalMode: indicatorRetrievalModeSchema,
@@ -231,7 +230,7 @@ export const workspaceResultSchema = z.object({
   latestSnapshotRows: z.array(workspaceLatestSnapshotRowSchema),
   warnings: z.array(z.string()).default([]),
   dataStatus: z.enum(["READY", "PARTIAL", "EMPTY", "ERROR"]),
-  provider: z.literal("ifind"),
+  provider: z.string().min(1),
 });
 
 export const workspacePersistedStateSchema = z.object({

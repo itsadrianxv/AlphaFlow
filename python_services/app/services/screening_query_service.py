@@ -2,40 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Protocol
-
 from app.services.screening_formula_engine import SafeFormulaEngine
-
-
-class ScreeningGateway(Protocol):
-    def query_statement_series(
-        self,
-        stock_codes: list[str],
-        indicators: list[dict[str, str]],
-        period: str,
-    ) -> dict[str, dict[str, float | None]]: ...
-
-    def query_latest_snapshot(
-        self,
-        stock_codes: list[str],
-        indicators: list[dict[str, str]],
-    ) -> dict[str, dict[str, float | None]]: ...
-
-    def resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]: ...
-
-
-def _chunked(items: list[str] | list[dict[str, str]], size: int):
-    return [items[index : index + size] for index in range(0, len(items), size)]
+from app.providers.screening.base import ScreeningDataProvider
 
 
 class ScreeningQueryService:
     def __init__(
         self,
         *,
-        gateway: ScreeningGateway,
+        provider: ScreeningDataProvider,
         formula_engine: SafeFormulaEngine | None = None,
     ) -> None:
-        self._gateway = gateway
+        self._provider = provider
         self._formula_engine = formula_engine or SafeFormulaEngine()
 
     def query_dataset(
@@ -46,13 +24,7 @@ class ScreeningQueryService:
         formulas: list[dict[str, object]],
         periods: list[str],
     ) -> dict[str, object]:
-        stock_chunks = _chunked(stock_codes, 5)
-        indicator_chunks = _chunked(indicators, 8)
-        stock_meta = (
-            self._gateway.resolve_stock_metadata(stock_codes)
-            if hasattr(self._gateway, "resolve_stock_metadata")
-            else {stock_code: {"stockName": stock_code} for stock_code in stock_codes}
-        )
+        stock_meta = self._provider.resolve_stock_metadata(stock_codes)
 
         series_values: dict[str, dict[str, dict[str, float | None]]] = {
             stock_code: {} for stock_code in stock_codes
@@ -72,32 +44,24 @@ class ScreeningQueryService:
             if indicator.get("retrievalMode") == "latest_only"
         ]
 
-        for stock_chunk in stock_chunks:
-            for period in periods:
-                for indicator_chunk in _chunked(series_indicators, 8):
-                    if not indicator_chunk:
-                        continue
-                    payload = self._gateway.query_statement_series(
-                        stock_chunk,
-                        indicator_chunk,
-                        period,
-                    )
-                    for stock_code, metric_values in payload.items():
-                        stock_bucket = series_values.setdefault(stock_code, {})
-                        for metric_id, value in metric_values.items():
-                            metric_bucket = stock_bucket.setdefault(metric_id, {})
-                            metric_bucket[period] = value
+        if series_indicators:
+            series_payload = self._provider.query_series_metrics(
+                stock_codes,
+                [indicator["id"] for indicator in series_indicators],
+                periods,
+            )
+            for stock_code, metric_values in series_payload.items():
+                stock_bucket = series_values.setdefault(stock_code, {})
+                for metric_id, by_period in metric_values.items():
+                    stock_bucket[metric_id] = by_period
 
-        for stock_chunk in stock_chunks:
-            for indicator_chunk in _chunked(latest_indicators, 8):
-                if not indicator_chunk:
-                    continue
-                payload = self._gateway.query_latest_snapshot(
-                    stock_chunk,
-                    indicator_chunk,
-                )
-                for stock_code, metric_values in payload.items():
-                    latest_values.setdefault(stock_code, {}).update(metric_values)
+        if latest_indicators:
+            latest_payload = self._provider.query_latest_metrics(
+                stock_codes,
+                [indicator["id"] for indicator in latest_indicators],
+            )
+            for stock_code, metric_values in latest_payload.items():
+                latest_values.setdefault(stock_code, {}).update(metric_values)
 
         inferred_formula_meta: list[dict[str, str]] = []
         for formula in formulas:
@@ -209,5 +173,5 @@ class ScreeningQueryService:
             "latestSnapshotRows": latest_snapshot_rows,
             "warnings": [],
             "dataStatus": "READY" if rows else "EMPTY",
-            "provider": "ifind",
+            "provider": self._provider.provider_name,
         }

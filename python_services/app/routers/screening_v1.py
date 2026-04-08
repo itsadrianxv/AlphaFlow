@@ -1,4 +1,4 @@
-"""Strict iFinD-backed screening workbench routes."""
+"""Strict screening workbench routes."""
 
 from __future__ import annotations
 
@@ -7,9 +7,10 @@ from functools import lru_cache
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.providers.screening.factory import get_screening_provider
 from app.services.screening_catalog import load_indicator_catalog
 from app.services.screening_formula_engine import SafeFormulaEngine
-from app.services.screening_ifind_gateway import IFindWorkbenchGateway, resolve_periods
+from app.services.screening_ifind_gateway import resolve_periods
 from app.services.screening_query_service import ScreeningQueryService
 from app.services.screening_universe import ScreeningStockSearcher
 
@@ -27,10 +28,24 @@ class ScreeningQueryRequest(BaseModel):
     formulas: list[dict[str, object]] = Field(default_factory=list)
     timeConfig: dict[str, str]
 
+
 @lru_cache(maxsize=1)
 def get_stock_searcher() -> ScreeningStockSearcher:
-    gateway = IFindWorkbenchGateway()
-    return ScreeningStockSearcher(universe_loader=gateway.load_universe)
+    provider = get_screening_provider()
+
+    def load_universe():
+        stock_codes = provider.get_all_stock_codes()
+        metadata = provider.resolve_stock_metadata(stock_codes)
+        return [
+            {
+                "stockCode": stock_code,
+                "stockName": metadata.get(stock_code, {}).get("stockName", stock_code),
+                "market": metadata.get(stock_code, {}).get("market", ""),
+            }
+            for stock_code in stock_codes
+        ]
+
+    return ScreeningStockSearcher(universe_loader=load_universe)
 
 
 @router.get("/stocks/search")
@@ -72,8 +87,8 @@ def validate_formula(request: FormulaValidationRequest):
 @router.post("/query")
 def query_dataset(request: ScreeningQueryRequest):
     try:
-        gateway = IFindWorkbenchGateway()
-        service = ScreeningQueryService(gateway=gateway)
+        provider = get_screening_provider()
+        service = ScreeningQueryService(provider=provider)
         periods = resolve_periods(request.timeConfig)
         return service.query_dataset(
             stock_codes=request.stockCodes,

@@ -12,6 +12,7 @@ import pandas as pd
 from app.providers.screening.akshare_provider import AkShareScreeningProvider
 from app.providers.screening.base import ScreeningDataProvider
 from app.providers.screening.ifind_provider import IFindScreeningProvider
+from app.providers.screening.tushare_provider import TushareScreeningProvider
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ class FallbackScreeningProvider(ScreeningDataProvider):
         self._primary = primary
         self._fallback = fallback
         self._industries_cache: tuple[list[str], float] | None = None
+        self.provider_name = primary.provider_name
 
     def get_all_stock_codes(self) -> list[str]:
         try:
@@ -123,6 +125,39 @@ class FallbackScreeningProvider(ScreeningDataProvider):
 
         self._industries_cache = (industries, _now_timestamp())
         return industries
+
+    def resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]:
+        try:
+            return self._primary.resolve_stock_metadata(stock_codes)
+        except Exception as exc:  # noqa: BLE001
+            return self._use_fallback("resolve_stock_metadata", exc, stock_codes)
+
+    def query_latest_metrics(
+        self,
+        stock_codes: list[str],
+        indicator_ids: list[str],
+    ) -> dict[str, dict[str, float | None]]:
+        try:
+            return self._primary.query_latest_metrics(stock_codes, indicator_ids)
+        except Exception as exc:  # noqa: BLE001
+            return self._use_fallback("query_latest_metrics", exc, stock_codes, indicator_ids)
+
+    def query_series_metrics(
+        self,
+        stock_codes: list[str],
+        indicator_ids: list[str],
+        periods: list[str],
+    ) -> dict[str, dict[str, dict[str, float | None]]]:
+        try:
+            return self._primary.query_series_metrics(stock_codes, indicator_ids, periods)
+        except Exception as exc:  # noqa: BLE001
+            return self._use_fallback(
+                "query_series_metrics",
+                exc,
+                stock_codes,
+                indicator_ids,
+                periods,
+            )
 
     def _derive_industries_from_universe(self) -> list[str]:
         stock_codes = self.get_all_stock_codes()
@@ -251,12 +286,18 @@ class FallbackScreeningProvider(ScreeningDataProvider):
 
 @lru_cache(maxsize=1)
 def get_screening_provider() -> ScreeningDataProvider:
-    primary_provider_name = os.getenv("SCREENING_PRIMARY_PROVIDER", "ifind").strip().lower()
-    enable_fallback = _env_bool("SCREENING_ENABLE_AKSHARE_FALLBACK", True)
+    primary_provider_name = os.getenv("SCREENING_PRIMARY_PROVIDER", "tushare").strip().lower()
+    enable_fallback = _env_bool("SCREENING_ENABLE_AKSHARE_FALLBACK", False)
 
     akshare_provider = AkShareScreeningProvider()
     if primary_provider_name == "akshare":
         return akshare_provider
+    if primary_provider_name == "tushare":
+        fallback_provider = akshare_provider if enable_fallback else None
+        return FallbackScreeningProvider(
+            primary=TushareScreeningProvider(),
+            fallback=fallback_provider,
+        )
 
     primary_provider = IFindScreeningProvider()
     fallback_provider = akshare_provider if enable_fallback else None

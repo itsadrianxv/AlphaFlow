@@ -43,7 +43,7 @@ describe("PythonCapabilityGatewayClient", () => {
       json: async () => ({
         meta: {
           traceId: "req-screening",
-          provider: "ifind",
+          provider: "tushare",
           capability: "screening",
           operation: "query_dataset",
         },
@@ -54,7 +54,7 @@ describe("PythonCapabilityGatewayClient", () => {
           latestSnapshotRows: [],
           warnings: [],
           dataStatus: "READY",
-          provider: "ifind",
+          provider: "tushare",
         },
       }),
     });
@@ -81,7 +81,7 @@ describe("PythonCapabilityGatewayClient", () => {
       },
     });
 
-    expect(payload.provider).toBe("ifind");
+    expect(payload.provider).toBe("tushare");
     expect(fetchMock).toHaveBeenCalledWith(
       "http://127.0.0.1:8000/api/v1/capabilities/screening/query-dataset",
       expect.objectContaining({

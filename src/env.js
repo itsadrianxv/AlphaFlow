@@ -56,6 +56,7 @@ export const env = createEnv({
       .default(300_000),
     IFIND_USERNAME: z.string().optional(),
     IFIND_PASSWORD: z.string().optional(),
+    TUSHARE_TOKEN: z.string().optional(),
     SCREENING_PRIMARY_PROVIDER: z.string().optional(),
     SCREENING_ENABLE_AKSHARE_FALLBACK: z.string().optional(),
     DEEPSEEK_API_KEY: z.string().optional(),
@@ -124,6 +125,7 @@ export const env = createEnv({
     ),
     IFIND_USERNAME: process.env.IFIND_USERNAME,
     IFIND_PASSWORD: process.env.IFIND_PASSWORD,
+    TUSHARE_TOKEN: process.env.TUSHARE_TOKEN,
     SCREENING_PRIMARY_PROVIDER: process.env.SCREENING_PRIMARY_PROVIDER,
     SCREENING_ENABLE_AKSHARE_FALLBACK:
       process.env.SCREENING_ENABLE_AKSHARE_FALLBACK,

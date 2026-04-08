@@ -67,42 +67,56 @@ def test_safe_formula_engine_validates_expression_and_target_limit():
 
 
 def test_screening_query_service_chunks_statement_queries_by_budget():
-    class FakeGateway:
+    class FakeProvider:
+        provider_name = "tushare"
+
         def __init__(self) -> None:
-            self.statement_calls: list[tuple[list[str], list[str], str]] = []
+            self.series_calls: list[tuple[list[str], list[str], list[str]]] = []
+            self.latest_calls: list[tuple[list[str], list[str]]] = []
 
-        def query_statement_series(
-            self,
-            stock_codes: list[str],
-            indicators: list[dict[str, str]],
-            period: str,
-        ) -> dict[str, dict[str, float | None]]:
-            self.statement_calls.append(
-                (stock_codes[:], [item["id"] for item in indicators], period)
-            )
+        def resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]:
             return {
                 stock_code: {
-                    indicator["id"]: float(index + len(stock_code))
-                    for index, indicator in enumerate(indicators)
+                    "stockName": f"股票{stock_code}",
+                    "market": "SH" if stock_code.startswith("6") else "SZ",
                 }
                 for stock_code in stock_codes
             }
 
-        def query_latest_snapshot(
+        def query_series_metrics(
             self,
             stock_codes: list[str],
-            indicators: list[dict[str, str]],
-        ) -> dict[str, dict[str, float | None]]:
+            indicator_ids: list[str],
+            periods: list[str],
+        ) -> dict[str, dict[str, dict[str, float | None]]]:
+            self.series_calls.append((stock_codes[:], indicator_ids[:], periods[:]))
             return {
                 stock_code: {
-                    indicator["id"]: float(index + len(stock_code))
-                    for index, indicator in enumerate(indicators)
+                    indicator_id: {
+                        period: float(index + period_index + len(stock_code))
+                        for period_index, period in enumerate(periods)
+                    }
+                    for index, indicator_id in enumerate(indicator_ids)
                 }
                 for stock_code in stock_codes
             }
 
-    gateway = FakeGateway()
-    service = ScreeningQueryService(gateway=gateway)
+        def query_latest_metrics(
+            self,
+            stock_codes: list[str],
+            indicator_ids: list[str],
+        ) -> dict[str, dict[str, float | None]]:
+            self.latest_calls.append((stock_codes[:], indicator_ids[:]))
+            return {
+                stock_code: {
+                    indicator_id: float(index + len(stock_code))
+                    for index, indicator_id in enumerate(indicator_ids)
+                }
+                for stock_code in stock_codes
+            }
+
+    provider = FakeProvider()
+    service = ScreeningQueryService(provider=provider)
 
     stock_codes = [f"{600000 + index}" for index in range(20)]
     indicators = [
@@ -123,19 +137,90 @@ def test_screening_query_service_chunks_statement_queries_by_budget():
         periods=["2022", "2023", "2024"],
     )
 
-    assert result["provider"] == "ifind"
-    assert len(gateway.statement_calls) == 24
-    assert gateway.statement_calls[0] == (
-        stock_codes[:5],
-        [f"metric_{index}" for index in range(8)],
-        "2022",
+    assert result["provider"] == "tushare"
+    assert provider.series_calls == [
+        (
+            stock_codes,
+            [f"metric_{index}" for index in range(10)],
+            ["2022", "2023", "2024"],
+        )
+    ]
+    assert provider.latest_calls == []
+    assert result["latestSnapshotRows"][0]["stockName"] == f"股票{stock_codes[0]}"
+    assert result["rows"][0]["metrics"]["metric_0"]["byPeriod"] == {
+        "2022": 6.0,
+        "2023": 7.0,
+        "2024": 8.0,
+    }
+
+
+def test_screening_query_service_combines_latest_only_and_formula_values():
+    class FakeProvider:
+        provider_name = "tushare"
+
+        def resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]:
+            return {
+                stock_code: {"stockName": stock_code, "market": "SH"}
+                for stock_code in stock_codes
+            }
+
+        def query_series_metrics(
+            self,
+            stock_codes: list[str],
+            indicator_ids: list[str],
+            periods: list[str],
+        ) -> dict[str, dict[str, dict[str, float | None]]]:
+            assert indicator_ids == ["revenue"]
+            assert periods == ["2024"]
+            return {
+                stock_codes[0]: {"revenue": {"2024": 100.0}},
+            }
+
+        def query_latest_metrics(
+            self,
+            stock_codes: list[str],
+            indicator_ids: list[str],
+        ) -> dict[str, dict[str, float | None]]:
+            assert indicator_ids == ["pe_ttm"]
+            return {
+                stock_codes[0]: {"pe_ttm": 20.0},
+            }
+
+    service = ScreeningQueryService(provider=FakeProvider(), formula_engine=SafeFormulaEngine())
+
+    result = service.query_dataset(
+        stock_codes=["600519"],
+        indicators=[
+            {
+                "id": "revenue",
+                "name": "营业收入",
+                "retrievalMode": "statement_series",
+                "periodScope": "series",
+                "valueType": "NUMBER",
+            },
+            {
+                "id": "pe_ttm",
+                "name": "PE(TTM)",
+                "retrievalMode": "latest_only",
+                "periodScope": "latest_only",
+                "valueType": "NUMBER",
+            },
+        ],
+        formulas=[
+            {
+                "id": "revenue_over_pe",
+                "name": "收入除PE",
+                "expression": "var[0] / var[1]",
+                "targetIndicators": ["revenue", "pe_ttm"],
+            }
+        ],
+        periods=["2024"],
     )
-    assert gateway.statement_calls[1] == (
-        stock_codes[:5],
-        ["metric_8", "metric_9"],
-        "2022",
-    )
-    assert gateway.statement_calls[2][2] == "2023"
+
+    assert result["provider"] == "tushare"
+    assert result["latestSnapshotRows"][0]["metrics"]["pe_ttm"]["value"] == 20.0
+    assert result["rows"][0]["metrics"]["revenue"]["byPeriod"]["2024"] == 100.0
+    assert result["rows"][0]["metrics"]["revenue_over_pe"]["byPeriod"]["2024"] == 5.0
 
 
 def test_load_indicator_catalog_returns_non_empty_snapshot():
@@ -148,27 +233,23 @@ def test_load_indicator_catalog_returns_non_empty_snapshot():
     assert catalog["items"]
 
 
-def test_resolve_indicator_mapping_path_supports_container_layout(tmp_path):
-    from app.services.screening_catalog import resolve_indicator_mapping_path
+def test_indicator_catalog_uses_tushare_business_ids():
+    from app.services.screening_catalog import load_indicator_catalog
 
-    app_root = tmp_path / "app"
-    source_file = app_root / "app" / "services" / "screening_catalog.py"
-    source_file.parent.mkdir(parents=True, exist_ok=True)
-    source_file.write_text("# container layout", encoding="utf-8")
+    load_indicator_catalog.cache_clear()
+    catalog = load_indicator_catalog()
+    item_ids = {item["id"] for item in catalog["items"]}
 
-    mapping_path = (
-        app_root
-        / "temp"
-        / "-v3"
-        / "backend"
-        / "app"
-        / "utils"
-        / "indicators_mapping.py"
-    )
-    mapping_path.parent.mkdir(parents=True, exist_ok=True)
-    mapping_path.write_text(
-        "FINANCIAL_STATEMENT_CATEGORIES = {}",
-        encoding="utf-8",
-    )
-
-    assert resolve_indicator_mapping_path(source_file) == mapping_path
+    assert {
+        "pe_ttm",
+        "pb",
+        "market_cap",
+        "float_market_cap",
+        "total_shares",
+        "float_a_shares",
+        "roe_report",
+        "eps_report",
+        "revenue",
+        "net_profit_parent",
+        "asset_liability_ratio",
+    }.issubset(item_ids)

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import hashlib
+from importlib.util import find_spec
 import json
-from typing import Any, Callable, Generic, TypeVar
+import os
+from typing import Any, Generic, TypeVar
 
+from app.providers.screening.factory import get_screening_provider
 from app.services.firecrawl_capability_client import FirecrawlCapabilityClient
-from app.services.ifind_session_manager import IFindSessionManager
-from app.services.screening_ifind_gateway import IFindWorkbenchGateway, resolve_periods
+from app.services.screening_ifind_gateway import resolve_periods
 from app.services.screening_query_service import ScreeningQueryService
 from app.services.zhipu_search_client import ZhipuSearchClient
 
@@ -57,23 +59,26 @@ class ExternalCapabilityGateway:
     def __init__(
         self,
         *,
-        ifind_session_manager: IFindSessionManager | None = None,
         firecrawl_client: FirecrawlCapabilityClient | None = None,
         zhipu_client: ZhipuSearchClient | None = None,
     ) -> None:
-        self._ifind_session_manager = ifind_session_manager or IFindSessionManager()
         self._firecrawl_client = firecrawl_client or FirecrawlCapabilityClient()
         self._zhipu_client = zhipu_client or ZhipuSearchClient()
 
-    def query_screening_dataset(self, request_id: str, payload: dict[str, Any]) -> CapabilityResult[dict[str, Any]]:
+    def query_screening_dataset(
+        self,
+        request_id: str,
+        payload: dict[str, Any],
+    ) -> CapabilityResult[dict[str, Any]]:
         diagnostics = {
-            **self._ifind_session_manager.preflight(),
+            "provider": os.getenv("SCREENING_PRIMARY_PROVIDER", "tushare"),
+            "hasToken": bool(os.getenv("TUSHARE_TOKEN", "").strip()),
+            "sdkAvailable": find_spec("tushare") is not None,
             "requestFingerprint": _fingerprint(payload),
         }
         try:
-            provider = self._ifind_session_manager.ensure_session()
-            gateway = IFindWorkbenchGateway(provider=provider)
-            service = ScreeningQueryService(gateway=gateway)
+            provider = get_screening_provider()
+            service = ScreeningQueryService(provider=provider)
             data = service.query_dataset(
                 stock_codes=list(payload.get("stockCodes", [])),
                 indicators=list(payload.get("indicators", [])),
@@ -81,7 +86,7 @@ class ExternalCapabilityGateway:
                 periods=resolve_periods(dict(payload.get("timeConfig", {}))),
             )
             return CapabilityResult(
-                provider="ifind",
+                provider=provider.provider_name,
                 capability="screening",
                 operation="query_dataset",
                 data=data,
@@ -89,18 +94,22 @@ class ExternalCapabilityGateway:
             )
         except Exception as exc:  # noqa: BLE001
             raise CapabilityError(
-                provider="ifind",
+                provider="tushare",
                 capability="screening",
                 operation="query_dataset",
-                code="ifind_query_failed",
+                code="tushare_query_failed",
                 message=str(exc),
-                failure_phase=_classify_ifind_failure(str(exc)),
+                failure_phase=_classify_screening_failure(str(exc)),
                 diagnostics=diagnostics,
                 retryable=False,
                 status_code=503,
             ) from exc
 
-    def search_web(self, request_id: str, payload: dict[str, Any]) -> CapabilityResult[list[dict[str, Any]]]:
+    def search_web(
+        self,
+        request_id: str,
+        payload: dict[str, Any],
+    ) -> CapabilityResult[list[dict[str, Any]]]:
         diagnostics = {
             **self._firecrawl_client.diagnostics(),
             "requestFingerprint": _fingerprint(payload),
@@ -132,7 +141,11 @@ class ExternalCapabilityGateway:
                 status_code=503,
             ) from exc
 
-    def fetch_web_page(self, request_id: str, payload: dict[str, Any]) -> CapabilityResult[dict[str, Any] | None]:
+    def fetch_web_page(
+        self,
+        request_id: str,
+        payload: dict[str, Any],
+    ) -> CapabilityResult[dict[str, Any] | None]:
         diagnostics = {
             **self._firecrawl_client.diagnostics(),
             "requestFingerprint": _fingerprint(payload),
@@ -160,7 +173,11 @@ class ExternalCapabilityGateway:
                 status_code=503,
             ) from exc
 
-    def match_concepts(self, request_id: str, payload: dict[str, Any]) -> CapabilityResult[list[dict[str, Any]]]:
+    def match_concepts(
+        self,
+        request_id: str,
+        payload: dict[str, Any],
+    ) -> CapabilityResult[list[dict[str, Any]]]:
         diagnostics = {
             "configured": bool(self._zhipu_client.api_key),
             "endpoint": self._zhipu_client.endpoint,
@@ -203,12 +220,10 @@ def _fingerprint(payload: dict[str, Any]) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:12]
 
 
-def _classify_ifind_failure(message: str) -> str:
+def _classify_screening_failure(message: str) -> str:
     normalized = message.lower()
-    if "ifind_username" in normalized or "ifind_password" in normalized:
+    if "tushare_token" in normalized or "token" in normalized:
         return "configuration"
-    if "login" in normalized or "登录" in message:
-        return "authentication"
-    if "iFinDPy" in message or "sdk" in normalized:
+    if "sdk" in normalized or "tushare" in normalized:
         return "runtime_environment"
     return "request"

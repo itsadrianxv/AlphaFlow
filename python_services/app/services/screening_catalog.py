@@ -3,93 +3,66 @@
 from __future__ import annotations
 
 from functools import lru_cache
-import importlib.util
-from pathlib import Path
 
 
-MAPPING_RELATIVE_PATH = (
-    Path("temp")
-    / "-v3"
-    / "backend"
-    / "app"
-    / "utils"
-    / "indicators_mapping.py"
-)
-
-
-LATEST_ONLY_KEYWORDS = ("估值", "资金流向")
-
-
-def _infer_value_type(name: str) -> str:
-    if "率" in name or "占比" in name or "比率" in name or "周转" in name:
-        return "PERCENT"
-    if "价" in name or "市值" in name or "收入" in name or "利润" in name:
-        return "NUMBER"
-    return "NUMBER"
-
-
-def _infer_retrieval_mode(category_name: str) -> tuple[str, str]:
-    if any(keyword in category_name for keyword in LATEST_ONLY_KEYWORDS):
-        return ("latest_only", "latest_only")
-    return ("statement_series", "series")
-
-
-def resolve_indicator_mapping_path(current_file: Path | None = None) -> Path:
-    source_file = (current_file or Path(__file__)).resolve()
-    checked_paths: list[Path] = []
-
-    for parent in source_file.parents:
-        candidate = parent / MAPPING_RELATIVE_PATH
-        checked_paths.append(candidate)
-        if candidate.is_file():
-            return candidate
-
-    raise RuntimeError(
-        "Unable to locate temp-v3 indicator mapping. Checked: "
-        + ", ".join(str(path) for path in checked_paths)
-    )
+_CATALOG = {
+    "valuation": {
+        "name": "估值水平",
+        "items": [
+            ("pe_ttm", "PE(TTM)", "NUMBER", "latest_only", "latest_only"),
+            ("pb", "PB", "NUMBER", "latest_only", "latest_only"),
+            ("market_cap", "总市值", "NUMBER", "latest_only", "latest_only"),
+            ("float_market_cap", "流通市值", "NUMBER", "latest_only", "latest_only"),
+        ],
+    },
+    "capital": {
+        "name": "股本结构",
+        "items": [
+            ("total_shares", "总股本", "NUMBER", "latest_only", "latest_only"),
+            ("float_a_shares", "流通A股", "NUMBER", "latest_only", "latest_only"),
+        ],
+    },
+    "profitability": {
+        "name": "盈利能力",
+        "items": [
+            ("roe_report", "ROE(报告期)", "PERCENT", "series", "statement_series"),
+            ("eps_report", "EPS(报告期)", "NUMBER", "series", "statement_series"),
+            ("asset_liability_ratio", "资产负债率", "PERCENT", "series", "statement_series"),
+        ],
+    },
+    "growth": {
+        "name": "成长质量",
+        "items": [
+            ("revenue", "营业收入", "NUMBER", "series", "statement_series"),
+            ("net_profit_parent", "归母净利润", "NUMBER", "series", "statement_series"),
+        ],
+    },
+}
 
 
 @lru_cache(maxsize=1)
 def load_indicator_catalog() -> dict[str, list[dict[str, object]]]:
-    mapping_path = resolve_indicator_mapping_path()
-
-    spec = importlib.util.spec_from_file_location(
-        "temp_v3_indicators_mapping",
-        mapping_path,
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Unable to load temp-v3 indicator mapping: {mapping_path}")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    raw_categories = getattr(module, "FINANCIAL_STATEMENT_CATEGORIES", {})
-
     categories: list[dict[str, object]] = []
     items: list[dict[str, object]] = []
-    for category_name, payload in raw_categories.items():
-        category_id = str(category_name)
-        indicators = payload.get("indicators", {})
+    for category_id, payload in _CATALOG.items():
+        category_items = payload["items"]
         categories.append(
             {
                 "id": category_id,
-                "name": payload.get("name", category_name),
-                "indicatorCount": len(indicators),
+                "name": payload["name"],
+                "indicatorCount": len(category_items),
             }
         )
-        retrieval_mode, period_scope = _infer_retrieval_mode(category_id)
-        for indicator_name, provider_field in indicators.items():
+        for indicator_id, name, value_type, period_scope, retrieval_mode in category_items:
             items.append(
                 {
-                    "id": str(provider_field),
-                    "name": str(indicator_name),
+                    "id": indicator_id,
+                    "name": name,
                     "categoryId": category_id,
-                    "providerField": str(provider_field),
-                    "valueType": _infer_value_type(str(indicator_name)),
+                    "valueType": value_type,
                     "periodScope": period_scope,
                     "retrievalMode": retrieval_mode,
-                    "description": str(category_name),
+                    "description": payload["name"],
                 }
             )
-
     return {"categories": categories, "items": items}

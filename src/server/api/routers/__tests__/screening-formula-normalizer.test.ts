@@ -4,28 +4,28 @@ import { normalizeFormulaExpression } from "~/server/api/routers/screening-formu
 describe("normalizeFormulaExpression", () => {
   const catalogItems = [
     {
-      id: "roe_ttm",
-      name: "ROE(TTM)",
+      id: "roe_report",
+      name: "ROE(报告期)",
       categoryId: "profitability",
       valueType: "PERCENT",
-      periodScope: "latest_only",
-      retrievalMode: "latest_only",
+      periodScope: "series",
+      retrievalMode: "statement_series",
     },
     {
-      id: "eps_ttm",
-      name: "EPS(TTM)",
+      id: "eps_report",
+      name: "EPS(报告期)",
       categoryId: "profitability",
       valueType: "NUMBER",
-      periodScope: "latest_only",
-      retrievalMode: "latest_only",
+      periodScope: "series",
+      retrievalMode: "statement_series",
     },
   ] as const;
 
   it("converts selected metric placeholders to safe var indexes", () => {
     expect(
       normalizeFormulaExpression({
-        expression: "[ROE(TTM)] + [EPS(TTM)]",
-        targetIndicatorIds: ["roe_ttm", "eps_ttm"],
+        expression: "[ROE(报告期)] + [EPS(报告期)]",
+        targetIndicatorIds: ["roe_report", "eps_report"],
         catalogItems,
       }),
     ).toBe("var[0] + var[1]");
@@ -34,10 +34,10 @@ describe("normalizeFormulaExpression", () => {
   it("rejects placeholders that are not part of selected target indicators", () => {
     expect(() =>
       normalizeFormulaExpression({
-        expression: "[ROE(TTM)] + [PB(TTM)]",
-        targetIndicatorIds: ["roe_ttm", "eps_ttm"],
+        expression: "[ROE(报告期)] + [PB]",
+        targetIndicatorIds: ["roe_report", "eps_report"],
         catalogItems,
       }),
-    ).toThrow(/PB\(TTM\)/);
+    ).toThrow(/PB/);
   });
 });

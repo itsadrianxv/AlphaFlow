@@ -7,6 +7,7 @@ pydantic==2.10.5
 
 # Financial data source
 akshare>=1.18.0
+tushare>=1.4.21
 
 # HTTP client (for potential external API calls)
 httpx==0.26.0

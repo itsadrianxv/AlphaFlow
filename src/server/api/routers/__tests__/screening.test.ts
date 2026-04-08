@@ -22,7 +22,7 @@ describe("screening contracts", () => {
   it("rejects workspace queries above the 20-stock limit", () => {
     const result = workspaceQuerySchema.safeParse({
       stockCodes: Array.from({ length: 21 }, (_, index) => `${600000 + index}`),
-      indicatorIds: ["ths_revenue_stock"],
+      indicatorIds: ["revenue"],
       formulaIds: [],
       timeConfig: {
         periodType: "ANNUAL",
@@ -74,7 +74,7 @@ describe("screening contracts", () => {
 
   it("locks local filters to latest snapshot scope", () => {
     const result = workspaceFilterRuleSchema.safeParse({
-      metricId: "ths_revenue_stock",
+      metricId: "revenue",
       operator: ">=",
       value: 10,
       valueType: "NUMBER",
@@ -89,7 +89,7 @@ describe("screening contracts", () => {
       name: "高质量成长",
       description: "小批量筛选工作台",
       stockCodes: ["600519", "000001"],
-      indicatorIds: ["ths_revenue_stock", "ths_np_atoopc_stock"],
+      indicatorIds: ["revenue", "net_profit_parent"],
       formulaIds: [],
       timeConfig: {
         periodType: "ANNUAL",
@@ -98,7 +98,7 @@ describe("screening contracts", () => {
       },
       filterRules: [
         {
-          metricId: "ths_revenue_stock",
+          metricId: "revenue",
           operator: ">",
           value: 100,
           valueType: "NUMBER",
@@ -106,7 +106,7 @@ describe("screening contracts", () => {
         },
       ],
       sortState: {
-        metricId: "ths_revenue_stock",
+        metricId: "revenue",
         direction: "desc",
       },
       columnState: {
@@ -117,7 +117,7 @@ describe("screening contracts", () => {
         periods: ["2022", "2023", "2024"],
         indicatorMeta: [
           {
-            id: "ths_revenue_stock",
+            id: "revenue",
             name: "营业收入",
             valueType: "NUMBER",
             periodScope: "series",
@@ -129,7 +129,7 @@ describe("screening contracts", () => {
             stockCode: "600519",
             stockName: "贵州茅台",
             metrics: {
-              ths_revenue_stock: {
+              revenue: {
                 byPeriod: {
                   "2022": 1200,
                   "2023": 1300,
@@ -144,7 +144,7 @@ describe("screening contracts", () => {
             stockCode: "600519",
             stockName: "贵州茅台",
             metrics: {
-              ths_revenue_stock: {
+              revenue: {
                 value: 1400,
                 period: "2024",
               },
@@ -153,7 +153,7 @@ describe("screening contracts", () => {
         ],
         warnings: [],
         dataStatus: "READY",
-        provider: "ifind",
+        provider: "tushare",
       },
       lastFetchedAt: "2026-03-20T10:00:00.000Z",
     });

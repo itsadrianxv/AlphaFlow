@@ -23,17 +23,17 @@ def test_screening_query_capability_returns_standard_meta_and_records_replay(tmp
         "latestSnapshotRows": [],
         "warnings": [],
         "dataStatus": "READY",
-        "provider": "ifind",
+        "provider": "tushare",
     }
 
     with patch(
         "app.routers.capabilities_v1.external_capability_gateway.query_screening_dataset",
         return_value=CapabilityResult(
-            provider="ifind",
+            provider="tushare",
             capability="screening",
             operation="query_dataset",
             data=fake_payload,
-            diagnostics={"environment": "test"},
+            diagnostics={"hasToken": True},
         ),
     ):
         response = client.post(
@@ -54,10 +54,10 @@ def test_screening_query_capability_returns_standard_meta_and_records_replay(tmp
     assert response.status_code == 200
     payload = response.json()
     assert payload["meta"]["traceId"] == "req_screening_case"
-    assert payload["meta"]["provider"] == "ifind"
+    assert payload["meta"]["provider"] == "tushare"
     assert payload["meta"]["capability"] == "screening"
     assert payload["meta"]["operation"] == "query_dataset"
-    assert payload["data"]["provider"] == "ifind"
+    assert payload["data"]["provider"] == "tushare"
 
     artifacts = list(Path(replay_dir).rglob("*.json"))
     assert len(artifacts) == 1
@@ -72,13 +72,13 @@ def test_screening_query_capability_returns_error_envelope():
     with patch(
         "app.routers.capabilities_v1.external_capability_gateway.query_screening_dataset",
         side_effect=CapabilityError(
-            provider="ifind",
+            provider="tushare",
             capability="screening",
             operation="query_dataset",
-            code="ifind_login_failed",
-            message="iFinD login failed",
-            failure_phase="authentication",
-            diagnostics={"sdkAvailable": True},
+            code="tushare_query_failed",
+            message="Tushare token missing",
+            failure_phase="configuration",
+            diagnostics={"hasToken": False},
             status_code=503,
         ),
     ):
@@ -100,30 +100,12 @@ def test_screening_query_capability_returns_error_envelope():
     assert response.status_code == 503
     payload = response.json()
     assert payload["error"]["traceId"] == "req_screening_error"
-    assert payload["error"]["provider"] == "ifind"
+    assert payload["error"]["provider"] == "tushare"
     assert payload["error"]["capability"] == "screening"
     assert payload["error"]["operation"] == "query_dataset"
-    assert payload["error"]["code"] == "ifind_login_failed"
-    assert payload["error"]["failurePhase"] == "authentication"
-    assert payload["error"]["diagnostics"]["sdkAvailable"] is True
-
-
-def test_ifind_session_manager_serializes_initial_login():
-    from app.services.ifind_session_manager import IFindSessionManager
-
-    class FakeProvider:
-        login_calls = 0
-
-        def _ensure_login(self) -> None:  # noqa: SLF001
-            type(self).login_calls += 1
-
-    manager = IFindSessionManager(provider_factory=FakeProvider)
-
-    provider_a = manager.ensure_session()
-    provider_b = manager.ensure_session()
-
-    assert provider_a is provider_b
-    assert FakeProvider.login_calls == 1
+    assert payload["error"]["code"] == "tushare_query_failed"
+    assert payload["error"]["failurePhase"] == "configuration"
+    assert payload["error"]["diagnostics"]["hasToken"] is False
 
 
 def test_capability_replay_compare_uses_semantic_outcome_only(tmp_path, monkeypatch):
@@ -138,7 +120,7 @@ def test_capability_replay_compare_uses_semantic_outcome_only(tmp_path, monkeypa
 
     recorded = record_replay_artifact(
         trace_id="req_compare",
-        provider="ifind",
+        provider="tushare",
         capability="screening",
         operation="query_dataset",
         request_payload={"stockCodes": ["600519"]},
