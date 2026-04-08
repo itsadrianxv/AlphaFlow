@@ -1,21 +1,15 @@
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-sans/700.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource/ibm-plex-mono/600.css";
 import "~/styles/globals.css";
 
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 
 import { TRPCReactProvider } from "~/trpc/react";
-
-const uiSans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-ui-sans",
-});
-
-const dataMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-data-mono",
-});
 
 export const metadata: Metadata = {
   title: "股票筛选增强 · 投资决策终端",
@@ -29,7 +23,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body className={`${uiSans.variable} ${dataMono.variable} antialiased`}>
+      <body className="antialiased">
         <TRPCReactProvider>{children}</TRPCReactProvider>
       </body>
     </html>

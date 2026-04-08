@@ -20,8 +20,8 @@ import {
   workspaceSummarySchema,
 } from "~/contracts/screening";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { LocalStockSearchService } from "~/server/infrastructure/screening/local-stock-search-service";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
+import { LocalStockSearchService } from "~/server/infrastructure/screening/local-stock-search-service";
 
 type ScreeningFormulaRecord = {
   id: string;
@@ -232,7 +232,9 @@ export const screeningRouter = createTRPCRouter({
         skip: input?.offset ?? 0,
       });
 
-      return records.map((record) => buildFormula(record));
+      return records.map((record: (typeof records)[number]) =>
+        buildFormula(record),
+      );
     }),
 
   validateFormula: protectedProcedure
@@ -360,17 +362,18 @@ export const screeningRouter = createTRPCRouter({
         return indicator;
       });
 
-      const formulas =
+      const formulaRecords =
         input.formulaIds.length === 0
           ? []
-          : (
-              await db.screeningFormula.findMany({
-                where: {
-                  userId: ctx.session.user.id,
-                  id: { in: input.formulaIds },
-                },
-              })
-            ).map((record) => buildFormula(record));
+          : await db.screeningFormula.findMany({
+              where: {
+                userId: ctx.session.user.id,
+                id: { in: input.formulaIds },
+              },
+            });
+      const formulas = formulaRecords.map(
+        (record: (typeof formulaRecords)[number]) => buildFormula(record),
+      );
 
       if (formulas.length !== input.formulaIds.length) {
         throw new TRPCError({
@@ -424,7 +427,10 @@ export const screeningRouter = createTRPCRouter({
       });
 
       if (!existing) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "宸ヤ綔鍙颁笉瀛樺湪" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "宸ヤ綔鍙颁笉瀛樺湪",
+        });
       }
 
       const updated = await db.screeningWorkspace.update({
@@ -462,7 +468,9 @@ export const screeningRouter = createTRPCRouter({
         skip: input?.offset ?? 0,
       });
 
-      return records.map((record) => buildWorkspaceSummary(record));
+      return records.map((record: (typeof records)[number]) =>
+        buildWorkspaceSummary(record),
+      );
     }),
 
   getWorkspace: protectedProcedure
@@ -477,7 +485,10 @@ export const screeningRouter = createTRPCRouter({
       });
 
       if (!record) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "宸ヤ綔鍙颁笉瀛樺湪" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "宸ヤ綔鍙颁笉瀛樺湪",
+        });
       }
 
       return buildWorkspaceDetail(record);
@@ -495,7 +506,10 @@ export const screeningRouter = createTRPCRouter({
       });
 
       if (!record) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "宸ヤ綔鍙颁笉瀛樺湪" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "宸ヤ綔鍙颁笉瀛樺湪",
+        });
       }
 
       await db.screeningWorkspace.delete({
@@ -505,4 +519,3 @@ export const screeningRouter = createTRPCRouter({
       return { success: true };
     }),
 });
-

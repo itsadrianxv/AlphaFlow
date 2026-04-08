@@ -27,6 +27,8 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.2",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.8",
     "@langchain/langgraph": "^1.2.0",
     "@prisma/client": "^6.6.0",
     "@t3-oss/env-nextjs": "^0.12.0",

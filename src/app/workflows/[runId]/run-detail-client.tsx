@@ -272,6 +272,8 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
       await utils.workflow.getRun.invalidate({ runId });
     },
   });
+  type RunEventItem = NonNullable<typeof runQuery.data>["events"][number];
+  type RunNodeItem = NonNullable<typeof runQuery.data>["nodes"][number];
 
   useEffect(() => {
     const eventSource = new EventSource(`/api/workflows/runs/${runId}/events`);
@@ -315,7 +317,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
 
   const timeline = useMemo(() => {
     const dbEvents =
-      runQuery.data?.events.map((event) => ({
+      runQuery.data?.events.map((event: RunEventItem) => ({
         runId,
         sequence: event.sequence,
         type: event.eventType,
@@ -372,7 +374,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
     () =>
       [...(run?.events ?? [])]
         .reverse()
-        .find((event) => event.eventType === "RUN_PAUSED"),
+        .find((event: RunEventItem) => event.eventType === "RUN_PAUSED"),
     [run?.events],
   );
   const clarificationPayload =
@@ -1079,7 +1081,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                 />
               ) : (
                 <div className="grid gap-3">
-                  {run.nodes.map((node) => (
+                  {run.nodes.map((node: RunNodeItem) => (
                     <article
                       key={node.id}
                       className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4"
@@ -1130,7 +1132,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                 />
               ) : (
                 <div className="grid gap-2">
-                  {timeline.map((event) => (
+                  {timeline.map((event: StreamEvent) => (
                     <article
                       key={`${event.sequence}-${event.type}`}
                       className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] px-4 py-3"

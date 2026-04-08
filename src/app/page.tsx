@@ -17,6 +17,13 @@ import { getTemplateLabel } from "~/app/workflows/research-view-models";
 import { auth } from "~/server/auth";
 import { api, HydrateClient } from "~/trpc/server";
 
+type WorkflowRunListItem = Awaited<
+  ReturnType<typeof api.workflow.listRuns>
+>["items"][number];
+type RecommendationListItem = Awaited<
+  ReturnType<typeof api.timing.listRecommendations>
+>[number];
+
 function formatDate(value?: Date | null): string {
   if (!value) {
     return "-";
@@ -92,21 +99,26 @@ export default async function Home() {
     }
   }
 
-  const liveRuns = (workflowRuns ?? []).filter(
-    (run) => run.status === "PENDING" || run.status === "RUNNING",
+  const allWorkflowRuns: NonNullable<typeof workflowRuns> = workflowRuns ?? [];
+  const liveRuns = allWorkflowRuns.filter(
+    (run: WorkflowRunListItem) =>
+      run.status === "PENDING" || run.status === "RUNNING",
   );
   const recentScreeningWorkspaces: NonNullable<typeof screeningWorkspaces> =
     screeningWorkspaces ?? [];
+  const allRecommendations: NonNullable<typeof recommendations> =
+    recommendations ?? [];
   const latestRecommendationRunId = recommendations?.[0]?.workflowRunId;
   const latestRecommendations = latestRecommendationRunId
-    ? (recommendations ?? []).filter(
-        (item) => item.workflowRunId === latestRecommendationRunId,
+    ? allRecommendations.filter(
+        (item: RecommendationListItem) =>
+          item.workflowRunId === latestRecommendationRunId,
       )
-    : (recommendations ?? []).slice(0, 6);
+    : allRecommendations.slice(0, 6);
   const portfolioSnapshot = portfolioSnapshots?.[0] ?? null;
 
   const priorityRecommendation = latestRecommendations[0] ?? null;
-  const priorityResearch = liveRuns[0] ?? workflowRuns?.[0] ?? null;
+  const priorityResearch = liveRuns[0] ?? allWorkflowRuns[0] ?? null;
   const priorityScreening = recentScreeningWorkspaces[0] ?? null;
 
   const priorityTitle = !signedIn
@@ -136,9 +148,13 @@ export default async function Home() {
             )}`
           : "工作台已空闲，可以发起新的研究或筛选。";
 
-  const chartValues = liveRuns.slice(0, 4).map((item) => item.progressPercent);
+  const chartValues = liveRuns
+    .slice(0, 4)
+    .map((item: WorkflowRunListItem) => item.progressPercent);
   const opportunityScale = Math.max(
-    ...latestRecommendations.map((item) => item.suggestedMaxPct ?? 0),
+    ...latestRecommendations.map(
+      (item: RecommendationListItem) => item.suggestedMaxPct ?? 0,
+    ),
     1,
   );
 
@@ -281,62 +297,66 @@ export default async function Home() {
               />
             ) : (
               <div className="grid gap-4">
-                {latestRecommendations.slice(0, 5).map((item) => {
-                  const width = Math.max(
-                    14,
-                    ((item.suggestedMaxPct ?? 0) / opportunityScale) * 100,
-                  );
+                {latestRecommendations
+                  .slice(0, 5)
+                  .map((item: RecommendationListItem) => {
+                    const width = Math.max(
+                      14,
+                      ((item.suggestedMaxPct ?? 0) / opportunityScale) * 100,
+                    );
 
-                  return (
-                    <article
-                      key={item.id}
-                      className="rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] p-4"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="text-sm font-medium text-[var(--app-text-strong)]">
-                              {item.stockName}
+                    return (
+                      <article
+                        key={item.id}
+                        className="rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] p-4"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="text-sm font-medium text-[var(--app-text-strong)]">
+                                {item.stockName}
+                              </div>
+                              <div className="text-xs text-[var(--app-text-subtle)]">
+                                {item.stockCode}
+                              </div>
+                              <StatusPill
+                                label={
+                                  actionLabelMap[item.action] ?? item.action
+                                }
+                                tone="success"
+                              />
+                              <StatusPill
+                                label={`优先级 ${item.priority}`}
+                                tone="warning"
+                              />
                             </div>
-                            <div className="text-xs text-[var(--app-text-subtle)]">
-                              {item.stockCode}
+                            <div className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
+                              {item.reasoning.actionRationale}
                             </div>
-                            <StatusPill
-                              label={actionLabelMap[item.action] ?? item.action}
-                              tone="success"
-                            />
-                            <StatusPill
-                              label={`优先级 ${item.priority}`}
-                              tone="warning"
-                            />
                           </div>
-                          <div className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
-                            {item.reasoning.actionRationale}
-                          </div>
-                        </div>
-                        <div className="w-full max-w-[220px]">
-                          <div className="flex items-center justify-between gap-3 text-xs text-[var(--app-text-subtle)]">
-                            <span>建议上限</span>
-                            <span className="app-data text-[var(--app-text-strong)]">
+                          <div className="w-full max-w-[220px]">
+                            <div className="flex items-center justify-between gap-3 text-xs text-[var(--app-text-subtle)]">
+                              <span>建议上限</span>
+                              <span className="app-data text-[var(--app-text-strong)]">
+                                {formatPct(item.suggestedMaxPct)}
+                              </span>
+                            </div>
+                            <div className="mt-2 h-2 rounded-full bg-[rgba(255,255,255,0.06)]">
+                              <div
+                                className="h-2 rounded-full bg-[var(--app-brand)]"
+                                style={{ width: `${width}%` }}
+                              />
+                            </div>
+                            <div className="mt-2 text-xs text-[var(--app-text-subtle)]">
+                              风险预算 {formatPct(item.riskBudgetPct)} ·
+                              建议区间 {formatPct(item.suggestedMinPct)} 至{" "}
                               {formatPct(item.suggestedMaxPct)}
-                            </span>
-                          </div>
-                          <div className="mt-2 h-2 rounded-full bg-[rgba(255,255,255,0.06)]">
-                            <div
-                              className="h-2 rounded-full bg-[var(--app-brand)]"
-                              style={{ width: `${width}%` }}
-                            />
-                          </div>
-                          <div className="mt-2 text-xs text-[var(--app-text-subtle)]">
-                            风险预算 {formatPct(item.riskBudgetPct)} · 建议区间{" "}
-                            {formatPct(item.suggestedMinPct)} 至{" "}
-                            {formatPct(item.suggestedMaxPct)}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                      </article>
+                    );
+                  })}
               </div>
             )}
           </BentoCard>
@@ -371,7 +391,7 @@ export default async function Home() {
                 </div>
 
                 <div className="grid gap-3">
-                  {liveRuns.map((run) => (
+                  {liveRuns.map((run: WorkflowRunListItem) => (
                     <article
                       key={run.id}
                       className="rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] p-4"

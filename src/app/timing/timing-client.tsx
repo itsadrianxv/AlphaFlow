@@ -287,15 +287,26 @@ export function TimingClient() {
 
   const cards = cardsQuery.data ?? [];
   const recommendations = recommendationsQuery.data ?? [];
+  type RecommendationItem = NonNullable<
+    typeof recommendationsQuery.data
+  >[number];
+  type PortfolioSnapshotItem = NonNullable<
+    typeof portfolioSnapshotsQuery.data
+  >[number];
+  type ReviewRecordItem = NonNullable<typeof reviewRecordsQuery.data>[number];
+  type PresetItem = NonNullable<typeof presetsQuery.data>[number];
+  type CardItem = NonNullable<typeof cardsQuery.data>[number];
+  type WatchListItem = NonNullable<typeof watchListsQuery.data>[number];
   const latestRecommendationRunId = recommendations[0]?.workflowRunId;
   const latestRecommendations = latestRecommendationRunId
     ? recommendations.filter(
-        (item) => item.workflowRunId === latestRecommendationRunId,
+        (item: RecommendationItem) =>
+          item.workflowRunId === latestRecommendationRunId,
       )
     : recommendations;
   const selectedSnapshot =
     portfolioSnapshotsQuery.data?.find(
-      (snapshot) => snapshot.id === selectedPortfolioId,
+      (snapshot: PortfolioSnapshotItem) => snapshot.id === selectedPortfolioId,
     ) ?? null;
   const recommendationContext = latestRecommendations[0]?.reasoning;
   const reviewRecords = reviewRecordsQuery.data ?? [];
@@ -331,7 +342,9 @@ export function TimingClient() {
       return;
     }
 
-    const preset = presets.find((item) => item.id === presetDraftId);
+    const preset = presets.find(
+      (item: PresetItem) => item.id === presetDraftId,
+    );
     if (!preset) {
       return;
     }
@@ -481,36 +494,38 @@ export function TimingClient() {
             <EmptyState title="还没有新的组合建议" />
           ) : (
             <div className="grid gap-3">
-              {latestRecommendations.slice(0, 3).map((recommendation) => (
-                <article
-                  key={recommendation.id}
-                  className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <StatusPill
-                      label={
-                        actionLabelMap[recommendation.action] ??
-                        recommendation.action
-                      }
-                      tone={actionToneMap[recommendation.action] ?? "neutral"}
-                    />
-                    <StatusPill
-                      label={`优先级 ${recommendation.priority}`}
-                      tone="warning"
-                    />
-                    <StatusPill
-                      label={`预算 ${formatPct(recommendation.riskBudgetPct)}`}
-                      tone="neutral"
-                    />
-                  </div>
-                  <p className="mt-3 text-base font-medium text-[var(--app-text)]">
-                    {recommendation.stockName} · {recommendation.stockCode}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
-                    {recommendation.reasoning.actionRationale}
-                  </p>
-                </article>
-              ))}
+              {latestRecommendations
+                .slice(0, 3)
+                .map((recommendation: RecommendationItem) => (
+                  <article
+                    key={recommendation.id}
+                    className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusPill
+                        label={
+                          actionLabelMap[recommendation.action] ??
+                          recommendation.action
+                        }
+                        tone={actionToneMap[recommendation.action] ?? "neutral"}
+                      />
+                      <StatusPill
+                        label={`优先级 ${recommendation.priority}`}
+                        tone="warning"
+                      />
+                      <StatusPill
+                        label={`预算 ${formatPct(recommendation.riskBudgetPct)}`}
+                        tone="neutral"
+                      />
+                    </div>
+                    <p className="mt-3 text-base font-medium text-[var(--app-text)]">
+                      {recommendation.stockName} · {recommendation.stockCode}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
+                      {recommendation.reasoning.actionRationale}
+                    </p>
+                  </article>
+                ))}
             </div>
           )}
         </Panel>
@@ -670,7 +685,7 @@ export function TimingClient() {
                 tone={selectedPresetId ? "success" : "info"}
               />
               <StatusPill
-                label={`${reviewRecords.filter((item) => !item.completedAt).length} 条待复查`}
+                label={`${reviewRecords.filter((item: ReviewRecordItem) => !item.completedAt).length} 条待复查`}
                 tone="warning"
               />
             </div>
@@ -682,7 +697,7 @@ export function TimingClient() {
                 className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
               >
                 <option value="">内置默认参数</option>
-                {presets.map((preset) => (
+                {presets.map((preset: PresetItem) => (
                   <option key={preset.id} value={preset.id}>
                     {preset.name}
                   </option>
@@ -696,7 +711,7 @@ export function TimingClient() {
               {presets.length === 0 ? (
                 <EmptyState title="还没有自定义参数预设" />
               ) : (
-                presets.map((preset) => (
+                presets.map((preset: PresetItem) => (
                   <button
                     key={preset.id}
                     type="button"
@@ -723,7 +738,7 @@ export function TimingClient() {
                   className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 >
                   <option value="">新建参数预设</option>
-                  {presets.map((preset) => (
+                  {presets.map((preset: PresetItem) => (
                     <option key={preset.id} value={preset.id}>
                       {preset.name}
                     </option>
@@ -825,11 +840,13 @@ export function TimingClient() {
                   className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 >
                   <option value="">新建一个快照</option>
-                  {portfolioSnapshotsQuery.data?.map((snapshot) => (
-                    <option key={snapshot.id} value={snapshot.id}>
-                      {snapshot.name}
-                    </option>
-                  ))}
+                  {portfolioSnapshotsQuery.data?.map(
+                    (snapshot: PortfolioSnapshotItem) => (
+                      <option key={snapshot.id} value={snapshot.id}>
+                        {snapshot.name}
+                      </option>
+                    ),
+                  )}
                 </select>
               </label>
               <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
@@ -957,7 +974,7 @@ export function TimingClient() {
                 <StatusPill
                   label={
                     watchListsQuery.data?.find(
-                      (item) => item.id === watchListId,
+                      (item: WatchListItem) => item.id === watchListId,
                     )?.name ?? "未选择自选清单"
                   }
                   tone="info"
@@ -1026,7 +1043,7 @@ export function TimingClient() {
           <EmptyState title="暂无组合建议" />
         ) : (
           <div className="grid gap-4">
-            {latestRecommendations.map((recommendation) => (
+            {latestRecommendations.map((recommendation: RecommendationItem) => (
               <article
                 key={recommendation.id}
                 className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-5"
@@ -1118,7 +1135,7 @@ export function TimingClient() {
                     </p>
                     <ul className="mt-2 grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
                       {recommendation.reasoning.marketContext.constraints.map(
-                        (item) => (
+                        (item: string) => (
                           <li key={item}>- {item}</li>
                         ),
                       )}
@@ -1130,12 +1147,12 @@ export function TimingClient() {
                     </p>
                     <ul className="mt-2 grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
                       {recommendation.reasoning.signalContext.triggerNotes.map(
-                        (item) => (
+                        (item: string) => (
                           <li key={item}>- {item}</li>
                         ),
                       )}
                       {recommendation.reasoning.signalContext.invalidationNotes.map(
-                        (item) => (
+                        (item: string) => (
                           <li key={item}>× {item}</li>
                         ),
                       )}
@@ -1151,7 +1168,7 @@ export function TimingClient() {
                           暂无
                         </span>
                       ) : (
-                        recommendation.riskFlags.map((flag) => (
+                        recommendation.riskFlags.map((flag: string) => (
                           <StatusPill key={flag} label={flag} tone="warning" />
                         ))
                       )}
@@ -1180,7 +1197,7 @@ export function TimingClient() {
           <EmptyState title="暂无复盘记录" />
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {reviewRecords.map((record) => (
+            {reviewRecords.map((record: ReviewRecordItem) => (
               <article
                 key={record.id}
                 className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-5"
@@ -1310,7 +1327,7 @@ export function TimingClient() {
           <EmptyState title="还没有信号结果" />
         ) : (
           <div className="grid gap-4">
-            {cards.map((card) => {
+            {cards.map((card: CardItem) => {
               const indicators = card.signalSnapshot?.indicators;
 
               return (
