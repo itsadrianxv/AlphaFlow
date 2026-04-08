@@ -168,7 +168,7 @@ const startScreeningInsightPipelineInput = z.object({
 });
 
 const startTimingSignalPipelineInput = z.object({
-  stockCode: z.string().regex(/^\\d{6}$/, "stockCode 必须是 6 位数字"),
+  stockCode: z.string().regex(/^\d{6}$/, "stockCode 必须是 6 位数字"),
   asOfDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
