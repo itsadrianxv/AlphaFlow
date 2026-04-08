@@ -1,5 +1,19 @@
-﻿import { createEnv } from "@t3-oss/env-nextjs";
+import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
+
+/**
+ * Keep fallback behavior consistent even when env validation is skipped.
+ * @param {string | number | undefined} value
+ * @param {number} fallback
+ */
+function readPositiveNumberEnv(value, fallback) {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 export const env = createEnv({
   /**
@@ -89,29 +103,47 @@ export const env = createEnv({
     AUTH_CREDENTIALS_USERNAME: process.env.AUTH_CREDENTIALS_USERNAME,
     AUTH_CREDENTIALS_PASSWORD: process.env.AUTH_CREDENTIALS_PASSWORD,
     DATABASE_URL: process.env.DATABASE_URL,
-    REDIS_URL: process.env.REDIS_URL,
-    PYTHON_SERVICE_URL: process.env.PYTHON_SERVICE_URL,
-    PYTHON_SERVICE_TIMEOUT_MS: process.env.PYTHON_SERVICE_TIMEOUT_MS,
+    REDIS_URL: process.env.REDIS_URL ?? "redis://127.0.0.1:6379",
+    PYTHON_SERVICE_URL:
+      process.env.PYTHON_SERVICE_URL ?? "http://127.0.0.1:8000",
+    PYTHON_SERVICE_TIMEOUT_MS: readPositiveNumberEnv(
+      process.env.PYTHON_SERVICE_TIMEOUT_MS,
+      60_000,
+    ),
     PYTHON_INTELLIGENCE_SERVICE_URL:
-      process.env.PYTHON_INTELLIGENCE_SERVICE_URL,
-    PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS:
+      process.env.PYTHON_INTELLIGENCE_SERVICE_URL ?? "http://127.0.0.1:8000",
+    PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS: readPositiveNumberEnv(
       process.env.PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS,
+      300_000,
+    ),
     IFIND_USERNAME: process.env.IFIND_USERNAME,
     IFIND_PASSWORD: process.env.IFIND_PASSWORD,
     SCREENING_PRIMARY_PROVIDER: process.env.SCREENING_PRIMARY_PROVIDER,
     SCREENING_ENABLE_AKSHARE_FALLBACK:
       process.env.SCREENING_ENABLE_AKSHARE_FALLBACK,
     DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
-    DEEPSEEK_BASE_URL: process.env.DEEPSEEK_BASE_URL,
-    DEEPSEEK_TIMEOUT_MS: process.env.DEEPSEEK_TIMEOUT_MS,
+    DEEPSEEK_BASE_URL:
+      process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com",
+    DEEPSEEK_TIMEOUT_MS: readPositiveNumberEnv(
+      process.env.DEEPSEEK_TIMEOUT_MS,
+      15_000,
+    ),
     FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
-    FIRECRAWL_BASE_URL: process.env.FIRECRAWL_BASE_URL,
-    FIRECRAWL_TIMEOUT_MS: process.env.FIRECRAWL_TIMEOUT_MS,
-    WORKFLOW_WORKER_POLL_INTERVAL_MS:
+    FIRECRAWL_BASE_URL:
+      process.env.FIRECRAWL_BASE_URL ?? "https://api.firecrawl.dev",
+    FIRECRAWL_TIMEOUT_MS: readPositiveNumberEnv(
+      process.env.FIRECRAWL_TIMEOUT_MS,
+      15_000,
+    ),
+    WORKFLOW_WORKER_POLL_INTERVAL_MS: readPositiveNumberEnv(
       process.env.WORKFLOW_WORKER_POLL_INTERVAL_MS,
-    SCREENING_WORKER_POLL_INTERVAL_MS:
+      2000,
+    ),
+    SCREENING_WORKER_POLL_INTERVAL_MS: readPositiveNumberEnv(
       process.env.SCREENING_WORKER_POLL_INTERVAL_MS,
-    NODE_ENV: process.env.NODE_ENV,
+      2000,
+    ),
+    NODE_ENV: process.env.NODE_ENV ?? "development",
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
