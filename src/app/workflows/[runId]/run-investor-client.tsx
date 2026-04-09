@@ -317,14 +317,14 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
           ) : null}
 
           {run.errorMessage ? (
-            <div className="rounded-[16px] border border-[rgba(201,119,132,0.34)] bg-[rgba(81,33,43,0.22)] px-4 py-3 text-sm text-[var(--app-danger)]">
+            <div className="rounded-[16px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
               {run.errorCode ? `${run.errorCode}: ` : ""}
               {run.errorMessage}
             </div>
           ) : null}
 
           {approveMutation.error ? (
-            <div className="rounded-[16px] border border-[rgba(201,119,132,0.34)] bg-[rgba(81,33,43,0.22)] px-4 py-3 text-sm text-[var(--app-danger)]">
+            <div className="rounded-[16px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
               {approveMutation.error.message}
             </div>
           ) : null}
@@ -334,7 +334,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
             description="在不改写原始结论的前提下，补充支持、证据不足与冲突信号。"
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+              <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
                 <div className="text-xs text-[var(--app-text-soft)]">
                   可信度得分
                 </div>
@@ -342,13 +342,13 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                   {confidenceAnalysis?.finalScore ?? "未分析"}
                 </div>
               </div>
-              <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+              <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
                 <div className="text-xs text-[var(--app-text-soft)]">等级</div>
                 <div className="app-data mt-2 text-lg text-[var(--app-text)]">
                   {formatConfidenceLevel(confidenceAnalysis?.level)}
                 </div>
               </div>
-              <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+              <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
                 <div className="text-xs text-[var(--app-text-soft)]">
                   支持/不足/冲突
                 </div>
@@ -358,7 +358,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                     : "0/0/0"}
                 </div>
               </div>
-              <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+              <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
                 <div className="text-xs text-[var(--app-text-soft)]">
                   证据覆盖率
                 </div>
@@ -375,7 +375,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                 {confidenceAnalysis.notes.map((note) => (
                   <div
                     key={note}
-                    className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.84)] px-3 py-2 text-sm leading-6 text-[var(--app-text-muted)]"
+                    className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-3 py-2 text-sm leading-6 text-[var(--app-text-muted)]"
                   >
                     {note}
                   </div>
@@ -388,7 +388,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                 {confidenceAnalysis.claims.map((claim) => (
                   <details
                     key={claim.claimId}
-                    className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.84)] px-4 py-3"
+                    className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3"
                   >
                     <summary className="cursor-pointer text-sm text-[var(--app-text)]">
                       {claim.claimText}
@@ -412,14 +412,14 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
           >
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {digest.metrics.length === 0 ? (
-                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3 text-sm text-[var(--app-text-muted)]">
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3 text-sm text-[var(--app-text-muted)]">
                   暂无结构化指标。
                 </div>
               ) : (
                 digest.metrics.map((metric) => (
                   <div
                     key={`${metric.label}-${metric.value}`}
-                    className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3"
+                    className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3"
                   >
                     <div className="text-xs text-[var(--app-text-soft)]">
                       {metric.label}
@@ -468,7 +468,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
               description="展示一手信源覆盖、采集器输出，以及最终公司结论使用到的结构化引用。"
             >
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
                   <div className="text-xs text-[var(--app-text-soft)]">
                     原始证据
                   </div>
@@ -477,7 +477,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                       companyResult.evidence.length}
                   </div>
                 </div>
-                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
                   <div className="text-xs text-[var(--app-text-soft)]">
                     入选证据
                   </div>
@@ -486,7 +486,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                       companyResult.evidence.length}
                   </div>
                 </div>
-                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
                   <div className="text-xs text-[var(--app-text-soft)]">
                     引用
                   </div>
@@ -495,7 +495,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                       companyResult.evidence.length}
                   </div>
                 </div>
-                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3">
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
                   <div className="text-xs text-[var(--app-text-soft)]">
                     一手信源
                   </div>
@@ -513,7 +513,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                     (collector) => (
                       <div
                         key={collector.collectorKey}
-                        className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.84)] px-4 py-3 text-sm text-[var(--app-text-muted)]"
+                        className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3 text-sm text-[var(--app-text-muted)]"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-[var(--app-text)]">
@@ -540,7 +540,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                     .map((reference) => (
                       <div
                         key={reference.id}
-                        className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.84)] px-4 py-3"
+                        className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3"
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusPill

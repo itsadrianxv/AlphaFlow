@@ -65,14 +65,14 @@ const navItems: Array<{
 
 const toneClassMap: Record<Tone, string> = {
   neutral:
-    "border-[var(--app-border-soft)] bg-[rgba(255,255,255,0.38)] text-[var(--app-text-muted)]",
-  info: "border-[rgba(255,161,16,0.42)] bg-[rgba(255,161,16,0.16)] text-[var(--app-text-strong)]",
+    "border-[var(--app-neutral-border)] bg-[var(--app-neutral-surface)] text-[var(--app-text-muted)]",
+  info: "border-[var(--app-info-border)] bg-[var(--app-info-surface)] text-[var(--app-text-strong)]",
   success:
-    "border-[rgba(250,82,15,0.42)] bg-[rgba(250,82,15,0.12)] text-[var(--app-text-strong)]",
+    "border-[var(--app-success-border)] bg-[var(--app-success-surface)] text-[var(--app-text-strong)]",
   warning:
-    "border-[rgba(255,129,5,0.38)] bg-[rgba(255,129,5,0.14)] text-[var(--app-text-strong)]",
+    "border-[var(--app-warning-border)] bg-[var(--app-warning-surface)] text-[var(--app-text-strong)]",
   danger:
-    "border-[rgba(183,63,19,0.36)] bg-[rgba(183,63,19,0.12)] text-[var(--app-danger)]",
+    "border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] text-[var(--app-danger)]",
 };
 
 const surfaceClassMap: Record<Surface, string> = {
@@ -904,7 +904,7 @@ export function DataTable<T>(props: {
                   <tr
                     key={rowId}
                     className={cn(
-                      selectedRowId === rowId && "bg-[rgba(120,160,243,0.08)]",
+                      selectedRowId === rowId && "bg-[var(--app-selection)]",
                       clickable && "cursor-pointer",
                     )}
                     onClick={() => onRowClick?.(row)}

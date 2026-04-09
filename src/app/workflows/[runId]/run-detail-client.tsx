@@ -538,24 +538,24 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                   </span>
                 </div>
                 {run.errorMessage ? (
-                  <div className="mt-4 rounded-[10px] border border-[rgba(239,142,157,0.34)] bg-[rgba(97,39,50,0.2)] px-4 py-3 text-sm text-[var(--app-danger)]">
+                  <div className="mt-4 rounded-[10px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
                     {run.errorCode ? `${run.errorCode}: ` : ""}
                     {run.errorMessage}
                   </div>
                 ) : null}
                 {canApprove ? (
-                  <div className="mt-4 rounded-[10px] border border-[rgba(191,154,96,0.34)] bg-[rgba(77,58,27,0.22)] px-4 py-3 text-sm text-[var(--app-warning)]">
+                  <div className="mt-4 rounded-[10px] border border-[var(--app-warning-border)] bg-[var(--app-warning-surface)] px-4 py-3 text-sm text-[var(--app-warning)]">
                     这条筛选洞察流程需要人工复核后才能继续执行。
                   </div>
                 ) : null}
                 {approveMutation.error ? (
-                  <div className="mt-4 rounded-[10px] border border-[rgba(239,142,157,0.34)] bg-[rgba(97,39,50,0.2)] px-4 py-3 text-sm text-[var(--app-danger)]">
+                  <div className="mt-4 rounded-[10px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
                     {approveMutation.error.message}
                   </div>
                 ) : null}
               </div>
 
-              <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.74)] p-4 text-sm text-[var(--app-text-muted)]">
+              <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] p-4 text-sm text-[var(--app-text-muted)]">
                 <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                   完成时间
                 </p>
@@ -578,7 +578,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
               description="本次研究在范围澄清阶段暂停，补充缺失信息后可直接重新发起同类任务。"
             >
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
-                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                   <p className="text-sm leading-7 text-[var(--app-text)]">
                     {typeof clarificationPayload.question === "string"
                       ? clarificationPayload.question
@@ -597,7 +597,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                     </div>
                   ) : null}
                   {clarificationPayload.suggestedInputPatch ? (
-                    <pre className="mt-4 overflow-x-auto rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] p-3 text-xs text-[var(--app-text-soft)]">
+                    <pre className="mt-4 overflow-x-auto rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] p-3 text-xs text-[var(--app-text-soft)]">
                       {JSON.stringify(
                         clarificationPayload.suggestedInputPatch,
                         null,
@@ -606,7 +606,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                     </pre>
                   ) : null}
                 </div>
-                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4 text-sm text-[var(--app-text-muted)]">
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4 text-sm text-[var(--app-text-muted)]">
                   <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                     下一步
                   </p>
@@ -631,7 +631,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
               description={clarificationDescription}
             >
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
-                <div className="rounded-[12px] border border-[rgba(191,154,96,0.34)] bg-[rgba(77,58,27,0.22)] p-4">
+                <div className="rounded-[12px] border border-[var(--app-warning-border)] bg-[var(--app-warning-surface)] p-4">
                   <p className="text-sm leading-7 text-[var(--app-text)]">
                     {typeof clarificationPayload.question === "string"
                       ? clarificationPayload.question
@@ -656,7 +656,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                     </div>
                   ) : null}
                 </div>
-                <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4 text-sm text-[var(--app-text-muted)]">
+                <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4 text-sm text-[var(--app-text-muted)]">
                   <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                     下一步
                   </p>
@@ -683,7 +683,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                 description="先看公司研究的最终立场，再决定是否继续下钻问题与证据。"
               >
                 <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-                  <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                  <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                     <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                       结论
                     </p>
@@ -696,7 +696,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                       ))}
                     </div>
                   </div>
-                  <div className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                  <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                     <p className="text-sm leading-7 text-[var(--app-text)]">
                       {companyResult.verdict.summary}
                     </p>
@@ -745,7 +745,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                   description="这里汇总新的研究工作流规划、笔记、压缩结论和缺口判断。"
                 >
                   <div className="grid gap-4 lg:grid-cols-2">
-                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                       <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                         研究简报
                       </p>
@@ -760,7 +760,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                         )}
                       </pre>
                     </article>
-                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                       <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                         计划单元
                       </p>
@@ -771,7 +771,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                           companyResult.researchPlan?.map((unit) => (
                             <div
                               key={unit.id}
-                              className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.72)] px-3 py-2"
+                              className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-3 py-2"
                             >
                               <div className="flex items-center justify-between gap-3">
                                 <p className="text-[13px] text-[var(--app-text)]">
@@ -790,7 +790,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                         )}
                       </div>
                     </article>
-                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                       <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                         压缩结论
                       </p>
@@ -806,7 +806,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                         ))}
                       </div>
                     </article>
-                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                       <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                         缺口分析
                       </p>
@@ -829,7 +829,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                         .map((note) => (
                           <article
                             key={note.noteId}
-                            className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4"
+                            className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <p className="text-sm text-[var(--app-text)]">
@@ -856,7 +856,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                     {companyResult.conceptInsights.map((item) => (
                       <article
                         key={item.concept}
-                        className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4"
+                        className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <p className="text-[15px] font-medium text-[var(--app-text)]">
@@ -884,7 +884,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                       return (
                         <article
                           key={item.question}
-                          className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4"
+                          className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-[15px] font-medium text-[var(--app-text)]">
@@ -959,7 +959,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                   description="抓取服务获取到的网页证据会优先出现在这里。"
                 >
                   <div className="grid gap-3">
-                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                    <article className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusPill
                           label={
@@ -1025,7 +1025,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                     {companyResult.evidence.map((item) => (
                       <article
                         key={`${item.referenceId}-${item.title}`}
-                        className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4"
+                        className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <StatusPill label={item.sourceType} tone="info" />
@@ -1062,7 +1062,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                     ))}
 
                     {(companyResult.references ?? []).length > 0 ? (
-                      <article className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4">
+                      <article className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                         <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                           引用列表
                         </p>
@@ -1070,7 +1070,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                           {(companyResult.references ?? []).map((reference) => (
                             <div
                               key={reference.id}
-                              className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.72)] p-3"
+                              className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] p-3"
                             >
                               <div className="flex flex-wrap items-center gap-2">
                                 <StatusPill
@@ -1131,7 +1131,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                 {resultHighlights.map((item) => (
                   <article
                     key={item.key}
-                    className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4"
+                    className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
                   >
                     <p className="text-xs uppercase tracking-[0.16em] text-[var(--app-text-soft)]">
                       {item.key}
@@ -1162,7 +1162,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                   {run.nodes.map((node: RunNodeItem) => (
                     <article
                       key={node.id}
-                      className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] p-4"
+                      className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
@@ -1188,7 +1188,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                       </div>
 
                       {node.errorMessage ? (
-                        <div className="mt-4 rounded-[10px] border border-[rgba(239,142,157,0.34)] bg-[rgba(97,39,50,0.2)] px-4 py-3 text-sm text-[var(--app-danger)]">
+                        <div className="mt-4 rounded-[10px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
                           {node.errorCode ? `${node.errorCode}: ` : ""}
                           {node.errorMessage}
                         </div>
@@ -1213,7 +1213,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
                   {timeline.map((event: StreamEvent) => (
                     <article
                       key={`${event.sequence}-${event.type}`}
-                      className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(13,18,25,0.72)] px-4 py-3"
+                      className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3"
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusPill
@@ -1237,7 +1237,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
               )}
 
               {streamError ? (
-                <div className="mt-4 rounded-[10px] border border-[rgba(226,181,111,0.34)] bg-[rgba(86,60,23,0.2)] px-4 py-3 text-sm text-[var(--app-warning)]">
+                <div className="mt-4 rounded-[10px] border border-[var(--app-warning-border)] bg-[var(--app-warning-surface)] px-4 py-3 text-sm text-[var(--app-warning)]">
                   {streamError}
                 </div>
               ) : null}
@@ -1248,7 +1248,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
             title="原始结果数据"
             description="需要更细节的研究输出时，再展开完整结果对象。"
           >
-            <pre className="app-data app-scroll overflow-auto rounded-[10px] border border-[var(--app-border)] bg-[rgba(10,14,18,0.88)] p-4 text-xs leading-6 text-[var(--app-accent-strong)]">
+            <pre className="app-data app-scroll overflow-auto rounded-[10px] border border-[var(--app-border)] bg-[var(--app-code-bg)] p-4 text-xs leading-6 text-[var(--app-accent-strong)]">
               {JSON.stringify(run.result ?? {}, null, 2)}
             </pre>
           </Panel>

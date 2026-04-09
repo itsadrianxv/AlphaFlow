@@ -245,8 +245,8 @@ export function WorkflowHistoryClient(props: {
                     onClick={() => setSelectedRunId(run.id)}
                     className={`rounded-[16px] border px-4 py-4 text-left transition-colors ${
                       active
-                        ? "border-[var(--app-border-strong)] bg-[rgba(18,28,39,0.96)]"
-                        : "border-[var(--app-border)] bg-[rgba(12,16,22,0.82)] hover:border-[var(--app-border-strong)] hover:bg-[rgba(16,21,29,0.9)]"
+                        ? "border-[var(--app-border-strong)] bg-[var(--app-panel-strong)]"
+                        : "border-[var(--app-border)] bg-[var(--app-panel)] hover:border-[var(--app-border-strong)] hover:bg-[var(--app-panel-strong)]"
                     }`}
                   >
                     <div className="flex flex-wrap items-center gap-2">
@@ -367,7 +367,7 @@ export function WorkflowHistoryClient(props: {
               </div>
 
               <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.82)] px-4 py-4">
+                <div className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-4">
                   <p className="text-xs text-[var(--app-text-soft)]">
                     发起时间
                   </p>
@@ -375,7 +375,7 @@ export function WorkflowHistoryClient(props: {
                     {formatDate(runDetailQuery.data.createdAt)}
                   </p>
                 </div>
-                <div className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.82)] px-4 py-4">
+                <div className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-4">
                   <p className="text-xs text-[var(--app-text-soft)]">
                     完成时间
                   </p>
@@ -383,7 +383,7 @@ export function WorkflowHistoryClient(props: {
                     {formatDate(runDetailQuery.data.completedAt)}
                   </p>
                 </div>
-                <div className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.82)] px-4 py-4">
+                <div className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-4">
                   <p className="text-xs text-[var(--app-text-soft)]">
                     当前节点
                   </p>
@@ -391,7 +391,7 @@ export function WorkflowHistoryClient(props: {
                     {runDetailQuery.data.currentNodeKey ?? "无活动节点"}
                   </p>
                 </div>
-                <div className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.82)] px-4 py-4">
+                <div className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-4">
                   <p className="text-xs text-[var(--app-text-soft)]">
                     结果版本
                   </p>
@@ -402,7 +402,7 @@ export function WorkflowHistoryClient(props: {
               </div>
 
               {isLiveRun(runDetailQuery.data.status) ? (
-                <div className="mt-5 rounded-[16px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.82)] p-4">
+                <div className="mt-5 rounded-[16px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                   <div className="mb-2 flex items-center justify-between gap-3 text-xs text-[var(--app-text-soft)]">
                     <span>
                       {runDetailQuery.data.currentNodeKey ?? "等待更新"}
@@ -417,7 +417,7 @@ export function WorkflowHistoryClient(props: {
               ) : null}
 
               {runDetailQuery.data.errorMessage ? (
-                <div className="mt-5 rounded-[16px] border border-[rgba(201,119,132,0.34)] bg-[rgba(81,33,43,0.22)] px-4 py-3 text-sm text-[var(--app-danger)]">
+                <div className="mt-5 rounded-[16px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
                   {runDetailQuery.data.errorCode
                     ? `${runDetailQuery.data.errorCode}: `
                     : ""}
@@ -429,7 +429,7 @@ export function WorkflowHistoryClient(props: {
                 {digest.metrics.map((metric) => (
                   <div
                     key={`${runDetailQuery.data.id}-${metric.label}`}
-                    className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.82)] px-4 py-4"
+                    className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-4"
                   >
                     <p className="text-xs text-[var(--app-text-soft)]">
                       {metric.label}

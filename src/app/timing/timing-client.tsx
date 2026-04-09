@@ -550,7 +550,7 @@ export function TimingClient() {
                 .map((recommendation: RecommendationItem) => (
                   <article
                     key={recommendation.id}
-                    className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-4"
+                    className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
                   >
                     <div className="flex flex-wrap items-center gap-2">
                       <StatusPill
@@ -584,7 +584,7 @@ export function TimingClient() {
         <Panel title="风险预算 / 组合语境">
           <div className="grid gap-3">
             {latestRecommendations.length > 0 && recommendationContext ? (
-              <article className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-4">
+              <article className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusPill
                     label={
@@ -618,7 +618,7 @@ export function TimingClient() {
             )}
 
             {selectedSnapshot ? (
-              <article className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-4">
+              <article className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-base font-medium text-[var(--app-text)]">
@@ -655,7 +655,7 @@ export function TimingClient() {
                   )
                 }
                 placeholder="例如 600519"
-                className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
               />
             </label>
             <div className="flex items-center gap-3">
@@ -683,7 +683,7 @@ export function TimingClient() {
               <select
                 value={watchListId}
                 onChange={(event) => setWatchListId(event.target.value)}
-                className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
               >
                 {watchListsQuery.data?.map((watchList) => (
                   <option key={watchList.id} value={watchList.id}>
@@ -727,7 +727,7 @@ export function TimingClient() {
         }
       >
         <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <div className="grid gap-4 rounded-[12px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.76)] p-4">
+          <div className="grid gap-4 rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] p-4">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
                 label={
@@ -745,7 +745,7 @@ export function TimingClient() {
               <select
                 value={selectedPresetId}
                 onChange={(event) => setSelectedPresetId(event.target.value)}
-                className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
               >
                 <option value="">内置默认参数</option>
                 {presets.map((preset: PresetItem) => (
@@ -767,7 +767,7 @@ export function TimingClient() {
                     key={preset.id}
                     type="button"
                     onClick={() => setPresetDraftId(preset.id)}
-                    className="flex items-center justify-between rounded-[10px] border border-[var(--app-border)] bg-[rgba(10,13,18,0.9)] px-4 py-3 text-left text-sm text-[var(--app-text)] transition-colors hover:border-[var(--app-border-strong)]"
+                    className="flex items-center justify-between rounded-[10px] border border-[var(--app-border)] bg-[var(--app-code-bg)] px-4 py-3 text-left text-sm text-[var(--app-text)] transition-colors hover:border-[var(--app-border-strong)]"
                   >
                     <span>{preset.name}</span>
                     <span className="text-xs text-[var(--app-text-soft)]">
@@ -779,14 +779,14 @@ export function TimingClient() {
             </div>
           </div>
 
-          <div className="grid gap-4 rounded-[12px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.76)] p-4">
+          <div className="grid gap-4 rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] p-4">
             <div className="grid gap-4 md:grid-cols-[220px_1fr]">
               <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
                 编辑已有参数预设
                 <select
                   value={presetDraftId}
                   onChange={(event) => setPresetDraftId(event.target.value)}
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 >
                   <option value="">新建参数预设</option>
                   {presets.map((preset: PresetItem) => (
@@ -801,7 +801,7 @@ export function TimingClient() {
                 <input
                   value={presetName}
                   onChange={(event) => setPresetName(event.target.value)}
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 />
               </label>
             </div>
@@ -810,7 +810,7 @@ export function TimingClient() {
               <input
                 value={presetDescription}
                 onChange={(event) => setPresetDescription(event.target.value)}
-                className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
               />
             </label>
             <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
@@ -819,11 +819,11 @@ export function TimingClient() {
                 value={presetConfigJson}
                 onChange={(event) => setPresetConfigJson(event.target.value)}
                 rows={14}
-                className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(10,13,18,0.96)] px-4 py-3 font-mono text-xs leading-6 text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-code-bg)] px-4 py-3 font-mono text-xs leading-6 text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
               />
             </label>
             {presetFormError ? (
-              <div className="rounded-[10px] border border-[rgba(239,142,157,0.34)] bg-[rgba(97,39,50,0.2)] px-4 py-3 text-sm text-[var(--app-danger)]">
+              <div className="rounded-[10px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
                 {presetFormError}
               </div>
             ) : null}
@@ -888,7 +888,7 @@ export function TimingClient() {
                   onChange={(event) =>
                     setSelectedPortfolioId(event.target.value)
                   }
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 >
                   <option value="">新建一个快照</option>
                   {portfolioSnapshotsQuery.data?.map(
@@ -905,7 +905,7 @@ export function TimingClient() {
                 <input
                   value={portfolioName}
                   onChange={(event) => setPortfolioName(event.target.value)}
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 />
               </label>
               <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
@@ -913,7 +913,7 @@ export function TimingClient() {
                 <input
                   value={baseCurrency}
                   onChange={(event) => setBaseCurrency(event.target.value)}
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 />
               </label>
             </div>
@@ -925,7 +925,7 @@ export function TimingClient() {
                   value={cash}
                   onChange={(event) => setCash(event.target.value)}
                   inputMode="decimal"
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 />
               </label>
               <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
@@ -934,7 +934,7 @@ export function TimingClient() {
                   value={totalCapital}
                   onChange={(event) => setTotalCapital(event.target.value)}
                   inputMode="decimal"
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 />
               </label>
               <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
@@ -943,7 +943,7 @@ export function TimingClient() {
                   value={maxSingleNamePct}
                   onChange={(event) => setMaxSingleNamePct(event.target.value)}
                   inputMode="decimal"
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 />
               </label>
               <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
@@ -954,7 +954,7 @@ export function TimingClient() {
                     setMaxPortfolioRiskBudgetPct(event.target.value)
                   }
                   inputMode="decimal"
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 />
               </label>
             </div>
@@ -968,7 +968,7 @@ export function TimingClient() {
                     setMaxThemeExposurePct(event.target.value)
                   }
                   inputMode="decimal"
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 />
               </label>
               <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
@@ -977,7 +977,7 @@ export function TimingClient() {
                   value={defaultProbePct}
                   onChange={(event) => setDefaultProbePct(event.target.value)}
                   inputMode="decimal"
-                  className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                  className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
                 />
               </label>
             </div>
@@ -988,12 +988,12 @@ export function TimingClient() {
                 value={positionsJson}
                 onChange={(event) => setPositionsJson(event.target.value)}
                 rows={12}
-                className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(10,13,18,0.96)] px-4 py-3 font-mono text-xs leading-6 text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+                className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-code-bg)] px-4 py-3 font-mono text-xs leading-6 text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
               />
             </label>
 
             {portfolioFormError ? (
-              <div className="rounded-[10px] border border-[rgba(239,142,157,0.34)] bg-[rgba(97,39,50,0.2)] px-4 py-3 text-sm text-[var(--app-danger)]">
+              <div className="rounded-[10px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
                 {portfolioFormError}
               </div>
             ) : null}
@@ -1020,7 +1020,7 @@ export function TimingClient() {
           }
         >
           <div className="grid gap-4">
-            <div className="grid gap-3 rounded-[12px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] p-4">
+            <div className="grid gap-3 rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusPill
                   label={
@@ -1042,7 +1042,7 @@ export function TimingClient() {
             </div>
 
             {latestRecommendations.length > 0 && recommendationContext ? (
-              <div className="grid gap-3 rounded-[12px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] p-4">
+              <div className="grid gap-3 rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] p-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusPill
                     label={
@@ -1097,7 +1097,7 @@ export function TimingClient() {
             {latestRecommendations.map((recommendation: RecommendationItem) => (
               <article
                 key={recommendation.id}
-                className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-5"
+                className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-5"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -1139,7 +1139,7 @@ export function TimingClient() {
                 </div>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-4">
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                     <div className="text-xs text-[var(--app-text-soft)]">
                       建议区间
                     </div>
@@ -1148,7 +1148,7 @@ export function TimingClient() {
                       {formatPct(recommendation.suggestedMaxPct)}
                     </div>
                   </div>
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                     <div className="text-xs text-[var(--app-text-soft)]">
                       置信度
                     </div>
@@ -1156,7 +1156,7 @@ export function TimingClient() {
                       {recommendation.confidence}
                     </div>
                   </div>
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                     <div className="text-xs text-[var(--app-text-soft)]">
                       当前持仓
                     </div>
@@ -1167,7 +1167,7 @@ export function TimingClient() {
                       )}
                     </div>
                   </div>
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                     <div className="text-xs text-[var(--app-text-soft)]">
                       目标增量
                     </div>
@@ -1251,7 +1251,7 @@ export function TimingClient() {
             {reviewRecords.map((record: ReviewRecordItem) => (
               <article
                 key={record.id}
-                className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-5"
+                className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-5"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -1301,7 +1301,7 @@ export function TimingClient() {
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                     <div className="text-xs text-[var(--app-text-soft)]">
                       区间收益
                     </div>
@@ -1309,7 +1309,7 @@ export function TimingClient() {
                       {formatPct(record.actualReturnPct)}
                     </div>
                   </div>
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                     <div className="text-xs text-[var(--app-text-soft)]">
                       最大顺行
                     </div>
@@ -1317,7 +1317,7 @@ export function TimingClient() {
                       {formatPct(record.maxFavorableExcursionPct)}
                     </div>
                   </div>
-                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                  <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                     <div className="text-xs text-[var(--app-text-soft)]">
                       最大逆行
                     </div>
@@ -1353,14 +1353,14 @@ export function TimingClient() {
               )
             }
             placeholder="按股票代码筛选"
-            className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+            className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
           />
           <select
             value={filterSourceType}
             onChange={(event) =>
               setFilterSourceType(event.target.value as typeof filterSourceType)
             }
-            className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.9)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
+            className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text)] outline-none transition-colors focus:border-[var(--app-border-strong)]"
           >
             <option value="all">全部来源</option>
             <option value="single">单股</option>
@@ -1384,7 +1384,7 @@ export function TimingClient() {
               return (
                 <article
                   key={card.id}
-                  className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(14,18,24,0.88)] p-5"
+                  className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-5"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -1419,7 +1419,7 @@ export function TimingClient() {
                   </div>
 
                   <div className="mt-4 grid gap-3 md:grid-cols-4">
-                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                       <div className="text-xs text-[var(--app-text-soft)]">
                         置信度
                       </div>
@@ -1427,7 +1427,7 @@ export function TimingClient() {
                         {card.confidence}
                       </div>
                     </div>
-                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                       <div className="text-xs text-[var(--app-text-soft)]">
                         RSI
                       </div>
@@ -1435,7 +1435,7 @@ export function TimingClient() {
                         {indicators?.rsi.value.toFixed(1) ?? "-"}
                       </div>
                     </div>
-                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                       <div className="text-xs text-[var(--app-text-soft)]">
                         MACD 柱值
                       </div>
@@ -1443,7 +1443,7 @@ export function TimingClient() {
                         {indicators?.macd.histogram.toFixed(2) ?? "-"}
                       </div>
                     </div>
-                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(15,20,27,0.78)] px-4 py-3">
+                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
                       <div className="text-xs text-[var(--app-text-soft)]">
                         量比 20D
                       </div>

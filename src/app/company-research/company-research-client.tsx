@@ -111,7 +111,7 @@ function CompanyRunCard({
   });
 
   return (
-    <article className="rounded-[18px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.88)] p-5">
+    <article className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-panel)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -155,7 +155,7 @@ function CompanyRunCard({
         {digest.metrics.slice(0, 4).map((metric) => (
           <div
             key={`${run.id}-${metric.label}`}
-            className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.84)] px-4 py-3"
+            className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3"
           >
             <div className="text-xs text-[var(--app-text-soft)]">
               {metric.label}
@@ -429,7 +429,7 @@ export function CompanyResearchClient() {
         </details>
 
         {startMutation.error ? (
-          <div className="border border-[rgba(210,115,78,0.45)] bg-[rgba(250,82,15,0.08)] px-4 py-3 text-sm text-[var(--app-danger)]">
+          <div className="border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
             {startMutation.error?.message ?? ""}
           </div>
         ) : null}
@@ -496,7 +496,7 @@ export function CompanyResearchClient() {
       )}
 
       {runsQuery.error ? (
-        <div className="mt-4 border border-[rgba(210,115,78,0.45)] bg-[rgba(250,82,15,0.08)] px-4 py-3 text-sm text-[var(--app-danger)]">
+        <div className="mt-4 border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
           {runsQuery.error?.message ?? ""}
         </div>
       ) : null}
@@ -594,7 +594,7 @@ export function CompanyResearchClient() {
               className="app-textarea min-h-[150px]"
             />
 
-            <details className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.82)] p-4">
+            <details className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
               <summary className="cursor-pointer text-sm font-medium text-[var(--app-text)]">
                 高级选项
               </summary>
@@ -669,7 +669,7 @@ export function CompanyResearchClient() {
             </details>
 
             {startMutation.error ? (
-              <div className="rounded-[12px] border border-[rgba(201,119,132,0.34)] bg-[rgba(81,33,43,0.2)] px-4 py-3 text-sm text-[var(--app-danger)]">
+              <div className="rounded-[12px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
                 {startMutation.error?.message ?? ""}
               </div>
             ) : null}
@@ -687,7 +687,7 @@ export function CompanyResearchClient() {
                   setFocusConcepts(item.focusConcepts);
                   setKeyQuestion(item.keyQuestion);
                 }}
-                className="rounded-[14px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.84)] px-4 py-3 text-left transition-colors hover:border-[var(--app-border-strong)] hover:bg-[rgba(16,21,29,0.94)]"
+                className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3 text-left transition-colors hover:border-[var(--app-border-strong)] hover:bg-[var(--app-panel-strong)]"
               >
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium text-[var(--app-text)]">
@@ -736,7 +736,7 @@ export function CompanyResearchClient() {
         )}
 
         {runsQuery.error ? (
-          <div className="mt-4 rounded-[12px] border border-[rgba(201,119,132,0.34)] bg-[rgba(81,33,43,0.2)] px-4 py-3 text-sm text-[var(--app-danger)]">
+          <div className="mt-4 rounded-[12px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
             {runsQuery.error?.message ?? ""}
           </div>
         ) : null}

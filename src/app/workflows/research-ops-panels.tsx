@@ -275,7 +275,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
             {planLevels.map((level) => (
               <section
                 key={`plan-depth-${level.depth}`}
-                className="rounded-[12px] border border-[var(--app-border)] bg-[rgba(12,16,22,0.72)] p-4"
+                className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] p-4"
               >
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="text-sm font-medium text-[var(--app-text)]">
@@ -293,7 +293,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
                     return (
                       <article
                         key={unit.id}
-                        className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] p-4"
+                        className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
@@ -378,7 +378,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
             {replans.map((record) => (
               <article
                 key={record.replanId}
-                className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] p-4"
+                className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusPill
@@ -419,7 +419,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
           description="软门禁评审结果会保留合同得分、覆盖率和修复建议，但不阻塞最终交付。"
         >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] px-4 py-3">
+            <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
               <div className="text-xs text-[var(--app-text-soft)]">status</div>
               <div className="mt-2">
                 <StatusPill
@@ -434,7 +434,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
                 />
               </div>
             </div>
-            <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] px-4 py-3">
+            <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
               <div className="text-xs text-[var(--app-text-soft)]">
                 contract
               </div>
@@ -442,7 +442,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
                 {reflection.contractScore ?? "-"}
               </div>
             </div>
-            <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] px-4 py-3">
+            <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
               <div className="text-xs text-[var(--app-text-soft)]">
                 citations
               </div>
@@ -450,7 +450,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
                 {formatPercent(reflection.citationCoverage)}
               </div>
             </div>
-            <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] px-4 py-3">
+            <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
               <div className="text-xs text-[var(--app-text-soft)]">
                 first-party
               </div>
@@ -460,12 +460,12 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
             </div>
           </div>
 
-          <div className="mt-4 rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] p-4 text-sm leading-6 text-[var(--app-text)]">
+          <div className="mt-4 rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4 text-sm leading-6 text-[var(--app-text)]">
             {reflection.summary || "No reflection summary available."}
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-3">
-            <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] p-4">
+            <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
               <div className="text-sm font-medium text-[var(--app-text)]">
                 quality flags
               </div>
@@ -480,7 +480,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
               </div>
             </div>
 
-            <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] p-4">
+            <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
               <div className="text-sm font-medium text-[var(--app-text)]">
                 missing requirements
               </div>
@@ -495,7 +495,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
               </div>
             </div>
 
-            <div className="rounded-[10px] border border-[var(--app-border)] bg-[rgba(16,21,29,0.82)] p-4">
+            <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
               <div className="text-sm font-medium text-[var(--app-text)]">
                 suggested fixes
               </div>
