@@ -576,7 +576,6 @@ export function ScreeningStudioClient() {
       section="screening"
       title="小批量筛选工作台"
       description="先搜股票，再选指标、公式与报告期；只有点击“获取”时才会请求数据。结果获取后，筛选、排序和保存都在本地工作台内完成。"
-      workflowTabs={screeningStageTabs}
       actions={
         <>
           <select

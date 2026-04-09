@@ -508,7 +508,6 @@ export function CompanyResearchClient() {
       section="companyResearch"
       eyebrow="公司判断"
       title="公司判断"
-      workflowTabs={companyResearchStageTabs}
       actions={
         <>
           <Link href="/" className="app-button">
@@ -550,7 +549,6 @@ export function CompanyResearchClient() {
       section="companyResearch"
       eyebrow="公司判断"
       title="公司判断"
-      workflowTabs={companyResearchStageTabs}
       actions={
         <>
           <Link href="/" className="app-button">

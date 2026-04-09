@@ -6,7 +6,7 @@ function readSource(relativePath: string) {
 }
 
 describe("workflow page composition", () => {
-  it("connects every core workflow page to an explicit stage-tab config", () => {
+  it("renders workflow stage cards from a single source on every core workflow page", () => {
     const screeningSource = readSource("./screening/screening-studio-client.tsx");
     const workflowsSource = readSource("./workflows/workflows-client.tsx");
     const companyResearchSource = readSource(
@@ -15,22 +15,22 @@ describe("workflow page composition", () => {
     const timingSource = readSource("./timing/timing-client.tsx");
 
     expect(screeningSource).toContain("screeningStageTabs");
-    expect(screeningSource).toContain("workflowTabs={screeningStageTabs}");
     expect(screeningSource).toContain("WorkflowStageSwitcher");
+    expect(screeningSource).not.toContain("workflowTabs={screeningStageTabs}");
 
     expect(workflowsSource).toContain("workflowsStageTabs");
-    expect(workflowsSource).toContain("workflowTabs={workflowsStageTabs}");
     expect(workflowsSource).toContain("WorkflowStageSwitcher");
+    expect(workflowsSource).not.toContain("workflowTabs={workflowsStageTabs}");
 
     expect(companyResearchSource).toContain("companyResearchStageTabs");
-    expect(companyResearchSource).toContain(
+    expect(companyResearchSource).toContain("WorkflowStageSwitcher");
+    expect(companyResearchSource).not.toContain(
       "workflowTabs={companyResearchStageTabs}",
     );
-    expect(companyResearchSource).toContain("WorkflowStageSwitcher");
 
     expect(timingSource).toContain("timingStageTabs");
-    expect(timingSource).toContain("workflowTabs={timingStageTabs}");
     expect(timingSource).toContain("WorkflowStageSwitcher");
+    expect(timingSource).not.toContain("workflowTabs={timingStageTabs}");
   });
 
   it("removes the old bento dashboard structure from the home page", () => {

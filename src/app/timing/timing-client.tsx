@@ -507,7 +507,6 @@ export function TimingClient() {
       section="timing"
       eyebrow="组合决策"
       title="择时组合"
-      workflowTabs={timingStageTabs}
       actions={
         <>
           <Link href="/workflows" className="app-button">

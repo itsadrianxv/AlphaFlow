@@ -459,7 +459,6 @@ export function WorkflowsClient() {
       section="workflows"
       title="行业研究"
       description="把研究问题、约束和最近结论收进一条连续流程里，减少在多个页面之间切换。"
-      workflowTabs={workflowsStageTabs}
       actions={
         <>
           <Link href="/" className="app-button">
@@ -501,7 +500,6 @@ export function WorkflowsClient() {
       section="workflows"
       title="行业研究"
       description="把研究问题、约束和偏好收在一个入口里，统一查看最近运行与结论摘要。"
-      workflowTabs={workflowsStageTabs}
       actions={
         <>
           <Link href="/" className="app-button">
