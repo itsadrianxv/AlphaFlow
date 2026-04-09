@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { statusTone } from "~/app/_components/status-tone";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import {
   EmptyState,
   KeyPointList,
@@ -13,6 +14,7 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { companyResearchStageTabs } from "~/app/company-research/company-research-stage-tabs";
 import { buildResearchDigest } from "~/app/workflows/research-view-models";
 import { COMPANY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { api, type RouterOutputs } from "~/trpc/react";
@@ -236,6 +238,9 @@ export function CompanyResearchClient() {
   const [forbiddenEvidenceTypes, setForbiddenEvidenceTypes] = useState("");
   const [preferredSources, setPreferredSources] = useState("");
   const [freshnessWindowDays, setFreshnessWindowDays] = useState("180");
+  const [activeTabId, setActiveTabId] = useState(
+    companyResearchStageTabs[0]?.id ?? "target",
+  );
 
   useEffect(() => {
     const mappings = [
@@ -327,11 +332,225 @@ export function CompanyResearchClient() {
     });
   };
 
+  const launchPanel = (
+    <Panel
+      title="发起公司判断"
+      actions={
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={startMutation.isPending || !companyName.trim()}
+          className="app-button app-button-primary"
+        >
+          {startMutation.isPending ? "正在生成判断" : "开始判断"}
+        </button>
+      }
+    >
+      <div className="grid gap-4">
+        <input
+          value={companyName}
+          onChange={(event) => setCompanyName(event.target.value)}
+          placeholder="公司名称，例如：英伟达"
+          className="app-input"
+        />
+        <textarea
+          value={keyQuestion}
+          onChange={(event) => setKeyQuestion(event.target.value)}
+          placeholder="最想优先确认的问题，例如：过去几个季度里，真正驱动利润率上行的业务环节有哪些？"
+          className="app-textarea min-h-[150px]"
+        />
+
+        <details className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4">
+          <summary className="cursor-pointer text-sm text-[var(--app-text-strong)]">
+            高级选项
+          </summary>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <input
+              value={stockCode}
+              onChange={(event) => setStockCode(event.target.value)}
+              placeholder="股票代码，可选"
+              className="app-input"
+            />
+            <input
+              value={officialWebsite}
+              onChange={(event) => setOfficialWebsite(event.target.value)}
+              placeholder="官网或投资者关系地址，可选"
+              className="app-input"
+            />
+            <textarea
+              value={focusConcepts}
+              onChange={(event) => setFocusConcepts(event.target.value)}
+              placeholder="重点概念，每行一个。"
+              className="app-textarea min-h-[140px]"
+            />
+            <textarea
+              value={supplementalUrls}
+              onChange={(event) => setSupplementalUrls(event.target.value)}
+              placeholder="补充链接，每行一个。"
+              className="app-textarea min-h-[140px]"
+            />
+            <textarea
+              value={researchGoal}
+              onChange={(event) => setResearchGoal(event.target.value)}
+              placeholder="可选：本次研究目标。"
+              className="app-textarea min-h-[120px]"
+            />
+            <textarea
+              value={mustAnswerQuestions}
+              onChange={(event) => setMustAnswerQuestions(event.target.value)}
+              placeholder="可选：必答问题，每行一条。"
+              className="app-textarea min-h-[120px]"
+            />
+            <textarea
+              value={preferredSources}
+              onChange={(event) => setPreferredSources(event.target.value)}
+              placeholder="可选：优先信源。"
+              className="app-textarea min-h-[120px]"
+            />
+            <textarea
+              value={forbiddenEvidenceTypes}
+              onChange={(event) => setForbiddenEvidenceTypes(event.target.value)}
+              placeholder="可选：禁用证据类型。"
+              className="app-textarea min-h-[120px]"
+            />
+            <input
+              value={freshnessWindowDays}
+              onChange={(event) => setFreshnessWindowDays(event.target.value)}
+              placeholder="可选：时效窗口（天）"
+              className="app-input"
+            />
+            <input
+              value={idempotencyKey}
+              onChange={(event) => setIdempotencyKey(event.target.value)}
+              placeholder="可选：幂等键"
+              className="app-input md:col-span-2"
+            />
+          </div>
+        </details>
+
+        {startMutation.error ? (
+          <div className="border border-[rgba(210,115,78,0.45)] bg-[rgba(250,82,15,0.08)] px-4 py-3 text-sm text-[var(--app-danger)]">
+            {startMutation.error?.message ?? ""}
+          </div>
+        ) : null}
+      </div>
+    </Panel>
+  );
+
+  const starterPanel = (
+    <Panel title="快速样例">
+      <div className="grid gap-3">
+        {starterCases.map((item) => (
+          <button
+            key={item.companyName}
+            type="button"
+            onClick={() => {
+              setCompanyName(item.companyName);
+              setFocusConcepts(item.focusConcepts);
+              setKeyQuestion(item.keyQuestion);
+            }}
+            className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-3 text-left transition-colors hover:border-[var(--app-flame)]"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-[var(--app-text-strong)]">
+                {item.companyName}
+              </p>
+              <StatusPill label="概念拆解" tone="info" />
+            </div>
+            <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
+              {item.keyQuestion}
+            </p>
+          </button>
+        ))}
+      </div>
+    </Panel>
+  );
+
+  const recentPanel = (
+    <Panel
+      title="最新公司判断"
+      actions={
+        <button
+          type="button"
+          onClick={() => runsQuery.refetch()}
+          className="app-button"
+        >
+          刷新列表
+        </button>
+      }
+    >
+      {runsQuery.isLoading ? (
+        <EmptyState title="正在加载公司判断" />
+      ) : sortedRuns.length === 0 ? (
+        <EmptyState title="还没有公司判断记录" />
+      ) : (
+        <div className="grid gap-4">
+          {sortedRuns.map((run) => (
+            <CompanyRunCard
+              key={run.id}
+              run={run}
+              onCancel={(runId) => cancelMutation.mutate({ runId })}
+            />
+          ))}
+        </div>
+      )}
+
+      {runsQuery.error ? (
+        <div className="mt-4 border border-[rgba(210,115,78,0.45)] bg-[rgba(250,82,15,0.08)] px-4 py-3 text-sm text-[var(--app-danger)]">
+          {runsQuery.error?.message ?? ""}
+        </div>
+      ) : null}
+    </Panel>
+  );
+
   return (
     <WorkspaceShell
       section="companyResearch"
       eyebrow="公司判断"
       title="公司判断"
+      workflowTabs={companyResearchStageTabs}
+      actions={
+        <>
+          <Link href="/" className="app-button">
+            返回看板
+          </Link>
+          <Link href="/company-research/history" className="app-button">
+            历史记录
+          </Link>
+          <Link href="/workflows" className="app-button app-button-primary">
+            打开行业判断
+          </Link>
+          <Link href="/timing" className="app-button app-button-success">
+            前往择时组合
+          </Link>
+        </>
+      }
+    >
+      <WorkflowStageSwitcher
+        tabs={companyResearchStageTabs}
+        activeTabId={activeTabId}
+        onChange={setActiveTabId}
+        panels={{
+          target: launchPanel,
+          sources: (
+            <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+              {launchPanel}
+              {starterPanel}
+            </div>
+          ),
+          launch: launchPanel,
+          findings: recentPanel,
+        }}
+      />
+    </WorkspaceShell>
+  );
+
+  return (
+    <WorkspaceShell
+      section="companyResearch"
+      eyebrow="公司判断"
+      title="公司判断"
+      workflowTabs={companyResearchStageTabs}
       actions={
         <>
           <Link href="/" className="app-button">
@@ -453,7 +672,7 @@ export function CompanyResearchClient() {
 
             {startMutation.error ? (
               <div className="rounded-[12px] border border-[rgba(201,119,132,0.34)] bg-[rgba(81,33,43,0.2)] px-4 py-3 text-sm text-[var(--app-danger)]">
-                {startMutation.error.message}
+                {startMutation.error?.message ?? ""}
               </div>
             ) : null}
           </div>
@@ -520,7 +739,7 @@ export function CompanyResearchClient() {
 
         {runsQuery.error ? (
           <div className="mt-4 rounded-[12px] border border-[rgba(201,119,132,0.34)] bg-[rgba(81,33,43,0.2)] px-4 py-3 text-sm text-[var(--app-danger)]">
-            {runsQuery.error.message}
+            {runsQuery.error?.message ?? ""}
           </div>
         ) : null}
       </Panel>

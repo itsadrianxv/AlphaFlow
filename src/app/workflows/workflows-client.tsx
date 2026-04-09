@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { statusTone } from "~/app/_components/status-tone";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import {
   EmptyState,
   InlineNotice,
@@ -19,6 +20,7 @@ import {
   buildResearchDigest,
   type InvestorTone,
 } from "~/app/workflows/research-view-models";
+import { workflowsStageTabs } from "~/app/workflows/workflows-stage-tabs";
 import { QUICK_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { api, type RouterOutputs } from "~/trpc/react";
 
@@ -196,6 +198,9 @@ export function WorkflowsClient() {
   const [forbiddenEvidenceTypes, setForbiddenEvidenceTypes] = useState("");
   const [preferredSources, setPreferredSources] = useState("");
   const [freshnessWindowDays, setFreshnessWindowDays] = useState("180");
+  const [activeTabId, setActiveTabId] = useState(
+    workflowsStageTabs[0]?.id ?? "question",
+  );
 
   useEffect(() => {
     const nextQuery = searchParams.get("query");
@@ -294,11 +299,223 @@ export function WorkflowsClient() {
     });
   };
 
+  const launchFormPanel = (
+    <SectionCard
+      title="发起行业研究"
+      description="直接输入研究问题；如需限制证据范围、时效或必答问题，在下方补充约束。"
+      actions={
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={startMutation.isPending || !query.trim()}
+          className="app-button app-button-primary"
+        >
+          {startMutation.isPending ? "正在生成判断" : "开始研究"}
+        </button>
+      }
+    >
+      <div className="grid gap-4">
+        <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
+          研究问题
+          <textarea
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="例如：AI 眼镜供应链里，哪些环节会最先兑现利润？"
+            className="app-textarea min-h-[180px]"
+          />
+        </label>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
+            研究目标
+            <textarea
+              value={researchGoal}
+              onChange={(event) => setResearchGoal(event.target.value)}
+              placeholder="可选：本次研究最想得到的判断。"
+              className="app-textarea min-h-[110px]"
+            />
+          </label>
+
+          <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
+            必答问题
+            <textarea
+              value={mustAnswerQuestions}
+              onChange={(event) => setMustAnswerQuestions(event.target.value)}
+              placeholder="可选：每行一个必须回答的问题。"
+              className="app-textarea min-h-[110px]"
+            />
+          </label>
+
+          <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
+            优先信源
+            <textarea
+              value={preferredSources}
+              onChange={(event) => setPreferredSources(event.target.value)}
+              placeholder="可选：每行一个优先信源。"
+              className="app-textarea min-h-[96px]"
+            />
+          </label>
+
+          <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
+            禁用证据类型
+            <textarea
+              value={forbiddenEvidenceTypes}
+              onChange={(event) =>
+                setForbiddenEvidenceTypes(event.target.value)
+              }
+              placeholder="可选：每行一个禁用证据类型。"
+              className="app-textarea min-h-[96px]"
+            />
+          </label>
+
+          <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
+            时效窗口（天）
+            <input
+              value={freshnessWindowDays}
+              onChange={(event) => setFreshnessWindowDays(event.target.value)}
+              placeholder="例如 180"
+              className="app-input"
+            />
+          </label>
+
+          <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
+            幂等键
+            <input
+              value={idempotencyKey}
+              onChange={(event) => setIdempotencyKey(event.target.value)}
+              placeholder="用于避免重复创建"
+              className="app-input"
+            />
+          </label>
+        </div>
+
+        {startMutation.error ? (
+          <InlineNotice
+            tone="danger"
+            description={startMutation.error?.message ?? ""}
+          />
+        ) : null}
+      </div>
+    </SectionCard>
+  );
+
+  const quickPromptPanel = (
+    <SectionCard
+      title="常用问题模板"
+      description="点击填入后可以继续补充约束，再直接发起研究。"
+    >
+      <div className="grid gap-3">
+        {quickPrompts.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            onClick={() => setQuery(prompt)}
+            className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-3 text-left text-sm leading-6 text-[var(--app-text-muted)] transition-colors hover:border-[var(--app-flame)] hover:text-[var(--app-text-strong)]"
+          >
+            {prompt}
+          </button>
+        ))}
+
+        <div className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4">
+          <div className="text-sm text-[var(--app-text-strong)]">使用建议</div>
+          <ul className="mt-3 grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
+            <li>把问题写成可验证的投资判断，而不是泛泛主题。</li>
+            <li>如果已经有假设，可以放到“必答问题”里让结果更聚焦。</li>
+            <li>当研究对时效敏感时，缩短窗口以减少旧证据干扰。</li>
+          </ul>
+        </div>
+      </div>
+    </SectionCard>
+  );
+
+  const queuePanel = (
+    <SectionCard
+      title="最近运行"
+      description="按最新时间排序，集中查看行业研究进度、指标和结论摘要。"
+      actions={
+        <button
+          type="button"
+          onClick={() => runsQuery.refetch()}
+          className="app-button"
+        >
+          刷新列表
+        </button>
+      }
+    >
+      {runsQuery.isLoading ? (
+        <LoadingSkeleton rows={3} />
+      ) : sortedRuns.length === 0 ? (
+        <EmptyState title="还没有行业研究记录" />
+      ) : (
+        <div className="grid gap-4">
+          {sortedRuns.map((run) => (
+            <InvestorRunCard
+              key={run.id}
+              run={run}
+              onCancel={(runId) => cancelMutation.mutate({ runId })}
+            />
+          ))}
+        </div>
+      )}
+
+      {runsQuery.error ? (
+        <InlineNotice
+          tone="danger"
+          description={runsQuery.error?.message ?? ""}
+          className="mt-4"
+        />
+      ) : null}
+    </SectionCard>
+  );
+
+  return (
+    <WorkspaceShell
+      section="workflows"
+      title="行业研究"
+      description="把研究问题、约束和最近结论收进一条连续流程里，减少在多个页面之间切换。"
+      workflowTabs={workflowsStageTabs}
+      actions={
+        <>
+          <Link href="/" className="app-button">
+            返回总览
+          </Link>
+          <Link href="/workflows/history" className="app-button">
+            历史记录
+          </Link>
+          <Link href="/company-research" className="app-button">
+            公司研究
+          </Link>
+          <Link href="/screening" className="app-button app-button-primary">
+            股票筛选
+          </Link>
+        </>
+      }
+    >
+      <WorkflowStageSwitcher
+        tabs={workflowsStageTabs}
+        activeTabId={activeTabId}
+        onChange={setActiveTabId}
+        panels={{
+          question: launchFormPanel,
+          constraints: launchFormPanel,
+          launch: (
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
+              {launchFormPanel}
+              {quickPromptPanel}
+            </div>
+          ),
+          queue: queuePanel,
+        }}
+      />
+    </WorkspaceShell>
+  );
+
   return (
     <WorkspaceShell
       section="workflows"
       title="行业研究"
       description="把研究问题、约束和偏好收在一个入口里，统一查看最近运行与结论摘要。"
+      workflowTabs={workflowsStageTabs}
       actions={
         <>
           <Link href="/" className="app-button">
@@ -413,7 +630,7 @@ export function WorkflowsClient() {
             {startMutation.error ? (
               <InlineNotice
                 tone="danger"
-                description={startMutation.error.message}
+                description={startMutation.error?.message ?? ""}
               />
             ) : null}
           </div>
@@ -481,7 +698,7 @@ export function WorkflowsClient() {
         {runsQuery.error ? (
           <InlineNotice
             tone="danger"
-            description={runsQuery.error.message}
+            description={runsQuery.error?.message ?? ""}
             className="mt-4"
           />
         ) : null}

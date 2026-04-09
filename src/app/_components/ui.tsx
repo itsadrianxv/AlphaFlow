@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Children, isValidElement, type ReactNode } from "react";
+import React, { Children, isValidElement, type ReactNode } from "react";
+
+import {
+  primaryWorkflowStages,
+  type WorkflowStageTab,
+} from "~/app/_components/workflow-stage-config";
 
 export function cn(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
@@ -60,19 +65,19 @@ const navItems: Array<{
 
 const toneClassMap: Record<Tone, string> = {
   neutral:
-    "border-[var(--app-border-soft)] bg-[rgba(170,182,199,0.08)] text-[var(--app-text-muted)]",
-  info: "border-[rgba(95,136,221,0.3)] bg-[rgba(95,136,221,0.12)] text-[var(--app-brand-strong)]",
+    "border-[var(--app-border-soft)] bg-[rgba(255,255,255,0.38)] text-[var(--app-text-muted)]",
+  info: "border-[rgba(255,161,16,0.42)] bg-[rgba(255,161,16,0.16)] text-[var(--app-text-strong)]",
   success:
-    "border-[rgba(63,139,112,0.32)] bg-[rgba(63,139,112,0.14)] text-[#b7e2d2]",
+    "border-[rgba(250,82,15,0.42)] bg-[rgba(250,82,15,0.12)] text-[var(--app-text-strong)]",
   warning:
-    "border-[rgba(197,146,66,0.34)] bg-[rgba(197,146,66,0.14)] text-[#f0d3a0]",
+    "border-[rgba(255,129,5,0.38)] bg-[rgba(255,129,5,0.14)] text-[var(--app-text-strong)]",
   danger:
-    "border-[rgba(190,109,107,0.34)] bg-[rgba(190,109,107,0.14)] text-[#f3c6c4]",
+    "border-[rgba(183,63,19,0.36)] bg-[rgba(183,63,19,0.12)] text-[var(--app-danger)]",
 };
 
 const surfaceClassMap: Record<Surface, string> = {
-  base: "bg-[var(--app-bg-inset)]",
-  inset: "bg-[var(--app-bg-inset)] border border-[var(--app-border-soft)]",
+  base: "bg-[var(--app-surface)]",
+  inset: "bg-[var(--app-surface)] border border-[var(--app-border-soft)]",
   raised: "glass-panel",
   floating: "glass-panel shadow-[var(--app-shadow-lg)]",
 };
@@ -84,27 +89,33 @@ const densityClassMap: Record<Density, string> = {
 
 function AppMark() {
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] text-[11px] font-semibold tracking-[0.08em] text-[var(--app-text-strong)]">
+    <div className="flex h-10 w-10 items-center justify-center border border-[var(--app-border-soft)] bg-[image:var(--app-block-gradient)] text-[11px] tracking-[0.08em] text-[var(--app-black)] shadow-[var(--app-shadow-sm)]">
       SSB
     </div>
   );
 }
 
 export function PageHeader(props: {
+  eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
 }) {
-  const { title, description, actions } = props;
+  const { eyebrow, title, description, actions } = props;
 
   return (
-    <header className="flex flex-col gap-4 border-b border-[var(--app-border-soft)] pb-5 lg:flex-row lg:items-start lg:justify-between">
+    <header className="app-page-header flex flex-col gap-5 border-b border-[var(--app-border-soft)] pb-6 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
-        <h1 className="app-display text-[28px] leading-tight text-[var(--app-text-strong)] sm:text-[32px]">
+        {eyebrow ? (
+          <div className="mb-4 text-[11px] uppercase tracking-[0.2em] text-[var(--app-text-subtle)]">
+            {eyebrow}
+          </div>
+        ) : null}
+        <h1 className="app-display text-[42px] leading-[0.95] text-[var(--app-text-strong)] sm:text-[58px] xl:text-[82px]">
           {title}
         </h1>
         {description ? (
-          <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--app-text-muted)]">
+          <p className="mt-4 max-w-4xl text-sm leading-7 text-[var(--app-text-muted)] sm:text-base">
             {description}
           </p>
         ) : null}
@@ -125,10 +136,135 @@ export function WorkspaceShell(props: {
   description?: string;
   actions?: ReactNode;
   summary?: ReactNode;
+  workflowTabs?: WorkflowStageTab[];
   children: ReactNode;
 }) {
-  const { section, title, description, actions, summary, children } = props;
+  const {
+    section,
+    eyebrow,
+    title,
+    description,
+    actions,
+    summary,
+    workflowTabs,
+    children,
+  } = props;
   const activeItem = navItems.find((item) => item.key === section);
+  const activeStageId = section === "home" ? null : section;
+
+  return (
+    <main className="app-shell" data-workflow-shell="mistral">
+      <div className="border-b border-[var(--app-border-soft)] bg-[var(--app-surface)]">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <Link href="/" className="flex items-center gap-4">
+              <AppMark />
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.2em] text-[var(--app-text-subtle)]">
+                  Stock Screening Boost
+                </div>
+                <div className="mt-2 text-xl leading-none text-[var(--app-text-strong)]">
+                  投资决策工作流
+                </div>
+              </div>
+            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/screening/history" className="app-button">
+                筛选档案
+              </Link>
+              <Link href="/workflows/history" className="app-button">
+                研究档案
+              </Link>
+              <Link href="/timing/history" className="app-button">
+                组合复盘
+              </Link>
+            </div>
+          </div>
+
+          <nav
+            className="grid gap-3 lg:grid-cols-4"
+            aria-label="Primary workflow"
+          >
+            {primaryWorkflowStages.map((stage, index) => {
+              const active = activeStageId === stage.id;
+
+              return (
+                <Link
+                  key={stage.id}
+                  href={stage.href}
+                  data-stage-active={active}
+                  className={cn(
+                    "border border-[var(--app-border-soft)] bg-[var(--app-bg)] px-4 py-4 transition-colors",
+                    active
+                      ? "border-[var(--app-brand)] bg-[var(--app-surface-strong)] text-[var(--app-text-strong)]"
+                      : "text-[var(--app-text-muted)] hover:border-[var(--app-flame)] hover:text-[var(--app-text-strong)]",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] uppercase tracking-[0.18em] text-[var(--app-text-subtle)]">
+                      {stage.id}
+                    </span>
+                    <span className="app-workflow-index">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <div className="mt-3 text-[24px] leading-none text-[var(--app-text-strong)]">
+                    {stage.label}
+                  </div>
+                  <div className="mt-3 text-sm leading-6">{stage.summary}</div>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+      </div>
+
+      <section className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+        <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-8">
+          <PageHeader
+            eyebrow={eyebrow}
+            title={title}
+            description={description}
+            actions={actions}
+          />
+
+          {workflowTabs && workflowTabs.length > 0 ? (
+            <section className="grid gap-3 lg:grid-cols-4 xl:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
+              {workflowTabs.map((tab, tabIndex) => (
+                <article
+                  key={tab.id}
+                  className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--app-text-subtle)]">
+                      Step {tabIndex + 1}
+                    </div>
+                    <div className="app-workflow-index">
+                      {String(tabIndex + 1).padStart(2, "0")}
+                    </div>
+                  </div>
+                  <div className="mt-3 text-xl leading-none text-[var(--app-text-strong)]">
+                    {tab.label}
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
+                    {tab.summary}
+                  </div>
+                </article>
+              ))}
+            </section>
+          ) : null}
+
+          {summary ? (
+            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {summary}
+            </section>
+          ) : null}
+
+          <div className="grid gap-6">{children}</div>
+        </div>
+      </section>
+    </main>
+  );
 
   return (
     <main className="app-shell">
@@ -332,10 +468,10 @@ export function MetricTile(props: {
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs font-medium uppercase tracking-wider text-[var(--app-text-subtle)]">
+          <div className="text-xs uppercase tracking-[0.18em] text-[var(--app-text-subtle)]">
             {label}
           </div>
-          <div className="app-data mt-2 text-[32px] font-semibold leading-none text-[var(--app-text-strong)] tracking-tight">
+          <div className="app-data mt-3 text-[32px] leading-none text-[var(--app-text-strong)] tracking-tight">
             {value}
           </div>
         </div>
@@ -378,6 +514,7 @@ export function StatusPill(props: {
     <span
       className={cn(
         "inline-flex min-h-7 items-center rounded-[8px] border px-2.5 py-1 text-[11px] font-medium",
+        "uppercase tracking-[0.14em]",
         toneClassMap[tone],
         className,
       )}
@@ -503,7 +640,7 @@ export function EmptyState(props: {
         className,
       )}
     >
-      <div className="text-[15px] font-medium text-[var(--app-text-strong)]">
+      <div className="text-[18px] leading-none text-[var(--app-text-strong)]">
         {title}
       </div>
       {description ? (

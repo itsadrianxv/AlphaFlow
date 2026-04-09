@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import {
   EmptyState,
   InlineNotice,
@@ -10,6 +11,7 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { screeningStageTabs } from "~/app/screening/screening-stage-tabs";
 import {
   annualPresetOptions,
   buildCatalogNotice,
@@ -117,6 +119,9 @@ export function ScreeningStudioClient() {
   >([]);
   const [formulaValidation, setFormulaValidation] = useState<string | null>(
     null,
+  );
+  const [activeTabId, setActiveTabId] = useState(
+    screeningStageTabs[0]?.id ?? "stocks",
   );
 
   const catalogQuery = api.screening.listIndicatorCatalog.useQuery(undefined, {
@@ -513,11 +518,65 @@ export function ScreeningStudioClient() {
     await createFormulaMutation.mutateAsync(payload);
   }
 
+  const stagePreviewPanels = {
+    stocks: (
+      <SectionCard
+        title="选股池"
+        description="先确定本轮筛选覆盖哪些股票，再进入指标和公式配置。"
+      >
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          当前已选择 {selectedStocks.length} 只股票，最多支持 20 只。
+        </div>
+      </SectionCard>
+    ),
+    indicators: (
+      <SectionCard
+        title="指标-公式"
+        description="明确本轮筛选要看哪些官方指标和自定义公式。"
+      >
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          当前已选 {selectedIndicatorIds.length} 个指标和 {selectedFormulaIds.length} 个公式。
+        </div>
+      </SectionCard>
+    ),
+    period: (
+      <SectionCard
+        title="期间设置"
+        description="确认财报周期、回溯方式和时间边界。"
+      >
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          当前模式为 {timeConfig.periodType} / {timeConfig.rangeMode}。
+        </div>
+      </SectionCard>
+    ),
+    filters: (
+      <SectionCard
+        title="本地筛选"
+        description="远端数据取回后，优先在本地完成过滤和排序。"
+      >
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          当前配置 {filterRules.length} 条本地规则。
+        </div>
+      </SectionCard>
+    ),
+    results: (
+      <SectionCard
+        title="结果表"
+        description="查看可见结果、告警和最终输出，再决定是否保存工作台。"
+      >
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          当前可见 {visibleRows.length} 条结果。
+        </div>
+      </SectionCard>
+    ),
+  } satisfies Record<string, React.ReactNode>;
+
   return (
     <WorkspaceShell
       section="screening"
       title="小批量筛选工作台"
       description="先搜股票，再选指标、公式与报告期；只有点击“获取”时才会请求数据。结果获取后，筛选、排序和保存都在本地工作台内完成。"
+      workflowTabs={screeningStageTabs}
       actions={
         <>
           <select
@@ -575,6 +634,13 @@ export function ScreeningStudioClient() {
           description={notice.text}
         />
       ) : null}
+
+      <WorkflowStageSwitcher
+        tabs={screeningStageTabs}
+        activeTabId={activeTabId}
+        onChange={setActiveTabId}
+        panels={stagePreviewPanels}
+      />
 
       <div className="grid gap-6 xl:grid-cols-12">
         <SectionCard

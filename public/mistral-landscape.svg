@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" fill="none">
+  <rect width="1600" height="900" fill="#FFFAEB"/>
+  <rect width="1600" height="900" fill="url(#sky)"/>
+  <path d="M0 398C132 338 252 326 360 362C492 406 590 448 718 440C862 430 957 336 1095 320C1262 302 1386 350 1600 450V900H0V398Z" fill="url(#ridgeOne)"/>
+  <path d="M0 486C187 436 322 454 470 516C606 574 716 600 868 574C1032 546 1157 450 1325 434C1450 422 1539 444 1600 478V900H0V486Z" fill="url(#ridgeTwo)"/>
+  <path d="M0 582C178 560 304 598 448 646C592 694 770 708 924 674C1074 642 1195 576 1340 566C1456 558 1547 590 1600 624V900H0V582Z" fill="url(#ridgeThree)"/>
+  <path d="M843 315C758 354 707 418 696 512C682 629 748 699 878 742C968 772 1067 796 1128 840" stroke="#1F1F1F" stroke-opacity=".14" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="1224" cy="174" r="94" fill="url(#sun)"/>
+  <defs>
+    <linearGradient id="sky" x1="800" y1="0" x2="800" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF0C2"/>
+      <stop offset=".48" stop-color="#FFE295"/>
+      <stop offset="1" stop-color="#FFFAEB"/>
+    </linearGradient>
+    <linearGradient id="ridgeOne" x1="800" y1="320" x2="800" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD900"/>
+      <stop offset="1" stop-color="#FFA110"/>
+    </linearGradient>
+    <linearGradient id="ridgeTwo" x1="800" y1="434" x2="800" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB83E"/>
+      <stop offset="1" stop-color="#FF8105"/>
+    </linearGradient>
+    <linearGradient id="ridgeThree" x1="800" y1="566" x2="800" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FB6424"/>
+      <stop offset="1" stop-color="#FA520F"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1224 174) rotate(90) scale(94)">
+      <stop stop-color="#FFF0C2"/>
+      <stop offset=".5" stop-color="#FFD900"/>
+      <stop offset="1" stop-color="#FFA110"/>
+    </radialGradient>
+  </defs>
+</svg>

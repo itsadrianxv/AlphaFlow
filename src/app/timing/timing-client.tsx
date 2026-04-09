@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import {
   EmptyState,
   Panel,
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { timingStageTabs } from "~/app/timing/timing-stage-tabs";
 import { api } from "~/trpc/react";
 
 function formatDate(value?: Date | null) {
@@ -191,6 +193,9 @@ export function TimingClient() {
     defaultPresetConfigJson,
   );
   const [presetFormError, setPresetFormError] = useState<string | null>(null);
+  const [activeTabId, setActiveTabId] = useState(
+    timingStageTabs[0]?.id ?? "signals",
+  );
 
   const watchListsQuery = api.watchlist.list.useQuery({
     limit: 50,
@@ -458,11 +463,51 @@ export function TimingClient() {
     }
   };
 
+  const stagePreviewPanels = {
+    signals: (
+      <Panel title="信号来源">
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          先决定是单股、自选股还是筛选联动。当前信号卡 {cards.length} 条。
+        </div>
+      </Panel>
+    ),
+    portfolio: (
+      <Panel title="组合约束">
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          当前组合快照 {portfolioSnapshotsQuery.data?.length ?? 0} 份，选中{" "}
+          {selectedSnapshot?.name ?? "未选择"}。
+        </div>
+      </Panel>
+    ),
+    preset: (
+      <Panel title="预设策略">
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          当前预设 {presets.length} 个，选中 {selectedPresetId || "默认预设"}。
+        </div>
+      </Panel>
+    ),
+    recommendations: (
+      <Panel title="组合建议">
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          当前最新建议 {latestRecommendations.length} 条，建议先看风险预算，再看动作区间。
+        </div>
+      </Panel>
+    ),
+    reviews: (
+      <Panel title="复盘记录">
+        <div className="text-sm leading-6 text-[var(--app-text-muted)]">
+          当前复盘记录 {reviewRecords.length} 条，用于回看执行后表现。
+        </div>
+      </Panel>
+    ),
+  } satisfies Record<string, React.ReactNode>;
+
   return (
     <WorkspaceShell
       section="timing"
       eyebrow="组合决策"
       title="择时组合"
+      workflowTabs={timingStageTabs}
       actions={
         <>
           <Link href="/workflows" className="app-button">
@@ -477,6 +522,13 @@ export function TimingClient() {
         </>
       }
     >
+      <WorkflowStageSwitcher
+        tabs={timingStageTabs}
+        activeTabId={activeTabId}
+        onChange={setActiveTabId}
+        panels={stagePreviewPanels}
+      />
+
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <Panel
           title="最新建议"
