@@ -5,15 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { statusTone } from "~/app/_components/status-tone";
-import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import {
   EmptyState,
+  InlineNotice,
   KeyPointList,
   Panel,
   ProgressBar,
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { companyResearchStageTabs } from "~/app/company-research/company-research-stage-tabs";
 import { buildResearchDigest } from "~/app/workflows/research-view-models";
 import { COMPANY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
@@ -63,23 +64,17 @@ statusLabelMap.PAUSED = "已暂停";
 const starterCases = [
   {
     companyName: "英伟达",
-    focusConcepts: `AI 服务器
-数据中心网络
-软件生态`,
+    focusConcepts: "AI 服务器\n数据中心网络\n软件生态",
     keyQuestion: "过去几个季度里，真正驱动利润率抬升的业务环节有哪些？",
   },
   {
     companyName: "特斯拉",
-    focusConcepts: `储能
-自动驾驶
-机器人`,
+    focusConcepts: "储能\n自动驾驶\n机器人",
     keyQuestion: "当前新业务增长是订单先行，还是利润已经开始兑现？",
   },
   {
     companyName: "药明康德",
-    focusConcepts: `ADC
-多肽
-海外产能`,
+    focusConcepts: "ADC\n多肽\n海外产能",
     keyQuestion: "新业务增长背后，哪些指标能够证明需求与利润同步兑现？",
   },
 ];
@@ -111,7 +106,7 @@ function CompanyRunCard({
   });
 
   return (
-    <article className="rounded-[18px] border border-[var(--app-border)] bg-[var(--app-panel)] p-5">
+    <Panel surface="inset" density="compact">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -218,7 +213,7 @@ function CompanyRunCard({
           )}
         </div>
       </div>
-    </article>
+    </Panel>
   );
 }
 
@@ -332,107 +327,96 @@ export function CompanyResearchClient() {
     });
   };
 
-  const launchPanel = (
+  const targetPanel = (
     <Panel
-      title="发起公司判断"
-      actions={
-        <button
-          type="button"
-          onClick={handleStart}
-          disabled={startMutation.isPending || !companyName.trim()}
-          className="app-button app-button-primary"
-        >
-          {startMutation.isPending ? "正在生成判断" : "开始判断"}
-        </button>
-      }
+      title="研究目标"
+      description="先锁定公司、代码和当前最想验证的核心判断。"
     >
       <div className="grid gap-4">
-        <input
-          value={companyName}
-          onChange={(event) => setCompanyName(event.target.value)}
-          placeholder="公司名称，例如：英伟达"
-          className="app-input"
-        />
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+          <input
+            value={companyName}
+            onChange={(event) => setCompanyName(event.target.value)}
+            placeholder="公司名称，例如：英伟达"
+            className="app-input"
+          />
+          <input
+            value={stockCode}
+            onChange={(event) => setStockCode(event.target.value)}
+            placeholder="股票代码，可选"
+            className="app-input"
+          />
+        </div>
         <textarea
           value={keyQuestion}
           onChange={(event) => setKeyQuestion(event.target.value)}
           placeholder="最想优先确认的问题，例如：过去几个季度里，真正驱动利润率上行的业务环节有哪些？"
-          className="app-textarea min-h-[150px]"
+          className="app-textarea min-h-[180px]"
         />
+      </div>
+    </Panel>
+  );
 
-        <details className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4">
-          <summary className="cursor-pointer text-sm text-[var(--app-text-strong)]">
-            高级选项
-          </summary>
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <input
-              value={stockCode}
-              onChange={(event) => setStockCode(event.target.value)}
-              placeholder="股票代码，可选"
-              className="app-input"
-            />
-            <input
-              value={officialWebsite}
-              onChange={(event) => setOfficialWebsite(event.target.value)}
-              placeholder="官网或投资者关系地址，可选"
-              className="app-input"
-            />
-            <textarea
-              value={focusConcepts}
-              onChange={(event) => setFocusConcepts(event.target.value)}
-              placeholder="重点概念，每行一个。"
-              className="app-textarea min-h-[140px]"
-            />
-            <textarea
-              value={supplementalUrls}
-              onChange={(event) => setSupplementalUrls(event.target.value)}
-              placeholder="补充链接，每行一个。"
-              className="app-textarea min-h-[140px]"
-            />
-            <textarea
-              value={researchGoal}
-              onChange={(event) => setResearchGoal(event.target.value)}
-              placeholder="可选：本次研究目标。"
-              className="app-textarea min-h-[120px]"
-            />
-            <textarea
-              value={mustAnswerQuestions}
-              onChange={(event) => setMustAnswerQuestions(event.target.value)}
-              placeholder="可选：必答问题，每行一条。"
-              className="app-textarea min-h-[120px]"
-            />
-            <textarea
-              value={preferredSources}
-              onChange={(event) => setPreferredSources(event.target.value)}
-              placeholder="可选：优先信源。"
-              className="app-textarea min-h-[120px]"
-            />
-            <textarea
-              value={forbiddenEvidenceTypes}
-              onChange={(event) => setForbiddenEvidenceTypes(event.target.value)}
-              placeholder="可选：禁用证据类型。"
-              className="app-textarea min-h-[120px]"
-            />
-            <input
-              value={freshnessWindowDays}
-              onChange={(event) => setFreshnessWindowDays(event.target.value)}
-              placeholder="可选：时效窗口（天）"
-              className="app-input"
-            />
-            <input
-              value={idempotencyKey}
-              onChange={(event) => setIdempotencyKey(event.target.value)}
-              placeholder="可选：幂等键"
-              className="app-input md:col-span-2"
-            />
-          </div>
-        </details>
-
-        {startMutation.error ? (
-          <div className="border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
-            {startMutation.error?.message ?? ""}
-          </div>
-        ) : null}
+  const sourcesPanel = (
+    <Panel
+      title="证据来源"
+      description="补充官网、概念线索和研究偏好，让证据链从一开始就可控。"
+    >
+      <div className="grid gap-4 md:grid-cols-2">
+        <input
+          value={officialWebsite}
+          onChange={(event) => setOfficialWebsite(event.target.value)}
+          placeholder="官网或投资者关系地址，可选"
+          className="app-input"
+        />
+        <input
+          value={idempotencyKey}
+          onChange={(event) => setIdempotencyKey(event.target.value)}
+          placeholder="幂等键，可选"
+          className="app-input"
+        />
+        <textarea
+          value={focusConcepts}
+          onChange={(event) => setFocusConcepts(event.target.value)}
+          placeholder="重点概念，每行一个。"
+          className="app-textarea min-h-[140px]"
+        />
+        <textarea
+          value={supplementalUrls}
+          onChange={(event) => setSupplementalUrls(event.target.value)}
+          placeholder="补充链接，每行一个。"
+          className="app-textarea min-h-[140px]"
+        />
+        <textarea
+          value={researchGoal}
+          onChange={(event) => setResearchGoal(event.target.value)}
+          placeholder="可选：本次研究目标。"
+          className="app-textarea min-h-[120px]"
+        />
+        <textarea
+          value={mustAnswerQuestions}
+          onChange={(event) => setMustAnswerQuestions(event.target.value)}
+          placeholder="可选：必答问题，每行一条。"
+          className="app-textarea min-h-[120px]"
+        />
+        <textarea
+          value={preferredSources}
+          onChange={(event) => setPreferredSources(event.target.value)}
+          placeholder="可选：优先信源。"
+          className="app-textarea min-h-[120px]"
+        />
+        <textarea
+          value={forbiddenEvidenceTypes}
+          onChange={(event) => setForbiddenEvidenceTypes(event.target.value)}
+          placeholder="可选：禁用证据类型。"
+          className="app-textarea min-h-[120px]"
+        />
+        <input
+          value={freshnessWindowDays}
+          onChange={(event) => setFreshnessWindowDays(event.target.value)}
+          placeholder="可选：时效窗口（天）"
+          className="app-input md:col-span-2"
+        />
       </div>
     </Panel>
   );
@@ -466,7 +450,76 @@ export function CompanyResearchClient() {
     </Panel>
   );
 
-  const recentPanel = (
+  const launchPanel = (
+    <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+      <Panel
+        title="发起执行"
+        description="确认本轮公司判断的目标和证据边界，再开始生成结论。"
+        actions={
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={startMutation.isPending || !companyName.trim()}
+            className="app-button app-button-primary"
+          >
+            {startMutation.isPending ? "正在生成判断" : "开始判断"}
+          </button>
+        }
+      >
+        <div className="grid gap-4">
+          <div className="rounded-[16px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4">
+            <div className="text-xs tracking-[0.08em] text-[var(--app-text-subtle)]">
+              研究对象
+            </div>
+            <p className="mt-3 text-lg leading-8 text-[var(--app-text-strong)]">
+              {companyName.trim() || "先在“研究目标”步骤里选择公司。"}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
+              {keyQuestion.trim() || "当前还没有填写核心判断问题。"}
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[16px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4">
+              <div className="text-xs tracking-[0.08em] text-[var(--app-text-subtle)]">
+                证据边界
+              </div>
+              <div className="mt-3 text-sm leading-7 text-[var(--app-text-muted)]">
+                官网：{officialWebsite.trim() ? "已设置" : "未设置"}
+                <br />
+                概念线索：{focusConcepts.trim() ? "已设置" : "未设置"}
+                <br />
+                补充链接：{supplementalUrls.trim() ? "已设置" : "未设置"}
+              </div>
+            </div>
+            <div className="rounded-[16px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4">
+              <div className="text-xs tracking-[0.08em] text-[var(--app-text-subtle)]">
+                研究偏好
+              </div>
+              <div className="mt-3 text-sm leading-7 text-[var(--app-text-muted)]">
+                研究目标：{researchGoal.trim() ? "已设置" : "未设置"}
+                <br />
+                必答问题：{mustAnswerQuestions.trim() ? "已设置" : "未设置"}
+                <br />
+                时效窗口：{freshnessWindowDays.trim() || "未设置"} 天
+              </div>
+            </div>
+          </div>
+
+          {startMutation.error ? (
+            <InlineNotice
+              tone="danger"
+              description={startMutation.error?.message ?? ""}
+            />
+          ) : null}
+        </div>
+      </Panel>
+
+      {starterPanel}
+    </div>
+  );
+
+  const findingsPanel = (
     <Panel
       title="最新公司判断"
       actions={
@@ -496,9 +549,11 @@ export function CompanyResearchClient() {
       )}
 
       {runsQuery.error ? (
-        <div className="mt-4 border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
-          {runsQuery.error?.message ?? ""}
-        </div>
+        <InlineNotice
+          tone="danger"
+          description={runsQuery.error?.message ?? ""}
+          className="mt-4"
+        />
       ) : null}
     </Panel>
   );
@@ -517,7 +572,7 @@ export function CompanyResearchClient() {
             历史记录
           </Link>
           <Link href="/workflows" className="app-button app-button-primary">
-            打开行业判断
+            打开行业研究
           </Link>
           <Link href="/timing" className="app-button app-button-success">
             前往择时组合
@@ -530,217 +585,12 @@ export function CompanyResearchClient() {
         activeTabId={activeTabId}
         onChange={setActiveTabId}
         panels={{
-          target: launchPanel,
-          sources: (
-            <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-              {launchPanel}
-              {starterPanel}
-            </div>
-          ),
+          target: targetPanel,
+          sources: sourcesPanel,
           launch: launchPanel,
-          findings: recentPanel,
+          findings: findingsPanel,
         }}
       />
-    </WorkspaceShell>
-  );
-
-  return (
-    <WorkspaceShell
-      section="companyResearch"
-      eyebrow="公司判断"
-      title="公司判断"
-      actions={
-        <>
-          <Link href="/" className="app-button">
-            返回看板
-          </Link>
-          <Link href="/company-research/history" className="app-button">
-            历史记录
-          </Link>
-          <Link href="/workflows" className="app-button app-button-primary">
-            打开行业判断
-          </Link>
-          <Link href="/timing" className="app-button app-button-success">
-            前往择时组合
-          </Link>
-        </>
-      }
-    >
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Panel
-          title="发起公司判断"
-          actions={
-            <button
-              type="button"
-              onClick={handleStart}
-              disabled={startMutation.isPending || !companyName.trim()}
-              className="app-button app-button-primary"
-            >
-              {startMutation.isPending ? "正在生成判断" : "开始判断"}
-            </button>
-          }
-        >
-          <div className="grid gap-4">
-            <input
-              value={companyName}
-              onChange={(event) => setCompanyName(event.target.value)}
-              placeholder="公司名称，例如：英伟达"
-              className="app-input"
-            />
-            <textarea
-              value={keyQuestion}
-              onChange={(event) => setKeyQuestion(event.target.value)}
-              placeholder="最想优先确认的问题，例如：过去几个季度里，真正驱动利润率上行的业务环节有哪些？"
-              className="app-textarea min-h-[150px]"
-            />
-
-            <details className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] p-4">
-              <summary className="cursor-pointer text-sm font-medium text-[var(--app-text)]">
-                高级选项
-              </summary>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <input
-                  value={stockCode}
-                  onChange={(event) => setStockCode(event.target.value)}
-                  placeholder="股票代码，可选"
-                  className="app-input"
-                />
-                <input
-                  value={officialWebsite}
-                  onChange={(event) => setOfficialWebsite(event.target.value)}
-                  placeholder="官网或投资者关系地址，可选"
-                  className="app-input"
-                />
-                <textarea
-                  value={focusConcepts}
-                  onChange={(event) => setFocusConcepts(event.target.value)}
-                  placeholder="重点概念，每行一个，例如：AI 芯片、数据中心、软件生态"
-                  className="app-textarea min-h-[140px]"
-                />
-                <textarea
-                  value={supplementalUrls}
-                  onChange={(event) => setSupplementalUrls(event.target.value)}
-                  placeholder="补充链接，每行一个，可选"
-                  className="app-textarea min-h-[140px]"
-                />
-                <textarea
-                  value={researchGoal}
-                  onChange={(event) => setResearchGoal(event.target.value)}
-                  placeholder="可选：本次研究的目标"
-                  className="app-textarea min-h-[120px]"
-                />
-                <textarea
-                  value={mustAnswerQuestions}
-                  onChange={(event) =>
-                    setMustAnswerQuestions(event.target.value)
-                  }
-                  placeholder="可选：必须回答的问题，每行一条"
-                  className="app-textarea min-h-[120px]"
-                />
-                <textarea
-                  value={preferredSources}
-                  onChange={(event) => setPreferredSources(event.target.value)}
-                  placeholder="可选：优先信源，每行一条"
-                  className="app-textarea min-h-[120px]"
-                />
-                <textarea
-                  value={forbiddenEvidenceTypes}
-                  onChange={(event) =>
-                    setForbiddenEvidenceTypes(event.target.value)
-                  }
-                  placeholder="可选：禁用证据类型，每行一条"
-                  className="app-textarea min-h-[120px]"
-                />
-                <input
-                  value={freshnessWindowDays}
-                  onChange={(event) =>
-                    setFreshnessWindowDays(event.target.value)
-                  }
-                  placeholder="可选：时效窗口（天）"
-                  className="app-input"
-                />
-                <input
-                  value={idempotencyKey}
-                  onChange={(event) => setIdempotencyKey(event.target.value)}
-                  placeholder="可选：幂等键，用于避免重复创建"
-                  className="app-input md:col-span-2"
-                />
-              </div>
-            </details>
-
-            {startMutation.error ? (
-              <div className="rounded-[12px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
-                {startMutation.error?.message ?? ""}
-              </div>
-            ) : null}
-          </div>
-        </Panel>
-
-        <Panel title="快速样例">
-          <div className="grid gap-3">
-            {starterCases.map((item) => (
-              <button
-                key={item.companyName}
-                type="button"
-                onClick={() => {
-                  setCompanyName(item.companyName);
-                  setFocusConcepts(item.focusConcepts);
-                  setKeyQuestion(item.keyQuestion);
-                }}
-                className="rounded-[14px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3 text-left transition-colors hover:border-[var(--app-border-strong)] hover:bg-[var(--app-panel-strong)]"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-[var(--app-text)]">
-                    {item.companyName}
-                  </p>
-                  <StatusPill label="概念拆解" tone="info" />
-                </div>
-                <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
-                  {item.keyQuestion}
-                </p>
-              </button>
-            ))}
-            <p className="text-xs text-[var(--app-text-soft)]">
-              点击填入样例。
-            </p>
-          </div>
-        </Panel>
-      </div>
-
-      <Panel
-        title="最新公司判断"
-        actions={
-          <button
-            type="button"
-            onClick={() => runsQuery.refetch()}
-            className="app-button"
-          >
-            刷新列表
-          </button>
-        }
-      >
-        {runsQuery.isLoading ? (
-          <EmptyState title="正在加载公司判断" />
-        ) : sortedRuns.length === 0 ? (
-          <EmptyState title="还没有公司判断记录" />
-        ) : (
-          <div className="grid gap-4">
-            {sortedRuns.map((run) => (
-              <CompanyRunCard
-                key={run.id}
-                run={run}
-                onCancel={(runId) => cancelMutation.mutate({ runId })}
-              />
-            ))}
-          </div>
-        )}
-
-        {runsQuery.error ? (
-          <div className="mt-4 rounded-[12px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-4 py-3 text-sm text-[var(--app-danger)]">
-            {runsQuery.error?.message ?? ""}
-          </div>
-        ) : null}
-      </Panel>
     </WorkspaceShell>
   );
 }

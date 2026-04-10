@@ -1,8 +1,42 @@
 import "~/styles/globals.css";
 
 import type { Metadata } from "next";
+import {
+  Cormorant_Garamond,
+  IBM_Plex_Mono,
+  IBM_Plex_Sans,
+  Space_Grotesk,
+} from "next/font/google";
 
 import { TRPCReactProvider } from "~/trpc/react";
+
+const displaySerif = Cormorant_Garamond({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const displaySans = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-heading",
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const bodySans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  variable: "--font-body",
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+const codeMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  variable: "--font-data",
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "股票筛选增强 · 投资决策工作流",
@@ -16,7 +50,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body className="antialiased">
+      <body
+        className={`${displaySerif.variable} ${displaySans.variable} ${bodySans.variable} ${codeMono.variable} antialiased`}
+      >
         <TRPCReactProvider>{children}</TRPCReactProvider>
       </body>
     </html>

@@ -2,68 +2,70 @@
 @source "..";
 
 @theme {
-  --font-sans: Arial, "Helvetica Neue", "Nimbus Sans", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --font-sans:
+    var(--font-body), "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    sans-serif;
+  --font-mono:
+    var(--font-data), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
-  --app-bg: #f4efe6;
-  --app-surface: #fbf7f0;
-  --app-surface-strong: #efe4d6;
-  --app-surface-floating: #fffdfa;
-  --app-surface-quiet: #f7f1e8;
-  --app-brand: #8a5a3c;
-  --app-flame: #9e6b4c;
-  --app-orange: #b07a55;
-  --app-gold: #c7a06c;
-  --app-yellow: #e2cfac;
-  --app-black: #1f2430;
-  --app-text: #1f2430;
-  --app-text-strong: #171c26;
-  --app-text-muted: rgba(31, 36, 48, 0.72);
-  --app-text-subtle: rgba(31, 36, 48, 0.5);
-  --app-text-soft: rgba(31, 36, 48, 0.38);
-  --app-border: rgba(97, 81, 64, 0.2);
-  --app-border-soft: rgba(97, 81, 64, 0.14);
-  --app-border-strong: rgba(138, 90, 60, 0.34);
-  --app-warning: #9a6a2f;
-  --app-danger: #8b4a43;
-  --app-success: #416a53;
-  --app-info: #4f6b7a;
-  --app-bg-inset: #efe6d8;
-  --app-bg-raised: #f8f2e9;
-  --app-bg-floating: #fffdfa;
-  --app-bg-elevated: #ece1d2;
-  --app-brand-strong: #74472c;
-  --app-accent-strong: #3e5a68;
-  --app-panel-soft: rgba(247, 241, 232, 0.96);
-  --app-panel: rgba(251, 247, 240, 0.98);
-  --app-panel-strong: rgba(241, 233, 223, 1);
-  --app-code-bg: rgba(236, 228, 217, 0.96);
-  --app-selection: rgba(79, 107, 122, 0.12);
-  --app-neutral-surface: rgba(255, 253, 250, 0.9);
-  --app-neutral-border: rgba(97, 81, 64, 0.16);
-  --app-info-surface: rgba(79, 107, 122, 0.12);
-  --app-info-border: rgba(79, 107, 122, 0.24);
-  --app-success-surface: rgba(65, 106, 83, 0.12);
-  --app-success-border: rgba(65, 106, 83, 0.24);
-  --app-warning-surface: rgba(154, 106, 47, 0.12);
-  --app-warning-border: rgba(154, 106, 47, 0.24);
-  --app-danger-surface: rgba(139, 74, 67, 0.12);
-  --app-danger-border: rgba(139, 74, 67, 0.22);
-  --app-shadow-sm:
-    rgba(70, 53, 35, 0.08) 0 10px 24px,
-    rgba(70, 53, 35, 0.04) 0 2px 6px;
+  --app-bg: #000000;
+  --app-surface: #05070b;
+  --app-surface-strong: #0d1117;
+  --app-surface-floating: #090c12;
+  --app-surface-quiet: #030507;
+  --app-brand: #ff801f;
+  --app-flame: #ffa057;
+  --app-orange: #ff801f;
+  --app-gold: #ffc53d;
+  --app-yellow: #ffc53d;
+  --app-black: #000000;
+  --app-text: #f0f0f0;
+  --app-text-strong: #ffffff;
+  --app-text-muted: #a1a4a5;
+  --app-text-subtle: rgba(240, 240, 240, 0.58);
+  --app-text-soft: rgba(240, 240, 240, 0.38);
+  --app-border: rgba(214, 235, 253, 0.19);
+  --app-border-soft: rgba(217, 237, 254, 0.145);
+  --app-border-strong: rgba(59, 158, 255, 0.42);
+  --app-warning: #ffc53d;
+  --app-danger: #ff2047;
+  --app-success: #11ff99;
+  --app-info: #3b9eff;
+  --app-bg-inset: #020406;
+  --app-bg-raised: #070a0f;
+  --app-bg-floating: #0b0e14;
+  --app-bg-elevated: #10141c;
+  --app-brand-strong: #ffffff;
+  --app-accent-strong: #3b9eff;
+  --app-panel-soft: rgba(10, 14, 20, 0.92);
+  --app-panel: rgba(8, 11, 16, 0.96);
+  --app-panel-strong: rgba(13, 17, 24, 1);
+  --app-code-bg: #070a10;
+  --app-selection: rgba(59, 158, 255, 0.12);
+  --app-neutral-surface: rgba(255, 255, 255, 0.025);
+  --app-neutral-border: rgba(214, 235, 253, 0.14);
+  --app-info-surface: rgba(59, 158, 255, 0.1);
+  --app-info-border: rgba(59, 158, 255, 0.24);
+  --app-success-surface: rgba(17, 255, 153, 0.08);
+  --app-success-border: rgba(17, 255, 153, 0.2);
+  --app-warning-surface: rgba(255, 197, 61, 0.09);
+  --app-warning-border: rgba(255, 197, 61, 0.22);
+  --app-danger-surface: rgba(255, 32, 71, 0.09);
+  --app-danger-border: rgba(255, 32, 71, 0.22);
+  --app-shadow-sm: rgba(176, 199, 217, 0.145) 0 0 0 1px;
   --app-shadow-lg:
-    rgba(70, 53, 35, 0.12) 0 18px 48px,
-    rgba(70, 53, 35, 0.08) 0 6px 18px;
+    rgba(176, 199, 217, 0.145) 0 0 0 1px,
+    rgba(0, 0, 0, 0.45) 0 20px 48px;
   --app-block-gradient: linear-gradient(
     135deg,
-    #e4d3bb 0%,
-    #caa984 52%,
-    #6b7a82 100%
+    rgba(255, 128, 31, 0.28) 0%,
+    rgba(59, 158, 255, 0.2) 52%,
+    rgba(17, 255, 153, 0.14) 100%
   );
 }
 
@@ -84,10 +86,18 @@ body {
   background: var(--app-bg);
 }
 
+::selection {
+  background: rgba(255, 128, 31, 0.24);
+  color: var(--app-text-strong);
+}
+
 .app-display {
-  font-family: var(--font-sans);
-  font-weight: 400;
-  letter-spacing: -0.05em;
+  font-family:
+    var(--font-display), "Source Han Serif SC", "Songti SC", "STSong",
+    serif;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
 }
 
 .app-data {
@@ -106,80 +116,90 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 44px;
-  padding: 0.7rem 1rem;
-  border: 1px solid var(--app-border-soft);
-  background: var(--app-surface-floating);
-  color: var(--app-text-strong);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.82rem;
+  min-height: 40px;
+  padding: 0.62rem 1rem;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--app-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    color 180ms ease;
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .app-button:hover {
-  border-color: var(--app-border-strong);
-  background: var(--app-bg-raised);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--app-text-strong);
 }
 
 .app-button-primary {
-  border-color: var(--app-brand-strong);
-  background: var(--app-brand-strong);
-  color: #fff;
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #000000;
 }
 
 .app-button-primary:hover {
-  background: var(--app-brand);
-  border-color: var(--app-brand);
+  border-color: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.86);
+  color: #000000;
 }
 
 .app-button-success {
-  border-color: var(--app-success);
-  background: var(--app-success);
-  color: #fff;
+  border-color: rgba(17, 255, 153, 0.32);
+  background: rgba(17, 255, 153, 0.08);
+  color: #c6ffe8;
 }
 
 .app-button-success:hover {
-  background: #355844;
-  border-color: #355844;
-  color: #fff;
+  border-color: rgba(17, 255, 153, 0.44);
+  background: rgba(17, 255, 153, 0.14);
+  color: #f0fff8;
 }
 
 .app-button-danger {
   border-color: var(--app-danger-border);
   background: var(--app-danger-surface);
-  color: var(--app-danger);
+  color: #ff8aa0;
 }
 
 .app-button-danger:hover {
-  background: var(--app-danger);
-  border-color: var(--app-danger);
-  color: #fff;
+  border-color: rgba(255, 32, 71, 0.35);
+  background: rgba(255, 32, 71, 0.16);
+  color: #ffd6de;
 }
 
 .app-input,
-.app-textarea {
+.app-textarea,
+select {
   width: 100%;
   border: 1px solid var(--app-border-soft);
-  background: var(--app-surface-floating);
+  border-radius: 10px;
+  background: var(--app-panel-strong);
   color: var(--app-text);
   padding: 0.8rem 0.9rem;
   outline: none;
   transition:
-    border-color 180ms ease,
-    background-color 180ms ease,
-    box-shadow 180ms ease;
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.app-input::placeholder,
+.app-textarea::placeholder {
+  color: var(--app-text-soft);
 }
 
 .app-input:focus,
 .app-textarea:focus,
 select:focus {
   border-color: var(--app-accent-strong);
-  box-shadow: 0 0 0 3px rgba(79, 107, 122, 0.12);
-  background: #fff;
+  box-shadow: 0 0 0 3px rgba(59, 158, 255, 0.16);
+  background: var(--app-bg-elevated);
 }
 
 .app-textarea {
@@ -188,24 +208,26 @@ select:focus {
 
 .glass-panel,
 .app-panel {
-  background: var(--app-surface-floating);
-  border: 1px solid var(--app-border-soft);
+  background: var(--app-panel);
+  border: 1px solid var(--app-border);
   box-shadow: var(--app-shadow-sm);
 }
 
 .app-progress {
   height: 0.45rem;
   width: 100%;
-  background: rgba(79, 107, 122, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
 }
 
 .app-skeleton {
   background:
     linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.15) 0%,
-      rgba(255, 255, 255, 0.45) 50%,
-      rgba(255, 255, 255, 0.15) 100%
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.12) 50%,
+      rgba(255, 255, 255, 0.04) 100%
     );
   background-size: 240% 100%;
   animation: app-skeleton-wave 1.4s ease infinite;
@@ -215,6 +237,7 @@ select:focus {
   from {
     background-position: 100% 0;
   }
+
   to {
     background-position: -100% 0;
   }
@@ -234,11 +257,11 @@ select:focus {
 }
 
 .app-table th {
+  font-family: var(--font-heading);
   font-size: 0.72rem;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--app-text-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
 }
 
 .app-table td {
@@ -274,27 +297,31 @@ button,
 
 .app-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(31, 31, 31, 0.25) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
 }
 
-.app-shell article,
-.app-shell section,
-.app-shell aside,
-.app-shell button,
-.app-shell input,
-.app-shell textarea,
-.app-shell select,
-.app-shell table,
-.app-shell thead,
-.app-shell tbody,
-.app-shell tr,
-.app-shell td,
-.app-shell th,
-.glass-panel,
-.app-panel,
-.app-button,
-.app-input,
-.app-textarea,
-.app-progress {
-  border-radius: 0 !important;
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.12);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+  background-clip: padding-box;
 }

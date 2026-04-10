@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
+import type React from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   EmptyState,
   InlineNotice,
@@ -11,6 +11,7 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { screeningStageTabs } from "~/app/screening/screening-stage-tabs";
 import {
   annualPresetOptions,
@@ -518,7 +519,7 @@ export function ScreeningStudioClient() {
     await createFormulaMutation.mutateAsync(payload);
   }
 
-  const stagePreviewPanels = {
+  const stagePanelSummary = {
     stocks: (
       <SectionCard
         title="选股池"
@@ -535,7 +536,8 @@ export function ScreeningStudioClient() {
         description="明确本轮筛选要看哪些官方指标和自定义公式。"
       >
         <div className="text-sm leading-6 text-[var(--app-text-muted)]">
-          当前已选 {selectedIndicatorIds.length} 个指标和 {selectedFormulaIds.length} 个公式。
+          当前已选 {selectedIndicatorIds.length} 个指标和{" "}
+          {selectedFormulaIds.length} 个公式。
         </div>
       </SectionCard>
     ),
@@ -569,6 +571,13 @@ export function ScreeningStudioClient() {
         </div>
       </SectionCard>
     ),
+  } satisfies Record<string, React.ReactNode>;
+  const stagePanels = {
+    stocks: stagePanelSummary.stocks && null,
+    indicators: stagePanelSummary.indicators && null,
+    period: stagePanelSummary.period && null,
+    filters: stagePanelSummary.filters && null,
+    results: stagePanelSummary.results && null,
   } satisfies Record<string, React.ReactNode>;
 
   return (
@@ -638,14 +647,14 @@ export function ScreeningStudioClient() {
         tabs={screeningStageTabs}
         activeTabId={activeTabId}
         onChange={setActiveTabId}
-        panels={stagePreviewPanels}
+        panels={stagePanels}
       />
 
       <div className="grid gap-6 xl:grid-cols-12">
         <SectionCard
           title="股票搜索多选"
           description="基于本地股票代码映射搜索，最多选择 20 只股票加入当前工作台。"
-          className="xl:col-span-4"
+          className={activeTabId === "stocks" ? "xl:col-span-4" : "hidden"}
         >
           <input
             value={stockSearchKeyword}
@@ -730,7 +739,7 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="指标目录"
           description="官方指标与自定义公式都在当前工作台里统一勾选。"
-          className="xl:col-span-4"
+          className={activeTabId === "indicators" ? "xl:col-span-4" : "hidden"}
         >
           {catalogNotice ? (
             <InlineNotice
@@ -818,7 +827,7 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="公式编辑器"
           description="输入 [指标名]，保存时会由后端转换为安全表达式。"
-          className="xl:col-span-4"
+          className={activeTabId === "indicators" ? "xl:col-span-4" : "hidden"}
           actions={
             editingFormulaId ? (
               <button
@@ -965,7 +974,7 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="期间设置"
           description="改变期间设置不会自动取数，只有点击获取才会请求数据。"
-          className="xl:col-span-4"
+          className={activeTabId === "period" ? "xl:col-span-4" : "hidden"}
         >
           <div className="grid gap-3">
             <input
@@ -1095,7 +1104,7 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="本地筛选与排序"
           description="默认始终基于每只股票最新可用一期的值，不触发任何网络请求。"
-          className="xl:col-span-4"
+          className={activeTabId === "filters" ? "xl:col-span-4" : "hidden"}
         >
           <div className="grid gap-3">
             <div className="flex flex-wrap gap-2">
@@ -1229,7 +1238,7 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="结果表格"
           description="财报类指标按期间展开，latest-only 指标放在最新列。"
-          className="xl:col-span-8"
+          className={activeTabId === "results" ? "xl:col-span-8" : "hidden"}
         >
           {!resultSnapshot ? (
             <EmptyState

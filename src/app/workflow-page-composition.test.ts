@@ -19,20 +19,27 @@ describe("workflow page composition", () => {
     expect(screeningSource).toContain("screeningStageTabs");
     expect(screeningSource).toContain("WorkflowStageSwitcher");
     expect(screeningSource).not.toContain("workflowTabs={screeningStageTabs}");
+    expect(screeningSource).not.toContain("stagePreviewPanels");
 
     expect(workflowsSource).toContain("workflowsStageTabs");
     expect(workflowsSource).toContain("WorkflowStageSwitcher");
     expect(workflowsSource).not.toContain("workflowTabs={workflowsStageTabs}");
+    expect(workflowsSource).not.toContain("question: launchFormPanel");
+    expect(workflowsSource).not.toContain("constraints: launchFormPanel");
+    expect(workflowsSource.match(/<WorkspaceShell/g)?.length).toBe(1);
 
     expect(companyResearchSource).toContain("companyResearchStageTabs");
     expect(companyResearchSource).toContain("WorkflowStageSwitcher");
     expect(companyResearchSource).not.toContain(
       "workflowTabs={companyResearchStageTabs}",
     );
+    expect(companyResearchSource).not.toContain("target: launchPanel");
+    expect(companyResearchSource.match(/<WorkspaceShell/g)?.length).toBe(1);
 
     expect(timingSource).toContain("timingStageTabs");
     expect(timingSource).toContain("WorkflowStageSwitcher");
     expect(timingSource).not.toContain("workflowTabs={timingStageTabs}");
+    expect(timingSource).not.toContain("stagePreviewPanels");
   });
 
   it("removes the old bento dashboard structure from the home page", () => {

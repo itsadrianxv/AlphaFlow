@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
-import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
+import type React from "react";
+import { useEffect, useState } from "react";
 import {
   EmptyState,
   Panel,
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { timingStageTabs } from "~/app/timing/timing-stage-tabs";
 import { api } from "~/trpc/react";
 
@@ -463,7 +464,7 @@ export function TimingClient() {
     }
   };
 
-  const stagePreviewPanels = {
+  const stagePanelSummary = {
     signals: (
       <Panel title="信号来源">
         <div className="text-sm leading-6 text-[var(--app-text-muted)]">
@@ -489,7 +490,8 @@ export function TimingClient() {
     recommendations: (
       <Panel title="组合建议">
         <div className="text-sm leading-6 text-[var(--app-text-muted)]">
-          当前最新建议 {latestRecommendations.length} 条，建议先看风险预算，再看动作区间。
+          当前最新建议 {latestRecommendations.length}{" "}
+          条，建议先看风险预算，再看动作区间。
         </div>
       </Panel>
     ),
@@ -500,6 +502,13 @@ export function TimingClient() {
         </div>
       </Panel>
     ),
+  } satisfies Record<string, React.ReactNode>;
+  const stagePanels = {
+    signals: stagePanelSummary.signals && null,
+    portfolio: stagePanelSummary.portfolio && null,
+    preset: stagePanelSummary.preset && null,
+    recommendations: stagePanelSummary.recommendations && null,
+    reviews: stagePanelSummary.reviews && null,
   } satisfies Record<string, React.ReactNode>;
 
   return (
@@ -525,10 +534,16 @@ export function TimingClient() {
         tabs={timingStageTabs}
         activeTabId={activeTabId}
         onChange={setActiveTabId}
-        panels={stagePreviewPanels}
+        panels={stagePanels}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+      <div
+        className={
+          activeTabId === "recommendations"
+            ? "grid gap-6 xl:grid-cols-[1.08fr_0.92fr]"
+            : "hidden"
+        }
+      >
         <Panel
           title="最新建议"
           actions={
@@ -642,7 +657,13 @@ export function TimingClient() {
         </Panel>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+      <div
+        className={
+          activeTabId === "signals"
+            ? "grid gap-6 xl:grid-cols-[1fr_1fr]"
+            : "hidden"
+        }
+      >
         <Panel title="单股信号">
           <div className="grid gap-4">
             <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
@@ -713,6 +734,7 @@ export function TimingClient() {
 
       <Panel
         title="信号参数与复盘设定"
+        className={activeTabId === "preset" ? undefined : "hidden"}
         actions={
           <button
             type="button"
@@ -848,7 +870,13 @@ export function TimingClient() {
         </div>
       </Panel>
 
-      <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+      <div
+        className={
+          activeTabId === "portfolio"
+            ? "grid gap-6 xl:grid-cols-[1.08fr_0.92fr]"
+            : "hidden"
+        }
+      >
         <Panel
           title="组合快照"
           actions={
@@ -1080,6 +1108,7 @@ export function TimingClient() {
 
       <Panel
         title="建议明细"
+        className={activeTabId === "recommendations" ? undefined : "hidden"}
         actions={
           <button
             type="button"
@@ -1234,6 +1263,7 @@ export function TimingClient() {
 
       <Panel
         title="复盘记录"
+        className={activeTabId === "reviews" ? undefined : "hidden"}
         actions={
           <button
             type="button"
@@ -1334,6 +1364,7 @@ export function TimingClient() {
 
       <Panel
         title="信号库"
+        className={activeTabId === "signals" ? undefined : "hidden"}
         actions={
           <button
             type="button"

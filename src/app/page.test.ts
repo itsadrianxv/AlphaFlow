@@ -33,4 +33,18 @@ describe("HomePage server boundary", () => {
       'actions={\n          <Link href={primaryHref} className="app-button app-button-primary">',
     );
   });
+
+  it("loads the dark editorial theme from the root layout and global styles", () => {
+    const layoutSource = readSource("src/app/layout.tsx");
+    const globalsSource = readSource("src/styles/globals.css");
+
+    expect(layoutSource).toContain("Cormorant_Garamond");
+    expect(layoutSource).toContain("Space_Grotesk");
+    expect(layoutSource).toContain("IBM_Plex_Sans");
+    expect(layoutSource).toContain("IBM_Plex_Mono");
+    expect(globalsSource).toContain("color-scheme: dark");
+    expect(globalsSource).toContain("--app-bg: #000000");
+    expect(globalsSource).toContain("--app-text: #f0f0f0");
+    expect(globalsSource).toContain("--app-border: rgba(214, 235, 253, 0.19)");
+  });
 });

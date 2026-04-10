@@ -1,9 +1,8 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-
-import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 
 const tabs: WorkflowStageTab[] = [
   {

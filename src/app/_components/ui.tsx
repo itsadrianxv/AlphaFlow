@@ -139,7 +139,7 @@ const densityClassMap: Record<Density, string> = {
 
 function AppMark() {
   return (
-    <div className="flex h-10 w-10 items-center justify-center border border-[var(--app-border-soft)] bg-[image:var(--app-block-gradient)] text-[11px] tracking-[0.08em] text-[var(--app-black)] shadow-[var(--app-shadow-sm)]">
+    <div className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] font-[family-name:var(--font-heading)] text-[11px] tracking-[0.12em] text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]">
       SSB
     </div>
   );
@@ -157,11 +157,11 @@ export function PageHeader(props: {
     <header className="app-page-header flex flex-col gap-5 border-b border-[var(--app-border-soft)] pb-6 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
         {eyebrow ? (
-          <div className="mb-4 text-[11px] uppercase tracking-[0.2em] text-[var(--app-text-subtle)]">
+          <div className="mb-4 font-[family-name:var(--font-heading)] text-[11px] tracking-[0.18em] text-[var(--app-text-subtle)]">
             {eyebrow}
           </div>
         ) : null}
-        <h1 className="app-display text-[42px] leading-[0.95] text-[var(--app-text-strong)] sm:text-[58px] xl:text-[82px]">
+        <h1 className="app-display max-w-5xl text-[46px] leading-[0.96] text-[var(--app-text-strong)] sm:text-[58px] xl:text-[72px]">
           {title}
         </h1>
         {description ? (
@@ -221,7 +221,7 @@ export function WorkspaceShell(props: {
               <Link href="/" className="flex items-center gap-3">
                 <AppMark />
                 <div>
-                  <div className="text-sm font-medium text-[var(--app-text-strong)]">
+                  <div className="font-[family-name:var(--font-heading)] text-sm font-medium text-[var(--app-text-strong)]">
                     Stock Screening Boost
                   </div>
                   <div className="text-xs text-[var(--app-text-subtle)]">
@@ -242,11 +242,13 @@ export function WorkspaceShell(props: {
                       className={cn(
                         "rounded-[12px] border px-3 py-3 transition-colors",
                         active
-                          ? "border-[var(--app-border-strong)] bg-[var(--app-bg-floating)] text-[var(--app-text-strong)]"
+                          ? "border-[var(--app-border-strong)] bg-[var(--app-panel-strong)] text-[var(--app-text-strong)]"
                           : "border-transparent text-[var(--app-text-muted)] hover:border-[var(--app-border-soft)] hover:bg-[var(--app-bg-raised)] hover:text-[var(--app-text-strong)]",
                       )}
                     >
-                      <div className="text-sm font-medium">{item.label}</div>
+                      <div className="font-[family-name:var(--font-heading)] text-sm font-medium">
+                        {item.label}
+                      </div>
                       <div className="mt-1 text-xs leading-5 text-[var(--app-text-subtle)]">
                         {item.detail}
                       </div>
@@ -268,11 +270,11 @@ export function WorkspaceShell(props: {
                     className={cn(
                       "rounded-[12px] border px-3 py-3 transition-colors",
                       sectionView === "history"
-                        ? "border-[var(--app-border-strong)] bg-[var(--app-bg-floating)] text-[var(--app-text-strong)]"
+                        ? "border-[var(--app-border-strong)] bg-[var(--app-panel-strong)] text-[var(--app-text-strong)]"
                         : "border-[var(--app-border-soft)] bg-[var(--app-bg-raised)] text-[var(--app-text-muted)] hover:border-[var(--app-border-strong)] hover:text-[var(--app-text-strong)]",
                     )}
                   >
-                    <div className="text-sm font-medium">
+                    <div className="font-[family-name:var(--font-heading)] text-sm font-medium">
                       {contextualHistory.label}
                     </div>
                     <div className="mt-1 text-xs leading-5 text-[var(--app-text-subtle)]">
@@ -303,14 +305,14 @@ export function WorkspaceShell(props: {
                       className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-4"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--app-text-subtle)]">
+                        <div className="font-[family-name:var(--font-heading)] text-[11px] tracking-[0.14em] text-[var(--app-text-subtle)]">
                           Step {tabIndex + 1}
                         </div>
                         <div className="app-workflow-index">
                           {String(tabIndex + 1).padStart(2, "0")}
                         </div>
                       </div>
-                      <div className="mt-3 text-xl leading-none text-[var(--app-text-strong)]">
+                      <div className="mt-3 font-[family-name:var(--font-heading)] text-xl leading-none text-[var(--app-text-strong)]">
                         {tab.label}
                       </div>
                       <div className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
@@ -390,7 +392,7 @@ export function WorkspaceShell(props: {
   if ((section as string) !== "__legacy_sidebar__") {
     return (
       <main className="app-shell" data-workflow-shell="mistral">
-        <header className="sticky top-0 z-20 border-b border-[var(--app-border-soft)] bg-[rgba(251,247,240,0.94)] backdrop-blur-sm">
+        <header className="sticky top-0 z-20 border-b border-[var(--app-border-soft)] bg-[rgba(0,0,0,0.9)] backdrop-blur-sm">
           <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               {primaryNavigation}
@@ -488,14 +490,14 @@ export function WorkspaceShell(props: {
                     className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-4"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--app-text-subtle)]">
+                      <div className="font-[family-name:var(--font-heading)] text-[11px] tracking-[0.14em] text-[var(--app-text-subtle)]">
                         Step {tabIndex + 1}
                       </div>
                       <div className="app-workflow-index">
                         {String(tabIndex + 1).padStart(2, "0")}
                       </div>
                     </div>
-                    <div className="mt-3 text-xl leading-none text-[var(--app-text-strong)]">
+                    <div className="mt-3 font-[family-name:var(--font-heading)] text-xl leading-none text-[var(--app-text-strong)]">
                       {tab.label}
                     </div>
                     <div className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
@@ -652,7 +654,7 @@ export function SectionCard(props: {
   return (
     <section
       className={cn(
-        "rounded-[12px] border border-[var(--app-border-soft)] shadow-[var(--app-shadow-sm)]",
+        "rounded-[16px] border border-[var(--app-border-soft)] shadow-[var(--app-shadow-sm)]",
         surfaceClassMap[surface],
         densityClassMap[density],
         emphasis === "strong" && "border-[var(--app-border-strong)]",
@@ -665,7 +667,7 @@ export function SectionCard(props: {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             {title ? (
-              <h2 className="app-display text-[20px] leading-7 text-[var(--app-text-strong)]">
+              <h2 className="font-[family-name:var(--font-heading)] text-[20px] leading-7 text-[var(--app-text-strong)]">
                 {title}
               </h2>
             ) : null}
@@ -768,8 +770,8 @@ export function StatusPill(props: {
   return (
     <span
       className={cn(
-        "inline-flex min-h-7 items-center rounded-[8px] border px-2.5 py-1 text-[11px] font-medium",
-        "uppercase tracking-[0.14em]",
+        "inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-[11px] font-medium",
+        "tracking-[0.08em]",
         toneClassMap[tone],
         className,
       )}
@@ -791,7 +793,7 @@ export function InlineNotice(props: {
   return (
     <div
       className={cn(
-        "rounded-[10px] border px-4 py-3",
+        "rounded-[14px] border px-4 py-3",
         toneClassMap[tone],
         className,
       )}
@@ -822,7 +824,7 @@ export function ActionStrip(props: {
 
   return (
     <div
-      className={cn("rounded-[12px] border p-4", toneClassMap[tone], className)}
+      className={cn("rounded-[16px] border p-4", toneClassMap[tone], className)}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
@@ -891,7 +893,7 @@ export function EmptyState(props: {
   return (
     <div
       className={cn(
-        "rounded-[12px] border border-dashed border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] p-5",
+        "rounded-[16px] border border-dashed border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] p-5",
         className,
       )}
     >
@@ -950,7 +952,7 @@ export function KeyPointList(props: {
                     ? String(item.key)
                     : `${title}-${index}`
               }
-              className="rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-bg-floating)] px-3 py-2 text-sm leading-6 text-[var(--app-text-muted)]"
+              className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-bg-floating)] px-3 py-2 text-sm leading-6 text-[var(--app-text-muted)]"
             >
               {item}
             </li>
@@ -978,7 +980,7 @@ export function LoadingSkeleton(props: {
         <div
           key={placeholderId}
           className={cn(
-            "app-skeleton h-[88px] rounded-[12px] border border-[var(--app-border-soft)]",
+            "app-skeleton h-[88px] rounded-[16px] border border-[var(--app-border-soft)]",
             itemClassName,
           )}
         />
@@ -1126,7 +1128,7 @@ export function DataTable<T>(props: {
 
   return (
     <div className={className}>
-      <div className="hidden overflow-x-auto rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] md:block">
+      <div className="hidden overflow-x-auto rounded-[16px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] md:block">
         <table className="app-table min-w-full">
           <thead>
             <tr>
@@ -1196,7 +1198,7 @@ export function DataTable<T>(props: {
                   type={onRowClick ? "button" : undefined}
                   onClick={() => onRowClick?.(row)}
                   className={cn(
-                    "rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] p-4 text-left",
+                    "rounded-[16px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] p-4 text-left",
                     onRowClick && "cursor-pointer",
                     selectedRowId === rowId &&
                       "border-[var(--app-border-strong)] bg-[var(--app-bg-floating)]",
