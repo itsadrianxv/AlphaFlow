@@ -67,6 +67,7 @@ export function ScreeningHistoryClient() {
   return (
     <WorkspaceShell
       section="screening"
+      sectionView="history"
       title="已保存工作台库"
       description="浏览最近保存的小批量筛选工作台，查看上次快照摘要，并回到主工作台继续手动刷新。"
       actions={

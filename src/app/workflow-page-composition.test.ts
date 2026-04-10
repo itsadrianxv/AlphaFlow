@@ -7,7 +7,9 @@ function readSource(relativePath: string) {
 
 describe("workflow page composition", () => {
   it("renders workflow stage cards from a single source on every core workflow page", () => {
-    const screeningSource = readSource("./screening/screening-studio-client.tsx");
+    const screeningSource = readSource(
+      "./screening/screening-studio-client.tsx",
+    );
     const workflowsSource = readSource("./workflows/workflows-client.tsx");
     const companyResearchSource = readSource(
       "./company-research/company-research-client.tsx",
@@ -38,5 +40,17 @@ describe("workflow page composition", () => {
 
     expect(homePageSource).not.toContain("BentoCard");
     expect(homePageSource).not.toContain("BentoGrid");
+  });
+
+  it("routes history pages through the sidebar history view state", () => {
+    const screeningHistorySource = readSource(
+      "./screening/history/screening-history-client.tsx",
+    );
+    const workflowHistorySource = readSource(
+      "./_components/workflow-history-client.tsx",
+    );
+
+    expect(screeningHistorySource).toContain('sectionView="history"');
+    expect(workflowHistorySource).toContain('sectionView="history"');
   });
 });

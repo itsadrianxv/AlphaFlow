@@ -25,6 +25,8 @@ type WorkspaceSection =
   | "timing"
   | "companyResearch";
 
+type WorkspaceSectionView = "default" | "history";
+
 const navItems: Array<{
   key: WorkspaceSection;
   href: string;
@@ -60,6 +62,54 @@ const navItems: Array<{
     href: "/timing",
     label: "择时组合",
     detail: "组合建议与复盘闭环",
+  },
+];
+
+const sidebarNavItems: Array<{
+  key: WorkspaceSection;
+  href: string;
+  label: string;
+  detail: string;
+  historyHref?: string;
+  historyLabel?: string;
+}> = [
+  {
+    key: "home",
+    href: "/",
+    label: "\u6982\u89c8",
+    detail: "\u4eca\u65e5\u51b3\u7b56\u4e0e\u8fd0\u884c\u72b6\u6001",
+  },
+  {
+    key: "screening",
+    href: "/screening",
+    label: "\u7b5b\u9009",
+    detail: "\u7b56\u7565\u3001\u4f1a\u8bdd\u4e0e\u89c2\u5bdf\u6c60",
+    historyHref: "/screening/history",
+    historyLabel: "\u7b5b\u9009\u5386\u53f2",
+  },
+  {
+    key: "workflows",
+    href: "/workflows",
+    label: "\u884c\u4e1a\u7814\u7a76",
+    detail: "\u884c\u4e1a\u903b\u8f91\u4e0e\u7814\u7a76\u8fd0\u884c",
+    historyHref: "/workflows/history",
+    historyLabel: "\u884c\u4e1a\u7814\u7a76\u5386\u53f2",
+  },
+  {
+    key: "companyResearch",
+    href: "/company-research",
+    label: "\u516c\u53f8\u5224\u65ad",
+    detail: "\u516c\u53f8\u5224\u65ad\u4e0e\u8bc1\u636e\u8ddf\u8e2a",
+    historyHref: "/company-research/history",
+    historyLabel: "\u516c\u53f8\u5224\u65ad\u5386\u53f2",
+  },
+  {
+    key: "timing",
+    href: "/timing",
+    label: "\u62e9\u65f6\u7ec4\u5408",
+    detail: "\u7ec4\u5408\u5efa\u8bae\u4e0e\u590d\u76d8\u95ed\u73af",
+    historyHref: "/timing/history",
+    historyLabel: "\u62e9\u65f6\u7ec4\u5408\u5386\u53f2",
   },
 ];
 
@@ -131,6 +181,7 @@ export function PageHeader(props: {
 
 export function WorkspaceShell(props: {
   section: WorkspaceSection;
+  sectionView?: WorkspaceSectionView;
   eyebrow?: string;
   title: string;
   description?: string;
@@ -141,14 +192,148 @@ export function WorkspaceShell(props: {
 }) {
   const {
     section,
+    sectionView = "default",
     eyebrow,
     title,
     description,
     actions,
     summary,
-    workflowTabs,
+    workflowTabs = [],
     children,
   } = props;
+  const sidebarActiveItem = sidebarNavItems.find(
+    (item) => item.key === section,
+  );
+  const contextualHistory =
+    sidebarActiveItem?.historyHref && sidebarActiveItem.historyLabel
+      ? {
+          href: sidebarActiveItem.historyHref,
+          label: sidebarActiveItem.historyLabel,
+        }
+      : null;
+
+  if (sectionView === "default" || sectionView === "history") {
+    return (
+      <main className="app-shell" data-workflow-shell="mistral">
+        <div className="mx-auto min-h-screen w-full max-w-[1520px] lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="border-b border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] lg:min-h-screen lg:border-r lg:border-b-0">
+            <div className="flex h-full flex-col gap-6 px-4 py-5 sm:px-6 lg:sticky lg:top-0 lg:h-screen lg:px-5">
+              <Link href="/" className="flex items-center gap-3">
+                <AppMark />
+                <div>
+                  <div className="text-sm font-medium text-[var(--app-text-strong)]">
+                    Stock Screening Boost
+                  </div>
+                  <div className="text-xs text-[var(--app-text-subtle)]">
+                    {"\u6295\u8d44\u51b3\u7b56\u5de5\u4f5c\u53f0"}
+                  </div>
+                </div>
+              </Link>
+
+              <nav className="grid gap-2" aria-label="Sidebar navigation">
+                {sidebarNavItems.map((item) => {
+                  const active = item.key === section;
+
+                  return (
+                    <Link
+                      key={item.key}
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "rounded-[12px] border px-3 py-3 transition-colors",
+                        active
+                          ? "border-[var(--app-border-strong)] bg-[var(--app-bg-floating)] text-[var(--app-text-strong)]"
+                          : "border-transparent text-[var(--app-text-muted)] hover:border-[var(--app-border-soft)] hover:bg-[var(--app-bg-raised)] hover:text-[var(--app-text-strong)]",
+                      )}
+                    >
+                      <div className="text-sm font-medium">{item.label}</div>
+                      <div className="mt-1 text-xs leading-5 text-[var(--app-text-subtle)]">
+                        {item.detail}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              {contextualHistory ? (
+                <section className="grid gap-3 border-t border-[var(--app-border-soft)] pt-4">
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--app-text-subtle)]">
+                    {"\u5386\u53f2\u5165\u53e3"}
+                  </div>
+                  <Link
+                    href={contextualHistory.href}
+                    aria-current={
+                      sectionView === "history" ? "page" : undefined
+                    }
+                    className={cn(
+                      "rounded-[12px] border px-3 py-3 transition-colors",
+                      sectionView === "history"
+                        ? "border-[var(--app-border-strong)] bg-[var(--app-bg-floating)] text-[var(--app-text-strong)]"
+                        : "border-[var(--app-border-soft)] bg-[var(--app-bg-raised)] text-[var(--app-text-muted)] hover:border-[var(--app-border-strong)] hover:text-[var(--app-text-strong)]",
+                    )}
+                  >
+                    <div className="text-sm font-medium">
+                      {contextualHistory.label}
+                    </div>
+                    <div className="mt-1 text-xs leading-5 text-[var(--app-text-subtle)]">
+                      {
+                        "\u67e5\u770b\u5f53\u524d\u6a21\u5757\u7684\u5386\u53f2\u8bb0\u5f55\u4e0e\u56de\u6eaf\u5165\u53e3"
+                      }
+                    </div>
+                  </Link>
+                </section>
+              ) : null}
+            </div>
+          </aside>
+
+          <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+            <div className="mx-auto flex min-h-screen w-full max-w-[1260px] flex-col gap-8">
+              <PageHeader
+                eyebrow={eyebrow}
+                title={title}
+                description={description}
+                actions={actions}
+              />
+
+              {workflowTabs && workflowTabs.length > 0 ? (
+                <section className="grid gap-3 lg:grid-cols-4 xl:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
+                  {workflowTabs.map((tab, tabIndex) => (
+                    <article
+                      key={tab.id}
+                      className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-[var(--app-text-subtle)]">
+                          Step {tabIndex + 1}
+                        </div>
+                        <div className="app-workflow-index">
+                          {String(tabIndex + 1).padStart(2, "0")}
+                        </div>
+                      </div>
+                      <div className="mt-3 text-xl leading-none text-[var(--app-text-strong)]">
+                        {tab.label}
+                      </div>
+                      <div className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
+                        {tab.summary}
+                      </div>
+                    </article>
+                  ))}
+                </section>
+              ) : null}
+
+              {summary ? (
+                <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {summary}
+                </section>
+              ) : null}
+
+              <div className="grid gap-6">{children}</div>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
   const activeItem = navItems.find((item) => item.key === section);
   const activeStageId = section === "home" ? null : section;
   const primaryNavigation = (

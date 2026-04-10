@@ -1,6 +1,4 @@
 import Link from "next/link";
-
-import { primaryWorkflowStages } from "~/app/_components/workflow-stage-config";
 import { statusTone } from "~/app/_components/status-tone";
 import {
   ActionStrip,
@@ -10,6 +8,7 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { primaryWorkflowStages } from "~/app/_components/workflow-stage-config";
 import { getTemplateLabel } from "~/app/workflows/research-view-models";
 import { auth } from "~/server/auth";
 import { api, HydrateClient } from "~/trpc/server";
@@ -164,10 +163,11 @@ export default async function Home() {
         title="用一条流程完成筛选、研究、判断和组合动作。"
         description="这不是看板。首页只保留今天最该继续的动作、四个主阶段的入口，以及最近已经形成结论的工作流。"
         actions={
-          <>
-            <Link href={primaryHref} className="app-button app-button-primary">
-              {primaryLabel}
-            </Link>
+          <Link href={primaryHref} className="app-button app-button-primary">
+            {primaryLabel}
+          </Link>
+          /*
+              <>
             <Link href="/screening" className="app-button">
               筛选
             </Link>
@@ -180,7 +180,8 @@ export default async function Home() {
             <Link href="/timing" className="app-button">
               择时组合
             </Link>
-          </>
+              </>
+          */
         }
       >
         <ActionStrip
@@ -358,7 +359,10 @@ export default async function Home() {
                         label={actionLabelMap[item.action] ?? item.action}
                         tone="success"
                       />
-                      <StatusPill label={`优先级 ${item.priority}`} tone="warning" />
+                      <StatusPill
+                        label={`优先级 ${item.priority}`}
+                        tone="warning"
+                      />
                     </div>
                     <div className="mt-4 text-xl leading-tight text-[var(--app-text-strong)]">
                       {item.stockName} · {item.stockCode}

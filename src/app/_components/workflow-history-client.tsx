@@ -178,6 +178,7 @@ export function WorkflowHistoryClient(props: {
   return (
     <WorkspaceShell
       section={section}
+      sectionView="history"
       eyebrow={eyebrow}
       title={title}
       description={description}

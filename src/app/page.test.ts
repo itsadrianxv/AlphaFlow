@@ -25,4 +25,12 @@ describe("HomePage server boundary", () => {
     );
     expect(uiSource).not.toContain("export function statusTone");
   });
+
+  it("keeps home header actions focused on the primary CTA instead of repeating module navigation", () => {
+    const homePageSource = readSource("src/app/page.tsx");
+
+    expect(homePageSource).toContain(
+      'actions={\n          <Link href={primaryHref} className="app-button app-button-primary">',
+    );
+  });
 });
