@@ -9,7 +9,10 @@ export class PrismaResearchReminderRepository implements IReminderRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async save(reminder: ResearchReminder): Promise<void> {
-    if (reminder.targetType !== "TIMING_REVIEW" || !reminder.timingReviewRecordId) {
+    if (
+      reminder.targetType !== "TIMING_REVIEW" ||
+      !reminder.timingReviewRecordId
+    ) {
       throw new Error(
         "PrismaResearchReminderRepository only supports TIMING_REVIEW reminders.",
       );

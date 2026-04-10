@@ -4,6 +4,7 @@ import type {
   ThemeNewsItem,
 } from "~/server/domain/intelligence/types";
 import type { ResearchRuntimeConfig } from "~/server/domain/workflow/research";
+import type { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import type {
   DeepSeekClient,
   DeepSeekRequestOptions,
@@ -12,7 +13,6 @@ import type {
   FirecrawlScrapeDocument,
   FirecrawlSearchResult,
 } from "~/server/infrastructure/intelligence/firecrawl-client";
-import type { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import type {
   IntelligenceCandidateItem,
   PythonIntelligenceDataClient,
@@ -269,6 +269,3 @@ export class ResearchToolRegistry {
     });
   }
 }
-
-
-

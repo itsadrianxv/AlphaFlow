@@ -11,7 +11,7 @@ describe("ScreeningStudioClient copy", () => {
     expect(source).not.toContain("iFinD");
 
     const queryDatasetMutationSection = source.match(
-      /const queryDatasetMutation = api\.screening\.queryDataset\.useMutation\(\{([\s\S]*?)\n  }\);\n  const validateFormulaMutation/,
+      /const queryDatasetMutation = api\.screening\.queryDataset\.useMutation\(\{([\s\S]*?)\n {2}}\);\n {2}const validateFormulaMutation/,
     );
 
     expect(queryDatasetMutationSection?.[1]).toBeDefined();
