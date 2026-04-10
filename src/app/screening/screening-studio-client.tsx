@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
@@ -12,6 +11,7 @@ import {
   WorkspaceShell,
 } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
+import { buildScreeningWorkspaceHistoryItems } from "~/app/_components/workspace-history";
 import { screeningStageTabs } from "~/app/screening/screening-stage-tabs";
 import {
   annualPresetOptions,
@@ -178,6 +178,10 @@ export function ScreeningStudioClient() {
   );
   const formulas = formulasQuery.data ?? [];
   const workspaceOptions = workspacesQuery.data ?? [];
+  const workspaceHistoryItems = useMemo(
+    () => buildScreeningWorkspaceHistoryItems(workspaceOptions),
+    [workspaceOptions],
+  );
   const metricNameMap = useMemo(
     () =>
       buildMetricNameMap({
@@ -583,6 +587,11 @@ export function ScreeningStudioClient() {
   return (
     <WorkspaceShell
       section="screening"
+      historyItems={workspaceHistoryItems}
+      historyHref="/screening/history"
+      activeHistoryId={selectedWorkspaceId ?? undefined}
+      historyLoading={workspacesQuery.isLoading}
+      historyEmptyText="还没有保存的工作台"
       title="小批量筛选工作台"
       description="先搜股票，再选指标、公式与报告期；只有点击“获取”时才会请求数据。结果获取后，筛选、排序和保存都在本地工作台内完成。"
       actions={
@@ -624,9 +633,6 @@ export function ScreeningStudioClient() {
           >
             保存工作台
           </button>
-          <Link href="/screening/history" className="app-button">
-            工作台库
-          </Link>
         </>
       }
     >

@@ -17,6 +17,7 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-history";
 import { buildResearchDigest } from "~/app/workflows/research-view-models";
 import { api } from "~/trpc/react";
 
@@ -28,6 +29,13 @@ type HeaderAction = {
 };
 
 const pageSize = 18;
+const historyHrefBySection: Record<WorkspaceSection, string | undefined> = {
+  home: undefined,
+  screening: "/screening/history",
+  workflows: "/workflows/history",
+  timing: "/timing/history",
+  companyResearch: "/company-research/history",
+};
 
 const statusLabelMap: Record<string, string> = {
   PENDING: "排队中",
@@ -124,6 +132,10 @@ export function WorkflowHistoryClient(props: {
   const runs = useMemo(() => {
     return runsQuery.data?.pages.flatMap((page) => page.items) ?? [];
   }, [runsQuery.data]);
+  const historyItems = useMemo(
+    () => buildWorkflowRunHistoryItems(runs),
+    [runs],
+  );
 
   const liveCount = useMemo(() => {
     return runs.filter((run) => isLiveRun(run.status)).length;
@@ -179,6 +191,11 @@ export function WorkflowHistoryClient(props: {
     <WorkspaceShell
       section={section}
       sectionView="history"
+      historyItems={historyItems}
+      historyHref={historyHrefBySection[section]}
+      activeHistoryId={selectedRunId ?? undefined}
+      historyLoading={runsQuery.isLoading}
+      historyEmptyText={emptyTitle}
       eyebrow={eyebrow}
       title={title}
       description={description}

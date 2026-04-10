@@ -60,4 +60,32 @@ describe("workflow page composition", () => {
     expect(screeningHistorySource).toContain('sectionView="history"');
     expect(workflowHistorySource).toContain('sectionView="history"');
   });
+
+  it("feeds direct history items through the workflow pages instead of header history buttons", () => {
+    const screeningSource = readSource(
+      "./screening/screening-studio-client.tsx",
+    );
+    const companyResearchSource = readSource(
+      "./company-research/company-research-client.tsx",
+    );
+    const timingSource = readSource("./timing/timing-client.tsx");
+    const runInvestorSource = readSource(
+      "./workflows/[runId]/run-investor-client.tsx",
+    );
+    const runDetailSource = readSource(
+      "./workflows/[runId]/run-detail-client.tsx",
+    );
+
+    expect(screeningSource).toContain("historyItems={");
+    expect(companyResearchSource).toContain("historyItems={");
+    expect(timingSource).toContain("historyItems={");
+    expect(runInvestorSource).toContain("historyItems={");
+    expect(runDetailSource).toContain("historyItems={");
+
+    expect(screeningSource).not.toContain('href="/screening/history"');
+    expect(companyResearchSource).not.toContain(
+      'href="/company-research/history"',
+    );
+    expect(timingSource).not.toContain('href="/timing/history"');
+  });
 });

@@ -87,6 +87,15 @@ export function HistoryIcon(props: IconProps) {
   );
 }
 
+export function SidebarToggleIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <path d="M10 5v14" />
+    </BaseIcon>
+  );
+}
+
 export function MenuIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>

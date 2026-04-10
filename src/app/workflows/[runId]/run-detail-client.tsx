@@ -12,11 +12,20 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import {
+  buildScreeningWorkspaceHistoryItems,
+  buildWorkflowRunHistoryItems,
+} from "~/app/_components/workspace-history";
 import { ResearchOpsPanels } from "~/app/workflows/research-ops-panels";
 import { getTemplateLabel } from "~/app/workflows/research-view-models";
 import {
+  resolveWorkflowShellContext,
+  timingTemplateCodes,
+} from "~/app/workflows/workflow-shell-context";
+import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   type CompanyResearchResultDto,
+  QUICK_RESEARCH_TEMPLATE_CODE,
   type QuickResearchResultDto,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
 } from "~/server/domain/workflow/types";
@@ -115,18 +124,6 @@ function getClarificationPayloadFromResult(
   return isRecord(candidate) && candidate.needClarification === true
     ? candidate
     : null;
-}
-
-function getBackLink(templateCode?: string) {
-  return templateCode === COMPANY_RESEARCH_TEMPLATE_CODE
-    ? "/company-research"
-    : "/workflows";
-}
-
-function getSection(templateCode?: string) {
-  return templateCode === COMPANY_RESEARCH_TEMPLATE_CODE
-    ? "companyResearch"
-    : "workflows";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -382,8 +379,62 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
     () => buildResultHighlights(run?.result),
     [run?.result],
   );
-  const backLink = getBackLink(run?.template.code);
-  const section = getSection(run?.template.code);
+  const shellContext = resolveWorkflowShellContext(run?.template.code);
+  const screeningHistoryQuery = api.screening.listWorkspaces.useQuery(
+    { limit: 8, offset: 0 },
+    {
+      enabled: shellContext.historyQueryKind === "screening",
+      refetchOnWindowFocus: false,
+    },
+  );
+  const companyHistoryQuery = api.workflow.listRuns.useQuery(
+    {
+      limit: 8,
+      templateCode: COMPANY_RESEARCH_TEMPLATE_CODE,
+    },
+    {
+      enabled: shellContext.historyQueryKind === "companyResearch",
+      refetchOnWindowFocus: false,
+    },
+  );
+  const timingHistoryQuery = api.workflow.listRuns.useQuery(
+    {
+      limit: 8,
+      templateCodes: [...timingTemplateCodes],
+    },
+    {
+      enabled: shellContext.historyQueryKind === "timing",
+      refetchOnWindowFocus: false,
+    },
+  );
+  const workflowHistoryQuery = api.workflow.listRuns.useQuery(
+    {
+      limit: 8,
+      templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+    },
+    {
+      enabled: shellContext.historyQueryKind === "workflows",
+      refetchOnWindowFocus: false,
+    },
+  );
+  const historyItems =
+    shellContext.historyQueryKind === "screening"
+      ? buildScreeningWorkspaceHistoryItems(screeningHistoryQuery.data ?? [])
+      : shellContext.historyQueryKind === "companyResearch"
+        ? buildWorkflowRunHistoryItems(companyHistoryQuery.data?.items ?? [])
+        : shellContext.historyQueryKind === "timing"
+          ? buildWorkflowRunHistoryItems(timingHistoryQuery.data?.items ?? [])
+          : buildWorkflowRunHistoryItems(
+              workflowHistoryQuery.data?.items ?? [],
+            );
+  const historyLoading =
+    shellContext.historyQueryKind === "screening"
+      ? screeningHistoryQuery.isLoading
+      : shellContext.historyQueryKind === "companyResearch"
+        ? companyHistoryQuery.isLoading
+        : shellContext.historyQueryKind === "timing"
+          ? timingHistoryQuery.isLoading
+          : workflowHistoryQuery.isLoading;
   const latestPauseEvent = useMemo(
     () =>
       [...(run?.events ?? [])]
@@ -419,13 +470,17 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
 
   return (
     <WorkspaceShell
-      section={section}
+      section={shellContext.section}
+      historyItems={historyItems}
+      historyHref={shellContext.historyHref}
+      activeHistoryId={runId}
+      historyLoading={historyLoading}
       eyebrow="研究运行详情"
       title="研究任务详情"
       description="以运行视角查看状态、进度、节点、时间线和结果摘要。对进行中的任务，页面会自动接收事件并刷新。"
       actions={
         <>
-          <Link href={backLink} className="app-button">
+          <Link href={shellContext.backHref} className="app-button">
             返回任务列表
           </Link>
           {clarificationPayload && continuationHref ? (

@@ -10,6 +10,7 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { buildScreeningWorkspaceHistoryItems } from "~/app/_components/workspace-history";
 import { formatDateTime } from "~/app/screening/screening-ui";
 import { api, type RouterOutputs } from "~/trpc/react";
 
@@ -45,6 +46,10 @@ export function ScreeningHistoryClient() {
   });
 
   const workspaces = workspacesQuery.data ?? [];
+  const historyItems = useMemo(
+    () => buildScreeningWorkspaceHistoryItems(workspaces),
+    [workspaces],
+  );
   const latestFetchedCount = useMemo(
     () =>
       workspaces.filter((workspace: WorkspaceSummary) =>
@@ -68,6 +73,11 @@ export function ScreeningHistoryClient() {
     <WorkspaceShell
       section="screening"
       sectionView="history"
+      historyItems={historyItems}
+      historyHref="/screening/history"
+      activeHistoryId={selectedWorkspaceId ?? undefined}
+      historyLoading={workspacesQuery.isLoading}
+      historyEmptyText="还没有保存的工作台"
       title="已保存工作台库"
       description="浏览最近保存的小批量筛选工作台，查看上次快照摘要，并回到主工作台继续手动刷新。"
       actions={

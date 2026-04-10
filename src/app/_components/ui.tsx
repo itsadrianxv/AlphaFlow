@@ -8,7 +8,13 @@ import {
   type WorkflowStageTab,
 } from "~/app/_components/workflow-stage-config";
 
-export { WorkspaceShell } from "~/app/_components/workspace-shell";
+export {
+  DESKTOP_SIDEBAR_STORAGE_KEY,
+  type WorkspaceHistoryItem,
+  type WorkspaceSection,
+  type WorkspaceSectionView,
+  WorkspaceShell,
+} from "~/app/_components/workspace-shell";
 
 export function cn(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");

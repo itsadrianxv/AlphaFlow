@@ -1,42 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import React, { type ComponentType, type ReactNode, useState } from "react";
+/* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
+import React, {
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+  useEffect,
+  useState,
+} from "react";
 
 import {
   CloseIcon,
   CompanyResearchIcon,
-  HistoryIcon,
   MenuIcon,
   OverviewIcon,
   ScreeningIcon,
+  SidebarToggleIcon,
   TimingIcon,
   WorkflowsIcon,
 } from "~/app/_components/sidebar-icons";
 import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
 
+export const DESKTOP_SIDEBAR_STORAGE_KEY =
+  "ssb.workspaceShell.desktopCollapsed";
+
+const HISTORY_ITEM_LIMIT = 8;
+
 function cn(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
-type WorkspaceSection =
+export type WorkspaceSection =
   | "home"
   | "screening"
   | "workflows"
   | "timing"
   | "companyResearch";
 
-type WorkspaceSectionView = "default" | "history";
+export type WorkspaceSectionView = "default" | "history";
 
-type SidebarIcon = ComponentType<React.SVGProps<SVGSVGElement>>;
+export type WorkspaceHistoryItem = {
+  id: string;
+  title: string;
+  href: string;
+  activeMatchHref?: string;
+};
+
+type SidebarIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 const sidebarNavItems: Array<{
   key: WorkspaceSection;
   href: string;
   label: string;
   icon: SidebarIcon;
-  historyHref?: string;
-  historyLabel?: string;
 }> = [
   {
     key: "home",
@@ -49,32 +66,24 @@ const sidebarNavItems: Array<{
     href: "/screening",
     label: "筛选",
     icon: ScreeningIcon,
-    historyHref: "/screening/history",
-    historyLabel: "筛选历史",
   },
   {
     key: "workflows",
     href: "/workflows",
     label: "行业研究",
     icon: WorkflowsIcon,
-    historyHref: "/workflows/history",
-    historyLabel: "行业研究历史",
   },
   {
     key: "companyResearch",
     href: "/company-research",
     label: "公司判断",
     icon: CompanyResearchIcon,
-    historyHref: "/company-research/history",
-    historyLabel: "公司判断历史",
   },
   {
     key: "timing",
     href: "/timing",
     label: "择时组合",
     icon: TimingIcon,
-    historyHref: "/timing/history",
-    historyLabel: "择时组合历史",
   },
 ];
 
@@ -110,6 +119,7 @@ function SidebarLink(props: {
   icon: SidebarIcon;
   iconKey: string;
   active?: boolean;
+  collapsed?: boolean;
   onNavigate?: () => void;
 }) {
   const {
@@ -118,6 +128,7 @@ function SidebarLink(props: {
     icon: Icon,
     iconKey,
     active = false,
+    collapsed = false,
     onNavigate,
   } = props;
 
@@ -126,8 +137,12 @@ function SidebarLink(props: {
       href={href}
       aria-current={active ? "page" : undefined}
       onClick={onNavigate}
+      title={collapsed ? label : undefined}
       className={cn(
-        "flex items-center gap-3 rounded-[10px] border px-3 py-2.5 text-sm font-medium transition-colors",
+        "rounded-[10px] border text-sm font-medium transition-colors",
+        collapsed
+          ? "flex h-11 w-11 items-center justify-center"
+          : "flex items-center gap-3 px-3 py-2.5",
         active
           ? "border-[var(--app-border-strong)] bg-[var(--app-panel-strong)] text-[var(--app-text-strong)]"
           : "border-transparent text-[var(--app-text-muted)] hover:bg-[var(--app-bg-raised)] hover:text-[var(--app-text-strong)]",
@@ -139,8 +154,121 @@ function SidebarLink(props: {
       >
         <Icon className="h-[18px] w-[18px]" />
       </span>
-      <span className="truncate">{label}</span>
+      {collapsed ? <span className="sr-only">{label}</span> : null}
+      {!collapsed ? <span className="truncate">{label}</span> : null}
     </Link>
+  );
+}
+
+function SidebarHistoryShortcut(props: {
+  href: string;
+  active: boolean;
+  onNavigate?: () => void;
+}) {
+  const { href, active, onNavigate } = props;
+
+  return (
+    <Link
+      href={href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      data-history-shortcut={active ? "active" : "idle"}
+      className={cn(
+        "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs transition-colors",
+        active
+          ? "bg-[var(--app-panel-strong)] text-[var(--app-text-strong)]"
+          : "text-[var(--app-text-subtle)] hover:bg-[var(--app-bg-raised)] hover:text-[var(--app-text-strong)]",
+      )}
+    >
+      &gt;
+    </Link>
+  );
+}
+
+function SidebarHistorySkeleton() {
+  return (
+    <div className="grid gap-2">
+      {Array.from({ length: 3 }, (_, index) => (
+        <div
+          key={`history-skeleton-${index + 1}`}
+          className="h-9 rounded-[10px] bg-[var(--app-bg-raised)]"
+        />
+      ))}
+    </div>
+  );
+}
+
+function SidebarHistoryList(props: {
+  heading: string;
+  items: WorkspaceHistoryItem[];
+  historyHref?: string;
+  activeHistoryId?: string;
+  historyLoading?: boolean;
+  historyEmptyText?: string;
+  sectionView: WorkspaceSectionView;
+  onNavigate?: () => void;
+}) {
+  const {
+    heading,
+    items,
+    historyHref,
+    activeHistoryId,
+    historyLoading = false,
+    historyEmptyText = "暂无历史记录",
+    sectionView,
+    onNavigate,
+  } = props;
+  const recentItems = items.slice(0, HISTORY_ITEM_LIMIT);
+
+  return (
+    <section className="mt-auto border-t border-[var(--app-border-soft)] pt-5">
+      <div className="flex items-center justify-between gap-3 px-3 pb-2">
+        <div className="text-[11px] font-medium tracking-[0.08em] text-[var(--app-text-subtle)]">
+          {heading}
+        </div>
+        {historyHref ? (
+          <SidebarHistoryShortcut
+            href={historyHref}
+            active={sectionView === "history"}
+            onNavigate={onNavigate}
+          />
+        ) : null}
+      </div>
+
+      {historyLoading ? <SidebarHistorySkeleton /> : null}
+
+      {!historyLoading && recentItems.length > 0 ? (
+        <div className="grid gap-1">
+          {recentItems.map((item) => {
+            const active = item.id === activeHistoryId;
+
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
+                title={item.title}
+                className={cn(
+                  "block rounded-[10px] px-3 py-2 text-sm transition-colors",
+                  active
+                    ? "bg-[var(--app-panel-strong)] text-[var(--app-text-strong)]"
+                    : "text-[var(--app-text-muted)] hover:bg-[var(--app-bg-raised)] hover:text-[var(--app-text-strong)]",
+                )}
+              >
+                <span className="block truncate">{item.title}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {!historyLoading && recentItems.length === 0 ? (
+        <p className="px-3 py-2 text-sm text-[var(--app-text-subtle)]">
+          {historyEmptyText}
+        </p>
+      ) : null}
+    </section>
   );
 }
 
@@ -148,24 +276,66 @@ function SidebarRail(props: {
   section: WorkspaceSection;
   sectionView: WorkspaceSectionView;
   navMode: "desktop" | "mobile";
+  collapsed?: boolean;
+  historyHeading: string;
+  historyItems: WorkspaceHistoryItem[];
+  historyHref?: string;
+  activeHistoryId?: string;
+  historyLoading?: boolean;
+  historyEmptyText?: string;
   onNavigate?: () => void;
+  onToggleSidebar?: () => void;
 }) {
-  const { section, sectionView, navMode, onNavigate } = props;
-  const activeItem = sidebarNavItems.find((item) => item.key === section);
-  const contextualHistory =
-    activeItem?.historyHref && activeItem.historyLabel
-      ? {
-          href: activeItem.historyHref,
-          label: activeItem.historyLabel,
-        }
-      : null;
+  const {
+    section,
+    sectionView,
+    navMode,
+    collapsed = false,
+    historyHeading,
+    historyItems,
+    historyHref,
+    activeHistoryId,
+    historyLoading,
+    historyEmptyText,
+    onNavigate,
+    onToggleSidebar,
+  } = props;
+  const shouldShowHistory =
+    !collapsed &&
+    (historyLoading ||
+      historyItems.length > 0 ||
+      Boolean(historyHref) ||
+      Boolean(historyEmptyText));
 
   return (
-    <div className="flex h-full flex-col gap-6">
-      {navMode === "desktop" ? <SidebarBrand onNavigate={onNavigate} /> : null}
+    <div
+      className={cn(
+        "flex h-full flex-col",
+        collapsed ? "items-center gap-4" : "gap-6",
+      )}
+      data-sidebar-collapsed={collapsed ? "true" : "false"}
+    >
+      {navMode === "desktop" ? (
+        <div
+          className={cn(
+            "flex items-center",
+            collapsed ? "justify-center" : "justify-between gap-3",
+          )}
+        >
+          {!collapsed ? <SidebarBrand onNavigate={onNavigate} /> : null}
+          <button
+            type="button"
+            aria-label="Toggle sidebar"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] text-[var(--app-text-strong)] transition-colors hover:bg-[var(--app-bg-raised)]"
+            onClick={onToggleSidebar}
+          >
+            <SidebarToggleIcon className="h-[18px] w-[18px]" />
+          </button>
+        </div>
+      ) : null}
 
       <nav
-        className="grid gap-1"
+        className={cn("grid gap-1", collapsed ? "justify-items-center" : "")}
         data-sidebar-nav={navMode}
         aria-label="Sidebar navigation"
       >
@@ -177,25 +347,23 @@ function SidebarRail(props: {
             icon={item.icon}
             iconKey={item.key}
             active={item.key === section}
+            collapsed={collapsed}
             onNavigate={onNavigate}
           />
         ))}
       </nav>
 
-      {contextualHistory ? (
-        <section className="mt-auto border-t border-[var(--app-border-soft)] pt-5">
-          <div className="px-3 pb-2 text-[11px] font-medium tracking-[0.08em] text-[var(--app-text-subtle)]">
-            历史
-          </div>
-          <SidebarLink
-            href={contextualHistory.href}
-            label={contextualHistory.label}
-            icon={HistoryIcon}
-            iconKey="history"
-            active={sectionView === "history"}
-            onNavigate={onNavigate}
-          />
-        </section>
+      {shouldShowHistory ? (
+        <SidebarHistoryList
+          heading={historyHeading}
+          items={historyItems}
+          historyHref={historyHref}
+          activeHistoryId={activeHistoryId}
+          historyLoading={historyLoading}
+          historyEmptyText={historyEmptyText}
+          sectionView={sectionView}
+          onNavigate={onNavigate}
+        />
       ) : null}
     </div>
   );
@@ -244,6 +412,13 @@ export function WorkspaceShell(props: {
   actions?: ReactNode;
   summary?: ReactNode;
   workflowTabs?: WorkflowStageTab[];
+  historyItems?: WorkspaceHistoryItem[];
+  historyHeading?: string;
+  historyHref?: string;
+  activeHistoryId?: string;
+  historyLoading?: boolean;
+  historyEmptyText?: string;
+  initialDesktopCollapsed?: boolean;
   children: ReactNode;
 }) {
   const {
@@ -255,24 +430,81 @@ export function WorkspaceShell(props: {
     actions,
     summary,
     workflowTabs = [],
+    historyItems = [],
+    historyHeading = "历史",
+    historyHref,
+    activeHistoryId,
+    historyLoading = false,
+    historyEmptyText = "暂无历史记录",
+    initialDesktopCollapsed,
     children,
   } = props;
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(
+    initialDesktopCollapsed ?? false,
+  );
+  const [desktopStateReady, setDesktopStateReady] = useState(
+    initialDesktopCollapsed !== undefined,
+  );
+
+  useEffect(() => {
+    if (initialDesktopCollapsed !== undefined || desktopStateReady) {
+      return;
+    }
+
+    const storedValue = window.localStorage.getItem(
+      DESKTOP_SIDEBAR_STORAGE_KEY,
+    );
+    if (storedValue === "true") {
+      setDesktopCollapsed(true);
+    }
+    setDesktopStateReady(true);
+  }, [desktopStateReady, initialDesktopCollapsed]);
+
+  useEffect(() => {
+    if (!desktopStateReady) {
+      return;
+    }
+
+    window.localStorage.setItem(
+      DESKTOP_SIDEBAR_STORAGE_KEY,
+      desktopCollapsed ? "true" : "false",
+    );
+  }, [desktopCollapsed, desktopStateReady]);
 
   return (
     <main
-      className="app-shell min-h-screen bg-[var(--app-bg)] lg:grid lg:grid-cols-[258px_minmax(0,1fr)]"
+      className={cn(
+        "app-shell min-h-screen bg-[var(--app-bg)] lg:grid",
+        desktopCollapsed
+          ? "lg:grid-cols-[88px_minmax(0,1fr)]"
+          : "lg:grid-cols-[258px_minmax(0,1fr)]",
+      )}
       data-workflow-shell="mistral"
+      data-sidebar-collapsed={desktopCollapsed ? "true" : "false"}
     >
       <aside
         data-sidebar-anchor="left"
         className="hidden border-r border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] lg:block"
       >
-        <div className="sticky top-0 h-screen px-4 py-4">
+        <div
+          className={cn(
+            "sticky top-0 h-screen py-4",
+            desktopCollapsed ? "px-3" : "px-4",
+          )}
+        >
           <SidebarRail
             section={section}
             sectionView={sectionView}
             navMode="desktop"
+            collapsed={desktopCollapsed}
+            historyHeading={historyHeading}
+            historyItems={historyItems}
+            historyHref={historyHref}
+            activeHistoryId={activeHistoryId}
+            historyLoading={historyLoading}
+            historyEmptyText={historyEmptyText}
+            onToggleSidebar={() => setDesktopCollapsed((current) => !current)}
           />
         </div>
       </aside>
@@ -316,6 +548,12 @@ export function WorkspaceShell(props: {
                 section={section}
                 sectionView={sectionView}
                 navMode="mobile"
+                historyHeading={historyHeading}
+                historyItems={historyItems}
+                historyHref={historyHref}
+                activeHistoryId={activeHistoryId}
+                historyLoading={historyLoading}
+                historyEmptyText={historyEmptyText}
                 onNavigate={() => setMobileOpen(false)}
               />
             </aside>

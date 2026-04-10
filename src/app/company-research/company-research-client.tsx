@@ -15,6 +15,7 @@ import {
   WorkspaceShell,
 } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
+import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-history";
 import { companyResearchStageTabs } from "~/app/company-research/company-research-stage-tabs";
 import { buildResearchDigest } from "~/app/workflows/research-view-models";
 import { COMPANY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
@@ -291,6 +292,10 @@ export function CompanyResearchClient() {
         (left.createdAt?.getTime?.() ?? 0),
     );
   }, [runsQuery.data?.items]);
+  const historyItems = useMemo(
+    () => buildWorkflowRunHistoryItems(sortedRuns),
+    [sortedRuns],
+  );
 
   const handleStart = async () => {
     if (!companyName.trim()) {
@@ -561,15 +566,16 @@ export function CompanyResearchClient() {
   return (
     <WorkspaceShell
       section="companyResearch"
+      historyItems={historyItems}
+      historyHref="/company-research/history"
+      historyLoading={runsQuery.isLoading}
+      historyEmptyText="还没有公司判断记录"
       eyebrow="公司判断"
       title="公司判断"
       actions={
         <>
           <Link href="/" className="app-button">
             返回看板
-          </Link>
-          <Link href="/company-research/history" className="app-button">
-            历史记录
           </Link>
           <Link href="/workflows" className="app-button app-button-primary">
             打开行业研究

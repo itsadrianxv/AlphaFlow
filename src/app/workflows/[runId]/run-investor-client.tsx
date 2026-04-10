@@ -12,6 +12,10 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import {
+  buildScreeningWorkspaceHistoryItems,
+  buildWorkflowRunHistoryItems,
+} from "~/app/_components/workspace-history";
 import { ResearchOpsPanels } from "~/app/workflows/research-ops-panels";
 import {
   buildResearchDigest,
@@ -20,10 +24,13 @@ import {
   isCompanyResearchResult,
 } from "~/app/workflows/research-view-models";
 import {
+  resolveWorkflowShellContext,
+  timingTemplateCodes,
+} from "~/app/workflows/workflow-shell-context";
+import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   QUICK_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
-  SCREENING_TO_TIMING_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
   TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
   WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
@@ -71,54 +78,6 @@ const statusLabels: Record<string, string> = {
   FAILED: "失败",
   CANCELLED: "已取消",
 };
-
-function getBackLink(templateCode?: string) {
-  if (templateCode === COMPANY_RESEARCH_TEMPLATE_CODE) {
-    return "/company-research";
-  }
-
-  if (
-    templateCode === TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE ||
-    templateCode === WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE ||
-    templateCode === WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE ||
-    templateCode === TIMING_REVIEW_LOOP_TEMPLATE_CODE
-  ) {
-    return "/timing";
-  }
-
-  if (
-    templateCode === SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE ||
-    templateCode === SCREENING_TO_TIMING_TEMPLATE_CODE
-  ) {
-    return "/screening";
-  }
-
-  return "/workflows";
-}
-
-function getSection(templateCode?: string) {
-  if (templateCode === COMPANY_RESEARCH_TEMPLATE_CODE) {
-    return "companyResearch" as const;
-  }
-
-  if (
-    templateCode === TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE ||
-    templateCode === WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE ||
-    templateCode === WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE ||
-    templateCode === TIMING_REVIEW_LOOP_TEMPLATE_CODE
-  ) {
-    return "timing" as const;
-  }
-
-  if (
-    templateCode === SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE ||
-    templateCode === SCREENING_TO_TIMING_TEMPLATE_CODE
-  ) {
-    return "screening" as const;
-  }
-
-  return "workflows" as const;
-}
 
 function getTitle(templateCode?: string) {
   if (templateCode === COMPANY_RESEARCH_TEMPLATE_CODE) {
@@ -176,6 +135,62 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
   });
 
   const run = runQuery.data;
+  const shellContext = resolveWorkflowShellContext(run?.template.code);
+  const screeningHistoryQuery = api.screening.listWorkspaces.useQuery(
+    { limit: 8, offset: 0 },
+    {
+      enabled: shellContext.historyQueryKind === "screening",
+      refetchOnWindowFocus: false,
+    },
+  );
+  const companyHistoryQuery = api.workflow.listRuns.useQuery(
+    {
+      limit: 8,
+      templateCode: COMPANY_RESEARCH_TEMPLATE_CODE,
+    },
+    {
+      enabled: shellContext.historyQueryKind === "companyResearch",
+      refetchOnWindowFocus: false,
+    },
+  );
+  const timingHistoryQuery = api.workflow.listRuns.useQuery(
+    {
+      limit: 8,
+      templateCodes: [...timingTemplateCodes],
+    },
+    {
+      enabled: shellContext.historyQueryKind === "timing",
+      refetchOnWindowFocus: false,
+    },
+  );
+  const workflowHistoryQuery = api.workflow.listRuns.useQuery(
+    {
+      limit: 8,
+      templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+    },
+    {
+      enabled: shellContext.historyQueryKind === "workflows",
+      refetchOnWindowFocus: false,
+    },
+  );
+  const historyItems =
+    shellContext.historyQueryKind === "screening"
+      ? buildScreeningWorkspaceHistoryItems(screeningHistoryQuery.data ?? [])
+      : shellContext.historyQueryKind === "companyResearch"
+        ? buildWorkflowRunHistoryItems(companyHistoryQuery.data?.items ?? [])
+        : shellContext.historyQueryKind === "timing"
+          ? buildWorkflowRunHistoryItems(timingHistoryQuery.data?.items ?? [])
+          : buildWorkflowRunHistoryItems(
+              workflowHistoryQuery.data?.items ?? [],
+            );
+  const historyLoading =
+    shellContext.historyQueryKind === "screening"
+      ? screeningHistoryQuery.isLoading
+      : shellContext.historyQueryKind === "companyResearch"
+        ? companyHistoryQuery.isLoading
+        : shellContext.historyQueryKind === "timing"
+          ? timingHistoryQuery.isLoading
+          : workflowHistoryQuery.isLoading;
   const canApprove =
     run?.template.code === SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE &&
     run.status === "PAUSED";
@@ -200,13 +215,17 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
 
   return (
     <WorkspaceShell
-      section={getSection(run?.template.code)}
+      section={shellContext.section}
+      historyItems={historyItems}
+      historyHref={shellContext.historyHref}
+      activeHistoryId={runId}
+      historyLoading={historyLoading}
       eyebrow="投资结论"
       title={getTitle(run?.template.code)}
       description="把核心投资结论、证据摘要、风险、下一步动作和可信度分析放在同一页查看。"
       actions={
         <>
-          <Link href={getBackLink(run?.template.code)} className="app-button">
+          <Link href={shellContext.backHref} className="app-button">
             返回
           </Link>
           <Link href={`/workflows/${runId}/debug`} className="app-button">

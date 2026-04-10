@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   EmptyState,
   Panel,
@@ -11,7 +11,9 @@ import {
   WorkspaceShell,
 } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
+import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-history";
 import { timingStageTabs } from "~/app/timing/timing-stage-tabs";
+import { timingTemplateCodes } from "~/app/workflows/workflow-shell-context";
 import { api } from "~/trpc/react";
 
 function formatDate(value?: Date | null) {
@@ -220,6 +222,15 @@ export function TimingClient() {
     completedOnly: false,
   });
   const presetsQuery = api.timing.listTimingPresets.useQuery();
+  const runsQuery = api.workflow.listRuns.useQuery(
+    {
+      limit: 20,
+      templateCodes: [...timingTemplateCodes],
+    },
+    {
+      refetchOnWindowFocus: false,
+    },
+  );
 
   const startSingleMutation =
     api.workflow.startTimingSignalPipeline.useMutation({
@@ -317,6 +328,10 @@ export function TimingClient() {
   const recommendationContext = latestRecommendations[0]?.reasoning;
   const reviewRecords = reviewRecordsQuery.data ?? [];
   const presets = presetsQuery.data ?? [];
+  const historyItems = useMemo(
+    () => buildWorkflowRunHistoryItems(runsQuery.data?.items ?? []),
+    [runsQuery.data?.items],
+  );
 
   useEffect(() => {
     if (!selectedSnapshot) {
@@ -514,15 +529,16 @@ export function TimingClient() {
   return (
     <WorkspaceShell
       section="timing"
+      historyItems={historyItems}
+      historyHref="/timing/history"
+      historyLoading={runsQuery.isLoading}
+      historyEmptyText="还没有择时记录"
       eyebrow="组合决策"
       title="择时组合"
       actions={
         <>
           <Link href="/workflows" className="app-button">
             查看研究详情
-          </Link>
-          <Link href="/timing/history" className="app-button">
-            历史记录
           </Link>
           <Link href="/screening" className="app-button app-button-success">
             返回机会池
