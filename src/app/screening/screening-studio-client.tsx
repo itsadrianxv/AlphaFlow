@@ -57,6 +57,9 @@ const defaultColumnState = {
   pinnedMetricIds: ["stockCode", "stockName"],
 };
 
+const stageCanvasClassName =
+  "min-h-[calc(100vh-17rem)] xl:min-h-[calc(100vh-15rem)]";
+
 function emptyFilterRule(): FilterRuleDraft {
   return {
     clientId: crypto.randomUUID(),
@@ -664,6 +667,7 @@ export function ScreeningStudioClient() {
   return (
     <WorkspaceShell
       section="screening"
+      contentWidth="wide"
       historyItems={workspaceHistoryItems}
       historyHref="/screening/history"
       activeHistoryId={selectedWorkspaceId ?? undefined}
@@ -737,7 +741,11 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="股票搜索多选"
           description="基于本地股票代码映射搜索，最多选择 20 只股票加入当前工作台。"
-          className={activeTabId === "stocks" ? "xl:col-span-4" : "hidden"}
+          className={
+            activeTabId === "stocks"
+              ? `xl:col-span-12 ${stageCanvasClassName}`
+              : "hidden"
+          }
         >
           <input
             value={stockSearchKeyword}
@@ -822,7 +830,11 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="指标目录"
           description="官方指标与自定义公式都在当前工作台里统一勾选。"
-          className={activeTabId === "indicators" ? "xl:col-span-4" : "hidden"}
+          className={
+            activeTabId === "indicators"
+              ? `xl:col-span-7 ${stageCanvasClassName}`
+              : "hidden"
+          }
         >
           {catalogNotice ? (
             <InlineNotice
@@ -910,7 +922,11 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="公式编辑器"
           description="输入 [指标名]，保存时会由后端转换为安全表达式。"
-          className={activeTabId === "indicators" ? "xl:col-span-4" : "hidden"}
+          className={
+            activeTabId === "indicators"
+              ? `xl:col-span-5 ${stageCanvasClassName}`
+              : "hidden"
+          }
           actions={
             editingFormulaId ? (
               <button
@@ -1057,7 +1073,11 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="期间设置"
           description="改变期间设置不会自动取数，只有点击获取才会请求数据。"
-          className={activeTabId === "period" ? "xl:col-span-4" : "hidden"}
+          className={
+            activeTabId === "period"
+              ? `xl:col-span-12 ${stageCanvasClassName}`
+              : "hidden"
+          }
         >
           <div className="grid gap-3">
             <input
@@ -1187,7 +1207,11 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="本地筛选与排序"
           description="默认始终基于每只股票最新可用一期的值，不触发任何网络请求。"
-          className={activeTabId === "filters" ? "xl:col-span-4" : "hidden"}
+          className={
+            activeTabId === "filters"
+              ? `xl:col-span-12 ${stageCanvasClassName}`
+              : "hidden"
+          }
         >
           <div className="grid gap-3">
             <div className="flex flex-wrap gap-2">
@@ -1321,7 +1345,11 @@ export function ScreeningStudioClient() {
         <SectionCard
           title="结果表格"
           description="财报类指标按期间展开，latest-only 指标放在最新列。"
-          className={activeTabId === "results" ? "xl:col-span-8" : "hidden"}
+          className={
+            activeTabId === "results"
+              ? `xl:col-span-12 ${stageCanvasClassName}`
+              : "hidden"
+          }
         >
           {!resultSnapshot ? (
             <EmptyState

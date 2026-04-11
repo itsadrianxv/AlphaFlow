@@ -13,8 +13,10 @@ export function WorkflowStageSwitcher(props: {
   panels: Record<string, ReactNode>;
   onChange?: (tabId: string) => void;
   className?: string;
+  panelClassName?: string;
 }) {
-  const { tabs, activeTabId, panels, onChange, className } = props;
+  const { tabs, activeTabId, panels, onChange, className, panelClassName } =
+    props;
   const activeTab =
     tabs.find((tab) => tab.id === activeTabId) ?? tabs[0] ?? null;
   const activePanel = activeTab ? panels[activeTab.id] : null;
@@ -58,7 +60,9 @@ export function WorkflowStageSwitcher(props: {
         })}
       </div>
 
-      <div className="grid gap-6">{activePanel}</div>
+      {activePanel ? (
+        <div className={cn("grid gap-6", panelClassName)}>{activePanel}</div>
+      ) : null}
     </section>
   );
 }

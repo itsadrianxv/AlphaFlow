@@ -459,6 +459,7 @@ export function WorkspaceShell(props: {
   historyLoading?: boolean;
   historyEmptyText?: string;
   initialDesktopCollapsed?: boolean;
+  contentWidth?: "standard" | "wide";
   children: ReactNode;
 }) {
   const {
@@ -478,6 +479,7 @@ export function WorkspaceShell(props: {
     historyLoading = false,
     historyEmptyText = "暂无历史记录",
     initialDesktopCollapsed,
+    contentWidth = "standard",
     children,
   } = props;
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -536,7 +538,7 @@ export function WorkspaceShell(props: {
     >
       <aside
         data-sidebar-anchor="left"
-        className="hidden border-r border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] lg:block"
+        className="hidden border-r border-[var(--app-border-soft)] bg-[var(--app-sidebar-bg)] lg:block"
       >
         <div
           className={cn(
@@ -583,7 +585,7 @@ export function WorkspaceShell(props: {
               className="absolute inset-0 bg-[rgba(0,0,0,0.72)]"
               onClick={() => setMobileOpen(false)}
             />
-            <aside className="relative z-10 flex h-full w-[280px] max-w-[82vw] flex-col border-r border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] px-4 py-4 shadow-[var(--app-shadow-lg)]">
+            <aside className="relative z-10 flex h-full w-[280px] max-w-[82vw] flex-col border-r border-[var(--app-border-soft)] bg-[var(--app-sidebar-bg)] px-4 py-4 shadow-[var(--app-shadow-lg)]">
               <div className="mb-6 flex items-center justify-between gap-3">
                 <SidebarBrand onNavigate={() => setMobileOpen(false)} />
                 <button
@@ -611,7 +613,12 @@ export function WorkspaceShell(props: {
           </div>
         ) : null}
 
-        <div className="mx-auto flex min-h-screen w-full max-w-[1280px] flex-col gap-8 px-4 py-5 sm:px-6 lg:px-10 lg:py-8">
+        <div
+          className={cn(
+            "mx-auto flex min-h-screen w-full flex-col gap-8 px-4 py-5 sm:px-6 lg:px-10 lg:py-8",
+            contentWidth === "wide" ? "max-w-[1560px]" : "max-w-[1280px]",
+          )}
+        >
           <PageHeader
             eyebrow={eyebrow}
             title={title}

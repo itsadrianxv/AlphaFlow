@@ -80,6 +80,9 @@ const starterCases = [
   },
 ];
 
+const stageCanvasClassName =
+  "min-h-[calc(100vh-17rem)] xl:min-h-[calc(100vh-15rem)]";
+
 type RunListItem = RouterOutputs["workflow"]["listRuns"]["items"][number];
 
 function CompanyRunCard({
@@ -334,6 +337,7 @@ export function CompanyResearchClient() {
 
   const targetPanel = (
     <Panel
+      className={stageCanvasClassName}
       title="研究目标"
       description="先锁定公司、代码和当前最想验证的核心判断。"
     >
@@ -364,6 +368,7 @@ export function CompanyResearchClient() {
 
   const sourcesPanel = (
     <Panel
+      className={stageCanvasClassName}
       title="证据来源"
       description="补充官网、概念线索和研究偏好，让证据链从一开始就可控。"
     >
@@ -427,7 +432,7 @@ export function CompanyResearchClient() {
   );
 
   const starterPanel = (
-    <Panel title="快速样例">
+    <Panel className={stageCanvasClassName} title="快速样例">
       <div className="grid gap-3">
         {starterCases.map((item) => (
           <button
@@ -456,8 +461,9 @@ export function CompanyResearchClient() {
   );
 
   const launchPanel = (
-    <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.16fr)_minmax(360px,0.84fr)]">
       <Panel
+        className={stageCanvasClassName}
         title="发起执行"
         description="确认本轮公司判断的目标和证据边界，再开始生成结论。"
         actions={
@@ -526,6 +532,7 @@ export function CompanyResearchClient() {
 
   const findingsPanel = (
     <Panel
+      className={stageCanvasClassName}
       title="最新公司判断"
       actions={
         <button
@@ -566,6 +573,7 @@ export function CompanyResearchClient() {
   return (
     <WorkspaceShell
       section="companyResearch"
+      contentWidth="wide"
       historyItems={historyItems}
       historyHref="/company-research/history"
       historyLoading={runsQuery.isLoading}
