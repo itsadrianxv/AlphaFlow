@@ -255,6 +255,22 @@ export type TimingBarsData = {
   bars: TimingBar[];
 };
 
+export type TimingChartLinePoint = {
+  tradeDate: string;
+  value: number;
+};
+
+export type TimingChartLevels = {
+  ema5: TimingChartLinePoint[];
+  ema20: TimingChartLinePoint[];
+  ema60: TimingChartLinePoint[];
+  ema120: TimingChartLinePoint[];
+  recentHigh60d: number;
+  recentLow20d: number;
+  avgVolume20: number;
+  volumeSpikeDates: string[];
+};
+
 export type TimingSignalData = {
   stockCode: string;
   stockName: string;
@@ -741,6 +757,20 @@ export type TimingPresetDraft = {
   name: string;
   description?: string;
   config: TimingPresetConfig;
+};
+
+export type TimingReportEvidence = Record<
+  TimingSignalEngineKey,
+  TimingSignalEngineResult
+>;
+
+export type TimingReportPayload = {
+  card: TimingAnalysisCardRecord;
+  bars: TimingBar[];
+  chartLevels: TimingChartLevels;
+  evidence: TimingReportEvidence;
+  marketContext: MarketContextAnalysis;
+  reviewTimeline: TimingReviewRecord[];
 };
 
 export type TimingMarketRegime = TimingMarketState;

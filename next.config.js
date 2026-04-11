@@ -7,6 +7,7 @@ import "./src/env.js";
 /** @type {import("next").NextConfig} */
 const config = {
   serverExternalPackages: ["@prisma/client", "prisma"],
+  transpilePackages: ["echarts", "zrender"],
 };
 
 export default config;

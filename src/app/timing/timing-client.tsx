@@ -12,6 +12,7 @@ import {
 } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-history";
+import { TimingSignalCardList } from "~/app/timing/timing-signal-card-list";
 import { timingStageTabs } from "~/app/timing/timing-stage-tabs";
 import { timingTemplateCodes } from "~/app/workflows/workflow-shell-context";
 import { api } from "~/trpc/react";
@@ -71,12 +72,6 @@ const actionLabelMap: Record<string, string> = {
   HOLD: "持有",
   TRIM: "减仓",
   EXIT: "退出",
-};
-
-const sourceLabelMap: Record<string, string> = {
-  single: "单股",
-  watchlist: "自选股",
-  screening: "筛选联动",
 };
 
 const marketRegimeToneMap: Record<
@@ -328,7 +323,6 @@ export function TimingClient() {
   >[number];
   type ReviewRecordItem = NonNullable<typeof reviewRecordsQuery.data>[number];
   type PresetItem = NonNullable<typeof presetsQuery.data>[number];
-  type CardItem = NonNullable<typeof cardsQuery.data>[number];
   type WatchListItem = NonNullable<typeof watchListsQuery.data>[number];
   const latestRecommendationRunId = recommendations[0]?.workflowRunId;
   const latestRecommendations = latestRecommendationRunId
@@ -1440,85 +1434,7 @@ export function TimingClient() {
         ) : cards.length === 0 ? (
           <EmptyState title="还没有信号结果" />
         ) : (
-          <div className="grid gap-4">
-            {cards.map((card: CardItem) => {
-              const indicators = card.signalSnapshot?.indicators;
-
-              return (
-                <article
-                  key={card.id}
-                  className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] p-5"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-lg font-semibold text-[var(--app-text)]">
-                          {card.stockName}
-                        </h3>
-                        <span className="text-sm text-[var(--app-text-soft)]">
-                          {card.stockCode}
-                        </span>
-                        <StatusPill
-                          label={
-                            actionLabelMap[card.actionBias] ?? card.actionBias
-                          }
-                          tone={actionToneMap[card.actionBias] ?? "neutral"}
-                        />
-                        <StatusPill
-                          label={
-                            sourceLabelMap[card.sourceType] ?? card.sourceType
-                          }
-                          tone="info"
-                        />
-                      </div>
-                      <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--app-text-muted)]">
-                        {card.summary}
-                      </p>
-                    </div>
-                    <div className="text-right text-xs text-[var(--app-text-soft)]">
-                      <p>写入时间 {formatDate(card.createdAt)}</p>
-                      <p>信号日期 {card.signalSnapshot?.asOfDate ?? "-"}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 md:grid-cols-4">
-                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
-                      <div className="text-xs text-[var(--app-text-soft)]">
-                        置信度
-                      </div>
-                      <div className="mt-2 text-xl text-[var(--app-text)]">
-                        {card.confidence}
-                      </div>
-                    </div>
-                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
-                      <div className="text-xs text-[var(--app-text-soft)]">
-                        RSI
-                      </div>
-                      <div className="mt-2 text-xl text-[var(--app-text)]">
-                        {indicators?.rsi.value.toFixed(1) ?? "-"}
-                      </div>
-                    </div>
-                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
-                      <div className="text-xs text-[var(--app-text-soft)]">
-                        MACD 柱值
-                      </div>
-                      <div className="mt-2 text-xl text-[var(--app-text)]">
-                        {indicators?.macd.histogram.toFixed(2) ?? "-"}
-                      </div>
-                    </div>
-                    <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel-soft)] px-4 py-3">
-                      <div className="text-xs text-[var(--app-text-soft)]">
-                        量比 20D
-                      </div>
-                      <div className="mt-2 text-xl text-[var(--app-text)]">
-                        {indicators?.volumeRatio20.toFixed(2) ?? "-"}
-                      </div>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+          <TimingSignalCardList cards={cards} />
         )}
       </Panel>
     </WorkspaceShell>

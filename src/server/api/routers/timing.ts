@@ -1,13 +1,17 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { MarketRegimeService } from "~/server/application/timing/market-regime-service";
 import { applyTimingPresetPatch } from "~/server/application/timing/timing-feedback-service";
+import { TimingReportService } from "~/server/application/timing/timing-report-service";
 import { PrismaPortfolioSnapshotRepository } from "~/server/infrastructure/timing/prisma-portfolio-snapshot-repository";
 import { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
+import { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
 import { PrismaTimingPresetAdjustmentSuggestionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-adjustment-suggestion-repository";
 import { PrismaTimingPresetRepository } from "~/server/infrastructure/timing/prisma-timing-preset-repository";
 import { PrismaTimingRecommendationRepository } from "~/server/infrastructure/timing/prisma-timing-recommendation-repository";
 import { PrismaTimingReviewRecordRepository } from "~/server/infrastructure/timing/prisma-timing-review-record-repository";
+import { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
 
 const portfolioPositionInput = z.object({
   stockCode: z.string().regex(/^\d{6}$/, "stockCode must be 6 digits"),
@@ -64,6 +68,10 @@ const listTimingCardsInput = z.object({
 
 const getTimingCardInput = z.object({
   id: z.string().cuid(),
+});
+
+const getTimingReportInput = z.object({
+  cardId: z.string().cuid(),
 });
 
 const updatePortfolioSnapshotInput = z
@@ -210,6 +218,32 @@ export const timingRouter = createTRPCRouter({
       }
 
       return card;
+    }),
+
+  getTimingReport: protectedProcedure
+    .input(getTimingReportInput)
+    .query(async ({ ctx, input }) => {
+      const service = new TimingReportService({
+        analysisCardRepository: new PrismaTimingAnalysisCardRepository(ctx.db),
+        reviewRecordRepository: new PrismaTimingReviewRecordRepository(ctx.db),
+        marketContextSnapshotRepository:
+          new PrismaTimingMarketContextSnapshotRepository(ctx.db),
+        timingDataClient: new PythonTimingDataClient(),
+        marketRegimeService: new MarketRegimeService(),
+      });
+      const report = await service.getTimingReport({
+        userId: ctx.session.user.id,
+        cardId: input.cardId,
+      });
+
+      if (!report) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Timing report not found",
+        });
+      }
+
+      return report;
     }),
 
   createPortfolioSnapshot: protectedProcedure
