@@ -20,6 +20,7 @@ import {
 } from "~/app/_components/workspace-history";
 import { IndustryConclusionDetail } from "~/app/workflows/[runId]/industry-conclusion-detail";
 import { buildIndustryConclusionViewModel } from "~/app/workflows/[runId]/industry-conclusion-view-model";
+import { shouldShowRunDigestBanner } from "~/app/workflows/[runId]/run-investor-layout";
 import {
   buildCompanyResearchDetailModel,
   CompanyResearchDetailContent,
@@ -230,6 +231,11 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
     run?.template.code === COMPANY_RESEARCH_TEMPLATE_CODE &&
     (run.status === "SUCCEEDED" || run.status === "PAUSED") &&
     companyDetailModel !== null;
+  const showDigestBanner = shouldShowRunDigestBanner({
+    templateCode: run?.template.code,
+    status: run?.status,
+    hasCompanyDetailModel: companyDetailModel !== null,
+  });
   const quickResearchModePills =
     run?.template.code === QUICK_RESEARCH_TEMPLATE_CODE
       ? getQuickResearchModePills(run?.result, run?.input)
@@ -361,26 +367,28 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
         <IndustryConclusionDetail model={industryConclusionModel} />
       ) : (
         <>
-          <ActionBanner
-            title={digest.headline}
-            description={<MarkdownContent content={digest.summary} compact />}
-            tone={digest.verdictTone}
-            actions={
-              <>
-                <StatusPill
-                  label={digest.verdictLabel}
-                  tone={digest.verdictTone}
-                />
-                {quickResearchModePills.map((label) => (
+          {showDigestBanner ? (
+            <ActionBanner
+              title={digest.headline}
+              description={<MarkdownContent content={digest.summary} compact />}
+              tone={digest.verdictTone}
+              actions={
+                <>
                   <StatusPill
-                    key={label}
-                    label={label}
-                    tone={label === "已自动升级" ? "warning" : "info"}
+                    label={digest.verdictLabel}
+                    tone={digest.verdictTone}
                   />
-                ))}
-              </>
-            }
-          />
+                  {quickResearchModePills.map((label) => (
+                    <StatusPill
+                      key={label}
+                      label={label}
+                      tone={label === "已自动升级" ? "warning" : "info"}
+                    />
+                  ))}
+                </>
+              }
+            />
+          ) : null}
 
           {timingReportCardIds.length > 0 ? (
             <Panel

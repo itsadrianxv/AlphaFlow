@@ -1,8 +1,10 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
 import {
   buildCompanyResearchDetailModel,
+  CompanyResearchDetailContent,
   CompanyResearchDetailPanels,
   CompanyResearchPausedFallbackPanel,
 } from "~/app/workflows/company-research-detail";
@@ -21,10 +23,10 @@ function createCompanyResearchResult(): CompanyResearchResultDto {
     conceptInsights: [
       {
         concept: "算力",
-        whyItMatters: "需求增长驱动**资本开支**",
+        whyItMatters: "需求增长驱动 **资本开支**",
         companyFit: "公司已有`机柜`与客户资源",
         monetizationPath:
-          "通过高毛利机柜与运维服务变现\n\n- 提升单柜价值\n- 拉长服务周期",
+          "通过高毛利机柜与运维服务变现\n\n- 提升单柜价格\n- 拉长服务周期",
         maturity: "成长加速",
       },
     ],
@@ -216,6 +218,28 @@ describe("company-research-detail", () => {
     expect(markup).toContain("一手信源占比较高");
   });
 
+  it("renders detail content without the background summary strip", () => {
+    const model = buildCompanyResearchDetailModel({
+      status: "SUCCEEDED",
+      result: createCompanyResearchResult(),
+    });
+
+    if (!model || model.kind !== "detail") {
+      throw new Error("expected detail model");
+    }
+
+    const markup = renderToStaticMarkup(
+      React.createElement(CompanyResearchDetailContent, {
+        model,
+      }),
+    );
+
+    expect(markup).toContain('data-stage-switcher="true"');
+    expect(markup).toContain("步骤 1");
+    expect(markup).not.toContain("公司名称");
+    expect(markup).not.toContain("研究目标");
+  });
+
   it("renders the concepts tab with concept cards", () => {
     const model = buildCompanyResearchDetailModel({
       status: "SUCCEEDED",
@@ -235,7 +259,7 @@ describe("company-research-detail", () => {
 
     expect(markup).toMatch(/<strong[^>]*>资本开支<\/strong>/);
     expect(markup).toMatch(/<code[^>]*>机柜<\/code>/);
-    expect(markup).toContain("提升单柜价值");
+    expect(markup).toContain("提升单柜价格");
     expect(markup).toContain("成长加速");
   });
 
@@ -321,6 +345,6 @@ describe("company-research-detail", () => {
     expect(markup).toContain("信源覆盖不足");
     expect(markup).toContain("采集公司证据");
     expect(markup).not.toContain("source_coverage_low");
-    expect(markup).toContain("示例公司");
+    expect(markup).not.toContain("示例公司");
   });
 });

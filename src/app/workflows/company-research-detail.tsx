@@ -506,28 +506,6 @@ export function buildCompanyResearchDetailModel(params: {
   };
 }
 
-function BackgroundStrip(props: { items: CompanyResearchBackgroundItem[] }) {
-  return (
-    <Panel surface="inset" density="compact">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {props.items.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-bg-floating)] px-4 py-3"
-          >
-            <div className="text-xs text-[var(--app-text-soft)]">
-              {item.label}
-            </div>
-            <div className="mt-2 text-sm leading-6 text-[var(--app-text)]">
-              {item.value}
-            </div>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-
 function SummaryMetricRow(props: {
   items: Array<{
     label: string;
@@ -1068,7 +1046,6 @@ export function CompanyResearchDetailContent(props: {
 
   return (
     <div className="grid gap-6">
-      <BackgroundStrip items={props.model.backgroundItems} />
       <CompanyResearchDetailPanels
         model={props.model}
         activeTabId={activeTabId}
@@ -1091,7 +1068,6 @@ export function CompanyResearchPausedFallbackPanel(props: {
 }) {
   return (
     <div className="grid gap-6">
-      <BackgroundStrip items={props.model.backgroundItems} />
       <Panel
         title="已暂停"
         description="当前还没有完整的结构化公司研究结果，先处理暂停原因再继续。"
