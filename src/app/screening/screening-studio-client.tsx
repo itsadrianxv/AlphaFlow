@@ -2,7 +2,8 @@
 
 import { useSearchParams } from "next/navigation";
 import type React from "react";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { StockSearchPicker } from "~/app/_components/stock-search-picker";
 import {
   EmptyState,
   InlineNotice,
@@ -141,7 +142,6 @@ export function ScreeningStudioClient() {
     useState<ResultMissingValueMode>("keep");
   const [columnQuickFilterDraft, setColumnQuickFilterDraft] =
     useState<ColumnQuickFilterDraft | null>(null);
-  const deferredStockKeyword = useDeferredValue(stockSearchKeyword.trim());
   const [catalogSearchQuery, setCatalogSearchQuery] = useState("");
   const [editingFormulaId, setEditingFormulaId] = useState<string | null>(null);
   const [formulaName, setFormulaName] = useState("");
@@ -174,16 +174,6 @@ export function ScreeningStudioClient() {
     { id: selectedWorkspaceId ?? "" },
     {
       enabled: selectedWorkspaceId !== null && !draftMode,
-      refetchOnWindowFocus: false,
-    },
-  );
-  const searchStocksQuery = api.screening.searchStocks.useQuery(
-    {
-      keyword: deferredStockKeyword,
-      limit: 20,
-    },
-    {
-      enabled: deferredStockKeyword.length > 0,
       refetchOnWindowFocus: false,
     },
   );
@@ -924,84 +914,16 @@ export function ScreeningStudioClient() {
               : "hidden"
           }
         >
-          <input
-            value={stockSearchKeyword}
-            onChange={(event) => setStockSearchKeyword(event.target.value)}
-            placeholder="输入股票代码或名称"
-            className="app-input"
+          <StockSearchPicker
+            label="搜索股票"
+            keyword={stockSearchKeyword}
+            onKeywordChange={setStockSearchKeyword}
+            selectedStocks={selectedStocks}
+            onToggleStock={toggleStock}
+            maxSelection={20}
+            className="mt-1"
+            emptyHint="输入关键词后从本地股票列表搜索，最多选择 20 只。"
           />
-          <div className="mt-4 flex flex-wrap gap-2">
-            {selectedStocks.map((stock) => (
-              <button
-                key={stock.stockCode}
-                type="button"
-                onClick={() => toggleStock(stock)}
-                className="rounded-full border border-[var(--app-border-soft)] px-3 py-1 text-xs text-[var(--app-text)]"
-              >
-                {stock.stockName} {stock.stockCode}
-              </button>
-            ))}
-          </div>
-          <div className="mt-4 max-h-[280px] overflow-auto rounded-[12px] border border-[var(--app-border-soft)]">
-            {deferredStockKeyword.length === 0 ? (
-              <div className="p-4 text-sm text-[var(--app-text-muted)]">
-                输入关键词后从本地股票列表搜索，最多选择 20 只。
-              </div>
-            ) : searchStocksQuery.isLoading ? (
-              <div className="p-4 text-sm text-[var(--app-text-muted)]">
-                搜索中...
-              </div>
-            ) : searchStocksQuery.isError ? (
-              <div className="p-4">
-                <InlineNotice
-                  tone="danger"
-                  description={searchStocksQuery.error.message}
-                />
-              </div>
-            ) : (searchStocksQuery.data?.length ?? 0) === 0 ? (
-              <div className="p-4 text-sm text-[var(--app-text-muted)]">
-                未找到匹配的股票。
-              </div>
-            ) : (
-              <div className="grid">
-                {(searchStocksQuery.data ?? []).map((stock) => {
-                  const selected = selectedStocks.some(
-                    (item) => item.stockCode === stock.stockCode,
-                  );
-                  return (
-                    <button
-                      key={stock.stockCode}
-                      type="button"
-                      onClick={() =>
-                        toggleStock({
-                          stockCode: stock.stockCode,
-                          stockName: stock.stockName,
-                          market: stock.market,
-                        })
-                      }
-                      className="flex items-center justify-between border-b border-[var(--app-border-soft)] px-4 py-3 text-left text-sm last:border-b-0"
-                    >
-                      <div>
-                        <div className="text-[var(--app-text)]">
-                          {stock.stockName} {stock.stockCode}
-                        </div>
-                        <div className="text-xs text-[var(--app-text-subtle)]">
-                          {stock.market} ·{" "}
-                          {stock.matchField === "CODE"
-                            ? "代码命中"
-                            : "名称命中"}
-                        </div>
-                      </div>
-                      <StatusPill
-                        label={selected ? "已选" : "添加"}
-                        tone={selected ? "success" : "info"}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </SectionCard>
 
         <SectionCard

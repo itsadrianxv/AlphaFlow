@@ -39,11 +39,10 @@ describe("workflow stage config", () => {
       "launch",
     ]);
     expect(timingStageTabs.map((tab) => tab.id)).toEqual([
-      "signals",
+      "source",
       "portfolio",
-      "preset",
-      "recommendations",
-      "reviews",
+      "strategy",
+      "results",
     ]);
   });
 });
