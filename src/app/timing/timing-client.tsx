@@ -111,6 +111,12 @@ const reviewVerdictToneMap: Record<
   FAILURE: "warning",
 };
 
+const resultActionStartedMessageMap = {
+  single: "单股信号流程已启动，结果区会自动刷新约 3 分钟。",
+  watchlistCards: "候选信号刷新已启动，结果区会自动刷新约 3 分钟。",
+  watchlistTiming: "组合建议流程已启动，结果区会自动刷新约 3 分钟。",
+} as const;
+
 const defaultPortfolioFormErrors: PortfolioFormErrors = { rows: {} };
 
 export function TimingClient() {
@@ -541,6 +547,28 @@ export function TimingClient() {
     startSingleMutation.error?.message,
     startWatchlistCardsMutation.error?.message,
     startWatchlistTimingMutation.error?.message,
+  ]);
+  const resultActionSuccessMessage = useMemo(() => {
+    if (sourceMode === "single") {
+      return startSingleMutation.data
+        ? resultActionStartedMessageMap.single
+        : null;
+    }
+
+    if (startWatchlistTimingMutation.data) {
+      return resultActionStartedMessageMap.watchlistTiming;
+    }
+
+    if (startWatchlistCardsMutation.data) {
+      return resultActionStartedMessageMap.watchlistCards;
+    }
+
+    return null;
+  }, [
+    sourceMode,
+    startSingleMutation.data,
+    startWatchlistCardsMutation.data,
+    startWatchlistTimingMutation.data,
   ]);
 
   async function handleStartSingle() {
@@ -1588,6 +1616,12 @@ export function TimingClient() {
               <InlineNotice
                 tone="warning"
                 description={resultActionDisabledReason}
+              />
+            ) : null}
+            {!resultActionErrorMessage && resultActionSuccessMessage ? (
+              <InlineNotice
+                tone="success"
+                description={resultActionSuccessMessage}
               />
             ) : null}
             {resultActionErrorMessage ? (

@@ -1,8 +1,21 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const WORKFLOW_ERROR_MESSAGE = "组合建议生成失败：工作流模板不可用";
+const WORKFLOW_STARTED_MESSAGE =
+  "组合建议流程已启动，结果区会自动刷新约 3 分钟。";
+
+function createIdleMutation() {
+  return {
+    data: null,
+    error: null,
+    isPending: false,
+    mutateAsync: vi.fn(async () => undefined),
+  };
+}
+
+let startWatchlistTimingMutationState = createIdleMutation();
 
 vi.mock("next/link", () => ({
   default: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) =>
@@ -85,12 +98,6 @@ vi.mock("~/app/timing/timing-stage-tabs", () => ({
 }));
 
 vi.mock("~/trpc/react", () => {
-  const createIdleMutation = () => ({
-    error: null,
-    isPending: false,
-    mutateAsync: vi.fn(async () => undefined),
-  });
-
   return {
     api: {
       useUtils: () => ({
@@ -159,11 +166,7 @@ vi.mock("~/trpc/react", () => {
           useMutation: createIdleMutation,
         },
         startWatchlistTimingPipeline: {
-          useMutation: () => ({
-            error: new Error(WORKFLOW_ERROR_MESSAGE),
-            isPending: false,
-            mutateAsync: vi.fn(async () => undefined),
-          }),
+          useMutation: () => startWatchlistTimingMutationState,
         },
         startTimingReviewLoop: {
           useMutation: createIdleMutation,
@@ -174,11 +177,36 @@ vi.mock("~/trpc/react", () => {
 });
 
 describe("TimingClient", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    startWatchlistTimingMutationState = createIdleMutation();
+  });
+
   it("renders the watchlist timing workflow error when the combination suggestion run fails", async () => {
+    startWatchlistTimingMutationState = {
+      ...createIdleMutation(),
+      error: new Error(WORKFLOW_ERROR_MESSAGE),
+    };
     globalThis.React = React;
     const { TimingClient } = await import("~/app/timing/timing-client");
     const markup = renderToStaticMarkup(React.createElement(TimingClient));
 
     expect(markup).toContain(WORKFLOW_ERROR_MESSAGE);
+  });
+
+  it("renders a success notice when the combination suggestion workflow has started", async () => {
+    startWatchlistTimingMutationState = {
+      ...createIdleMutation(),
+      data: {
+        runId: "run-1",
+        status: "PENDING",
+        createdAt: new Date("2026-04-17T12:00:00.000Z"),
+      },
+    };
+    globalThis.React = React;
+    const { TimingClient } = await import("~/app/timing/timing-client");
+    const markup = renderToStaticMarkup(React.createElement(TimingClient));
+
+    expect(markup).toContain(WORKFLOW_STARTED_MESSAGE);
   });
 });
