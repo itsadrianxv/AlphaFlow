@@ -14,8 +14,10 @@ router = APIRouter(prefix="/api/v1/market-context")
 async def get_market_context_snapshot(
     request: Request,
     force_refresh: bool = Query(default=False, alias="forceRefresh"),
+    theme_limit: int = Query(default=3, alias="themeLimit", ge=1, le=24),
 ):
     return market_context_gateway.get_snapshot(
         request_id=request.state.request_id,
         force_refresh=force_refresh,
+        theme_limit=theme_limit,
     )

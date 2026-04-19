@@ -50,6 +50,7 @@ export type PythonMarketContextClientConfig = {
 
 export type GetPythonMarketContextSnapshotOptions = {
   forceRefresh?: boolean;
+  themeLimit?: number;
 };
 
 export class PythonMarketContextClient {
@@ -85,6 +86,9 @@ export class PythonMarketContextClient {
       );
       if (options?.forceRefresh) {
         requestUrl.searchParams.set("forceRefresh", "true");
+      }
+      if (options?.themeLimit) {
+        requestUrl.searchParams.set("themeLimit", String(options.themeLimit));
       }
 
       const response = await fetch(requestUrl.toString(), {

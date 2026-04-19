@@ -161,3 +161,44 @@ def test_market_context_gateway_marks_partial_when_macro_snapshot_is_unavailable
     assert response.data.availability.regime.warning is not None
     assert response.data.availability.flow.available is True
     assert response.data.availability.hotThemes.available is True
+
+
+def test_market_context_gateway_respects_theme_limit():
+    recorder = MetricsRecorder()
+    recorder.record_theme_request(dataset="theme_news", theme="AI")
+    recorder.record_theme_request(dataset="theme_news", theme="鏈哄櫒浜?")
+    recorder.record_theme_request(dataset="theme_news", theme="创新药")
+
+    gateway = MarketContextGateway(
+        macro_provider=SimpleNamespace(
+            get_macro_snapshot=lambda: {
+                "asOf": "2026-04-18T00:00:00+00:00",
+                "gdpYoY": 5.4,
+                "m2YoY": 8.3,
+                "socialFinancingIncrement": 5200.0,
+                "manufacturingPmi": 50.8,
+            },
+            get_hsgt_flow_snapshot=lambda: {
+                "asOf": "2026-04-18T00:00:00+00:00",
+                "northboundNetAmount": 1762.62,
+                "southboundNetAmount": -664.0,
+            },
+        ),
+        intelligence_data_gateway=SimpleNamespace(
+            get_theme_news=lambda **kwargs: _theme_news(
+                kwargs["theme"],
+                f'{kwargs["theme"]} 催化提升',
+                "positive",
+                0.82,
+            ),
+            get_theme_concepts=lambda **kwargs: _theme_concepts(kwargs["theme"]),
+        ),
+        market_data_gateway=SimpleNamespace(
+            get_theme_candidates=lambda **kwargs: _theme_candidates(kwargs["theme"]),
+        ),
+        recorder=recorder,
+    )
+
+    response = gateway.get_snapshot(request_id="req-3", theme_limit=2)
+
+    assert len(response.data.hotThemes) == 2

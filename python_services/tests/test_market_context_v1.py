@@ -104,3 +104,18 @@ def test_get_market_context_snapshot_v1_supports_force_refresh_query_param():
     assert response.status_code == 200
     get_snapshot.assert_called_once()
     assert get_snapshot.call_args.kwargs["force_refresh"] is True
+
+
+def test_get_market_context_snapshot_v1_forwards_theme_limit():
+    with patch(
+        "app.routers.market_context_v1.market_context_gateway.get_snapshot",
+        return_value=build_payload(),
+    ) as get_snapshot:
+        response = client.get(
+            "/api/v1/market-context/snapshot",
+            params={"themeLimit": "6"},
+        )
+
+    assert response.status_code == 200
+    get_snapshot.assert_called_once()
+    assert get_snapshot.call_args.kwargs["theme_limit"] == 6

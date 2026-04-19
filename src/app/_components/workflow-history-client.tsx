@@ -32,6 +32,7 @@ type HeaderAction = {
 const pageSize = 18;
 const historyHrefBySection: Record<WorkspaceSection, string | undefined> = {
   home: undefined,
+  opportunityIntelligence: undefined,
   screening: "/screening/history",
   workflows: "/workflows/history",
   timing: "/timing/history",

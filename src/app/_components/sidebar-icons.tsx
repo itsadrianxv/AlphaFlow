@@ -40,6 +40,16 @@ export function ScreeningIcon(props: IconProps) {
   );
 }
 
+export function OpportunityIntelligenceIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M4.5 18.5 9 14l3 2.5 5.5-7 2 1.5" />
+      <path d="M5 5h14" />
+      <path d="M5 9h9" />
+    </BaseIcon>
+  );
+}
+
 export function WorkflowsIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>

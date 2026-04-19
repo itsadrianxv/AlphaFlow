@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { MarketContextSection } from "~/app/_components/market-context-section";
+import { OpportunityIntelligenceSummary } from "~/app/_components/opportunity-intelligence-summary";
 import { ResearchVoiceInput } from "~/app/_components/research-voice-input";
 import {
   InlineNotice,
@@ -377,7 +377,7 @@ export function WorkflowsClient() {
         </>
       }
     >
-      <MarketContextSection section="workflows" />
+      <OpportunityIntelligenceSummary />
       <WorkflowStageSwitcher
         tabs={workflowsStageTabs}
         activeTabId={activeTabId}

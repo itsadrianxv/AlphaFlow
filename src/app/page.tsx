@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { OpportunityIntelligenceSummary } from "~/app/_components/opportunity-intelligence-summary";
 import { statusTone } from "~/app/_components/status-tone";
 import {
   ActionStrip,
@@ -203,6 +204,8 @@ export default async function Home() {
             </Link>
           }
         />
+
+        {signedIn ? <OpportunityIntelligenceSummary /> : null}
 
         {loadError ? (
           <SectionCard surface="inset" density="compact">

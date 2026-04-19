@@ -14,6 +14,7 @@ import {
   CloseIcon,
   CompanyResearchIcon,
   MenuIcon,
+  OpportunityIntelligenceIcon,
   OverviewIcon,
   ResearchSpacesIcon,
   ScreeningIcon,
@@ -40,6 +41,7 @@ function cn(...values: Array<string | false | null | undefined>) {
 
 export type WorkspaceSection =
   | "home"
+  | "opportunityIntelligence"
   | "screening"
   | "workflows"
   | "timing"
@@ -69,6 +71,12 @@ const sidebarNavItems: Array<{
     href: "/",
     label: "概览",
     icon: OverviewIcon,
+  },
+  {
+    key: "opportunityIntelligence",
+    href: "/opportunity-intelligence",
+    label: "机会研判",
+    icon: OpportunityIntelligenceIcon,
   },
   {
     key: "screening",

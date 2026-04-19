@@ -114,7 +114,7 @@ describe("workflow page composition", () => {
     expect(companyResearchHistorySource).not.toContain("headerActions");
   });
 
-  it("injects the shared market context entrypoint into every core workflow page", () => {
+  it("injects the shared opportunity intelligence summary into every core workflow page", () => {
     const screeningSource = readSource(
       "./screening/screening-studio-client.tsx",
     );
@@ -124,10 +124,10 @@ describe("workflow page composition", () => {
     );
     const timingSource = readSource("./timing/timing-client.tsx");
 
-    expect(screeningSource).toContain("MarketContextSection");
-    expect(workflowsSource).toContain("MarketContextSection");
-    expect(companyResearchSource).toContain("MarketContextSection");
-    expect(timingSource).toContain("MarketContextSection");
+    expect(screeningSource).toContain("OpportunityIntelligenceSummary");
+    expect(workflowsSource).toContain("OpportunityIntelligenceSummary");
+    expect(companyResearchSource).toContain("OpportunityIntelligenceSummary");
+    expect(timingSource).toContain("OpportunityIntelligenceSummary");
   });
 
   it("uses a dedicated document-style quick research detail component", () => {
