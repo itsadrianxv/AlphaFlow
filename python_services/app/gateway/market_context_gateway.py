@@ -60,10 +60,9 @@ class MarketContextGateway:
         self,
         request_id: str,
         force_refresh: bool = False,
-        theme_limit: int = 3,
     ) -> MarketContextSnapshotResponse:
         started_at = time.perf_counter()
-        selected_themes = self._select_themes(limit=theme_limit)
+        selected_themes = self._select_themes(limit=3)
         result = execute_cached(
             dataset="market_context_snapshot",
             provider=self.provider_name,

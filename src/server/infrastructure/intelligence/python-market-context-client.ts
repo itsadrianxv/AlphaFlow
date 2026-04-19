@@ -48,11 +48,6 @@ export type PythonMarketContextClientConfig = {
   timeoutMs?: number;
 };
 
-export type GetPythonMarketContextSnapshotOptions = {
-  forceRefresh?: boolean;
-  themeLimit?: number;
-};
-
 export class PythonMarketContextClient {
   private readonly baseUrl: string;
   private readonly marketContextBasePath: string;
@@ -69,34 +64,24 @@ export class PythonMarketContextClient {
       config?.timeoutMs ?? env.PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS;
   }
 
-  async getSnapshot(options?: GetPythonMarketContextSnapshotOptions) {
-    return this.request("/snapshot", options);
+  async getSnapshot() {
+    return this.request("/snapshot");
   }
 
-  private async request(
-    path: string,
-    options?: GetPythonMarketContextSnapshotOptions,
-  ) {
+  private async request(path: string) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
-      const requestUrl = new URL(
+      const response = await fetch(
         `${this.baseUrl}${this.marketContextBasePath}${path}`,
-      );
-      if (options?.forceRefresh) {
-        requestUrl.searchParams.set("forceRefresh", "true");
-      }
-      if (options?.themeLimit) {
-        requestUrl.searchParams.set("themeLimit", String(options.themeLimit));
-      }
-
-      const response = await fetch(requestUrl.toString(), {
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
+        {
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "Unknown error");

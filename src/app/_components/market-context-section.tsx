@@ -37,12 +37,6 @@ const flowLabelMap = {
   unknown: "北向待确认",
 } as const;
 
-const refreshSourceLabelMap = {
-  INITIAL: "首次创建",
-  MANUAL: "手动刷新",
-  AUTO: "自动刷新",
-} as const;
-
 const actionLabelMap: Record<MarketContextSectionTarget, string> = {
   workflows: "发起行业研究",
   companyResearch: "打开公司研究",
@@ -50,53 +44,20 @@ const actionLabelMap: Record<MarketContextSectionTarget, string> = {
   timing: "打开择时",
 };
 
-function formatRefreshTimestamp(value: string | null) {
-  if (!value) {
-    return "暂无";
-  }
-
-  return new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
-}
-
 export function MarketContextSection(props: {
   section: MarketContextSectionTarget;
   currentStockCodes?: string[];
 }) {
   const { section, currentStockCodes = [] } = props;
-  const utils = api.useUtils();
   const snapshotQuery = api.marketContext.getSnapshot.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
-  const refreshMutation = api.marketContext.refreshSnapshot.useMutation({
-    onSuccess: (data) => {
-      utils.marketContext.getSnapshot.setData(undefined, data);
-    },
-  });
-
-  const refreshButton = (
-    <button
-      type="button"
-      onClick={() => refreshMutation.mutate()}
-      className="app-button"
-      disabled={refreshMutation.isPending}
-    >
-      {refreshMutation.isPending ? "刷新中..." : "刷新"}
-    </button>
-  );
 
   if (snapshotQuery.isLoading) {
     return (
       <SectionCard
         title="市场上下文"
         description="正在读取宏观慢变量、资金方向和热门主题。"
-        actions={refreshButton}
       >
         <div className="text-sm leading-6 text-[var(--app-text-muted)]">
           正在整理当前市场环境。
@@ -110,22 +71,16 @@ export function MarketContextSection(props: {
       <SectionCard
         title="市场上下文"
         description="当前未能获取完整市场上下文。"
-        actions={refreshButton}
       >
         <InlineNotice
           tone="warning"
-          description={
-            refreshMutation.error?.message ??
-            snapshotQuery.error?.message ??
-            "市场上下文暂不可用。"
-          }
+          description={snapshotQuery.error?.message ?? "市场上下文暂不可用。"}
         />
       </SectionCard>
     );
   }
 
-  const snapshot = snapshotQuery.data.snapshot;
-  const refreshState = snapshotQuery.data.refreshState;
+  const snapshot = snapshotQuery.data;
   const sectionHint = snapshot.downstreamHints[section];
   const hotThemes = snapshot.hotThemes.slice(0, 3);
   const matchedThemes = findMatchingHotThemes(hotThemes, currentStockCodes);
@@ -137,11 +92,7 @@ export function MarketContextSection(props: {
         : "上下文待补齐";
 
   return (
-    <SectionCard
-      title="市场上下文"
-      description={sectionHint.summary}
-      actions={refreshButton}
-    >
+    <SectionCard title="市场上下文" description={sectionHint.summary}>
       <div className="grid gap-4">
         <div className="flex flex-wrap gap-2">
           <StatusPill
@@ -153,27 +104,12 @@ export function MarketContextSection(props: {
             tone={flowToneMap[snapshot.flow.direction]}
           />
           <StatusPill label={statusLabel} tone="neutral" />
-          <StatusPill
-            label={`更新 ${formatRefreshTimestamp(refreshState.lastSuccessfulRefreshAt)}`}
-            tone="neutral"
-          />
-          <StatusPill
-            label={refreshSourceLabelMap[refreshState.source]}
-            tone="info"
-          />
         </div>
 
         <div className="grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
           <p>{snapshot.regime.summary}</p>
           <p>{snapshot.flow.summary}</p>
         </div>
-
-        {refreshState.lastRefreshError ? (
-          <InlineNotice
-            tone="warning"
-            description={refreshState.lastRefreshError}
-          />
-        ) : null}
 
         {matchedThemes.length > 0 ? (
           <InlineNotice

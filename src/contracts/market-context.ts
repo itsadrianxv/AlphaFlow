@@ -116,33 +116,4 @@ export const marketContextSnapshotSchema = z.object({
   }),
 });
 
-export const marketContextRefreshSourceSchema = z.enum([
-  "INITIAL",
-  "MANUAL",
-  "AUTO",
-]);
-
-export const marketContextRefreshStateSchema = z.object({
-  source: marketContextRefreshSourceSchema,
-  lastSuccessfulRefreshAt: z.string().min(1).nullable(),
-  lastRefreshAttemptAt: z.string().min(1),
-  lastRefreshError: z.string().min(1).nullable(),
-  lastAutoRefreshDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullable(),
-});
-
-export const marketContextEnvelopeSchema = z.object({
-  snapshot: marketContextSnapshotSchema,
-  refreshState: marketContextRefreshStateSchema,
-});
-
 export type MarketContextSnapshot = z.infer<typeof marketContextSnapshotSchema>;
-export type MarketContextRefreshSource = z.infer<
-  typeof marketContextRefreshSourceSchema
->;
-export type MarketContextRefreshState = z.infer<
-  typeof marketContextRefreshStateSchema
->;
-export type MarketContextEnvelope = z.infer<typeof marketContextEnvelopeSchema>;

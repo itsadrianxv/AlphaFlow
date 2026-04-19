@@ -19,8 +19,8 @@ from app.main import app
 client = TestClient(app)
 
 
-def build_payload():
-    return MarketContextSnapshotResponse(
+def test_get_market_context_snapshot_v1_success():
+    payload = MarketContextSnapshotResponse(
         meta=GatewayMeta(
             requestId="req-1",
             provider="market-context",
@@ -38,19 +38,19 @@ def build_payload():
                 growthTone="expansion",
                 liquidityTone="supportive",
                 riskTone="risk_on",
-                summary="macro constructive",
-                drivers=["PMI > 50"],
+                summary="制造业景气回到扩张区间。",
+                drivers=["PMI 回到 50 上方"],
             ),
             flow=MarketFlowSummary(
                 northboundNetAmount=1762.62,
                 direction="inflow",
-                summary="northbound inflow",
+                summary="北向资金净流入。",
             ),
             hotThemes=[
                 HotThemeContext(
                     theme="AI",
                     heatScore=84,
-                    whyHot="catalyst cluster",
+                    whyHot="催化集中。",
                     conceptMatches=[],
                     candidateStocks=[],
                     topNews=[],
@@ -58,15 +58,15 @@ def build_payload():
             ],
             downstreamHints=MarketContextDownstreamHints(
                 workflows=SectionHint(
-                    summary="workflow summary",
-                    suggestedQuestion="question",
+                    summary="优先研究高景气主题。",
+                    suggestedQuestion="围绕 AI 产业链，当前景气扩散到哪些环节？",
                 ),
-                companyResearch=SectionHint(summary="company summary"),
+                companyResearch=SectionHint(summary="优先确认主题兑现路径。"),
                 screening=SectionHint(
-                    summary="screening summary",
-                    suggestedDraftName="AI pool",
+                    summary="优先从热门主题候选股开始缩小范围。",
+                    suggestedDraftName="AI 热门主题候选池",
                 ),
-                timing=SectionHint(summary="timing summary"),
+                timing=SectionHint(summary="风险偏好偏强，可保持进攻型观察。"),
             ),
             availability=MarketContextAvailability(
                 regime=MarketContextAvailabilityEntry(available=True),
@@ -76,11 +76,9 @@ def build_payload():
         ),
     )
 
-
-def test_get_market_context_snapshot_v1_success():
     with patch(
         "app.routers.market_context_v1.market_context_gateway.get_snapshot",
-        return_value=build_payload(),
+        return_value=payload,
     ):
         response = client.get("/api/v1/market-context/snapshot")
 
@@ -88,34 +86,4 @@ def test_get_market_context_snapshot_v1_success():
     body = response.json()
     assert body["data"]["status"] == "complete"
     assert body["data"]["hotThemes"][0]["theme"] == "AI"
-    assert body["data"]["downstreamHints"]["screening"]["suggestedDraftName"] == "AI pool"
-
-
-def test_get_market_context_snapshot_v1_supports_force_refresh_query_param():
-    with patch(
-        "app.routers.market_context_v1.market_context_gateway.get_snapshot",
-        return_value=build_payload(),
-    ) as get_snapshot:
-        response = client.get(
-            "/api/v1/market-context/snapshot",
-            params={"forceRefresh": "true"},
-        )
-
-    assert response.status_code == 200
-    get_snapshot.assert_called_once()
-    assert get_snapshot.call_args.kwargs["force_refresh"] is True
-
-
-def test_get_market_context_snapshot_v1_forwards_theme_limit():
-    with patch(
-        "app.routers.market_context_v1.market_context_gateway.get_snapshot",
-        return_value=build_payload(),
-    ) as get_snapshot:
-        response = client.get(
-            "/api/v1/market-context/snapshot",
-            params={"themeLimit": "6"},
-        )
-
-    assert response.status_code == 200
-    get_snapshot.assert_called_once()
-    assert get_snapshot.call_args.kwargs["theme_limit"] == 6
+    assert body["data"]["downstreamHints"]["screening"]["suggestedDraftName"] == "AI 热门主题候选池"

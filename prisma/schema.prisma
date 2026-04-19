@@ -77,31 +77,6 @@ model User {
     timingPresetAdjustmentSuggestions TimingPresetAdjustmentSuggestion[]
     workflowRuns                      WorkflowRun[]
     researchSpaces                    ResearchSpace[]
-    marketContextSnapshot             MarketContextSnapshot?
-}
-
-enum MarketContextRefreshSource {
-    INITIAL
-    MANUAL
-    AUTO
-}
-
-model MarketContextSnapshot {
-    id                      String                     @id @default(cuid())
-    userId                  String                     @unique
-    snapshotJson            Json
-    snapshotAsOf            String
-    lastSuccessfulRefreshAt DateTime?
-    lastRefreshAttemptAt    DateTime
-    lastRefreshError        String?
-    lastRefreshSource       MarketContextRefreshSource
-    lastAutoRefreshDate     String?
-    createdAt               DateTime                   @default(now())
-    updatedAt               DateTime                   @updatedAt
-
-    user                    User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-    @@index([lastAutoRefreshDate, updatedAt])
 }
 
 model VerificationToken {
