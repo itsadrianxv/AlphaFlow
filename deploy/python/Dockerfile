@@ -11,12 +11,13 @@ RUN set -eux; \
   find /etc/apt -type f \( -name '*.sources' -o -name '*.list' \) -print0 \
     | xargs -0 -r sed -i 's|http://deb.debian.org|https://deb.debian.org|g; s|http://security.debian.org|https://security.debian.org|g'; \
   apt-get update; \
-  apt-get install -y --no-install-recommends libidn12; \
+  apt-get install -y --no-install-recommends ffmpeg libidn12; \
   ln -sf /usr/lib/x86_64-linux-gnu/libidn.so.12 /usr/lib/x86_64-linux-gnu/libidn.so.11; \
   rm -rf /var/lib/apt/lists/*
 
 COPY python_services/requirements.txt ./requirements.txt
 COPY python_services/requirements-refchecker.txt ./requirements-refchecker.txt
+COPY python_services/scripts ./scripts
 COPY deploy/python/vendor ./vendor
 RUN pip install --default-timeout=1200 --no-cache-dir -r requirements.txt \
   && case "${INSTALL_REFCHECKER}" in \
@@ -54,10 +55,10 @@ RUN pip install --default-timeout=1200 --no-cache-dir -r requirements.txt \
     echo "No vendor iFinD package provided; continuing without iFinDPy."; \
   fi \
   && python -c "import importlib.util; print('iFinDPy spec:', importlib.util.find_spec('iFinDPy'))" \
+  && python scripts/download_funasr_models.py --output-dir /app/models/funasr \
   && rm -rf vendor requirements-refchecker.txt
 
 COPY python_services/app ./app
-COPY python_services/scripts ./scripts
 COPY temp/-v3/backend/app/utils/indicators_mapping.py ./temp/-v3/backend/app/utils/indicators_mapping.py
 
 EXPOSE 8000

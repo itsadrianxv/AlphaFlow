@@ -1,6 +1,7 @@
 # FastAPI and server
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
+python-multipart==0.0.20
 
 # Data validation (using newer version with precompiled wheels for Python 3.13)
 pydantic==2.10.5
@@ -11,6 +12,8 @@ tushare>=1.4.21
 
 # HTTP client (for potential external API calls)
 httpx==0.26.0
+funasr>=1.2.6
+modelscope>=1.23.2
 
 # Optional L2 cache backend
 redis==5.2.1
