@@ -114,6 +114,13 @@ function Invoke-Docker {
   }
 }
 
+function Get-DockerImageId {
+  param([string]$ImageName)
+
+  $result = @(Invoke-Docker -DockerArgs @("image", "inspect", "--format", "{{.Id}}", $ImageName))
+  return ($result | Select-Object -First 1).Trim()
+}
+
 function Invoke-Compose {
   param([string[]]$ComposeArgs)
 
@@ -198,6 +205,13 @@ if ($Services -contains "python-service") {
     "--build-arg", "INSTALL_REFCHECKER=$installRefchecker",
     $deployMainRoot
   )
+
+  $pythonVoiceBaseImageId = Get-DockerImageId -ImageName $pythonVoiceBaseImage
+  if ([string]::IsNullOrWhiteSpace($pythonVoiceBaseImageId)) {
+    throw "Failed to resolve local python voice base image id for '$pythonVoiceBaseImage'."
+  }
+
+  $env:PYTHON_VOICE_BASE_IMAGE = $pythonVoiceBaseImageId
 }
 
 Write-Host "Validating docker compose configuration..."

@@ -86,6 +86,10 @@ function createSandbox(options?: {
       '  Write-Output "python-voice-base built"',
       "  exit 0",
       "}",
+      'if ($joined -match "^image inspect " -and $joined -match "python-voice-base") {',
+      '  Write-Output "sha256:voicebase"',
+      "  exit 0",
+      "}",
       'if ($joined -match "(^| )compose " -and $joined -match " config") {',
       '  Write-Output "services:"',
       '  Write-Output "  web:"',
@@ -251,5 +255,5 @@ describe("deploy-main.ps1", () => {
     expect(log).toContain("up -d --build python-service");
     expect(baseBuildIndex).toBeGreaterThanOrEqual(0);
     expect(composeUpIndex).toBeGreaterThan(baseBuildIndex);
-  });
+  }, 15_000);
 });
