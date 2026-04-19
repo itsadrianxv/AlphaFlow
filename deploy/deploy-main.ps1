@@ -258,7 +258,11 @@ if ($Services -contains "python-service") {
   $null = Invoke-Compose -ComposeArgs @("up", "-d", "--no-build", "python-service")
 }
 if ($servicesToComposeBuild.Count -gt 0) {
-  $null = Invoke-Compose -ComposeArgs (@("up", "-d", "--build") + $servicesToComposeBuild)
+  $composeArgs = @("up", "-d", "--build")
+  if ($Services -contains "python-service") {
+    $composeArgs += "--no-deps"
+  }
+  $null = Invoke-Compose -ComposeArgs ($composeArgs + $servicesToComposeBuild)
 }
 
 Write-Host "Checking running services..."
