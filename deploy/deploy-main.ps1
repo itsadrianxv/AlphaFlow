@@ -127,16 +127,40 @@ function Build-DockerImage {
     [string]$DockerfilePath,
     [string]$ImageTag,
     [string]$BuildContext,
-    [string[]]$BuildArgs = @()
+    [string[]]$BuildArgs = @(),
+    [switch]$DisableBuildKit
   )
 
   $dockerArgs = @("build", "-f", $DockerfilePath, "-t", $ImageTag)
   foreach ($arg in $BuildArgs) {
     $dockerArgs += @("--build-arg", $arg)
   }
+  $dockerArgs += "--pull=false"
   $dockerArgs += $BuildContext
 
-  $null = Invoke-Docker -DockerArgs $dockerArgs
+  $previousBuildKit = $env:DOCKER_BUILDKIT
+  $previousComposeBuild = $env:COMPOSE_DOCKER_CLI_BUILD
+
+  try {
+    if ($DisableBuildKit) {
+      $env:DOCKER_BUILDKIT = "0"
+      $env:COMPOSE_DOCKER_CLI_BUILD = "0"
+    }
+
+    $null = Invoke-Docker -DockerArgs $dockerArgs
+  } finally {
+    if ($null -eq $previousBuildKit) {
+      Remove-Item Env:DOCKER_BUILDKIT -ErrorAction SilentlyContinue
+    } else {
+      $env:DOCKER_BUILDKIT = $previousBuildKit
+    }
+
+    if ($null -eq $previousComposeBuild) {
+      Remove-Item Env:COMPOSE_DOCKER_CLI_BUILD -ErrorAction SilentlyContinue
+    } else {
+      $env:COMPOSE_DOCKER_CLI_BUILD = $previousComposeBuild
+    }
+  }
 }
 
 function Invoke-Compose {
@@ -232,11 +256,6 @@ if ($ForceRebuild -and ($Services -contains "python-service")) {
       "INSTALL_REFCHECKER=$installRefchecker"
     )
 
-  $pythonVoiceBaseImageId = Get-DockerImageId -ImageName $pythonVoiceBaseImage
-  if ([string]::IsNullOrWhiteSpace($pythonVoiceBaseImageId)) {
-    throw "Failed to resolve local python voice base image id for '$pythonVoiceBaseImage'."
-  }
-
   $pythonServiceImage = "$composeProjectName-python-service"
   Write-Host "Building python-service image from local voice base..."
   Build-DockerImage `
@@ -244,9 +263,10 @@ if ($ForceRebuild -and ($Services -contains "python-service")) {
     -ImageTag $pythonServiceImage `
     -BuildContext $deployMainRoot `
     -BuildArgs @(
-      "PYTHON_VOICE_BASE_IMAGE=$pythonVoiceBaseImageId"
+      "PYTHON_VOICE_BASE_IMAGE=$pythonVoiceBaseImage"
       "INSTALL_REFCHECKER=$installRefchecker"
-    )
+    ) `
+    -DisableBuildKit
 
   $servicesToComposeBuild = @($Services | Where-Object { $_ -ne "python-service" })
 }
