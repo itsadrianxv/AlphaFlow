@@ -56,6 +56,88 @@ function Resolve-RepositoryRoot {
   return $FallbackRoot
 }
 
+function Get-EnvFileValue {
+  param(
+    [string]$LiteralPath,
+    [string]$Key,
+    [string]$Fallback
+  )
+
+  if (-not (Test-Path -LiteralPath $LiteralPath)) {
+    return $Fallback
+  }
+
+  foreach ($line in Get-Content -LiteralPath $LiteralPath) {
+    if ($line -match "^\s*$([regex]::Escape($Key))=(.*)$") {
+      $value = $Matches[1].Trim()
+      if ($value.StartsWith('"') -and $value.EndsWith('"')) {
+        return $value.Trim('"')
+      }
+
+      return $value
+    }
+  }
+
+  return $Fallback
+}
+
+function Invoke-Docker {
+  param([string[]]$DockerArgs)
+
+  $stdoutPath = [System.IO.Path]::GetTempFileName()
+  $stderrPath = [System.IO.Path]::GetTempFileName()
+
+  try {
+    $process = Start-Process -FilePath "docker" `
+      -ArgumentList $DockerArgs `
+      -NoNewWindow `
+      -Wait `
+      -PassThru `
+      -RedirectStandardOutput $stdoutPath `
+      -RedirectStandardError $stderrPath
+
+    $output = @()
+    if (Test-Path -LiteralPath $stdoutPath) {
+      $output += Get-Content -LiteralPath $stdoutPath
+    }
+    if (Test-Path -LiteralPath $stderrPath) {
+      $output += Get-Content -LiteralPath $stderrPath
+    }
+
+    if ($process.ExitCode -ne 0) {
+      throw "docker failed: $($output -join [Environment]::NewLine)"
+    }
+
+    return @($output)
+  } finally {
+    Remove-Item -LiteralPath $stdoutPath, $stderrPath -ErrorAction SilentlyContinue
+  }
+}
+
+function Get-DockerImageId {
+  param([string]$ImageName)
+
+  $result = @(Invoke-Docker -DockerArgs @("image", "inspect", "--format", "{{.Id}}", $ImageName))
+  return ($result | Select-Object -First 1).Trim()
+}
+
+function Build-DockerImage {
+  param(
+    [string]$DockerfilePath,
+    [string]$ImageTag,
+    [string]$BuildContext,
+    [string[]]$BuildArgs = @()
+  )
+
+  $dockerArgs = @("build", "-f", $DockerfilePath, "-t", $ImageTag)
+  foreach ($arg in $BuildArgs) {
+    $dockerArgs += @("--build-arg", $arg)
+  }
+  $dockerArgs += $BuildContext
+
+  $null = Invoke-Docker -DockerArgs $dockerArgs
+}
+
 function Invoke-Compose {
   param([string[]]$ComposeArgs)
 
@@ -118,12 +200,66 @@ $script:EnvFile = Assert-RequiredPath `
 $script:ProjectDirectory = Assert-RequiredPath `
   -LiteralPath $projectDirectoryPath `
   -DisplayPath ".worktrees/deploy-main/deploy"
+$servicesToComposeBuild = @($Services)
+
+if ($Services -contains "python-service") {
+  $pythonVoiceBaseImage = Get-EnvFileValue `
+    -LiteralPath $script:EnvFile `
+    -Key "PYTHON_VOICE_BASE_IMAGE" `
+    -Fallback "stock-screening-boost-python-voice-base:local"
+  $composeProjectName = Get-EnvFileValue `
+    -LiteralPath $script:EnvFile `
+    -Key "COMPOSE_PROJECT_NAME" `
+    -Fallback "stock-screening-boost"
+  $installRefchecker = Get-EnvFileValue `
+    -LiteralPath $script:EnvFile `
+    -Key "REFCHECKER_ENABLED" `
+    -Fallback "false"
+  $pythonVoiceBaseDockerfile = Assert-RequiredPath `
+    -LiteralPath (Join-Path $deployMainRoot "deploy/python/Dockerfile.voice-base") `
+    -DisplayPath ".worktrees/deploy-main/deploy/python/Dockerfile.voice-base"
+  $pythonServiceDockerfile = Assert-RequiredPath `
+    -LiteralPath (Join-Path $deployMainRoot "deploy/python/Dockerfile") `
+    -DisplayPath ".worktrees/deploy-main/deploy/python/Dockerfile"
+
+  Write-Host "Building python voice base image..."
+  Build-DockerImage `
+    -DockerfilePath $pythonVoiceBaseDockerfile `
+    -ImageTag $pythonVoiceBaseImage `
+    -BuildContext $deployMainRoot `
+    -BuildArgs @(
+      "INSTALL_REFCHECKER=$installRefchecker"
+    )
+
+  $pythonVoiceBaseImageId = Get-DockerImageId -ImageName $pythonVoiceBaseImage
+  if ([string]::IsNullOrWhiteSpace($pythonVoiceBaseImageId)) {
+    throw "Failed to resolve local python voice base image id for '$pythonVoiceBaseImage'."
+  }
+
+  $pythonServiceImage = "$composeProjectName-python-service"
+  Write-Host "Building python-service image from local voice base..."
+  Build-DockerImage `
+    -DockerfilePath $pythonServiceDockerfile `
+    -ImageTag $pythonServiceImage `
+    -BuildContext $deployMainRoot `
+    -BuildArgs @(
+      "PYTHON_VOICE_BASE_IMAGE=$pythonVoiceBaseImageId"
+      "INSTALL_REFCHECKER=$installRefchecker"
+    )
+
+  $servicesToComposeBuild = @($Services | Where-Object { $_ -ne "python-service" })
+}
 
 Write-Host "Validating docker compose configuration..."
 $null = Invoke-Compose -ComposeArgs @("config")
 
 Write-Host "Starting target services..."
-$null = Invoke-Compose -ComposeArgs (@("up", "-d", "--build") + $Services)
+if ($Services -contains "python-service") {
+  $null = Invoke-Compose -ComposeArgs @("up", "-d", "--no-build", "python-service")
+}
+if ($servicesToComposeBuild.Count -gt 0) {
+  $null = Invoke-Compose -ComposeArgs (@("up", "-d", "--build") + $servicesToComposeBuild)
+}
 
 Write-Host "Checking running services..."
 $runningServices = @(Invoke-Compose -ComposeArgs (@("ps", "--services", "--status", "running") + $Services))

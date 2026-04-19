@@ -15,6 +15,7 @@ httpx==0.26.0
 funasr>=1.2.6
 modelscope>=1.23.2
 torch>=2.5.1,<2.7
+torchaudio>=2.5.1,<2.7
 
 # Optional L2 cache backend
 redis==5.2.1

@@ -38,6 +38,7 @@ services:
       dockerfile: deploy/python/Dockerfile
       args:
         INSTALL_REFCHECKER: ${REFCHECKER_ENABLED:-false}
+        PYTHON_VOICE_BASE_IMAGE: ${PYTHON_VOICE_BASE_IMAGE:-stock-screening-boost-python-voice-base:local}
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: "1"
