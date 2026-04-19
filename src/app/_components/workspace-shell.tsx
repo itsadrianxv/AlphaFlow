@@ -9,7 +9,7 @@ import React, {
   useEffect,
   useState,
 } from "react";
-
+import { AlphaFlowMark } from "~/app/_components/brand/alpha-flow-mark";
 import {
   CloseIcon,
   CompanyResearchIcon,
@@ -25,7 +25,12 @@ import {
 import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
 
 export const DESKTOP_SIDEBAR_STORAGE_KEY =
-  "ssb.workspaceShell.desktopCollapsed";
+  "alphaflow.workspaceShell.desktopCollapsed";
+const LEGACY_DESKTOP_SIDEBAR_STORAGE_KEY = [
+  "ssb",
+  "workspaceShell",
+  "desktopCollapsed",
+].join(".");
 
 const HISTORY_ITEM_LIMIT = 8;
 
@@ -103,12 +108,25 @@ const sidebarNavItems: Array<{
   },
 ];
 
-function AppMark() {
-  return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] font-[family-name:var(--font-heading)] text-[11px] tracking-[0.12em] text-[var(--app-text-strong)]">
-      SSB
-    </div>
-  );
+type DesktopSidebarStorage = Pick<Storage, "getItem" | "setItem">;
+
+export function loadDesktopSidebarCollapsedState(
+  storage: DesktopSidebarStorage,
+) {
+  const currentValue = storage.getItem(DESKTOP_SIDEBAR_STORAGE_KEY);
+
+  if (currentValue === "true" || currentValue === "false") {
+    return currentValue === "true";
+  }
+
+  const legacyValue = storage.getItem(LEGACY_DESKTOP_SIDEBAR_STORAGE_KEY);
+
+  if (legacyValue === "true" || legacyValue === "false") {
+    storage.setItem(DESKTOP_SIDEBAR_STORAGE_KEY, legacyValue);
+    return legacyValue === "true";
+  }
+
+  return false;
 }
 
 function SidebarBrand(props: { onNavigate?: () => void }) {
@@ -116,10 +134,13 @@ function SidebarBrand(props: { onNavigate?: () => void }) {
 
   return (
     <Link href="/" className="flex items-center gap-3" onClick={onNavigate}>
-      <AppMark />
+      <AlphaFlowMark
+        className="h-9 w-9 rounded-[10px] border-[var(--app-border-soft)] shadow-none"
+        iconClassName="h-[18px] w-[18px]"
+      />
       <div className="min-w-0">
         <div className="truncate text-sm font-medium text-[var(--app-text-strong)]">
-          Stock Screening Boost
+          AlphaFlow
         </div>
         <div className="text-xs text-[var(--app-text-subtle)]">
           投资决策工作台
@@ -500,12 +521,7 @@ export function WorkspaceShell(props: {
       return;
     }
 
-    const storedValue = window.localStorage.getItem(
-      DESKTOP_SIDEBAR_STORAGE_KEY,
-    );
-    if (storedValue === "true") {
-      setDesktopCollapsed(true);
-    }
+    setDesktopCollapsed(loadDesktopSidebarCollapsedState(window.localStorage));
     setDesktopStateReady(true);
   }, [desktopStateReady, initialDesktopCollapsed]);
 

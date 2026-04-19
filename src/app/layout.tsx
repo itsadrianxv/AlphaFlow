@@ -39,10 +39,10 @@ const codeMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "股票筛选增强 · 投资决策工作流",
+  title: "AlphaFlow · 投资决策工作流",
   description:
     "把筛选、行业研究、公司判断和择时组合压缩成一条连续工作流的投资前端。",
-  icons: [{ rel: "icon", url: "/favicon.ico" }],
+  icons: [{ rel: "icon", url: "/icon.svg" }],
 };
 
 export default function RootLayout({

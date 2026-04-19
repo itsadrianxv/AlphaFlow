@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React, { type ReactNode } from "react";
 
+import { AlphaFlowMark } from "~/app/_components/brand/alpha-flow-mark";
 import {
   primaryWorkflowStages,
   type WorkflowStageTab,
@@ -145,14 +146,6 @@ const densityClassMap: Record<Density, string> = {
   compact: "p-4",
 };
 
-function AppMark() {
-  return (
-    <div className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] font-[family-name:var(--font-heading)] text-[11px] tracking-[0.12em] text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]">
-      SSB
-    </div>
-  );
-}
-
 export function PageHeader(props: {
   eyebrow?: string;
   title: string;
@@ -227,10 +220,10 @@ export function LegacyWorkspaceShell(props: {
           <aside className="border-b border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] lg:min-h-screen lg:border-r lg:border-b-0">
             <div className="flex h-full flex-col gap-6 px-4 py-5 sm:px-6 lg:sticky lg:top-0 lg:h-screen lg:px-5">
               <Link href="/" className="flex items-center gap-3">
-                <AppMark />
+                <AlphaFlowMark />
                 <div>
                   <div className="font-[family-name:var(--font-heading)] text-sm font-medium text-[var(--app-text-strong)]">
-                    Stock Screening Boost
+                    AlphaFlow
                   </div>
                   <div className="text-xs text-[var(--app-text-subtle)]">
                     {"\u6295\u8d44\u51b3\u7b56\u5de5\u4f5c\u53f0"}
@@ -410,10 +403,10 @@ export function LegacyWorkspaceShell(props: {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             {false ? (
               <Link href="/" className="flex items-center gap-4">
-              <AppMark />
+              <AlphaFlowMark />
               <div>
                 <div className="text-[11px] uppercase tracking-[0.2em] text-[var(--app-text-subtle)]">
-                  Stock Screening Boost
+                  AlphaFlow
                 </div>
                 <div className="mt-2 text-xl leading-none text-[var(--app-text-strong)]">
                   投资决策工作流
@@ -536,10 +529,10 @@ export function LegacyWorkspaceShell(props: {
           <aside className="border-b border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] lg:min-h-screen lg:border-r lg:border-b-0">
             <div className="flex h-full flex-col gap-6 px-4 py-5 sm:px-6 lg:px-5">
               <Link href="/" className="flex items-center gap-3">
-                <AppMark />
+                <AlphaFlowMark />
                 <div>
                   <div className="text-sm font-medium text-[var(--app-text-strong)]">
-                    股票筛选增强
+                    AlphaFlow
                   </div>
                   <div className="text-xs text-[var(--app-text-subtle)]">
                     投资决策工作台

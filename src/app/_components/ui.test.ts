@@ -188,7 +188,8 @@ describe("WorkspaceShell", () => {
       ),
     );
 
-    expect(markup).toContain("SSB");
+    expect(markup).toContain("AlphaFlow");
+    expect(markup).toContain('data-brand-mark="alphaflow"');
     expect(markup).not.toContain('aria-label="Primary workflow"');
     expect(markup).not.toContain("data-stage-active=");
     expect(markup).not.toContain("策略、会话与观察池");
