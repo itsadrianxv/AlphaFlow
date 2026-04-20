@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import calendar
+from datetime import UTC, date, datetime, time as datetime_time
 import os
+import re
 import time
 
 from app.contracts.market_context import (
@@ -37,6 +40,76 @@ def _average(values: list[float]) -> float | None:
     if not values:
         return None
     return sum(values) / len(values)
+
+
+_DATE_ONLY_RE = re.compile(r"^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})$")
+_MONTH_ONLY_RE = re.compile(r"^(?P<year>\d{4})(?P<month>\d{2})$")
+_QUARTER_RE = re.compile(r"^(?P<year>\d{4})-?Q(?P<quarter>[1-4])$", re.IGNORECASE)
+
+
+def _normalize_as_of_candidate(value: object) -> tuple[datetime, str] | None:
+    if value is None:
+        return None
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    date_only_match = _DATE_ONLY_RE.fullmatch(raw)
+    if date_only_match:
+        year = int(date_only_match.group("year"))
+        month = int(date_only_match.group("month"))
+        day = int(date_only_match.group("day"))
+        normalized_date = date(year, month, day)
+        return (
+            datetime.combine(normalized_date, datetime_time.min, tzinfo=UTC),
+            normalized_date.isoformat(),
+        )
+
+    month_only_match = _MONTH_ONLY_RE.fullmatch(raw)
+    if month_only_match:
+        year = int(month_only_match.group("year"))
+        month = int(month_only_match.group("month"))
+        last_day = calendar.monthrange(year, month)[1]
+        normalized_date = date(year, month, last_day)
+        return (
+            datetime.combine(normalized_date, datetime_time.min, tzinfo=UTC),
+            normalized_date.isoformat(),
+        )
+
+    quarter_match = _QUARTER_RE.fullmatch(raw)
+    if quarter_match:
+        year = int(quarter_match.group("year"))
+        quarter = int(quarter_match.group("quarter"))
+        month = quarter * 3
+        last_day = calendar.monthrange(year, month)[1]
+        normalized_date = date(year, month, last_day)
+        return (
+            datetime.combine(normalized_date, datetime_time.min, tzinfo=UTC),
+            normalized_date.isoformat(),
+        )
+
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+
+    return parsed.astimezone(UTC), parsed.isoformat()
+
+
+def _resolve_snapshot_as_of(candidates: list[object]) -> str:
+    normalized_candidates = [
+        normalized
+        for candidate in candidates
+        if (normalized := _normalize_as_of_candidate(candidate)) is not None
+    ]
+    if not normalized_candidates:
+        return iso_now()
+
+    return max(normalized_candidates, key=lambda item: item[0])[1]
 
 
 class MarketContextGateway:
@@ -95,7 +168,7 @@ class MarketContextGateway:
             hotThemes=MarketContextAvailabilityEntry(available=True),
         )
 
-        as_of_candidates = [iso_now()]
+        as_of_candidates: list[object] = []
 
         macro_snapshot = None
         try:
@@ -140,7 +213,7 @@ class MarketContextGateway:
         status = self._resolve_status(availability)
 
         return MarketContextSnapshot(
-            asOf=max(as_of_candidates),
+            asOf=_resolve_snapshot_as_of(as_of_candidates),
             status=status,
             regime=regime,
             flow=flow,

@@ -11,6 +11,7 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { formatOpportunityAsOf } from "~/app/opportunity-intelligence/format-as-of";
 import { buildOpportunityLeadActionLinks } from "~/app/opportunity-intelligence/opportunity-intelligence-links";
 import type { OpportunityLead } from "~/contracts/opportunity-intelligence";
 import { api } from "~/trpc/react";
@@ -34,13 +35,7 @@ const stageToneMap = {
 } as const;
 
 function formatAsOf(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
+  return formatOpportunityAsOf(value);
 }
 
 function LeadCard(props: {

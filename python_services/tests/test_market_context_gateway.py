@@ -161,3 +161,43 @@ def test_market_context_gateway_marks_partial_when_macro_snapshot_is_unavailable
     assert response.data.availability.regime.warning is not None
     assert response.data.availability.flow.available is True
     assert response.data.availability.hotThemes.available is True
+
+
+def test_market_context_gateway_normalizes_legacy_as_of_strings(monkeypatch):
+    monkeypatch.setattr(
+        "app.gateway.market_context_gateway.iso_now",
+        lambda: "2026-04-17T00:00:00+00:00",
+    )
+    gateway = MarketContextGateway(
+        macro_provider=SimpleNamespace(
+            get_macro_snapshot=lambda: {
+                "asOf": "20260418",
+                "gdpYoY": 5.1,
+                "m2YoY": 8.1,
+                "socialFinancingIncrement": 5000.0,
+                "manufacturingPmi": 50.2,
+            },
+            get_hsgt_flow_snapshot=lambda: {
+                "asOf": "2026-04-16T09:30:00+00:00",
+                "northboundNetAmount": 120.0,
+                "southboundNetAmount": -80.0,
+            },
+        ),
+        intelligence_data_gateway=SimpleNamespace(
+            get_theme_news=lambda **kwargs: _theme_news(
+                kwargs["theme"],
+                f'{kwargs["theme"]} fallback',
+                "positive",
+                0.7,
+            ),
+            get_theme_concepts=lambda **kwargs: _theme_concepts(kwargs["theme"]),
+        ),
+        market_data_gateway=SimpleNamespace(
+            get_theme_candidates=lambda **kwargs: _theme_candidates(kwargs["theme"]),
+        ),
+        recorder=MetricsRecorder(),
+    )
+
+    response = gateway.get_snapshot(request_id="req-3")
+
+    assert response.data.asOf == "2026-04-18T00:00:00+00:00"

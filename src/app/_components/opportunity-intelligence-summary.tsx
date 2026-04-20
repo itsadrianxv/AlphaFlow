@@ -2,17 +2,8 @@
 
 import Link from "next/link";
 import { InlineNotice, SectionCard, StatusPill } from "~/app/_components/ui";
+import { formatOpportunityAsOf } from "~/app/opportunity-intelligence/format-as-of";
 import { api } from "~/trpc/react";
-
-function formatAsOf(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
-}
 
 const stageLabelMap = {
   warming: "观察中",
@@ -100,7 +91,7 @@ export function OpportunityIntelligenceSummary(props: { limit?: 2 | 3 }) {
             tone={summary.status === "partial" ? "warning" : "info"}
           />
           <StatusPill
-            label={`截至 ${formatAsOf(summary.asOf)}`}
+            label={`截至 ${formatOpportunityAsOf(summary.asOf)}`}
             tone="neutral"
           />
           {summary.personalizationHitCount > 0 ? (
