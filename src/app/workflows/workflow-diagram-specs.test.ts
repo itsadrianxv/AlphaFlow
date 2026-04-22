@@ -59,6 +59,27 @@ describe("workflow diagram specs", () => {
     }
   });
 
+  it("uses Chinese labels for interactive workflow diagram nodes", () => {
+    const quickResearchSpec = getWorkflowDiagramSpec("quick_industry_research", 3);
+    const companyResearchSpec = getWorkflowDiagramSpec("company_research_center", 4);
+    const timingSpec = getWorkflowDiagramSpec("timing_signal_pipeline_v1", 1);
+
+    expect(
+      quickResearchSpec?.nodes.find((node) => node.id === "agent1_extract_research_spec")
+        ?.label,
+    ).toBe("提炼研究任务");
+    expect(
+      companyResearchSpec?.nodes.find((node) => node.id === "collector_industry_sources")
+        ?.label,
+    ).toBe("采集行业信源");
+    expect(
+      timingSpec?.nodes.find((node) => node.id === "technical_signal_agent")?.label,
+    ).toBe("技术信号研判");
+    expect(
+      timingSpec?.nodes.find((node) => node.id === "load_targets")?.description,
+    ).toBe("载入本次要分析的股票。");
+  });
+
   it("returns null for unknown template versions", () => {
     expect(getWorkflowDiagramSpec("company_research_center", 99)).toBeNull();
     expect(getLatestWorkflowDiagramSpec("unknown_template")).toBeNull();

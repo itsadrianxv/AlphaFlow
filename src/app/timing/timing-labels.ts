@@ -116,6 +116,25 @@ const timingVolatilityTrendLabelMap: Record<
   FALLING: "波动回落",
 };
 
+const timingNodeLabelMap: Record<string, string> = {
+  load_targets: "载入分析标的",
+  fetch_signal_snapshots: "抓取信号快照",
+  fetch_signal_snapshots_batch: "批量抓取信号快照",
+  technical_signal_agent: "技术信号研判",
+  timing_synthesis_agent: "综合择时结论",
+  persist_cards: "写入择时卡片",
+  load_watchlist_context: "载入自选股上下文",
+  market_regime_agent: "市场环境判断",
+  watchlist_risk_manager: "组合风险约束",
+  watchlist_portfolio_manager: "组合动作建议",
+  persist_recommendations: "写入组合建议",
+  load_due_reviews: "载入待复盘任务",
+  evaluate_outcomes: "评估实际结果",
+  review_agent: "生成复盘结论",
+  persist_reviews: "写入复盘记录",
+  schedule_next_review: "安排下一次复盘",
+};
+
 function formatNumber(value: number, digits = 2) {
   return value.toFixed(digits).replace(/\.00$/, "");
 }
@@ -180,6 +199,10 @@ export function formatTimingVolatilityTrendLabel(
   return (
     timingVolatilityTrendLabelMap[value as TimingMarketVolatilityTrend] ?? value
   );
+}
+
+export function formatTimingNodeLabel(value: string) {
+  return timingNodeLabelMap[value] ?? value;
 }
 
 export function formatTimingMetricValue(

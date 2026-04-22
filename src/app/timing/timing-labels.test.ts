@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatTimingDirectionLabel,
+  formatTimingNodeLabel,
   formatTimingMarketStateLabel,
   formatTimingMetricLabel,
   formatTimingSignalKeyLabel,
@@ -21,5 +22,14 @@ describe("timing-labels", () => {
 
   it("falls back to the original value for unknown labels", () => {
     expect(formatTimingMetricLabel("unknownMetric")).toBe("unknownMetric");
+  });
+
+  it("formats workflow node labels in Chinese for timing flows", () => {
+    expect(formatTimingNodeLabel("load_targets")).toBe("载入分析标的");
+    expect(formatTimingNodeLabel("technical_signal_agent")).toBe("技术信号研判");
+    expect(formatTimingNodeLabel("timing_synthesis_agent")).toBe("综合择时结论");
+    expect(formatTimingNodeLabel("market_regime_agent")).toBe("市场环境判断");
+    expect(formatTimingNodeLabel("persist_reviews")).toBe("写入复盘记录");
+    expect(formatTimingNodeLabel("unknown_node")).toBe("unknown_node");
   });
 });

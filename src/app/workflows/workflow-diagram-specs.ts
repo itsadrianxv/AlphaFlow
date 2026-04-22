@@ -26,25 +26,25 @@ const defaultNodeSize = {
 const lanes = {
   scope: {
     id: "scope",
-    label: "Scope",
+    label: "范围定义",
     y: 24,
     height: 88,
   },
   collect: {
     id: "collect",
-    label: "Collect",
+    label: "信息采集",
     y: 136,
     height: 112,
   },
   review: {
     id: "review",
-    label: "Review",
+    label: "校验复核",
     y: 272,
     height: 88,
   },
   report: {
     id: "report",
-    label: "Report",
+    label: "结论输出",
     y: 384,
     height: 88,
   },
@@ -81,7 +81,7 @@ function buildSpec(params: {
 const quickResearchV3 = buildSpec({
   templateCode: "quick_industry_research",
   templateVersion: 3,
-  title: "Quick Industry Research",
+  title: "行业研究流程图",
   layout: {
     width: 1260,
     height: 500,
@@ -90,8 +90,8 @@ const quickResearchV3 = buildSpec({
   nodes: [
     {
       id: "agent0_clarify_scope",
-      label: "Clarify Scope",
-      description: "Clarify intent and constraints.",
+      label: "澄清研究范围",
+      description: "明确主题、边界与约束条件。",
       kind: "agent",
       laneId: "scope",
       x: 48,
@@ -99,8 +99,8 @@ const quickResearchV3 = buildSpec({
     },
     {
       id: "agent1_extract_research_spec",
-      label: "Research Spec",
-      description: "Generate brief and unit plan.",
+      label: "提炼研究任务",
+      description: "生成研究简报和执行单元。",
       kind: "agent",
       laneId: "scope",
       x: 256,
@@ -108,8 +108,8 @@ const quickResearchV3 = buildSpec({
     },
     {
       id: "agent2_trend_analysis",
-      label: "Trend Analysis",
-      description: "Assess theme and momentum.",
+      label: "分析主题趋势",
+      description: "判断主题热度与资金动能。",
       kind: "agent",
       laneId: "collect",
       x: 48,
@@ -117,8 +117,8 @@ const quickResearchV3 = buildSpec({
     },
     {
       id: "agent3_candidate_screening",
-      label: "Candidate Screen",
-      description: "Screen candidate names.",
+      label: "筛选候选标的",
+      description: "筛出值得继续跟踪的标的。",
       kind: "agent",
       laneId: "collect",
       x: 256,
@@ -126,8 +126,8 @@ const quickResearchV3 = buildSpec({
     },
     {
       id: "agent4_credibility_and_competition",
-      label: "Credibility",
-      description: "Check evidence and competition.",
+      label: "核验可信度与竞争格局",
+      description: "校验证据质量并比较竞争位置。",
       kind: "agent",
       laneId: "collect",
       x: 464,
@@ -135,8 +135,8 @@ const quickResearchV3 = buildSpec({
     },
     {
       id: "agent5_report_synthesis",
-      label: "Report Synthesis",
-      description: "Write the research report.",
+      label: "汇总研究报告",
+      description: "生成行业研究结论。",
       kind: "agent",
       laneId: "report",
       x: 672,
@@ -144,8 +144,8 @@ const quickResearchV3 = buildSpec({
     },
     {
       id: "agent6_reflection",
-      label: "Reflection",
-      description: "Score quality and gaps.",
+      label: "反思校验",
+      description: "评估质量、缺口与重规划需求。",
       kind: "gate",
       laneId: "review",
       x: 880,
@@ -176,7 +176,7 @@ const quickResearchV3 = buildSpec({
 const companyResearchV1 = buildSpec({
   templateCode: "company_research_center",
   templateVersion: 1,
-  title: "Company Research v1",
+  title: "公司研究流程图 v1",
   layout: {
     width: 1120,
     height: 500,
@@ -185,8 +185,8 @@ const companyResearchV1 = buildSpec({
   nodes: [
     {
       id: "agent1_company_briefing",
-      label: "Company Brief",
-      description: "Create company research brief.",
+      label: "梳理公司简报",
+      description: "生成公司研究简报。",
       kind: "agent",
       laneId: "scope",
       x: 48,
@@ -194,8 +194,8 @@ const companyResearchV1 = buildSpec({
     },
     {
       id: "agent2_concept_mapping",
-      label: "Concept Map",
-      description: "Map the concept fit.",
+      label: "映射业务概念",
+      description: "梳理业务与概念的匹配关系。",
       kind: "agent",
       laneId: "collect",
       x: 256,
@@ -203,8 +203,8 @@ const companyResearchV1 = buildSpec({
     },
     {
       id: "agent3_question_design",
-      label: "Question Design",
-      description: "Design deep research questions.",
+      label: "设计关键问题",
+      description: "设计需要深挖的核心问题。",
       kind: "agent",
       laneId: "scope",
       x: 464,
@@ -212,8 +212,8 @@ const companyResearchV1 = buildSpec({
     },
     {
       id: "agent4_evidence_collection",
-      label: "Evidence",
-      description: "Collect evidence packs.",
+      label: "采集研究证据",
+      description: "收集可验证的证据包。",
       kind: "tool",
       laneId: "collect",
       x: 672,
@@ -221,8 +221,8 @@ const companyResearchV1 = buildSpec({
     },
     {
       id: "agent5_investment_synthesis",
-      label: "Investment Synthesis",
-      description: "Produce the final verdict.",
+      label: "生成投资结论",
+      description: "输出最终投资判断。",
       kind: "agent",
       laneId: "report",
       x: 880,
@@ -240,7 +240,7 @@ const companyResearchV1 = buildSpec({
 const companyResearchV2 = buildSpec({
   templateCode: "company_research_center",
   templateVersion: 2,
-  title: "Company Research v2",
+  title: "公司研究流程图 v2",
   layout: {
     width: 1460,
     height: 500,
@@ -249,8 +249,8 @@ const companyResearchV2 = buildSpec({
   nodes: [
     {
       id: "agent1_company_briefing",
-      label: "Company Brief",
-      description: "Create company brief.",
+      label: "梳理公司简报",
+      description: "生成公司研究简报。",
       kind: "agent",
       laneId: "scope",
       x: 40,
@@ -258,8 +258,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "agent2_concept_mapping",
-      label: "Concept Map",
-      description: "Map key concepts.",
+      label: "映射业务概念",
+      description: "梳理核心业务概念。",
       kind: "agent",
       laneId: "collect",
       x: 248,
@@ -267,8 +267,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "agent3_question_design",
-      label: "Question Design",
-      description: "Define research questions.",
+      label: "设计关键问题",
+      description: "定义本轮研究问题。",
       kind: "agent",
       laneId: "scope",
       x: 456,
@@ -276,8 +276,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "agent4_source_grounding",
-      label: "Source Grounding",
-      description: "Plan grounded sources.",
+      label: "锚定信源范围",
+      description: "规划本轮优先信源。",
       kind: "agent",
       laneId: "collect",
       x: 664,
@@ -285,8 +285,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "collector_official_sources",
-      label: "Official Sources",
-      description: "Collect official sources.",
+      label: "采集官网信源",
+      description: "抓取官网和公告等一手资料。",
       kind: "tool",
       laneId: "collect",
       x: 872,
@@ -296,8 +296,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "collector_financial_sources",
-      label: "Financial Sources",
-      description: "Collect financial sources.",
+      label: "采集财务信源",
+      description: "抓取财报和财务数据。",
       kind: "tool",
       laneId: "collect",
       x: 872,
@@ -307,8 +307,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "collector_news_sources",
-      label: "News Sources",
-      description: "Collect news sources.",
+      label: "采集新闻信源",
+      description: "抓取近期新闻与催化事件。",
       kind: "tool",
       laneId: "collect",
       x: 1048,
@@ -318,8 +318,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "collector_industry_sources",
-      label: "Industry Sources",
-      description: "Collect industry sources.",
+      label: "采集行业信源",
+      description: "抓取行业格局与产业链资料。",
       kind: "tool",
       laneId: "collect",
       x: 1048,
@@ -329,8 +329,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "agent9_evidence_curation",
-      label: "Evidence Curation",
-      description: "Curate collected evidence.",
+      label: "整理研究证据",
+      description: "筛选并整理已采集证据。",
       kind: "agent",
       laneId: "collect",
       x: 1224,
@@ -338,8 +338,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "agent10_reference_enrichment",
-      label: "Reference Enrichment",
-      description: "Add supporting references.",
+      label: "补充引用证据",
+      description: "补充结论所需引用。",
       kind: "tool",
       laneId: "report",
       x: 1224,
@@ -347,8 +347,8 @@ const companyResearchV2 = buildSpec({
     },
     {
       id: "agent11_investment_synthesis",
-      label: "Investment Synthesis",
-      description: "Produce the verdict.",
+      label: "生成投资结论",
+      description: "输出最终投资判断。",
       kind: "agent",
       laneId: "report",
       x: 1008,
@@ -378,7 +378,7 @@ const companyResearchV2 = buildSpec({
 const companyResearchV3 = buildSpec({
   templateCode: "company_research_center",
   templateVersion: 3,
-  title: "Company Research v3",
+  title: "公司研究流程图 v3",
   layout: {
     width: 1320,
     height: 500,
@@ -387,8 +387,8 @@ const companyResearchV3 = buildSpec({
   nodes: [
     {
       id: "agent0_clarify_scope",
-      label: "Clarify Scope",
-      description: "Clarify the brief.",
+      label: "澄清研究范围",
+      description: "澄清本轮研究的范围与重点。",
       kind: "agent",
       laneId: "scope",
       x: 40,
@@ -396,8 +396,8 @@ const companyResearchV3 = buildSpec({
     },
     {
       id: "agent1_write_research_brief",
-      label: "Research Brief",
-      description: "Write the brief.",
+      label: "撰写研究简报",
+      description: "整理本轮研究简报。",
       kind: "agent",
       laneId: "scope",
       x: 248,
@@ -405,8 +405,8 @@ const companyResearchV3 = buildSpec({
     },
     {
       id: "agent2_plan_research_units",
-      label: "Plan Units",
-      description: "Plan research units.",
+      label: "规划研究单元",
+      description: "拆分研究任务与依赖关系。",
       kind: "agent",
       laneId: "scope",
       x: 456,
@@ -414,8 +414,8 @@ const companyResearchV3 = buildSpec({
     },
     {
       id: "agent3_execute_research_units",
-      label: "Execute Units",
-      description: "Execute planned units.",
+      label: "执行研究单元",
+      description: "执行各个研究单元。",
       kind: "agent",
       laneId: "collect",
       x: 664,
@@ -423,8 +423,8 @@ const companyResearchV3 = buildSpec({
     },
     {
       id: "agent4_evidence_curation",
-      label: "Evidence Curation",
-      description: "Curate evidence.",
+      label: "整理研究证据",
+      description: "整理已拿到的证据。",
       kind: "agent",
       laneId: "collect",
       x: 872,
@@ -432,8 +432,8 @@ const companyResearchV3 = buildSpec({
     },
     {
       id: "agent5_gap_analysis",
-      label: "Gap Analysis",
-      description: "Review evidence gaps.",
+      label: "分析研究缺口",
+      description: "识别证据缺口与待补项。",
       kind: "gate",
       laneId: "review",
       x: 1080,
@@ -441,8 +441,8 @@ const companyResearchV3 = buildSpec({
     },
     {
       id: "agent6_compress_findings",
-      label: "Compress Findings",
-      description: "Compress research output.",
+      label: "压缩研究发现",
+      description: "提炼重点发现。",
       kind: "agent",
       laneId: "report",
       x: 872,
@@ -450,8 +450,8 @@ const companyResearchV3 = buildSpec({
     },
     {
       id: "agent7_reference_enrichment",
-      label: "Reference Enrichment",
-      description: "Add references.",
+      label: "补充引用证据",
+      description: "补充结论引用。",
       kind: "tool",
       laneId: "report",
       x: 1080,
@@ -459,8 +459,8 @@ const companyResearchV3 = buildSpec({
     },
     {
       id: "agent8_investment_synthesis",
-      label: "Investment Synthesis",
-      description: "Write the verdict.",
+      label: "生成投资结论",
+      description: "写出最终投资判断。",
       kind: "agent",
       laneId: "report",
       x: 248,
@@ -487,7 +487,7 @@ const companyResearchV3 = buildSpec({
 const companyResearchV4 = buildSpec({
   templateCode: "company_research_center",
   templateVersion: 4,
-  title: "Company Research v4",
+  title: "公司研究流程图 v4",
   layout: {
     width: 1520,
     height: 500,
@@ -496,8 +496,8 @@ const companyResearchV4 = buildSpec({
   nodes: [
     {
       id: "agent0_clarify_scope",
-      label: "Clarify Scope",
-      description: "Clarify scope and constraints.",
+      label: "澄清研究范围",
+      description: "明确研究边界与限制条件。",
       kind: "agent",
       laneId: "scope",
       x: 32,
@@ -505,8 +505,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "agent1_write_research_brief",
-      label: "Research Brief",
-      description: "Write the research brief.",
+      label: "撰写研究简报",
+      description: "整理研究目标与问题。",
       kind: "agent",
       laneId: "scope",
       x: 232,
@@ -514,8 +514,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "agent2_plan_research_units",
-      label: "Plan Units",
-      description: "Plan research units.",
+      label: "规划研究单元",
+      description: "拆解研究任务与依赖关系。",
       kind: "agent",
       laneId: "scope",
       x: 432,
@@ -523,8 +523,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "agent3_source_grounding",
-      label: "Source Grounding",
-      description: "Ground source channels.",
+      label: "锚定信源范围",
+      description: "确定优先信源渠道。",
       kind: "agent",
       laneId: "collect",
       x: 632,
@@ -532,8 +532,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "collector_official_sources",
-      label: "Official Sources",
-      description: "Collect official sources.",
+      label: "采集官网信源",
+      description: "抓取官网和公告等一手资料。",
       kind: "tool",
       laneId: "collect",
       x: 832,
@@ -543,8 +543,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "collector_financial_sources",
-      label: "Financial Sources",
-      description: "Collect financial sources.",
+      label: "采集财务信源",
+      description: "抓取财报和财务数据。",
       kind: "tool",
       laneId: "collect",
       x: 832,
@@ -554,8 +554,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "collector_news_sources",
-      label: "News Sources",
-      description: "Collect news sources.",
+      label: "采集新闻信源",
+      description: "抓取近期新闻与催化事件。",
       kind: "tool",
       laneId: "collect",
       x: 1008,
@@ -565,8 +565,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "collector_industry_sources",
-      label: "Industry Sources",
-      description: "Collect industry sources.",
+      label: "采集行业信源",
+      description: "抓取行业格局与产业链资料。",
       kind: "tool",
       laneId: "collect",
       x: 1008,
@@ -576,8 +576,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "agent4_synthesis",
-      label: "Synthesis",
-      description: "Merge grounded packs.",
+      label: "整合研究结论",
+      description: "汇总各路信源与中间结论。",
       kind: "agent",
       laneId: "collect",
       x: 1184,
@@ -585,8 +585,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "agent5_gap_analysis_and_replan",
-      label: "Gap & Replan",
-      description: "Check gaps and replan.",
+      label: "分析缺口并重规划",
+      description: "识别缺口并决定是否补充研究。",
       kind: "gate",
       laneId: "review",
       x: 1184,
@@ -594,8 +594,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "agent6_compress_findings",
-      label: "Compress Findings",
-      description: "Compress findings.",
+      label: "压缩研究发现",
+      description: "提炼关键发现。",
       kind: "agent",
       laneId: "report",
       x: 584,
@@ -603,8 +603,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "agent7_reference_enrichment",
-      label: "Reference Enrichment",
-      description: "Add references.",
+      label: "补充引用证据",
+      description: "补足结论引用与出处。",
       kind: "tool",
       laneId: "report",
       x: 784,
@@ -612,8 +612,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "agent8_finalize_report",
-      label: "Finalize Report",
-      description: "Finalize report.",
+      label: "整理最终报告",
+      description: "生成最终研究报告。",
       kind: "agent",
       laneId: "report",
       x: 984,
@@ -621,8 +621,8 @@ const companyResearchV4 = buildSpec({
     },
     {
       id: "agent9_reflection",
-      label: "Reflection",
-      description: "Reflect on output quality.",
+      label: "反思校验",
+      description: "校验输出质量与完整性。",
       kind: "gate",
       laneId: "review",
       x: 1184,
@@ -660,7 +660,7 @@ const companyResearchV4 = buildSpec({
 const timingSignalV1 = buildSpec({
   templateCode: "timing_signal_pipeline_v1",
   templateVersion: 1,
-  title: "Timing Signal",
+  title: "单股择时流程图",
   layout: {
     width: 1080,
     height: 500,
@@ -669,8 +669,8 @@ const timingSignalV1 = buildSpec({
   nodes: [
     {
       id: "load_targets",
-      label: "Load Targets",
-      description: "Load the target stock.",
+      label: "载入分析标的",
+      description: "载入本次要分析的股票。",
       kind: "system",
       laneId: "scope",
       x: 48,
@@ -678,8 +678,8 @@ const timingSignalV1 = buildSpec({
     },
     {
       id: "fetch_signal_snapshots",
-      label: "Signal Snapshots",
-      description: "Fetch signal snapshots.",
+      label: "抓取信号快照",
+      description: "抓取最新技术信号快照。",
       kind: "tool",
       laneId: "collect",
       x: 256,
@@ -687,8 +687,8 @@ const timingSignalV1 = buildSpec({
     },
     {
       id: "technical_signal_agent",
-      label: "Technical Signal",
-      description: "Score technical signals.",
+      label: "技术信号研判",
+      description: "评估技术指标与趋势信号。",
       kind: "agent",
       laneId: "collect",
       x: 464,
@@ -696,8 +696,8 @@ const timingSignalV1 = buildSpec({
     },
     {
       id: "timing_synthesis_agent",
-      label: "Timing Synthesis",
-      description: "Build the timing card.",
+      label: "综合择时结论",
+      description: "生成单股择时卡片。",
       kind: "agent",
       laneId: "report",
       x: 672,
@@ -705,8 +705,8 @@ const timingSignalV1 = buildSpec({
     },
     {
       id: "persist_cards",
-      label: "Persist Cards",
-      description: "Persist the timing report.",
+      label: "写入择时卡片",
+      description: "保存本次择时结果。",
       kind: "system",
       laneId: "report",
       x: 880,
@@ -724,7 +724,7 @@ const timingSignalV1 = buildSpec({
 const watchlistTimingCardsV1 = buildSpec({
   templateCode: "watchlist_timing_cards_pipeline_v1",
   templateVersion: 1,
-  title: "Watchlist Timing Cards",
+  title: "候选信号流程图",
   layout: {
     width: 1080,
     height: 500,
@@ -733,8 +733,8 @@ const watchlistTimingCardsV1 = buildSpec({
   nodes: [
     {
       id: "load_watchlist_context",
-      label: "Load Watchlist",
-      description: "Load watchlist context.",
+      label: "载入自选股上下文",
+      description: "载入本次候选池。",
       kind: "system",
       laneId: "scope",
       x: 48,
@@ -742,8 +742,8 @@ const watchlistTimingCardsV1 = buildSpec({
     },
     {
       id: "fetch_signal_snapshots_batch",
-      label: "Batch Snapshots",
-      description: "Fetch snapshots in batch.",
+      label: "批量抓取信号快照",
+      description: "批量抓取候选标的信号。",
       kind: "tool",
       laneId: "collect",
       x: 256,
@@ -751,8 +751,8 @@ const watchlistTimingCardsV1 = buildSpec({
     },
     {
       id: "technical_signal_agent",
-      label: "Technical Signal",
-      description: "Score technical signals.",
+      label: "技术信号研判",
+      description: "评估候选标的技术信号。",
       kind: "agent",
       laneId: "collect",
       x: 464,
@@ -760,8 +760,8 @@ const watchlistTimingCardsV1 = buildSpec({
     },
     {
       id: "timing_synthesis_agent",
-      label: "Timing Synthesis",
-      description: "Build timing cards.",
+      label: "综合择时结论",
+      description: "生成批量择时卡片。",
       kind: "agent",
       laneId: "report",
       x: 672,
@@ -769,8 +769,8 @@ const watchlistTimingCardsV1 = buildSpec({
     },
     {
       id: "persist_cards",
-      label: "Persist Cards",
-      description: "Persist timing cards.",
+      label: "写入择时卡片",
+      description: "保存批量择时结果。",
       kind: "system",
       laneId: "report",
       x: 880,
@@ -788,7 +788,7 @@ const watchlistTimingCardsV1 = buildSpec({
 const watchlistTimingV1 = buildSpec({
   templateCode: "watchlist_timing_pipeline_v1",
   templateVersion: 1,
-  title: "Watchlist Timing",
+  title: "组合择时流程图",
   layout: {
     width: 1520,
     height: 500,
@@ -797,8 +797,8 @@ const watchlistTimingV1 = buildSpec({
   nodes: [
     {
       id: "load_watchlist_context",
-      label: "Load Watchlist",
-      description: "Load watchlist and portfolio context.",
+      label: "载入自选股上下文",
+      description: "载入候选池与组合持仓。",
       kind: "system",
       laneId: "scope",
       x: 32,
@@ -806,8 +806,8 @@ const watchlistTimingV1 = buildSpec({
     },
     {
       id: "fetch_signal_snapshots_batch",
-      label: "Batch Snapshots",
-      description: "Fetch snapshots.",
+      label: "批量抓取信号快照",
+      description: "抓取候选标的信号。",
       kind: "tool",
       laneId: "collect",
       x: 232,
@@ -815,8 +815,8 @@ const watchlistTimingV1 = buildSpec({
     },
     {
       id: "technical_signal_agent",
-      label: "Technical Signal",
-      description: "Score technical signals.",
+      label: "技术信号研判",
+      description: "评估候选标的技术信号。",
       kind: "agent",
       laneId: "collect",
       x: 432,
@@ -824,8 +824,8 @@ const watchlistTimingV1 = buildSpec({
     },
     {
       id: "timing_synthesis_agent",
-      label: "Timing Synthesis",
-      description: "Build timing card proposals.",
+      label: "综合择时结论",
+      description: "生成择时卡片初稿。",
       kind: "agent",
       laneId: "collect",
       x: 632,
@@ -833,8 +833,8 @@ const watchlistTimingV1 = buildSpec({
     },
     {
       id: "market_regime_agent",
-      label: "Market Regime",
-      description: "Assess market regime.",
+      label: "市场环境判断",
+      description: "判断市场所处环境。",
       kind: "agent",
       laneId: "review",
       x: 832,
@@ -842,8 +842,8 @@ const watchlistTimingV1 = buildSpec({
     },
     {
       id: "watchlist_risk_manager",
-      label: "Risk Manager",
-      description: "Assess watchlist risk.",
+      label: "组合风险约束",
+      description: "评估组合风险边界。",
       kind: "agent",
       laneId: "review",
       x: 1032,
@@ -851,8 +851,8 @@ const watchlistTimingV1 = buildSpec({
     },
     {
       id: "watchlist_portfolio_manager",
-      label: "Portfolio Manager",
-      description: "Build portfolio plan.",
+      label: "组合动作建议",
+      description: "生成组合层面的动作建议。",
       kind: "agent",
       laneId: "report",
       x: 1232,
@@ -860,8 +860,8 @@ const watchlistTimingV1 = buildSpec({
     },
     {
       id: "persist_recommendations",
-      label: "Persist Recommendations",
-      description: "Persist portfolio recommendations.",
+      label: "写入组合建议",
+      description: "保存组合建议结果。",
       kind: "system",
       laneId: "report",
       x: 1032,
@@ -885,7 +885,7 @@ const watchlistTimingV1 = buildSpec({
 const timingReviewLoopV1 = buildSpec({
   templateCode: "timing_review_loop_v1",
   templateVersion: 1,
-  title: "Timing Review Loop",
+  title: "择时复盘流程图",
   layout: {
     width: 1080,
     height: 500,
@@ -894,8 +894,8 @@ const timingReviewLoopV1 = buildSpec({
   nodes: [
     {
       id: "load_due_reviews",
-      label: "Load Due Reviews",
-      description: "Load pending reviews.",
+      label: "载入待复盘任务",
+      description: "载入待处理的复盘任务。",
       kind: "system",
       laneId: "scope",
       x: 48,
@@ -903,8 +903,8 @@ const timingReviewLoopV1 = buildSpec({
     },
     {
       id: "evaluate_outcomes",
-      label: "Evaluate Outcomes",
-      description: "Evaluate outcomes.",
+      label: "评估实际结果",
+      description: "评估信号后的真实表现。",
       kind: "agent",
       laneId: "collect",
       x: 256,
@@ -912,8 +912,8 @@ const timingReviewLoopV1 = buildSpec({
     },
     {
       id: "review_agent",
-      label: "Review Agent",
-      description: "Review performance.",
+      label: "生成复盘结论",
+      description: "形成复盘分析结论。",
       kind: "agent",
       laneId: "review",
       x: 464,
@@ -921,8 +921,8 @@ const timingReviewLoopV1 = buildSpec({
     },
     {
       id: "persist_reviews",
-      label: "Persist Reviews",
-      description: "Persist review results.",
+      label: "写入复盘记录",
+      description: "保存复盘分析结果。",
       kind: "system",
       laneId: "report",
       x: 672,
@@ -930,8 +930,8 @@ const timingReviewLoopV1 = buildSpec({
     },
     {
       id: "schedule_next_review",
-      label: "Schedule Next Review",
-      description: "Trigger next reminders.",
+      label: "安排下一次复盘",
+      description: "触发后续复盘提醒。",
       kind: "system",
       laneId: "report",
       x: 880,

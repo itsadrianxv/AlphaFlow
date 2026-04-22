@@ -179,56 +179,56 @@ function acceptanceCriteriaFor(capability: ResearchUnitCapability) {
   switch (capability) {
     case "theme_overview":
       return [
-        "Summarize the investable theme in one concise paragraph.",
-        "Include at least one concrete catalyst or market context signal.",
+        "用一段精炼文字说明当前主题的投资主线。",
+        "至少指出一个明确催化剂或市场环境信号。",
       ];
     case "market_heat":
       return [
-        "Return a bounded heat score and a short conclusion.",
-        "Tie the score to observable news or market behavior.",
+        "输出有边界的热度分数和简短结论。",
+        "把分数和可观察到的新闻或市场表现对应起来。",
       ];
     case "candidate_screening":
       return [
-        "Return at least one candidate when the topic is investable.",
-        "Each candidate must include a concrete reason.",
+        "若主题具备投资价值，至少给出一个候选标的。",
+        "每个候选标的都要附上明确理由。",
       ];
     case "credibility_lookup":
       return [
-        "Validate the top candidates against external evidence.",
-        "Surface at least one supporting point or one risk per candidate.",
+        "用外部证据核验重点候选标的。",
+        "每个候选标的至少给出一个支持点或一个风险点。",
       ];
     case "competition_synthesis":
       return [
-        "Rank candidate quality or industry positioning.",
-        "Explain the comparison in investor-friendly language.",
+        "比较候选质量或行业位置，并给出排序。",
+        "用投资者易理解的语言解释比较结论。",
       ];
     case "official_search":
       return [
-        "Prefer first-party or near first-party disclosures.",
-        "Return URLs that can support downstream citations.",
+        "优先采用公司公告、官网或招股书等一手披露。",
+        "返回可用于后续引用的链接。",
       ];
     case "news_search":
       return [
-        "Return recent event evidence tied to catalysts or risks.",
-        "Avoid purely repetitive or low-signal coverage.",
+        "返回与催化剂或风险点相关的近期事件证据。",
+        "避免重复性强、信息量低的内容。",
       ];
     case "industry_search":
       return [
-        "Map competition or supply-chain position.",
-        "Return evidence that helps answer strategic questions.",
+        "梳理竞争格局或产业链位置。",
+        "返回能回答关键战略问题的证据。",
       ];
     case "page_scrape":
       return [
-        "Extract verifiable first-party facts from the page.",
-        "Preserve the source URL for citation coverage.",
+        "从页面中提取可核验的一手事实。",
+        "保留来源链接，便于后续引用。",
       ];
     case "financial_pack":
       return [
-        "Return structured financial evidence when stock code exists.",
-        "Explain data gaps explicitly when no pack is returned.",
+        "在有股票代码时返回结构化财务证据。",
+        "若未取到数据包，需要明确说明数据缺口。",
       ];
     default:
-      return ["Return a concise, valid artifact for downstream synthesis."];
+      return ["输出可供后续综合的精炼研究产出。"];
   }
 }
 
@@ -239,9 +239,8 @@ function withUnitMetadata(
   return {
     ...unit,
     id: normalizeId(unit.id, `unit_${index + 1}`),
-    title: unit.title.trim() || `Research unit ${index + 1}`,
-    objective:
-      unit.objective.trim() || unit.title.trim() || `Unit ${index + 1}`,
+    title: unit.title.trim() || `研究单元 ${index + 1}`,
+    objective: unit.objective.trim() || unit.title.trim() || `研究单元 ${index + 1}`,
     keyQuestions: uniqueStrings(unit.keyQuestions ?? [], 4),
     dependsOn: uniqueStrings(unit.dependsOn ?? [], 4),
     priority: unit.priority ?? "medium",
@@ -429,8 +428,8 @@ function buildUnitPlanFallback(params: {
     const units: ResearchUnitPlan[] = [
       {
         id: "theme_overview",
-        title: "Theme overview",
-        objective: `Summarize the current market context for ${params.brief.query}.`,
+        title: "主题总览",
+        objective: `概括 ${params.brief.query} 当前所处的市场主线与投资背景。`,
         keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
         priority: "high",
         capability: "theme_overview",
@@ -442,8 +441,8 @@ function buildUnitPlanFallback(params: {
       },
       {
         id: "market_heat",
-        title: "Market heat",
-        objective: `Measure the latest heat and momentum around ${params.brief.query}.`,
+        title: "市场热度",
+        objective: `衡量 ${params.brief.query} 最近的热度变化与资金动能。`,
         keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
         priority: "high",
         capability: "market_heat",
@@ -455,8 +454,8 @@ function buildUnitPlanFallback(params: {
       },
       {
         id: "candidate_screening",
-        title: "Candidate screening",
-        objective: "Screen a small list of candidates connected to the topic.",
+        title: "候选筛选",
+        objective: "筛出与该主题最相关、最值得继续跟踪的一小批候选标的。",
         keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
         priority: "high",
         capability: "candidate_screening",
@@ -468,8 +467,8 @@ function buildUnitPlanFallback(params: {
       },
       {
         id: "credibility_lookup",
-        title: "Credibility lookup",
-        objective: "Validate catalysts and risks for the screened candidates.",
+        title: "可信度核验",
+        objective: "核验候选标的的催化剂、风险点与论据可靠性。",
         keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
         priority: "medium",
         capability: "credibility_lookup",
@@ -481,8 +480,8 @@ function buildUnitPlanFallback(params: {
       },
       {
         id: "competition_synthesis",
-        title: "Competition synthesis",
-        objective: "Summarize competition intensity and ranking of candidates.",
+        title: "竞争格局综合",
+        objective: "比较候选标的的竞争位置，并整理优先级排序。",
         keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
         priority: "medium",
         capability: "competition_synthesis",
@@ -504,8 +503,8 @@ function buildUnitPlanFallback(params: {
   const defaultUnits: ResearchUnitPlan[] = [
     {
       id: "business_model",
-      title: "Business model",
-      objective: `Clarify ${companyName}'s business model and commercial drivers.`,
+      title: "商业模式",
+      objective: `梳理 ${companyName} 的商业模式、收入来源与核心驱动。`,
       keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
       priority: "high",
       capability: "official_search",
@@ -517,8 +516,8 @@ function buildUnitPlanFallback(params: {
     },
     {
       id: "financial_quality",
-      title: "Financial quality",
-      objective: `Check whether ${companyName}'s growth is translating into revenue or profit.`,
+      title: "财务质量",
+      objective: `判断 ${companyName} 的增长是否已经兑现到收入、利润和现金流。`,
       keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
       priority: "high",
       capability: "financial_pack",
@@ -530,8 +529,8 @@ function buildUnitPlanFallback(params: {
     },
     {
       id: "recent_events",
-      title: "Recent events",
-      objective: `Review recent announcements and catalysts related to ${companyName}.`,
+      title: "近期催化",
+      objective: `盘点 ${companyName} 近期公告、催化剂和风险事件。`,
       keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
       priority: "medium",
       capability: "news_search",
@@ -543,8 +542,8 @@ function buildUnitPlanFallback(params: {
     },
     {
       id: "industry_landscape",
-      title: "Industry landscape",
-      objective: `Map the competitive landscape around ${companyName}.`,
+      title: "行业格局",
+      objective: `梳理 ${companyName} 所在赛道的竞争格局与产业链位置。`,
       keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
       priority: "medium",
       capability: "industry_search",
@@ -556,8 +555,8 @@ function buildUnitPlanFallback(params: {
     },
     {
       id: "first_party_pages",
-      title: "First-party pages",
-      objective: `Pull first-party pages for ${companyName} to confirm investor-facing claims.`,
+      title: "一手页面核验",
+      objective: `抓取 ${companyName} 的官网或投资者关系页面，核验面对投资者的关键信息。`,
       keyQuestions: params.brief.mustAnswerQuestions.slice(0, 2),
       priority: "medium",
       capability: "page_scrape",
@@ -595,7 +594,7 @@ function buildGapFallback(params: {
         withUnitMetadata(
           {
             id: `followup_${params.gapIteration + 1}_${index + 1}`,
-            title: `Follow-up ${index + 1}`,
+            title: `补充求证 ${index + 1}`,
             objective: compactText(question, 120),
             keyQuestions: [question],
             priority: "medium",
@@ -614,8 +613,8 @@ function buildGapFallback(params: {
   return {
     requiresFollowup,
     summary: requiresFollowup
-      ? "Some important questions remain under-supported and need a bounded follow-up search."
-      : "Current evidence is sufficient for synthesis at this iteration.",
+      ? "仍有关键问题证据不足，需要追加一轮有边界的补充检索。"
+      : "当前这一轮证据已足够进入综合判断。",
     missingAreas: openQuestions.slice(0, 4),
     followupUnits,
     iteration: params.gapIteration,

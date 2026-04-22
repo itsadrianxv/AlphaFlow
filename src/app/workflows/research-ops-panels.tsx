@@ -8,11 +8,14 @@ import { Panel, StatusPill } from "~/app/_components/ui";
 import {
   formatReflectionStatusLabel,
   formatReplanActionLabel,
+  formatResearchAcceptanceCriteria,
   formatResearchArtifactLabel,
   formatResearchCapabilityLabel,
   formatResearchPriorityLabel,
   formatResearchRoleLabel,
+  formatResearchResultSummary,
   formatResearchStatusLabel,
+  formatResearchUnitTitle,
   formatRuntimeIssueLabel,
   formatWorkflowNodeLabel,
 } from "~/app/workflows/detail-labels";
@@ -256,9 +259,23 @@ function formatPercent(value?: number) {
   return `${Math.round(value * 100)}%`;
 }
 
+function formatPlanDependency(
+  dependencyId: string,
+  planById: Map<string, PlanUnit>,
+) {
+  const dependency = planById.get(dependencyId);
+
+  if (dependency) {
+    return formatResearchUnitTitle(dependency.id, dependency.title);
+  }
+
+  return formatResearchUnitTitle(dependencyId, dependencyId);
+}
+
 export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
   const plan = parsePlan(props.result);
   const planLevels = buildPlanLevels(plan);
+  const planById = new Map(plan.map((unit) => [unit.id, unit] as const));
   const runs = parseUnitRuns(props.result);
   const reflection = parseReflection(props.result);
   const replans = parseReplans(props.result);
@@ -302,7 +319,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
                             <div className="text-sm font-medium text-[var(--app-text)]">
-                              {unit.title}
+                              {formatResearchUnitTitle(unit.id, unit.title)}
                             </div>
                             <div className="mt-1 text-xs text-[var(--app-text-soft)]">
                               {formatResearchCapabilityLabel(unit.capability)} ·{" "}
@@ -330,7 +347,9 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
                             依赖：
                             {unit.dependsOn.length > 0
                               ? unit.dependsOn
-                                  .map((item) => formatWorkflowNodeLabel(item))
+                                  .map((item) =>
+                                    formatPlanDependency(item, planById),
+                                  )
                                   .join("，")
                               : "无"}
                           </div>
@@ -360,7 +379,9 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
                             {unit.acceptanceCriteria
                               .slice(0, 3)
                               .map((criterion) => (
-                                <p key={criterion}>- {criterion}</p>
+                                <p key={criterion}>
+                                  - {formatResearchAcceptanceCriteria(criterion)}
+                                </p>
                               ))}
                           </div>
                         ) : null}
@@ -418,7 +439,7 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
                   ) : null}
                 </div>
                 <MarkdownContent
-                  content={record.resultSummary}
+                  content={formatResearchResultSummary(record.resultSummary)}
                   compact
                   className="mt-3"
                 />
