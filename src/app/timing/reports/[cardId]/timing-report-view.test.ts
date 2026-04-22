@@ -1,17 +1,20 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+
 import {
   TimingReportPanels,
   TimingReportView,
 } from "~/app/timing/reports/[cardId]/timing-report-view";
+import type { WorkflowDiagramRunDetail } from "~/app/workflows/workflow-diagram-runtime";
 import type { TimingReportPayload } from "~/server/domain/timing/types";
 
 const sampleReport = {
   card: {
     id: "card_1",
+    workflowRunId: "run_timing_1",
     stockCode: "600519",
-    stockName: "贵州茅台",
+    stockName: "璐靛窞鑼呭彴",
     confidence: 83,
     actionBias: "ADD",
     summary:
@@ -100,7 +103,7 @@ const sampleReport = {
   evidence: {
     multiTimeframeAlignment: {
       key: "multiTimeframeAlignment",
-      label: "多周期一致性",
+      label: "澶氬懆鏈熶竴鑷存€?",
       direction: "bullish",
       score: 76,
       confidence: 0.84,
@@ -115,7 +118,7 @@ const sampleReport = {
     },
     relativeStrength: {
       key: "relativeStrength",
-      label: "相对强弱",
+      label: "鐩稿寮哄急",
       direction: "bullish",
       score: 66,
       confidence: 0.78,
@@ -132,7 +135,7 @@ const sampleReport = {
     },
     volatilityPercentile: {
       key: "volatilityPercentile",
-      label: "娉㈠姩鐜",
+      label: "濞夈垹濮╅悳顖氼暔",
       direction: "neutral",
       score: 12,
       confidence: 0.52,
@@ -147,7 +150,7 @@ const sampleReport = {
     },
     liquidityStructure: {
       key: "liquidityStructure",
-      label: "流动性结构",
+      label: "娴佸姩鎬х粨鏋?",
       direction: "bullish",
       score: 58,
       confidence: 0.71,
@@ -163,7 +166,7 @@ const sampleReport = {
     },
     breakoutFailure: {
       key: "breakoutFailure",
-      label: "突破有效性",
+      label: "绐佺牬鏈夋晥鎬?",
       direction: "bullish",
       score: 55,
       confidence: 0.69,
@@ -177,7 +180,7 @@ const sampleReport = {
     },
     gapVolumeQuality: {
       key: "gapVolumeQuality",
-      label: "缺口与放量质量",
+      label: "缂哄彛涓庢斁閲忚川閲?",
       direction: "neutral",
       score: 16,
       confidence: 0.51,
@@ -251,56 +254,121 @@ const sampleReport = {
   reviewTimeline: [],
 } as unknown as TimingReportPayload;
 
+function createRun(
+  overrides: Partial<WorkflowDiagramRunDetail> = {},
+): WorkflowDiagramRunDetail {
+  return {
+    id: "run_timing_1",
+    query: "600519",
+    status: "SUCCEEDED",
+    progressPercent: 100,
+    currentNodeKey: "persist_cards",
+    input: {},
+    errorCode: null,
+    errorMessage: null,
+    result: {},
+    template: {
+      code: "timing_signal_pipeline_v1",
+      version: 1,
+    },
+    createdAt: new Date("2026-03-06T08:00:00.000Z"),
+    startedAt: new Date("2026-03-06T08:00:05.000Z"),
+    completedAt: new Date("2026-03-06T08:02:00.000Z"),
+    nodes: [
+      {
+        id: "node_1",
+        nodeKey: "load_targets",
+        agentName: "load_targets",
+        attempt: 1,
+        status: "SUCCEEDED",
+        errorCode: null,
+        errorMessage: null,
+        durationMs: 500,
+        startedAt: new Date("2026-03-06T08:00:05.000Z"),
+        completedAt: new Date("2026-03-06T08:00:05.500Z"),
+        output: {},
+      },
+    ],
+    events: [],
+    ...overrides,
+  };
+}
+
 describe("TimingReportView", () => {
-  it("renders four research sections in the full report shell", () => {
+  it("renders five steps and defaults to agent when run data is present", () => {
     const markup = renderToStaticMarkup(
       React.createElement(TimingReportView, {
         report: sampleReport,
+        run: createRun(),
       }),
     );
 
-    expect(markup).toContain("当前结论");
-    expect(markup).toContain("结构证据");
-    expect(markup).toContain("市场环境");
-    expect(markup).toContain("轻量复盘时间线");
+    expect(markup).toContain('data-stage-switcher="true"');
+    expect(markup).toContain('data-active-tab="agent"');
+    expect(markup).toContain("Agent 鐘舵€佸浘");
+    expect(markup).toContain("褰撳墠缁撹");
+    expect(markup).toContain("缁撴瀯璇佹嵁");
+    expect(markup).toContain("鎵ц椋庢帶");
+    expect(markup).toContain("澶嶇洏璺熻釜");
   });
 
-  it("keeps the price chart and market context in the stacked report layout", () => {
+  it("keeps the history preview on four steps and summary as the default", () => {
     const markup = renderToStaticMarkup(
       React.createElement(TimingReportPanels, {
         report: sampleReport,
+        activeTabId: "summary",
       }),
     );
 
-    expect(markup).toContain("价格结构");
-    expect(markup).toContain("市场环境");
-    expect(markup).toContain("风险标签");
+    expect(markup).toContain('data-stage-switcher="true"');
+    expect(markup).toContain('data-active-tab="summary"');
+    expect(markup).not.toContain("Agent 鐘舵€佸浘");
+    expect(markup).toContain("褰撳墠缁撹");
   });
 
-  it("reuses the chart in the evidence section and hides the old structure explanation card", () => {
+  it("keeps the price chart and market context in the report steps", () => {
+    const summaryMarkup = renderToStaticMarkup(
+      React.createElement(TimingReportPanels, {
+        report: sampleReport,
+        activeTabId: "summary",
+      }),
+    );
+    const executionMarkup = renderToStaticMarkup(
+      React.createElement(TimingReportPanels, {
+        report: sampleReport,
+        activeTabId: "execution",
+      }),
+    );
+
+    expect(summaryMarkup).toContain("浠锋牸缁撴瀯");
+    expect(executionMarkup).toContain("甯傚満鐜");
+    expect(executionMarkup).toContain("椋庨櫓鏍囩");
+  });
+
+  it("reuses the chart in the evidence step and hides the old structure explanation card", () => {
     const evidenceMarkup = renderToStaticMarkup(
       React.createElement(TimingReportPanels, {
         report: sampleReport,
+        activeTabId: "evidence",
       }),
     );
 
-    expect(evidenceMarkup).toContain("价格结构");
-    expect(evidenceMarkup).not.toContain("核心结构");
+    expect(evidenceMarkup).toContain("浠锋牸缁撴瀯");
+    expect(evidenceMarkup).not.toContain("鏍稿績缁撴瀯");
   });
 
   it("renders translated evidence and risk labels without leaking raw english keys", () => {
     const markup = renderToStaticMarkup(
       React.createElement(TimingReportPanels, {
         report: sampleReport,
+        activeTabId: "evidence",
       }),
     );
 
     expect(markup).toContain("ATR");
-    expect(markup).toContain("RSI");
     expect(markup).toContain("高波动");
     expect(markup).not.toContain("bullish");
     expect(markup).not.toContain("bearish");
-    expect(markup).toContain("高波动");
     expect(markup).not.toContain("distanceTo60dHighPct");
     expect(markup).not.toContain("sampleSize");
   });

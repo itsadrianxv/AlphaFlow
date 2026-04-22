@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getTimingReportUseQueryMock = vi.fn();
 const listTimingCardsUseQueryMock = vi.fn();
+const getRunUseQueryMock = vi.fn();
 
 vi.mock("next/link", () => ({
   default: (props: {
@@ -51,23 +52,14 @@ vi.mock("~/app/_components/workspace-history", () => ({
 }));
 
 vi.mock("~/app/timing/reports/[cardId]/timing-report-view", () => ({
-  TimingReportView: () =>
-    React.createElement(
-      "div",
-      { "data-testid": "timing-report-view" },
-      "report",
-    ),
-}));
-
-vi.mock("~/app/workflows/workflow-visualization-panel", () => ({
-  WorkflowVisualizationPanel: (props: { runId?: string }) =>
+  TimingReportView: (props: { run?: { id: string } | null }) =>
     React.createElement(
       "div",
       {
-        "data-testid": "workflow-visualization-panel",
-        "data-run-id": props.runId ?? "",
+        "data-testid": "timing-report-view",
+        "data-run-id": props.run?.id ?? "",
       },
-      "workflow visualization",
+      "report",
     ),
 }));
 
@@ -81,6 +73,11 @@ vi.mock("~/trpc/react", () => ({
         useQuery: listTimingCardsUseQueryMock,
       },
     },
+    workflow: {
+      getRun: {
+        useQuery: getRunUseQueryMock,
+      },
+    },
   },
 }));
 
@@ -90,7 +87,7 @@ function createReport(workflowRunId?: string | null) {
       id: "card_1",
       workflowRunId: workflowRunId ?? null,
       stockCode: "600519",
-      stockName: "贵州茅台",
+      stockName: "璐靛窞鑼呭彴",
       asOfDate: "2026-03-06",
       signalSnapshot: {
         asOfDate: "2026-03-06",
@@ -103,6 +100,7 @@ describe("TimingReportClient", () => {
   beforeEach(() => {
     getTimingReportUseQueryMock.mockReset();
     listTimingCardsUseQueryMock.mockReset();
+    getRunUseQueryMock.mockReset();
 
     getTimingReportUseQueryMock.mockReturnValue({
       data: null,
@@ -114,11 +112,22 @@ describe("TimingReportClient", () => {
       data: [],
       isLoading: false,
     });
+
+    getRunUseQueryMock.mockReturnValue({
+      data: null,
+      error: null,
+      isLoading: false,
+    });
   });
 
-  it("renders the workflow visualization panel with the linked workflowRunId", async () => {
+  it("loads the linked workflow run and passes it to the report view", async () => {
     getTimingReportUseQueryMock.mockReturnValue({
       data: createReport("run_1"),
+      error: null,
+      isLoading: false,
+    });
+    getRunUseQueryMock.mockReturnValue({
+      data: { id: "run_1" },
       error: null,
       isLoading: false,
     });
@@ -132,12 +141,12 @@ describe("TimingReportClient", () => {
       }),
     );
 
-    expect(markup).toContain("workflow-visualization-panel");
+    expect(getRunUseQueryMock).toHaveBeenCalled();
+    expect(markup).toContain('data-testid="timing-report-view"');
     expect(markup).toContain('data-run-id="run_1"');
-    expect(markup).toContain("timing-report-view");
   });
 
-  it("still renders the workflow visualization panel when the report has no workflowRunId", async () => {
+  it("still renders the report view when the report has no workflowRunId", async () => {
     getTimingReportUseQueryMock.mockReturnValue({
       data: createReport(null),
       error: null,
@@ -153,7 +162,7 @@ describe("TimingReportClient", () => {
       }),
     );
 
-    expect(markup).toContain("workflow-visualization-panel");
+    expect(markup).toContain('data-testid="timing-report-view"');
     expect(markup).toContain('data-run-id=""');
   });
 });

@@ -12,6 +12,8 @@ import {
   StatusPill,
   type Tone,
 } from "~/app/_components/ui";
+import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import {
   formatRuntimeIssueLabel,
   formatSourceTierLabel,
@@ -24,12 +26,55 @@ import {
   isCompanyResearchResult,
   type ResearchDigest,
 } from "~/app/workflows/research-view-models";
+import { WorkflowAgentStep } from "~/app/workflows/workflow-agent-step";
+import type { WorkflowDiagramRunDetail } from "~/app/workflows/workflow-diagram-runtime";
 import type { ConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   type CompanyResearchReferenceItem,
   type CompanyResearchResultDto,
 } from "~/server/domain/workflow/types";
+
+const companyResearchDetailTabs: WorkflowStageTab[] = [
+  {
+    id: "agent",
+    label: "Agent 状态图",
+    summary: "先看 Agent 状态图、运行摘要和研究执行状态。",
+  },
+  {
+    id: "summary",
+    label: "投资结论",
+    summary: "先看立场、理由、风险和下一步动作。",
+  },
+  {
+    id: "concepts",
+    label: "业务与概念",
+    summary: "聚焦业务契合点、概念兑现和变现路径。",
+  },
+  {
+    id: "questions",
+    label: "关键问题",
+    summary: "按研究问题查看答案、置信度和证据预览。",
+  },
+  {
+    id: "references",
+    label: "引用与来源",
+    summary: "审查证据覆盖、来源类型和引用内容。",
+  },
+];
+
+const companyResearchPausedTabs: WorkflowStageTab[] = [
+  {
+    id: "agent",
+    label: "Agent 状态图",
+    summary: "先看 Agent 状态图、运行摘要和研究执行状态。",
+  },
+  {
+    id: "paused",
+    label: "已暂停",
+    summary: "查看阻塞项和下一步动作，确认如何继续。",
+  },
+];
 
 type CompanyResearchBackgroundItem = {
   label: string;
@@ -565,7 +610,7 @@ function ConceptsSection(props: { model: CompanyResearchDetailModel }) {
       description="聚焦业务契合点、概念兑现和变现路径。"
     >
       {props.model.conceptCards.length === 0 ? (
-        <EmptyState title="鏆傛棤姒傚康鍗＄墖" />
+        <EmptyState title="暂无业务与概念卡片" />
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">
           {props.model.conceptCards.map((card) => (
@@ -613,7 +658,7 @@ function QuestionsSection(props: {
       description="按研究问题查看答案、置信度和证据预览。"
     >
       {props.model.questionCards.length === 0 ? (
-        <EmptyState title="鏆傛棤闂鍗＄墖" />
+        <EmptyState title="暂无关键问题卡片" />
       ) : (
         <div className="grid gap-3">
           {props.model.questionCards.map((item) => {
@@ -639,7 +684,7 @@ function QuestionsSection(props: {
                         tone="info"
                       />
                       <StatusPill
-                        label={`${item.gapCount} 缂哄彛`}
+                        label={`${item.gapCount} 缺口`}
                         tone={item.gapCount > 0 ? "warning" : "neutral"}
                       />
                     </div>
@@ -798,9 +843,7 @@ function ReferencesSection(props: {
                   </div>
                   <p className="mt-2 text-xs text-[var(--app-text-soft)]">
                     {reference.sourceName}
-                    {reference.publishedAt
-                      ? ` 路 ${reference.publishedAt}`
-                      : ""}
+                    {reference.publishedAt ? ` / ${reference.publishedAt}` : ""}
                   </p>
                   <p className="mt-3 text-sm leading-6 text-[var(--app-text)]">
                     {reference.extractedFact}
@@ -818,38 +861,82 @@ function ReferencesSection(props: {
   );
 }
 
+function PausedSection(props: { model: CompanyResearchPausedFallbackModel }) {
+  return (
+    <Panel
+      title="已暂停"
+      description="当前还没有完整的结构化公司研究结果，先处理暂停原因再继续。"
+    >
+      <div className="grid gap-4 xl:grid-cols-2">
+        <KeyPointList
+          title="当前阻塞项"
+          items={props.model.blockers.map((item) => (
+            <MarkdownContent key={item} content={item} compact />
+          ))}
+          emptyText="暂无阻塞项。"
+          tone="warning"
+        />
+        <KeyPointList
+          title="建议动作"
+          items={props.model.nextActions.map((item) => (
+            <MarkdownContent key={item} content={item} compact />
+          ))}
+          emptyText="暂无建议动作。"
+          tone="info"
+        />
+      </div>
+    </Panel>
+  );
+}
+
 export function CompanyResearchDetailPanels(props: {
   model: CompanyResearchDetailModel;
+  run?: WorkflowDiagramRunDetail | null;
+  activeTabId?: string;
+  onTabChange?: (tabId: string) => void;
   expandedQuestionId?: string | null;
   onQuestionToggle?: (questionId: string) => void;
   referenceFilterId?: string;
   onReferenceFilterChange?: (filterId: string) => void;
 }) {
+  const activeTabId = props.activeTabId ?? "agent";
   const expandedQuestionId =
     props.expandedQuestionId ?? props.model.questionCards[0]?.id ?? null;
   const referenceFilterId = props.referenceFilterId ?? "all";
 
   return (
-    <div className="grid gap-6">
-      <SummarySection model={props.model} />
-      <ConceptsSection model={props.model} />
-      <QuestionsSection
-        model={props.model}
-        expandedQuestionId={expandedQuestionId}
-        onQuestionToggle={props.onQuestionToggle}
-      />
-      <ReferencesSection
-        model={props.model}
-        referenceFilterId={referenceFilterId}
-        onReferenceFilterChange={props.onReferenceFilterChange}
-      />
-    </div>
+    <WorkflowStageSwitcher
+      tabs={companyResearchDetailTabs}
+      activeTabId={activeTabId}
+      onChange={props.onTabChange}
+      panels={{
+        agent: <WorkflowAgentStep run={props.run ?? null} />,
+        summary: <SummarySection model={props.model} />,
+        concepts: <ConceptsSection model={props.model} />,
+        questions: (
+          <QuestionsSection
+            model={props.model}
+            expandedQuestionId={expandedQuestionId}
+            onQuestionToggle={props.onQuestionToggle}
+          />
+        ),
+        references: (
+          <ReferencesSection
+            model={props.model}
+            referenceFilterId={referenceFilterId}
+            onReferenceFilterChange={props.onReferenceFilterChange}
+          />
+        ),
+      }}
+    />
   );
 }
 
 export function CompanyResearchDetailContent(props: {
   model: CompanyResearchDetailModel;
+  run?: WorkflowDiagramRunDetail | null;
 }) {
+  const [activeTabId, setActiveTabId] = useState("agent");
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(
     props.model.questionCards[0]?.id ?? null,
   );
@@ -870,6 +957,9 @@ export function CompanyResearchDetailContent(props: {
     <div className="grid gap-6">
       <CompanyResearchDetailPanels
         model={props.model}
+        run={props.run}
+        activeTabId={activeTabId}
+        onTabChange={setActiveTabId}
         expandedQuestionId={stableExpandedQuestionId}
         onQuestionToggle={(questionId) =>
           setExpandedQuestionId((current) =>
@@ -885,32 +975,21 @@ export function CompanyResearchDetailContent(props: {
 
 export function CompanyResearchPausedFallbackPanel(props: {
   model: CompanyResearchPausedFallbackModel;
+  run?: WorkflowDiagramRunDetail | null;
 }) {
+  const [activeTabId, setActiveTabId] = useState("agent");
+
   return (
     <div className="grid gap-6">
-      <Panel
-        title="已暂停"
-        description="当前还没有完整的结构化公司研究结果，先处理暂停原因再继续。"
-      >
-        <div className="grid gap-4 xl:grid-cols-2">
-          <KeyPointList
-            title="褰撳墠闃诲椤?"
-            items={props.model.blockers.map((item) => (
-              <MarkdownContent key={item} content={item} compact />
-            ))}
-            emptyText="鏆傛棤闃诲椤广€?"
-            tone="warning"
-          />
-          <KeyPointList
-            title="寤鸿鍔ㄤ綔"
-            items={props.model.nextActions.map((item) => (
-              <MarkdownContent key={item} content={item} compact />
-            ))}
-            emptyText="暂无建议动作。"
-            tone="info"
-          />
-        </div>
-      </Panel>
+      <WorkflowStageSwitcher
+        tabs={companyResearchPausedTabs}
+        activeTabId={activeTabId}
+        onChange={setActiveTabId}
+        panels={{
+          agent: <WorkflowAgentStep run={props.run ?? null} />,
+          paused: <PausedSection model={props.model} />,
+        }}
+      />
     </div>
   );
 }

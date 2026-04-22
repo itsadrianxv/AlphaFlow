@@ -20,13 +20,9 @@ describe("workflow page composition", () => {
     expect(screeningSource).toContain("WorkflowStageSwitcher");
 
     expect(workflowsSource).toContain("WorkflowVisualizationPanel");
-    expect(workflowsSource).not.toContain("WorkflowStageSwitcher");
-    expect(workflowsSource).not.toContain("workflowsStageTabs");
     expect(workflowsSource.match(/<WorkspaceShell/g)?.length).toBe(1);
 
     expect(companyResearchSource).toContain("WorkflowVisualizationPanel");
-    expect(companyResearchSource).not.toContain("WorkflowStageSwitcher");
-    expect(companyResearchSource).not.toContain("companyResearchStageTabs");
     expect(companyResearchSource.match(/<WorkspaceShell/g)?.length).toBe(1);
 
     expect(timingSource).toContain("timingStageTabs");
@@ -82,17 +78,15 @@ describe("workflow page composition", () => {
 
     expect(workflowsSource).toContain("historyItems={");
     expect(workflowsSource).toContain("WorkflowVisualizationPanel");
-    expect(workflowsSource).not.toContain("WorkflowStageSwitcher");
 
     expect(companyResearchSource).toContain("historyItems={");
     expect(companyResearchSource).toContain("WorkflowVisualizationPanel");
-    expect(companyResearchSource).not.toContain("WorkflowStageSwitcher");
 
     expect(timingSource).toContain("historyItems={");
     expect(runInvestorSource).toContain("historyItems={");
-    expect(runInvestorSource).toContain("WorkflowVisualizationPanel");
     expect(runDetailSource).toContain("historyItems={");
-    expect(timingReportSource).toContain("WorkflowVisualizationPanel");
+    expect(timingReportSource).toContain("workflow.getRun.useQuery");
+    expect(timingReportSource).toContain("TimingReportView");
 
     expect(screeningSource).not.toContain('href="/screening/history"');
     expect(screeningSource).not.toContain('activeTabId === "filters"');
@@ -137,7 +131,7 @@ describe("workflow page composition", () => {
 
     expect(investorDetailSource).toContain("IndustryConclusionDetail");
     expect(investorDetailSource).toContain("buildIndustryConclusionViewModel");
-    expect(industryDetailSource).not.toContain("useState");
-    expect(industryDetailSource).not.toContain("setActiveSectionId");
+    expect(industryDetailSource).toContain("WorkflowStageSwitcher");
+    expect(industryDetailSource).not.toContain("WorkflowVisualizationPanel");
   });
 });

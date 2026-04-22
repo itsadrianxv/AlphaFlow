@@ -8,6 +8,7 @@ import {
   CompanyResearchDetailPanels,
   CompanyResearchPausedFallbackPanel,
 } from "~/app/workflows/company-research-detail";
+import type { WorkflowDiagramRunDetail } from "~/app/workflows/workflow-diagram-runtime";
 import type { CompanyResearchResultDto } from "~/server/domain/workflow/types";
 
 function createCompanyResearchResult(): CompanyResearchResultDto {
@@ -130,7 +131,124 @@ function createCompanyResearchResult(): CompanyResearchResultDto {
       notes: ["High first-party coverage"],
       claims: [],
     },
+    researchPlan: [
+      {
+        id: "unit_1",
+        title: "official_sources",
+        objective: "Collect first-party evidence",
+        keyQuestions: ["Is growth monetizing?"],
+        capability: "official_search",
+        role: "research_analyst",
+        priority: "high",
+        expectedArtifact: "research_note",
+        dependsOn: [],
+        fallbackCapabilities: ["news_search"],
+        acceptanceCriteria: ["first_party_sources_present"],
+      },
+    ],
+    researchUnitRuns: [
+      {
+        unitId: "unit_1",
+        title: "official_sources",
+        capability: "official_search",
+        status: "completed",
+        attempt: 1,
+        repairCount: 0,
+        qualityFlags: [],
+        fallbackUsed: undefined,
+        validationErrors: [],
+        startedAt: "2026-03-12T08:00:05.000Z",
+        completedAt: "2026-03-12T08:00:06.000Z",
+        notes: [],
+        sourceUrls: ["https://example.com/report"],
+        evidenceCount: 1,
+      },
+    ],
+    reflection: {
+      status: "warn",
+      summary: "Need more first-party evidence.",
+      contractScore: 88,
+      citationCoverage: 0.75,
+      firstPartyRatio: 0.25,
+      answeredQuestionCoverage: 1,
+      missingRequirements: ["citation_coverage_below_target"],
+      unansweredQuestions: [],
+      qualityFlags: ["first_party_low"],
+      suggestedFixes: ["Add official filings"],
+    },
     generatedAt: "2026-03-12T08:00:00.000Z",
+  };
+}
+
+function createWorkflowRun(
+  overrides: Partial<WorkflowDiagramRunDetail> = {},
+): WorkflowDiagramRunDetail {
+  return {
+    id: "run_company_1",
+    query: "Example Co",
+    status: "SUCCEEDED",
+    progressPercent: 100,
+    currentNodeKey: "agent8_finalize_report",
+    input: {},
+    errorCode: null,
+    errorMessage: null,
+    result: createCompanyResearchResult(),
+    template: {
+      code: "company_research_center",
+      version: 4,
+    },
+    createdAt: new Date("2026-03-12T08:00:00.000Z"),
+    startedAt: new Date("2026-03-12T08:00:05.000Z"),
+    completedAt: new Date("2026-03-12T08:05:00.000Z"),
+    nodes: [
+      {
+        id: "node_1",
+        nodeKey: "agent0_clarify_scope",
+        agentName: "agent0_clarify_scope",
+        attempt: 1,
+        status: "SUCCEEDED",
+        errorCode: null,
+        errorMessage: null,
+        durationMs: 800,
+        startedAt: new Date("2026-03-12T08:00:05.000Z"),
+        completedAt: new Date("2026-03-12T08:00:05.800Z"),
+        output: {},
+      },
+      {
+        id: "node_2",
+        nodeKey: "agent8_finalize_report",
+        agentName: "agent8_finalize_report",
+        attempt: 1,
+        status: "SUCCEEDED",
+        errorCode: null,
+        errorMessage: null,
+        durationMs: 1200,
+        startedAt: new Date("2026-03-12T08:03:00.000Z"),
+        completedAt: new Date("2026-03-12T08:03:01.200Z"),
+        output: {},
+      },
+    ],
+    events: [
+      {
+        id: "event_1",
+        sequence: 1,
+        eventType: "NODE_SUCCEEDED",
+        payload: {
+          nodeKey: "agent0_clarify_scope",
+        },
+        occurredAt: new Date("2026-03-12T08:00:05.800Z"),
+      },
+      {
+        id: "event_2",
+        sequence: 2,
+        eventType: "NODE_SUCCEEDED",
+        payload: {
+          nodeKey: "agent8_finalize_report",
+        },
+        occurredAt: new Date("2026-03-12T08:03:01.200Z"),
+      },
+    ],
+    ...overrides,
   };
 }
 
@@ -164,7 +282,7 @@ describe("company-research-detail", () => {
           {
             concept: "core_business",
             insight: "legacy payload stores concept data here",
-            research_priority: "楂?",
+            research_priority: "高",
           },
         ],
       },
@@ -184,7 +302,7 @@ describe("company-research-detail", () => {
     expect(model.conceptCards[0]?.whyItMatters).toContain("legacy payload");
   });
 
-  it("renders stacked detail panels", () => {
+  it("renders stage panels with agent as the first step", () => {
     const model = buildCompanyResearchDetailModel({
       status: "SUCCEEDED",
       result: createCompanyResearchResult(),
@@ -197,18 +315,20 @@ describe("company-research-detail", () => {
     const markup = renderToStaticMarkup(
       React.createElement(CompanyResearchDetailPanels, {
         model,
-        expandedQuestionId: "question-1",
+        run: createWorkflowRun(),
+        activeTabId: "agent",
       }),
     );
 
-    expect(markup).toContain("Example Co");
-    expect(markup).toContain("Official Sources");
-    expect(markup).toContain("Is growth monetizing?");
-    expect(markup).toContain("2026Q1 IR note");
-    expect(markup).toContain("Track order growth versus margin trend");
+    expect(markup).toContain('data-stage-switcher="true"');
+    expect(markup).toContain("Agent 状态图");
+    expect(markup).toContain("投资结论");
+    expect(markup).toContain("业务与概念");
+    expect(markup).toContain("关键问题");
+    expect(markup).toContain("引用与来源");
   });
 
-  it("renders detail content without the old stage switcher shell", () => {
+  it("defaults detail content to the agent step", () => {
     const model = buildCompanyResearchDetailModel({
       status: "SUCCEEDED",
       result: createCompanyResearchResult(),
@@ -221,14 +341,16 @@ describe("company-research-detail", () => {
     const markup = renderToStaticMarkup(
       React.createElement(CompanyResearchDetailContent, {
         model,
+        run: createWorkflowRun(),
       }),
     );
 
-    expect(markup).not.toContain('data-stage-switcher="true"');
-    expect(markup).not.toContain("步骤 1");
+    expect(markup).toContain('data-stage-switcher="true"');
+    expect(markup).toContain('data-active-tab="agent"');
+    expect(markup).toContain("Agent 状态图");
   });
 
-  it("builds and renders a paused fallback model when no structured result exists", () => {
+  it("builds and renders a paused fallback model with agent and paused steps", () => {
     const model = buildCompanyResearchDetailModel({
       status: "PAUSED",
       input: {
@@ -254,10 +376,20 @@ describe("company-research-detail", () => {
     const markup = renderToStaticMarkup(
       React.createElement(CompanyResearchPausedFallbackPanel, {
         model,
+        run: createWorkflowRun({
+          status: "PAUSED",
+          currentNodeKey: "agent3_source_grounding",
+          result: {
+            qualityFlags: ["source_coverage_low"],
+            missingRequirements: ["official website evidence"],
+          },
+        }),
       }),
     );
 
-    expect(markup).toContain("信源覆盖不足");
-    expect(markup).toContain("采集公司证据");
+    expect(markup).toContain('data-stage-switcher="true"');
+    expect(markup).toContain('data-active-tab="agent"');
+    expect(markup).toContain("Agent 状态图");
+    expect(markup).toContain("锚定信源范围");
   });
 });

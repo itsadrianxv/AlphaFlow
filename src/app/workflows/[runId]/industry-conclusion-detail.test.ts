@@ -6,6 +6,7 @@ import {
   IndustryConclusionDetail,
   type IndustryConclusionViewModel,
 } from "~/app/workflows/[runId]/industry-conclusion-detail";
+import type { WorkflowDiagramRunDetail } from "~/app/workflows/workflow-diagram-runtime";
 
 const model: IndustryConclusionViewModel = {
   query: "AI infra",
@@ -30,7 +31,7 @@ const model: IndustryConclusionViewModel = {
   ],
   overviewActions: [
     {
-      label: "Continue 中际旭创",
+      label: "Continue 涓檯鏃垱",
       href: "/company-research?companyName=%E4%B8%AD%E9%99%85%E6%97%AD%E5%88%9B",
       variant: "primary",
     },
@@ -56,7 +57,7 @@ const model: IndustryConclusionViewModel = {
     topPicks: [
       {
         stockCode: "300308",
-        stockName: "中际旭创",
+        stockName: "涓檯鏃垱",
         reason: "800G volume continues.",
         href: "/company-research?companyName=%E4%B8%AD%E9%99%85%E6%97%AD%E5%88%9B",
       },
@@ -96,33 +97,75 @@ const model: IndustryConclusionViewModel = {
   },
 };
 
+function createRun(
+  overrides: Partial<WorkflowDiagramRunDetail> = {},
+): WorkflowDiagramRunDetail {
+  return {
+    id: "run_quick_1",
+    query: "AI infra",
+    status: "SUCCEEDED",
+    progressPercent: 100,
+    currentNodeKey: "agent6_reflection",
+    input: {},
+    errorCode: null,
+    errorMessage: null,
+    result: {},
+    template: {
+      code: "quick_industry_research",
+      version: 3,
+    },
+    createdAt: new Date("2026-04-22T08:00:00.000Z"),
+    startedAt: new Date("2026-04-22T08:00:05.000Z"),
+    completedAt: new Date("2026-04-22T08:05:00.000Z"),
+    nodes: [
+      {
+        id: "node_1",
+        nodeKey: "agent0_clarify_scope",
+        agentName: "agent0_clarify_scope",
+        attempt: 1,
+        status: "SUCCEEDED",
+        errorCode: null,
+        errorMessage: null,
+        durationMs: 800,
+        startedAt: new Date("2026-04-22T08:00:05.000Z"),
+        completedAt: new Date("2026-04-22T08:00:05.800Z"),
+        output: {},
+      },
+    ],
+    events: [],
+    ...overrides,
+  };
+}
+
 describe("IndustryConclusionDetail", () => {
-  it("renders the full stacked conclusion document", () => {
-    const markup = renderToStaticMarkup(
-      React.createElement(IndustryConclusionDetail, { model }),
-    );
-
-    expect(markup).toContain('data-industry-conclusion-detail="true"');
-    expect(markup).toContain("AI infra is entering a validation window.");
-    expect(markup).toContain("View Report");
-    expect(markup).toContain("Industry demand and event flow are resonating.");
-    expect(markup).toContain("Orders and expansion cadence are aligned.");
-    expect(markup).toContain("Leader orders are monetizing faster.");
-    expect(markup).toContain("Can profits support the current multiple?");
-  });
-
-  it("ignores initialSectionId and keeps all sections visible in the stacked layout", () => {
+  it("renders five steps with agent first and defaults to the agent step", () => {
     const markup = renderToStaticMarkup(
       React.createElement(IndustryConclusionDetail, {
         model,
+        run: createRun(),
+      }),
+    );
+
+    expect(markup).toContain('data-industry-conclusion-detail="true"');
+    expect(markup).toContain('data-stage-switcher="true"');
+    expect(markup).toContain('data-active-tab="agent"');
+    expect(markup).toContain("Agent 鐘舵€佸浘");
+    expect(markup).toContain("鎬昏");
+    expect(markup).toContain("鏍稿績閫昏緫");
+    expect(markup).toContain("璇佹嵁涓庡彲淇″害");
+    expect(markup).toContain("椋庨櫓涓庝笅涓€姝?");
+  });
+
+  it("respects initialSectionId for non-agent steps", () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(IndustryConclusionDetail, {
+        model,
+        run: createRun(),
         initialSectionId: "evidence",
       }),
     );
 
-    expect(markup).toContain("本轮结论");
-    expect(markup).toContain("行业驱动");
-    expect(markup).toContain("证据校验");
-    expect(markup).toContain("风险判断");
+    expect(markup).toContain('data-active-tab="evidence"');
     expect(markup).toContain("order cadence");
   });
 });
