@@ -119,7 +119,7 @@ const startQuickResearchInput = z.object({
       freshnessWindowDays: z.number().int().min(1).max(3650).optional(),
     })
     .optional(),
-  query: z.string().min(1, "query 涓嶈兘涓虹┖"),
+  query: z.string().min(1, "query ????"),
   templateCode: z.string().default(QUICK_RESEARCH_TEMPLATE_CODE),
   templateVersion: z.number().int().positive().optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
@@ -148,7 +148,7 @@ const startCompanyResearchInput = z.object({
       freshnessWindowDays: z.number().int().min(1).max(3650).optional(),
     })
     .optional(),
-  companyName: z.string().min(1, "companyName 涓嶈兘涓虹┖"),
+  companyName: z.string().min(1, "companyName ????"),
   stockCode: z.string().trim().min(1).optional(),
   officialWebsite: z.string().url().optional(),
   focusConcepts: z.array(z.string().min(1)).max(8).optional(),

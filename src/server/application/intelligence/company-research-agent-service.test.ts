@@ -358,11 +358,11 @@ describe("CompanyResearchAgentService", () => {
     const completeJson = vi
       .fn()
       .mockResolvedValueOnce({
-        stance: "缁х画璺熻釜",
+        stance: "????",
         summary: "Summary only",
       })
       .mockResolvedValueOnce({
-        stance: "缁х画璺熻釜",
+        stance: "????",
         summary: "Summary only",
       });
     const { service } = createService({

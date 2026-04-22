@@ -97,7 +97,7 @@ export class WatchlistTimingCardsPipelineLangGraph extends BaseWorkflowLangGraph
         ]);
 
         if (!watchList || watchList.userId !== state.userId) {
-          throw new Error("鑷€夎偂鍒楄〃涓嶅瓨鍦ㄦ垨鏃犳潈璁块棶");
+          throw new Error("?????????????");
         }
 
         return {

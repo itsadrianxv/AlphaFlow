@@ -421,7 +421,7 @@ export const screeningRouter = createTRPCRouter({
       if (formulas.length !== input.formulaIds.length) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "閮ㄥ垎鍏紡涓嶅瓨鍦ㄦ垨鏃犳潈璁块棶",
+          message: "????????????",
         });
       }
 
@@ -472,7 +472,7 @@ export const screeningRouter = createTRPCRouter({
       if (!existing) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "宸ヤ綔鍙颁笉瀛樺湪",
+          message: "??????",
         });
       }
 
@@ -530,7 +530,7 @@ export const screeningRouter = createTRPCRouter({
       if (!record) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "宸ヤ綔鍙颁笉瀛樺湪",
+          message: "??????",
         });
       }
 
@@ -551,7 +551,7 @@ export const screeningRouter = createTRPCRouter({
       if (!record) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "宸ヤ綔鍙颁笉瀛樺湪",
+          message: "??????",
         });
       }
 

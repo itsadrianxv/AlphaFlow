@@ -225,7 +225,7 @@ describe("company-research-detail", () => {
     );
 
     expect(markup).not.toContain('data-stage-switcher="true"');
-    expect(markup).not.toContain("姝ラ 1");
+    expect(markup).not.toContain("步骤 1");
   });
 
   it("builds and renders a paused fallback model when no structured result exists", () => {

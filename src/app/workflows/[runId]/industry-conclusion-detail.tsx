@@ -90,7 +90,7 @@ function ActionLinks(props: { model: IndustryConclusionViewModel }) {
               : "app-button"
           }
         >
-          {action.label.replace("Space", "鐮旂┒绌洪棿")}
+          {action.label.replace("Space", "研究空间")}
         </Link>
       ))}
     </div>
@@ -102,18 +102,18 @@ function OverviewSection(props: { model: IndustryConclusionViewModel }) {
     <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
       <section className="grid gap-5">
         <SectionHeading
-          title="鏈疆缁撹"
+          title="本轮结论"
           description={
             <MarkdownContent content={props.model.summary} compact />
           }
         />
         <DetailList
           items={props.model.overviewPoints}
-          emptyText="鏆傛棤棰濆鎽樿銆?"
+          emptyText="暂无额外摘要。"
         />
       </section>
       <section className="grid content-start gap-5 border-t border-[var(--app-border-soft)] pt-5 xl:border-t-0 xl:border-l xl:pl-6 xl:pt-0">
-        <SectionHeading title="涓嬩竴姝?" />
+        <SectionHeading title="下一步" />
         <ActionLinks model={props.model} />
       </section>
     </div>
@@ -125,17 +125,17 @@ function LogicSection(props: { model: IndustryConclusionViewModel }) {
     <div className="grid gap-8">
       <section className="grid gap-5">
         <SectionHeading
-          title="琛屼笟椹卞姩"
-          description="鍏堣琛屼笟鍙樺寲銆佸厬鐜拌矾寰勫拰绔炰簤鏍煎眬锛屽啀钀藉埌鍏蜂綋鏍囩殑銆?"
+          title="行业驱动"
+          description="先讲行业变化、兑现路径和竞争格局，再落到具体标的。"
         />
         <DetailList
           items={props.model.logic.industryDrivers}
-          emptyText="鏆傛棤缁撴瀯鍖栬涓氶┍鍔ㄣ€?"
+          emptyText="暂无结构化行业驱动。"
         />
       </section>
 
       <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="绔炰簤鏍煎眬" />
+        <SectionHeading title="竞争格局" />
         <MarkdownContent
           content={props.model.logic.competitionSummary}
           compact
@@ -143,10 +143,10 @@ function LogicSection(props: { model: IndustryConclusionViewModel }) {
       </section>
 
       <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="閲嶇偣鏍囩殑" />
+        <SectionHeading title="重点标的" />
         {props.model.logic.topPicks.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
-            鏆傛棤閲嶇偣鏍囩殑銆?
+            暂无重点标的。
           </p>
         ) : (
           <div className="grid gap-0">
@@ -170,7 +170,7 @@ function LogicSection(props: { model: IndustryConclusionViewModel }) {
                 </div>
                 <div className="md:self-start">
                   <Link href={item.href} className="app-button">
-                    杩涘叆鍏徃鍒ゆ柇
+                    进入公司判断
                   </Link>
                 </div>
               </div>
@@ -187,13 +187,13 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
     <div className="grid gap-8">
       <section className="grid gap-5">
         <SectionHeading
-          title="璇佹嵁鏍￠獙"
-          description="鍏堢湅鏀寔/涓嶈冻/鍐茬獊鍜岃鐩栫巼锛屽啀鎸夐渶涓嬬湅鏂█涓庣爺绌跺崟鍏冦€?"
+          title="证据校验"
+          description="先看支持/不足/冲突和覆盖率，再按需下看断言与研究单元。"
         />
         <dl className="grid border border-[var(--app-border-soft)] sm:grid-cols-2 xl:grid-cols-4">
           <div className="border-b border-[var(--app-border-soft)] px-4 py-4 xl:border-r xl:border-b-0">
             <dt className="text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-              鍙俊搴?
+              可信度
             </dt>
             <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.scoreLabel}
@@ -201,7 +201,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
           </div>
           <div className="border-b border-[var(--app-border-soft)] px-4 py-4 sm:border-l xl:border-r xl:border-b-0">
             <dt className="text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-              绛夌骇
+              等级
             </dt>
             <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.levelLabel}
@@ -209,7 +209,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
           </div>
           <div className="border-b border-[var(--app-border-soft)] px-4 py-4 xl:border-r xl:border-b-0">
             <dt className="text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-              瑕嗙洊鐜?
+              覆盖率
             </dt>
             <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.coverageLabel}
@@ -217,7 +217,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
           </div>
           <div className="px-4 py-4 sm:border-l xl:border-l-0">
             <dt className="text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-              鏀寔/涓嶈冻/鍐茬獊
+              支持/不足/冲突
             </dt>
             <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.tripletLabel}
@@ -227,10 +227,10 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
       </section>
 
       <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="鍙俊搴﹁鏄?" />
+        <SectionHeading title="可信度说明" />
         <DetailList
           items={props.model.evidence.notes}
-          emptyText="鏆傛棤鍙俊搴﹁鏄庛€?"
+          emptyText="暂无可信度说明。"
         />
       </section>
 
@@ -238,31 +238,31 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
       props.model.evidence.missingRequirements.length > 0 ? (
         <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6 xl:grid-cols-2">
           <div className="grid gap-4">
-            <SectionHeading title="璐ㄩ噺鏍囪" />
+            <SectionHeading title="质量标记" />
             <DetailList
               items={props.model.evidence.qualityFlags.map((item) =>
                 formatRuntimeIssueLabel(item),
               )}
-              emptyText="鏆傛棤璐ㄩ噺鏍囪銆?"
+              emptyText="暂无质量标记。"
             />
           </div>
           <div className="grid gap-4">
-            <SectionHeading title="寰呰ˉ瑕佹眰" />
+            <SectionHeading title="待补要求" />
             <DetailList
               items={props.model.evidence.missingRequirements.map((item) =>
                 formatRuntimeIssueLabel(item),
               )}
-              emptyText="鏆傛棤寰呰ˉ瑕佹眰銆?"
+              emptyText="暂无待补要求。"
             />
           </div>
         </section>
       ) : null}
 
       <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="缁撹鏂█" />
+        <SectionHeading title="结论断言" />
         {props.model.evidence.claims.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
-            鏆傛棤缁撴瀯鍖栨柇瑷€銆?
+            暂无结构化断言。
           </p>
         ) : (
           <div className="grid gap-0">
@@ -292,10 +292,10 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
       </section>
 
       <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="鐮旂┒鍗曞厓鎽樿" />
+        <SectionHeading title="研究单元摘要" />
         {props.model.evidence.researchPlan.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
-            鏆傛棤鐮旂┒鍗曞厓璁板綍銆?
+            暂无研究单元记录。
           </p>
         ) : (
           <div className="grid gap-0">
@@ -330,24 +330,24 @@ function RisksSection(props: { model: IndustryConclusionViewModel }) {
     <div className="grid gap-8">
       <section className="grid gap-5">
         <SectionHeading
-          title="椋庨櫓鍒ゆ柇"
+          title="风险判断"
           description={
             <MarkdownContent content={props.model.risks.summary} compact />
           }
         />
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="grid gap-4">
-            <SectionHeading title="缂哄彛" />
+            <SectionHeading title="缺口" />
             <DetailList
               items={props.model.risks.missingAreas}
-              emptyText="鏆傛棤缁撴瀯鍖栫己鍙ｃ€?"
+              emptyText="暂无结构化缺口。"
             />
           </div>
           <div className="grid gap-4">
-            <SectionHeading title="椋庨櫓淇″彿" />
+            <SectionHeading title="风险信号" />
             <DetailList
               items={props.model.risks.riskSignals}
-              emptyText="鏆傛棤棰濆椋庨櫓淇″彿銆?"
+              emptyText="暂无额外风险信号。"
             />
           </div>
         </div>
@@ -355,17 +355,17 @@ function RisksSection(props: { model: IndustryConclusionViewModel }) {
 
       <section className="grid gap-6 border-t border-[var(--app-border-soft)] pt-6 xl:grid-cols-2">
         <div className="grid gap-4">
-          <SectionHeading title="寰呭洖绛旈棶棰?" />
+          <SectionHeading title="待回答问题" />
           <DetailList
             items={props.model.risks.unansweredQuestions}
-            emptyText="鏆傛棤寰呭洖绛旈棶棰樸€?"
+            emptyText="暂无待回答问题。"
           />
         </div>
         <div className="grid gap-4">
-          <SectionHeading title="涓嬩竴姝ュ姩浣?" />
+          <SectionHeading title="下一步动作" />
           <DetailList
             items={props.model.risks.nextActions}
-            emptyText="鏆傛棤鍚庣画鍔ㄤ綔銆?"
+            emptyText="暂无后续动作。"
           />
         </div>
       </section>
@@ -389,7 +389,7 @@ export function IndustryConclusionDetail(props: {
           <StatusPill label={model.verdictLabel} tone={model.verdictTone} />
           <StatusPill label={model.statusLabel} tone="info" />
           <StatusPill
-            label={`鐢熸垚浜?${model.generatedAtLabel}`}
+            label={`生成于 ${model.generatedAtLabel}`}
             tone="neutral"
           />
           {model.modePills.map((item) => (
@@ -400,7 +400,7 @@ export function IndustryConclusionDetail(props: {
         <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
           <div>
             <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--app-text-subtle)]">
-              {model.query || "琛屼笟鐮旂┒缁撹"}
+              {model.query || "行业研究结论"}
             </div>
             <h2 className="mt-3 font-[family-name:var(--font-heading)] text-[34px] leading-[0.96] text-[var(--app-text-strong)] sm:text-[42px]">
               {model.headline}

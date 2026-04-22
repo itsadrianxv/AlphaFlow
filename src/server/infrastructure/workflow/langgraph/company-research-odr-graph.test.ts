@@ -14,11 +14,11 @@ function createWorkflowServiceStub() {
     })),
     buildBrief: vi.fn(async () => ({
       query: "Validate company thesis",
-      companyName: "绀轰緥鍏徃",
+      companyName: "????",
       stockCode: "600519",
       officialWebsite: "https://example.com",
-      researchGoal: "楠岃瘉鍒╂鼎鍏戠幇",
-      focusConcepts: ["绠楀姏"],
+      researchGoal: "??????",
+      focusConcepts: ["??"],
       keyQuestions: ["Q1"],
       mustAnswerQuestions: ["Q1"],
       forbiddenEvidenceTypes: [],
@@ -28,11 +28,11 @@ function createWorkflowServiceStub() {
     })),
     planUnits: vi.fn(async () => ({
       brief: {
-        companyName: "绀轰緥鍏徃",
+        companyName: "????",
         stockCode: "600519",
         officialWebsite: "https://example.com",
-        researchGoal: "楠岃瘉鍒╂鼎鍏戠幇",
-        focusConcepts: ["绠楀姏"],
+        researchGoal: "??????",
+        focusConcepts: ["??"],
         keyQuestions: ["Q1"],
       },
       conceptInsights: [
@@ -203,11 +203,11 @@ function createWorkflowServiceStub() {
     })),
     finalizeReport: vi.fn(async () => ({
       brief: {
-        companyName: "绀轰緥鍏徃",
+        companyName: "????",
         stockCode: "600519",
         officialWebsite: "https://example.com",
-        researchGoal: "楠岃瘉鍒╂鼎鍏戠幇",
-        focusConcepts: ["绠楀姏"],
+        researchGoal: "??????",
+        focusConcepts: ["??"],
         keyQuestions: ["Q1"],
       },
       conceptInsights: [],
@@ -216,7 +216,7 @@ function createWorkflowServiceStub() {
       evidence: [],
       references: [],
       verdict: {
-        stance: "缁х画璺熻釜",
+        stance: "????",
         summary: "summary",
         bullPoints: [],
         bearPoints: [],
@@ -272,9 +272,9 @@ describe("company-research-odr-graph", () => {
       initialState: graph.buildInitialState({
         runId: "run-1",
         userId: "user-1",
-        query: "绀轰緥鍏徃",
+        query: "????",
         input: {
-          companyName: "绀轰緥鍏徃",
+          companyName: "????",
           stockCode: "600519",
           officialWebsite: "https://example.com",
         },
@@ -286,7 +286,7 @@ describe("company-research-odr-graph", () => {
     })) as CompanyResearchGraphState;
 
     expect(graph.templateVersion).toBe(3);
-    expect(finalState.researchBrief?.companyName).toBe("绀轰緥鍏徃");
+    expect(finalState.researchBrief?.companyName).toBe("????");
     expect(finalState.compressedFindings?.summary).toBe("compressed");
     expect(finalState.finalReport?.runtimeConfigSummary?.maxUnitsPerPlan).toBe(
       6,
@@ -311,9 +311,9 @@ describe("company-research-odr-graph", () => {
         initialState: graph.buildInitialState({
           runId: "run-2",
           userId: "user-1",
-          query: "绀轰緥鍏徃",
+          query: "????",
           input: {
-            companyName: "绀轰緥鍏徃",
+            companyName: "????",
           },
           progressPercent: 0,
         }),

@@ -405,12 +405,12 @@ describe("company-research-graph", () => {
         deadlineMinutes: 90,
       })),
       buildBrief: vi.fn(async () => ({
-        query: "绀轰緥鍏徃",
-        companyName: "绀轰緥鍏徃",
+        query: "????",
+        companyName: "????",
         stockCode: "600519",
         officialWebsite: "https://example.com",
-        researchGoal: "楠岃瘉鍒╂鼎鍏戠幇",
-        focusConcepts: ["绠楀姏"],
+        researchGoal: "??????",
+        focusConcepts: ["??"],
         keyQuestions: ["Q1"],
         mustAnswerQuestions: ["Q1"],
         forbiddenEvidenceTypes: [],
@@ -420,11 +420,11 @@ describe("company-research-graph", () => {
       })),
       planUnits: vi.fn(async () => ({
         brief: {
-          companyName: "绀轰緥鍏徃",
+          companyName: "????",
           stockCode: "600519",
           officialWebsite: "https://example.com",
-          researchGoal: "楠岃瘉鍒╂鼎鍏戠幇",
-          focusConcepts: ["绠楀姏"],
+          researchGoal: "??????",
+          focusConcepts: ["??"],
           keyQuestions: ["Q1"],
         },
         conceptInsights: [],
@@ -526,9 +526,9 @@ describe("company-research-graph", () => {
       })),
       finalizeReport: vi.fn(async () => ({
         brief: {
-          companyName: "绀轰緥鍏徃",
-          researchGoal: "楠岃瘉鍒╂鼎鍏戠幇",
-          focusConcepts: ["绠楀姏"],
+          companyName: "????",
+          researchGoal: "??????",
+          focusConcepts: ["??"],
           keyQuestions: ["Q1"],
         },
         conceptInsights: [],
@@ -583,9 +583,9 @@ describe("company-research-graph", () => {
       initialState: graph.buildInitialState({
         runId: "run-4",
         userId: "user-1",
-        query: "绀轰緥鍏徃",
+        query: "????",
         input: {
-          companyName: "绀轰緥鍏徃",
+          companyName: "????",
           stockCode: "600519",
           officialWebsite: "https://example.com",
         },

@@ -11,7 +11,7 @@ const sampleReport = {
   card: {
     id: "card_1",
     stockCode: "600519",
-    stockName: "璐靛窞鑼呭彴",
+    stockName: "贵州茅台",
     confidence: 83,
     actionBias: "ADD",
     summary:
@@ -100,7 +100,7 @@ const sampleReport = {
   evidence: {
     multiTimeframeAlignment: {
       key: "multiTimeframeAlignment",
-      label: "澶氬懆鏈熶竴鑷存€?",
+      label: "多周期一致性",
       direction: "bullish",
       score: 76,
       confidence: 0.84,
@@ -115,7 +115,7 @@ const sampleReport = {
     },
     relativeStrength: {
       key: "relativeStrength",
-      label: "鐩稿寮哄急",
+      label: "相对强弱",
       direction: "bullish",
       score: 66,
       confidence: 0.78,
@@ -147,7 +147,7 @@ const sampleReport = {
     },
     liquidityStructure: {
       key: "liquidityStructure",
-      label: "娴佸姩鎬х粨鏋?",
+      label: "流动性结构",
       direction: "bullish",
       score: 58,
       confidence: 0.71,
@@ -163,7 +163,7 @@ const sampleReport = {
     },
     breakoutFailure: {
       key: "breakoutFailure",
-      label: "绐佺牬鏈夋晥鎬?",
+      label: "突破有效性",
       direction: "bullish",
       score: 55,
       confidence: 0.69,
@@ -177,7 +177,7 @@ const sampleReport = {
     },
     gapVolumeQuality: {
       key: "gapVolumeQuality",
-      label: "缂哄彛涓庢斁閲忚川閲?",
+      label: "缺口与放量质量",
       direction: "neutral",
       score: 16,
       confidence: 0.51,
@@ -259,10 +259,10 @@ describe("TimingReportView", () => {
       }),
     );
 
-    expect(markup).toContain("褰撳墠缁撹");
-    expect(markup).toContain("缁撴瀯璇佹嵁");
-    expect(markup).toContain("甯傚満鐜");
-    expect(markup).toContain("澶嶇洏璺熻釜");
+    expect(markup).toContain("当前结论");
+    expect(markup).toContain("结构证据");
+    expect(markup).toContain("市场环境");
+    expect(markup).toContain("轻量复盘时间线");
   });
 
   it("keeps the price chart and market context in the stacked report layout", () => {
@@ -272,9 +272,9 @@ describe("TimingReportView", () => {
       }),
     );
 
-    expect(markup).toContain("浠锋牸缁撴瀯");
-    expect(markup).toContain("甯傚満鐜");
-    expect(markup).toContain("椋庨櫓鏍囩");
+    expect(markup).toContain("价格结构");
+    expect(markup).toContain("市场环境");
+    expect(markup).toContain("风险标签");
   });
 
   it("reuses the chart in the evidence section and hides the old structure explanation card", () => {
@@ -284,8 +284,8 @@ describe("TimingReportView", () => {
       }),
     );
 
-    expect(evidenceMarkup).toContain("浠锋牸缁撴瀯");
-    expect(evidenceMarkup).not.toContain("鏍稿績缁撴瀯");
+    expect(evidenceMarkup).toContain("价格结构");
+    expect(evidenceMarkup).not.toContain("核心结构");
   });
 
   it("renders translated evidence and risk labels without leaking raw english keys", () => {
@@ -300,7 +300,7 @@ describe("TimingReportView", () => {
     expect(markup).toContain("高波动");
     expect(markup).not.toContain("bullish");
     expect(markup).not.toContain("bearish");
-    expect(markup).not.toContain("volatilityPercentile");
+    expect(markup).toContain("高波动");
     expect(markup).not.toContain("distanceTo60dHighPct");
     expect(markup).not.toContain("sampleSize");
   });

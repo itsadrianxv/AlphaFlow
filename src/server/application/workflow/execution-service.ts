@@ -221,7 +221,7 @@ export class WorkflowExecutionService {
     if (!run) {
       throw new WorkflowDomainError(
         WORKFLOW_ERROR_CODES.WORKFLOW_RUN_NOT_FOUND,
-        `宸ヤ綔娴佽繍琛屼笉瀛樺湪: ${runId}`,
+        `????????: ${runId}`,
       );
     }
 

@@ -137,32 +137,32 @@ function formatDate(value?: Date | string | null) {
 function formatStatusLabel(status?: string) {
   switch (status) {
     case "PENDING":
-      return "鎺掗槦涓?";
+      return "排队中";
     case "RUNNING":
-      return "杩涜涓?";
+      return "进行中";
     case "PAUSED":
-      return "宸叉殏鍋?";
+      return "已暂停";
     case "SUCCEEDED":
-      return "宸插畬鎴?";
+      return "已完成";
     case "FAILED":
-      return "澶辫触";
+      return "失败";
     case "CANCELLED":
-      return "宸插彇娑?";
+      return "已取消";
     default:
-      return "鏈煡";
+      return "未知";
   }
 }
 
 function formatConfidenceLevel(level?: string) {
   switch (level) {
     case "high":
-      return "楂?";
+      return "高";
     case "medium":
-      return "涓?";
+      return "中";
     case "low":
-      return "浣?";
+      return "低";
     default:
-      return "鏈煡";
+      return "未知";
   }
 }
 
@@ -188,18 +188,18 @@ function buildBackgroundItemsFromBrief(params: {
   generatedAt?: Date | string | null;
 }) {
   return [
-    { label: "鍏徃鍚嶇О", value: params.companyName?.trim() || "-" },
-    { label: "鑲＄エ浠ｇ爜", value: params.stockCode?.trim() || "-" },
-    { label: "鐮旂┒鐩爣", value: params.researchGoal?.trim() || "-" },
+    { label: "公司名称", value: params.companyName?.trim() || "-" },
+    { label: "股票代码", value: params.stockCode?.trim() || "-" },
+    { label: "研究目标", value: params.researchGoal?.trim() || "-" },
     {
-      label: "鍏虫敞姒傚康",
+      label: "关注概念",
       value:
         params.focusConcepts && params.focusConcepts.length > 0
           ? params.focusConcepts.join(" / ")
           : "-",
     },
-    { label: "鐘舵€?", value: formatStatusLabel(params.status) },
-    { label: "鐢熸垚鏃堕棿", value: formatDate(params.generatedAt) },
+    { label: "状态", value: formatStatusLabel(params.status) },
+    { label: "生成时间", value: formatDate(params.generatedAt) },
   ];
 }
 
@@ -207,12 +207,12 @@ function findConfidenceSummary(analysis: ConfidenceAnalysis | null) {
   return {
     score:
       analysis?.finalScore === null || analysis?.finalScore === undefined
-        ? "鏈垎鏋?"
+        ? "未分析"
         : String(analysis.finalScore),
     level: formatConfidenceLevel(analysis?.level),
     coverage:
       analysis?.evidenceCoverageScore === undefined
-        ? "鏈垎鏋?"
+        ? "未分析"
         : `${analysis.evidenceCoverageScore}%`,
     notes: uniqueList(analysis?.notes ?? [], 3),
   };
@@ -245,11 +245,10 @@ function buildQuestionCards(result: CompanyResearchResultDto) {
       id: `question-${index + 1}`,
       question,
       whyImportant:
-        deepQuestion?.whyImportant ??
-        "鐢ㄤ簬楠岃瘉鏈鍏徃鐮旂┒鏍稿績鍋囪銆?",
-      targetMetric: deepQuestion?.targetMetric ?? "寰呰ˉ鍏?",
-      dataHint: deepQuestion?.dataHint ?? "寰呰ˉ鍏?",
-      answer: finding?.answer ?? "鏆傛棤缁撴瀯鍖栧洖绛斻€?",
+        deepQuestion?.whyImportant ?? "用于验证本次公司研究核心假设。",
+      targetMetric: deepQuestion?.targetMetric ?? "待补充",
+      dataHint: deepQuestion?.dataHint ?? "待补充",
+      answer: finding?.answer ?? "暂无结构化回答。",
       confidence: finding?.confidence ?? "low",
       referenceCount: finding?.referenceIds.length ?? referencePreview.length,
       gapCount: finding?.gaps.length ?? 0,
@@ -262,7 +261,7 @@ function buildQuestionCards(result: CompanyResearchResultDto) {
 function buildReferenceFilters(references: CompanyResearchReferenceItem[]) {
   const sourceTypes = ["official", "financial", "news", "industry"] as const;
   const filters: CompanyResearchReferenceFilter[] = [
-    { id: "all", label: "鍏ㄩ儴", count: references.length },
+    { id: "all", label: "全部", count: references.length },
     ...sourceTypes.map((type) => ({
       id: type,
       label: formatSourceTypeLabel(type),
@@ -270,13 +269,13 @@ function buildReferenceFilters(references: CompanyResearchReferenceItem[]) {
     })),
     {
       id: "first_party",
-      label: "涓€鎵?",
+      label: "一手",
       count: references.filter((item) => item.sourceTier === "first_party")
         .length,
     },
     {
       id: "third_party",
-      label: "涓夋柟",
+      label: "三方",
       count: references.filter((item) => item.sourceTier === "third_party")
         .length,
     },
@@ -330,14 +329,14 @@ function normalizeConceptCards(value: unknown): CompanyResearchConceptCard[] {
       whyItMatters: readFirstString(
         item,
         ["whyItMatters", "insight"],
-        "鏆傛棤鎽樿",
+        "暂无摘要",
       ),
-      companyFit: readFirstString(item, ["companyFit"], "寰呰ˉ鍏?"),
-      monetizationPath: readFirstString(item, ["monetizationPath"], "寰呰ˉ鍏?"),
+      companyFit: readFirstString(item, ["companyFit"], "待补充"),
+      monetizationPath: readFirstString(item, ["monetizationPath"], "待补充"),
       maturity: readFirstString(
         item,
         ["maturity", "research_priority"],
-        "鏈煡",
+        "未知",
       ),
     }));
 }
@@ -347,19 +346,19 @@ function buildReferenceStats(result: CompanyResearchResultDto) {
 
   return [
     {
-      label: "鍘熷璇佹嵁",
+      label: "原始证据",
       value: String(summary?.totalRawCount ?? result.evidence.length),
     },
     {
-      label: "鍏ラ€夎瘉鎹?",
+      label: "入选证据",
       value: String(summary?.totalCuratedCount ?? result.evidence.length),
     },
     {
-      label: "寮曠敤",
+      label: "引用",
       value: String(summary?.totalReferenceCount ?? result.references.length),
     },
     {
-      label: "涓€鎵嬩俊婧?",
+      label: "一手信源",
       value: String(
         summary?.totalFirstPartyCount ??
           result.references.filter((item) => item.sourceTier === "first_party")
@@ -455,10 +454,7 @@ export function buildCompanyResearchDetailModel(params: {
 
 function SummarySection(props: { model: CompanyResearchDetailModel }) {
   return (
-    <Panel
-      title="鎶曡祫缁撹"
-      description="鍏堢湅绔嬪満銆佺悊鐢便€侀闄╁拰涓嬩竴姝ュ姩浣溿€?"
-    >
+    <Panel title="投资结论" description="先看立场、理由、风险和下一步动作。">
       <div className="grid gap-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           {props.model.backgroundItems.map((item) => (
@@ -480,28 +476,28 @@ function SummarySection(props: { model: CompanyResearchDetailModel }) {
           <div className="grid gap-4">
             <MarkdownContent content={props.model.digest.summary} />
             <KeyPointList
-              title="鐪嬪閫昏緫"
+              title="看多逻辑"
               items={props.model.digest.bullPoints.map((item) => (
                 <MarkdownContent key={item} content={item} compact />
               ))}
-              emptyText="鏆傛棤鐪嬪閫昏緫"
+              emptyText="暂无结构化看多逻辑。"
               tone="success"
             />
             <KeyPointList
-              title="椋庨櫓鐐?"
+              title="风险点"
               items={props.model.digest.bearPoints.map((item) => (
                 <MarkdownContent key={item} content={item} compact />
               ))}
-              emptyText="鏆傛棤椋庨櫓鐐?"
+              emptyText="暂无结构化风险提示。"
               tone="warning"
             />
           </div>
           <div className="grid gap-4">
-            <Panel surface="inset" title="鍙俊搴︽憳瑕?">
+            <Panel surface="inset" title="可信度摘要">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
                   <div className="text-xs text-[var(--app-text-soft)]">
-                    寰楀垎
+                    可信度得分
                   </div>
                   <div className="mt-2 text-2xl text-[var(--app-text)]">
                     {props.model.confidenceSummary.score}
@@ -509,7 +505,7 @@ function SummarySection(props: { model: CompanyResearchDetailModel }) {
                 </div>
                 <div>
                   <div className="text-xs text-[var(--app-text-soft)]">
-                    绛夌骇
+                    等级
                   </div>
                   <div className="mt-2 text-2xl text-[var(--app-text)]">
                     {props.model.confidenceSummary.level}
@@ -517,7 +513,7 @@ function SummarySection(props: { model: CompanyResearchDetailModel }) {
                 </div>
                 <div>
                   <div className="text-xs text-[var(--app-text-soft)]">
-                    瑕嗙洊鐜?
+                    证据覆盖率
                   </div>
                   <div className="mt-2 text-2xl text-[var(--app-text)]">
                     {props.model.confidenceSummary.coverage}
@@ -532,11 +528,11 @@ function SummarySection(props: { model: CompanyResearchDetailModel }) {
                 <StatusPill
                   label={props.model.confidenceSummary.level}
                   tone={confidenceTone(
-                    props.model.confidenceSummary.level === "楂?"
+                    props.model.confidenceSummary.level === "高"
                       ? "high"
-                      : props.model.confidenceSummary.level === "涓?"
+                      : props.model.confidenceSummary.level === "中"
                         ? "medium"
-                        : props.model.confidenceSummary.level === "浣?"
+                        : props.model.confidenceSummary.level === "低"
                           ? "low"
                           : undefined,
                   )}
@@ -565,8 +561,8 @@ function SummarySection(props: { model: CompanyResearchDetailModel }) {
 function ConceptsSection(props: { model: CompanyResearchDetailModel }) {
   return (
     <Panel
-      title="涓氬姟涓庢蹇?"
-      description="鑱氱劍涓氬姟濂戝悎鐐广€佹蹇靛厬鐜板拰鍙樼幇璺緞銆?"
+      title="业务与概念"
+      description="聚焦业务契合点、概念兑现和变现路径。"
     >
       {props.model.conceptCards.length === 0 ? (
         <EmptyState title="鏆傛棤姒傚康鍗＄墖" />
@@ -613,8 +609,8 @@ function QuestionsSection(props: {
 }) {
   return (
     <Panel
-      title="鍏抽敭闂"
-      description="鎸夌爺绌堕棶棰樻煡鐪嬬瓟妗堛€佺疆淇″害鍜岃瘉鎹瑙堛€?"
+      title="关键问题"
+      description="按研究问题查看答案、置信度和证据预览。"
     >
       {props.model.questionCards.length === 0 ? (
         <EmptyState title="鏆傛棤闂鍗＄墖" />
@@ -639,7 +635,7 @@ function QuestionsSection(props: {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <StatusPill
-                        label={`${item.referenceCount} 寮曠敤`}
+                        label={`${item.referenceCount} 引用`}
                         tone="info"
                       />
                       <StatusPill
@@ -701,10 +697,7 @@ function ReferencesSection(props: {
   );
 
   return (
-    <Panel
-      title="寮曠敤涓庢潵婧?"
-      description="瀹℃煡璇佹嵁瑕嗙洊銆佹潵婧愮被鍨嬪拰寮曠敤鍐呭銆?"
-    >
+    <Panel title="引用与来源" description="审查证据覆盖、来源类型和引用内容。">
       <div className="grid gap-6">
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {props.model.referenceStats.map((item) => (
@@ -754,13 +747,13 @@ function ReferencesSection(props: {
                     {collector.label}
                   </div>
                   <StatusPill
-                    label={collector.configured ? "宸插惎鐢?" : "宸茶烦杩?"}
+                    label={collector.configured ? "已启用" : "已跳过"}
                     tone={collector.configured ? "info" : "warning"}
                   />
                 </div>
                 <div className="mt-2 text-xs leading-6 text-[var(--app-text-muted)]">
-                  鍘熷 {collector.rawCount} / 鍏ラ€?{collector.curatedCount} /
-                  涓€鎵?{collector.firstPartyCount}
+                  原始 {collector.rawCount} / 入选 {collector.curatedCount} /
+                  一手 {collector.firstPartyCount}
                 </div>
               </div>
             ))}
@@ -768,7 +761,7 @@ function ReferencesSection(props: {
 
           <div className="grid gap-3">
             {filteredReferences.length === 0 ? (
-              <EmptyState title="褰撳墠绛涢€変笅鏆傛棤寮曠敤" />
+              <EmptyState title="当前筛选下暂无引用" />
             ) : (
               filteredReferences.map((reference) => (
                 <article
@@ -896,8 +889,8 @@ export function CompanyResearchPausedFallbackPanel(props: {
   return (
     <div className="grid gap-6">
       <Panel
-        title="宸叉殏鍋?"
-        description="褰撳墠杩樻病鏈夊畬鏁寸殑缁撴瀯鍖栧叕鍙哥爺绌剁粨鏋滐紝鍏堝鐞嗘殏鍋滃師鍥犲啀缁х画銆?"
+        title="已暂停"
+        description="当前还没有完整的结构化公司研究结果，先处理暂停原因再继续。"
       >
         <div className="grid gap-4 xl:grid-cols-2">
           <KeyPointList
@@ -913,7 +906,7 @@ export function CompanyResearchPausedFallbackPanel(props: {
             items={props.model.nextActions.map((item) => (
               <MarkdownContent key={item} content={item} compact />
             ))}
-            emptyText="鏆傛棤寤鸿鍔ㄤ綔銆?"
+            emptyText="暂无建议动作。"
             tone="info"
           />
         </div>

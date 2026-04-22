@@ -119,10 +119,10 @@ describe("IndustryConclusionDetail", () => {
       }),
     );
 
-    expect(markup).toContain("鏈疆缁撹");
-    expect(markup).toContain("琛屼笟椹卞姩");
-    expect(markup).toContain("璇佹嵁鏍￠獙");
-    expect(markup).toContain("椋庨櫓鍒ゆ柇");
+    expect(markup).toContain("本轮结论");
+    expect(markup).toContain("行业驱动");
+    expect(markup).toContain("证据校验");
+    expect(markup).toContain("风险判断");
     expect(markup).toContain("order cadence");
   });
 });
