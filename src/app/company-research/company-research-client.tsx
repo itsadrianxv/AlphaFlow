@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { OpportunityIntelligenceSummary } from "~/app/_components/opportunity-intelligence-summary";
 import { ResearchVoiceInput } from "~/app/_components/research-voice-input";
 import {
   InlineNotice,
@@ -426,7 +425,6 @@ export function CompanyResearchClient() {
         </>
       }
     >
-      <OpportunityIntelligenceSummary />
       <WorkflowVisualizationPanel
         templateCode={COMPANY_RESEARCH_TEMPLATE_CODE}
         title="公司判断 Agent 状态图"

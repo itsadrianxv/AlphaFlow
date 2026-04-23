@@ -105,20 +105,22 @@ describe("workflow page composition", () => {
     expect(companyResearchHistorySource).not.toContain("headerActions");
   });
 
-  it("injects the shared opportunity intelligence summary into every core workflow page", () => {
-    const screeningSource = readSource(
-      "./screening/screening-studio-client.tsx",
-    );
+  it("keeps opportunity intelligence out of research, company research, and timing pages", () => {
     const workflowsSource = readSource("./workflows/workflows-client.tsx");
     const companyResearchSource = readSource(
       "./company-research/company-research-client.tsx",
     );
     const timingSource = readSource("./timing/timing-client.tsx");
+    const opportunityIntelligencePageSource = readSource(
+      "./opportunity-intelligence/page.tsx",
+    );
 
-    expect(screeningSource).toContain("OpportunityIntelligenceSummary");
-    expect(workflowsSource).toContain("OpportunityIntelligenceSummary");
-    expect(companyResearchSource).toContain("OpportunityIntelligenceSummary");
-    expect(timingSource).toContain("OpportunityIntelligenceSummary");
+    expect(workflowsSource).not.toContain("OpportunityIntelligenceSummary");
+    expect(companyResearchSource).not.toContain("OpportunityIntelligenceSummary");
+    expect(timingSource).not.toContain("OpportunityIntelligenceSummary");
+    expect(opportunityIntelligencePageSource).toContain(
+      "OpportunityIntelligenceClient",
+    );
   });
 
   it("uses a dedicated document-style quick research detail component", () => {

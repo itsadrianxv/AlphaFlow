@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, { useEffect, useMemo, useState } from "react";
-import { OpportunityIntelligenceSummary } from "~/app/_components/opportunity-intelligence-summary";
 import { ResearchVoiceInput } from "~/app/_components/research-voice-input";
 import {
   InlineNotice,
@@ -374,7 +373,6 @@ export function WorkflowsClient() {
         </>
       }
     >
-      <OpportunityIntelligenceSummary />
       <WorkflowVisualizationPanel
         templateCode={QUICK_RESEARCH_TEMPLATE_CODE}
         title="行业研究 Agent 状态图"

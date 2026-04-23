@@ -164,4 +164,13 @@ describe("WorkflowsClient", () => {
     expect(markup).toContain('data-run-id=""');
     expect(markup).toContain('data-template-code="quick_industry_research"');
   });
+
+  it("does not render the opportunity intelligence summary on the industry research page", async () => {
+    const { WorkflowsClient } = await import(
+      "~/app/workflows/workflows-client"
+    );
+    const markup = renderToStaticMarkup(React.createElement(WorkflowsClient));
+
+    expect(markup).not.toContain("opportunity-intelligence-summary");
+  });
 });

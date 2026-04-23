@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { OpportunityIntelligenceSummary } from "~/app/_components/opportunity-intelligence-summary";
 import { StockSearchPicker } from "~/app/_components/stock-search-picker";
 import {
   cn,
@@ -789,7 +788,6 @@ export function TimingClient() {
         </>
       }
     >
-      <OpportunityIntelligenceSummary />
       <WorkflowStageSwitcher
         tabs={timingStageTabs}
         activeTabId={activeTabId}

@@ -232,4 +232,12 @@ describe("TimingClient", () => {
 
     expect(markup).toContain(WORKFLOW_STARTED_MESSAGE);
   });
+
+  it("does not render the opportunity intelligence summary on the timing page", async () => {
+    globalThis.React = React;
+    const { TimingClient } = await import("~/app/timing/timing-client");
+    const markup = renderToStaticMarkup(React.createElement(TimingClient));
+
+    expect(markup).not.toContain("opportunity-intelligence-summary");
+  });
 });
