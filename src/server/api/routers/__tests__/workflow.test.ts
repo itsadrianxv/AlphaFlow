@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("~/server/api/trpc", () => {
+vi.mock("~/platform/trpc/server", () => {
   const procedureBuilder = {
     use: () => procedureBuilder,
     input(schema: unknown) {
@@ -19,14 +19,17 @@ vi.mock("~/server/api/trpc", () => {
   };
 });
 
-describe("workflowRouter.startTimingSignalPipeline", () => {
+describe("researchRunsRouter.startTimingSignalPipeline", () => {
   it("accepts a six-digit stock code", async () => {
-    const { workflowRouter } = await import("~/server/api/routers/workflow");
-    const procedure = workflowRouter.startTimingSignalPipeline as unknown as {
-      schema: {
-        safeParse(input: unknown): { success: boolean };
+    const { researchRunsRouter } = await import(
+      "~/modules/research/server/api/runs-router"
+    );
+    const procedure =
+      researchRunsRouter.startTimingSignalPipeline as unknown as {
+        schema: {
+          safeParse(input: unknown): { success: boolean };
+        };
       };
-    };
     const result = procedure.schema.safeParse({
       stockCode: "600519",
     });
@@ -35,17 +38,19 @@ describe("workflowRouter.startTimingSignalPipeline", () => {
   });
 });
 
-describe("workflowRouter watchlist timing inputs", () => {
+describe("researchRunsRouter watchlist timing inputs", () => {
   it("accepts UUID watchlist ids for watchlist timing workflows", async () => {
-    const { workflowRouter } = await import("~/server/api/routers/workflow");
+    const { researchRunsRouter } = await import(
+      "~/modules/research/server/api/runs-router"
+    );
     const startWatchlistTimingCardsProcedure =
-      workflowRouter.startWatchlistTimingCardsPipeline as unknown as {
+      researchRunsRouter.startWatchlistTimingCardsPipeline as unknown as {
         schema: {
           safeParse(input: unknown): { success: boolean };
         };
       };
     const startWatchlistTimingProcedure =
-      workflowRouter.startWatchlistTimingPipeline as unknown as {
+      researchRunsRouter.startWatchlistTimingPipeline as unknown as {
         schema: {
           safeParse(input: unknown): { success: boolean };
         };

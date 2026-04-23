@@ -1,7 +1,7 @@
 import React from "react";
-import { buildScreeningRedirectTo } from "~/app/screening/access-control";
-import { ScreeningLoginRedirectNotice } from "~/app/screening/screening-login-redirect-notice";
-import { ScreeningStudioClient } from "~/app/screening/screening-studio-client";
+import { buildScreeningRedirectTo } from "~/modules/screening/ui/access-control";
+import { ScreeningLoginRedirectNotice } from "~/modules/screening/ui/screening-login-redirect-notice";
+import { ScreeningStudioClient } from "~/modules/screening/ui/screening-studio-client";
 import { auth } from "~/server/auth";
 
 export default async function ScreeningPage(props: {

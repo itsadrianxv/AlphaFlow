@@ -9,8 +9,8 @@ describe("resolveAuthRedirect", () => {
   });
 
   it("keeps safe relative paths", () => {
-    expect(resolveAuthRedirect("/workflows?tab=active")).toBe(
-      "/workflows?tab=active",
+    expect(resolveAuthRedirect("/research?tab=active")).toBe(
+      "/research?tab=active",
     );
   });
 

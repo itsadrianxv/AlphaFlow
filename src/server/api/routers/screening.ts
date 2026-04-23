@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { PythonCapabilityGatewayClient } from "~/modules/research/server/infrastructure/capabilities/python-capability-gateway-client";
 import {
   type CreateWorkspaceInput,
   createFormulaInputSchema,
@@ -18,11 +19,10 @@ import {
   workspacePersistedStateSchema,
   workspaceQuerySchema,
   workspaceSummarySchema,
-} from "~/contracts/screening";
+} from "~/modules/screening/contracts/screening";
+import { LocalStockSearchService } from "~/modules/screening/server/infrastructure/local-stock-search-service";
+import { createTRPCRouter, protectedProcedure } from "~/platform/trpc/server";
 import { normalizeFormulaExpression } from "~/server/api/routers/screening-formula-normalizer";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
-import { LocalStockSearchService } from "~/server/infrastructure/screening/local-stock-search-service";
 
 type ScreeningFormulaRecord = {
   id: string;

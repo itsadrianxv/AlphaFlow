@@ -1,7 +1,5 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlphaFlowMark } from "~/app/_components/brand/alpha-flow-mark";
-import { InlineNotice, SectionCard, StatusPill } from "~/app/_components/ui";
 import { signInWithOAuth } from "~/app/login/actions";
 import { CredentialsForm } from "~/app/login/credentials-form";
 import { auth } from "~/server/auth";
@@ -10,6 +8,12 @@ import {
   signInMethods,
   socialSignInEnabled,
 } from "~/server/auth/sign-in-methods";
+import { AlphaFlowMark } from "~/shared/ui/brand/alpha-flow-mark";
+import {
+  InlineNotice,
+  SectionCard,
+  StatusPill,
+} from "~/shared/ui/primitives/ui";
 
 const workflowStages = [
   {

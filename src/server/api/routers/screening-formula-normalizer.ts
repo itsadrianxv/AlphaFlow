@@ -1,4 +1,4 @@
-import type { IndicatorCatalogItem } from "~/contracts/screening";
+import type { IndicatorCatalogItem } from "~/modules/screening/contracts/screening";
 
 type FormulaNormalizerParams = {
   expression: string;

@@ -8,7 +8,7 @@ import {
   Space_Grotesk,
 } from "next/font/google";
 
-import { TRPCReactProvider } from "~/trpc/react";
+import { TRPCReactProvider } from "~/platform/trpc/react";
 
 const displaySerif = Cormorant_Garamond({
   subsets: ["latin"],

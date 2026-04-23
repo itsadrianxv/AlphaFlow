@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const getFeedForUserMock = vi.fn();
 const getSummaryForUserMock = vi.fn();
 
-vi.mock("~/server/api/trpc", () => {
+vi.mock("~/platform/trpc/server", () => {
   const procedureBuilder = {
     use: () => procedureBuilder,
     input(schema: unknown) {
@@ -23,7 +23,7 @@ vi.mock("~/server/api/trpc", () => {
 });
 
 vi.mock(
-  "~/server/application/intelligence/opportunity-intelligence-service",
+  "~/modules/research/server/application/intelligence/opportunity-intelligence-service",
   () => ({
     OpportunityIntelligenceService: class OpportunityIntelligenceService {
       getFeedForUser = getFeedForUserMock;
@@ -32,7 +32,7 @@ vi.mock(
   }),
 );
 
-describe("opportunityIntelligenceRouter", () => {
+describe("researchOpportunitiesRouter", () => {
   beforeEach(() => {
     getFeedForUserMock.mockReset();
     getSummaryForUserMock.mockReset();
@@ -57,10 +57,10 @@ describe("opportunityIntelligenceRouter", () => {
       },
     });
 
-    const { opportunityIntelligenceRouter } = await import(
-      "~/server/api/routers/opportunity-intelligence"
+    const { researchOpportunitiesRouter } = await import(
+      "~/modules/research/server/api/opportunities-router"
     );
-    const procedure = opportunityIntelligenceRouter.getFeed as unknown as {
+    const procedure = researchOpportunitiesRouter.getFeed as unknown as {
       handler(args: {
         ctx: { session: { user: { id: string } }; db: unknown };
       }): Promise<unknown>;
@@ -96,10 +96,10 @@ describe("opportunityIntelligenceRouter", () => {
       personalizationHitCount: 1,
     });
 
-    const { opportunityIntelligenceRouter } = await import(
-      "~/server/api/routers/opportunity-intelligence"
+    const { researchOpportunitiesRouter } = await import(
+      "~/modules/research/server/api/opportunities-router"
     );
-    const procedure = opportunityIntelligenceRouter.getSummary as unknown as {
+    const procedure = researchOpportunitiesRouter.getSummary as unknown as {
       handler(args: {
         ctx: { session: { user: { id: string } }; db: unknown };
         input: { limit: number };

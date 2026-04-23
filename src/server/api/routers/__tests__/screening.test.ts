@@ -7,7 +7,7 @@ import {
   workspaceFilterRuleSchema,
   workspaceQuerySchema,
   workspaceTimeConfigSchema,
-} from "~/contracts/screening";
+} from "~/modules/screening/contracts/screening";
 
 describe("screening contracts", () => {
   it("accepts valid stock search input", () => {

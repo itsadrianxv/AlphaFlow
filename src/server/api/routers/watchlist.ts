@@ -12,18 +12,18 @@
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 // 领域层
-import { WatchList } from "~/server/domain/screening/aggregates/watch-list";
+import { WatchList } from "~/modules/screening/server/domain/aggregates/watch-list";
 // 领域异常
 import {
   DuplicateStockError,
   StockNotFoundError,
-} from "~/server/domain/screening/errors";
-import { StockCode } from "~/server/domain/screening/value-objects/stock-code";
-import { normalizeTags } from "~/server/domain/screening/value-objects/watched-stock";
+} from "~/modules/screening/server/domain/errors";
+import { StockCode } from "~/modules/screening/server/domain/value-objects/stock-code";
+import { normalizeTags } from "~/modules/screening/server/domain/value-objects/watched-stock";
 // Repository 实现
-import { PrismaWatchListRepository } from "~/server/infrastructure/screening/prisma-watch-list-repository";
+import { PrismaWatchListRepository } from "~/modules/screening/server/infrastructure/prisma-watch-list-repository";
+import { createTRPCRouter, protectedProcedure } from "~/platform/trpc/server";
 
 /**
  * 领域异常到 TRPCError 的映射

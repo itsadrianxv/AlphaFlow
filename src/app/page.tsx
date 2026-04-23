@@ -1,6 +1,10 @@
 import Link from "next/link";
-import { OpportunityIntelligenceSummary } from "~/app/_components/opportunity-intelligence-summary";
-import { statusTone } from "~/app/_components/status-tone";
+import { getTemplateLabel } from "~/modules/research/ui/industry/research-view-models";
+import { buildRunDetailHref } from "~/modules/research/ui/industry/run-detail-href";
+import { api, HydrateClient } from "~/platform/trpc/rsc";
+import { auth } from "~/server/auth";
+import { primaryWorkflowStages } from "~/shared/ui/navigation/workflow-stage-config";
+import { statusTone } from "~/shared/ui/primitives/status-tone";
 import {
   ActionStrip,
   EmptyState,
@@ -8,15 +12,10 @@ import {
   SectionCard,
   StatusPill,
   WorkspaceShell,
-} from "~/app/_components/ui";
-import { primaryWorkflowStages } from "~/app/_components/workflow-stage-config";
-import { getTemplateLabel } from "~/app/workflows/research-view-models";
-import { buildRunDetailHref } from "~/app/workflows/run-detail-href";
-import { auth } from "~/server/auth";
-import { api, HydrateClient } from "~/trpc/server";
+} from "~/shared/ui/primitives/ui";
 
 type WorkflowRunListItem = Awaited<
-  ReturnType<typeof api.workflow.listRuns>
+  ReturnType<typeof api.research.runs.listRuns>
 >["items"][number];
 type RecommendationListItem = Awaited<
   ReturnType<typeof api.timing.listRecommendations>
@@ -59,7 +58,7 @@ export default async function Home() {
 
   let loadError: string | null = null;
   let workflowRuns:
-    | Awaited<ReturnType<typeof api.workflow.listRuns>>["items"]
+    | Awaited<ReturnType<typeof api.research.runs.listRuns>>["items"]
     | null = null;
   let screeningWorkspaces: Awaited<
     ReturnType<typeof api.screening.listWorkspaces>
@@ -72,7 +71,7 @@ export default async function Home() {
     try {
       const [workflowRunResult, workspaces, latestRecommendations] =
         await Promise.all([
-          api.workflow.listRuns({ limit: 12 }),
+          api.research.runs.listRuns({ limit: 12 }),
           api.screening.listWorkspaces({ limit: 8, offset: 0 }),
           api.timing.listRecommendations({ limit: 12 }),
         ]);
@@ -142,7 +141,7 @@ export default async function Home() {
     : priorityRecommendation
       ? "/timing/history"
       : priorityResearch
-        ? `/workflows/${priorityResearch.id}`
+        ? `/research/runs/${priorityResearch.id}`
         : priorityScreening
           ? `/screening?workspaceId=${priorityScreening.id}`
           : "/screening";
@@ -173,10 +172,10 @@ export default async function Home() {
             <Link href="/screening" className="app-button">
               筛选
             </Link>
-            <Link href="/workflows" className="app-button">
+            <Link href="/research" className="app-button">
               行业研究
             </Link>
-            <Link href="/company-research" className="app-button">
+            <Link href="/research/company" className="app-button">
               公司判断
             </Link>
             <Link href="/timing" className="app-button">
@@ -204,8 +203,6 @@ export default async function Home() {
             </Link>
           }
         />
-
-        {signedIn ? <OpportunityIntelligenceSummary /> : null}
 
         {loadError ? (
           <SectionCard surface="inset" density="compact">
@@ -266,7 +263,7 @@ export default async function Home() {
             title="继续当前研究"
             description="优先展示正在推进中的工作，而不是总览式统计。"
             actions={
-              <Link href="/workflows" className="app-button">
+              <Link href="/research" className="app-button">
                 打开研究入口
               </Link>
             }

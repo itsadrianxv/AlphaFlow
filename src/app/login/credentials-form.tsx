@@ -2,12 +2,11 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-
-import { InlineNotice } from "~/app/_components/ui";
 import {
   type LoginActionState,
   signInWithCredentials,
 } from "~/app/login/actions";
+import { InlineNotice } from "~/shared/ui/primitives/ui";
 
 const initialState: LoginActionState = {
   error: null,

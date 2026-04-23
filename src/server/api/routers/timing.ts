@@ -1,18 +1,18 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { MarketRegimeService } from "~/server/application/timing/market-regime-service";
-import { applyTimingPresetPatch } from "~/server/application/timing/timing-feedback-service";
-import { TimingReportService } from "~/server/application/timing/timing-report-service";
-import { PrismaPortfolioSnapshotRepository } from "~/server/infrastructure/timing/prisma-portfolio-snapshot-repository";
-import { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
-import { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
-import { PrismaTimingPresetAdjustmentSuggestionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-adjustment-suggestion-repository";
-import { PrismaTimingPresetRepository } from "~/server/infrastructure/timing/prisma-timing-preset-repository";
-import { PrismaTimingRecommendationRepository } from "~/server/infrastructure/timing/prisma-timing-recommendation-repository";
-import { PrismaTimingReviewRecordRepository } from "~/server/infrastructure/timing/prisma-timing-review-record-repository";
-import { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
-import { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
+import { MarketRegimeService } from "~/modules/timing/server/application/market-regime-service";
+import { applyTimingPresetPatch } from "~/modules/timing/server/application/timing-feedback-service";
+import { TimingReportService } from "~/modules/timing/server/application/timing-report-service";
+import { PrismaPortfolioSnapshotRepository } from "~/modules/timing/server/infrastructure/prisma-portfolio-snapshot-repository";
+import { PrismaTimingAnalysisCardRepository } from "~/modules/timing/server/infrastructure/prisma-timing-analysis-card-repository";
+import { PrismaTimingMarketContextSnapshotRepository } from "~/modules/timing/server/infrastructure/prisma-timing-market-context-snapshot-repository";
+import { PrismaTimingPresetAdjustmentSuggestionRepository } from "~/modules/timing/server/infrastructure/prisma-timing-preset-adjustment-suggestion-repository";
+import { PrismaTimingPresetRepository } from "~/modules/timing/server/infrastructure/prisma-timing-preset-repository";
+import { PrismaTimingRecommendationRepository } from "~/modules/timing/server/infrastructure/prisma-timing-recommendation-repository";
+import { PrismaTimingReviewRecordRepository } from "~/modules/timing/server/infrastructure/prisma-timing-review-record-repository";
+import { PrismaTimingSignalSnapshotRepository } from "~/modules/timing/server/infrastructure/prisma-timing-signal-snapshot-repository";
+import { PythonTimingDataClient } from "~/modules/timing/server/infrastructure/python-timing-data-client";
+import { createTRPCRouter, protectedProcedure } from "~/platform/trpc/server";
 
 const portfolioPositionInput = z.object({
   stockCode: z.string().regex(/^\d{6}$/, "stockCode must be 6 digits"),

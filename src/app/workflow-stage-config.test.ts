@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-
-import { primaryWorkflowStages } from "~/app/_components/workflow-stage-config";
-import { companyResearchStageTabs } from "~/app/company-research/company-research-stage-tabs";
-import { screeningStageTabs } from "~/app/screening/screening-stage-tabs";
-import { timingStageTabs } from "~/app/timing/timing-stage-tabs";
-import { workflowsStageTabs } from "~/app/workflows/workflows-stage-tabs";
+import { companyResearchStageTabs } from "~/modules/research/ui/company/company-research-stage-tabs";
+import { workflowsStageTabs } from "~/modules/research/ui/industry/workflows-stage-tabs";
+import { screeningStageTabs } from "~/modules/screening/ui/screening-stage-tabs";
+import { timingStageTabs } from "~/modules/timing/ui/timing-stage-tabs";
+import { primaryWorkflowStages } from "~/shared/ui/navigation/workflow-stage-config";
 
 describe("workflow stage config", () => {
   it("defines the primary workflow order", () => {
@@ -15,8 +14,8 @@ describe("workflow stage config", () => {
       })),
     ).toEqual([
       { id: "screening", href: "/screening" },
-      { id: "workflows", href: "/workflows" },
-      { id: "companyResearch", href: "/company-research" },
+      { id: "workflows", href: "/research" },
+      { id: "companyResearch", href: "/research/company" },
       { id: "timing", href: "/timing" },
     ]);
   });
