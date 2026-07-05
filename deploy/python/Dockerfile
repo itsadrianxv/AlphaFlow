@@ -56,10 +56,6 @@ RUN pip install --default-timeout=1200 --no-cache-dir -r requirements.txt \
   && python -c "import importlib.util; print('iFinDPy spec:', importlib.util.find_spec('iFinDPy'))" \
   && rm -rf vendor requirements-refchecker.txt
 
-COPY python_services/app ./app
-COPY python_services/scripts ./scripts
-COPY temp/-v3/backend/app/utils/indicators_mapping.py ./temp/-v3/backend/app/utils/indicators_mapping.py
-
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

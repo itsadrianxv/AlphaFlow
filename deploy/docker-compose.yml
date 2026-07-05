@@ -75,8 +75,13 @@ services:
     ports:
       - "${PYTHON_SERVICE_PORT:-8000}:8000"
     volumes:
+      - ../python_services/app:/app/app
+      - ../python_services/scripts:/app/scripts
+      - ../temp:/app/temp
       - ../data:/app/data
       - python_theme_rules_data:/data/theme-concept-rules
+    command:
+      ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     healthcheck:
       test:
         [
@@ -106,7 +111,10 @@ services:
     ports:
       - "${KRONOS_SERVICE_PORT:-8010}:8010"
     volumes:
+      - ../python_services/kronos_service:/app/kronos_service
       - kronos_model_cache:/models/huggingface
+    command:
+      ["uvicorn", "kronos_service.app:app", "--host", "0.0.0.0", "--port", "8010", "--reload"]
     healthcheck:
       test:
         [
@@ -136,7 +144,7 @@ services:
       kronos-service:
         condition: service_healthy
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: "3000"
       AUTH_SECRET: ${AUTH_SECRET:-}
       AUTH_SECRET_1: ${AUTH_SECRET_1:-}
@@ -165,11 +173,15 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
     ports:
       - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - ..:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
     command:
       [
         "sh",
         "-c",
-        "npm run validate:runtime && npm run db:push -- --accept-data-loss && npm run start",
+        "npm run validate:runtime && npm run db:push -- --accept-data-loss && npm run dev",
       ]
 
   workflow-worker:
@@ -189,7 +201,7 @@ services:
       kronos-service:
         condition: service_healthy
     environment:
-      NODE_ENV: production
+      NODE_ENV: development
       AUTH_SECRET: ${AUTH_SECRET:-}
       AUTH_SECRET_1: ${AUTH_SECRET_1:-}
       AUTH_SECRET_2: ${AUTH_SECRET_2:-}
@@ -207,6 +219,10 @@ services:
       KRONOS_DEFAULT_PREDICTION_LENGTH: ${KRONOS_DEFAULT_PREDICTION_LENGTH:-60}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       WORKFLOW_WORKER_POLL_INTERVAL_MS: ${WORKFLOW_WORKER_POLL_INTERVAL_MS:-2000}
+    volumes:
+      - ..:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
     command:
       ["sh", "-c", "npm run validate:runtime && npm run worker:workflow"]
 volumes:
@@ -214,5 +230,7 @@ volumes:
   redis_data:
   python_theme_rules_data:
   kronos_model_cache:
+  web_node_modules:
+  web_next:
 
 

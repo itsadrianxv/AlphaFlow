@@ -10,8 +10,6 @@ COPY python_services/requirements-kronos.txt ./requirements-kronos.txt
 RUN pip install --default-timeout=1200 --no-cache-dir -r requirements.txt \
   && pip install --default-timeout=1200 --no-cache-dir -r requirements-kronos.txt
 
-COPY python_services/kronos_service ./kronos_service
-
 EXPOSE 8010
 
-CMD ["uvicorn", "kronos_service.app:app", "--host", "0.0.0.0", "--port", "8010"]
+CMD ["uvicorn", "kronos_service.app:app", "--host", "0.0.0.0", "--port", "8010", "--reload"]
