@@ -98,6 +98,7 @@ services:
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: "1"
+      PYTHONPATH: /opt/kronos
       WATCHFILES_FORCE_POLLING: "true"
       KRONOS_REPO_PATH: /opt/kronos
       KRONOS_MODEL_NAME: ${KRONOS_MODEL_NAME:-NeoQuasar/Kronos-base}
