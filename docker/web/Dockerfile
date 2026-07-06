@@ -1,6 +1,6 @@
 FROM node:20-bookworm-slim
 
-WORKDIR /app
+WORKDIR /repo/web
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -9,8 +9,8 @@ RUN set -eux; \
   apt-get install -y --no-install-recommends openssl; \
   rm -rf /var/lib/apt/lists/*
 
-COPY package.json package-lock.json ./
-COPY prisma ./prisma
+COPY web/package.json web/package-lock.json ./
+COPY web/prisma ./prisma
 RUN npm ci
 
 ARG SKIP_ENV_VALIDATION=1

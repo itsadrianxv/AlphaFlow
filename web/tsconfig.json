@@ -28,7 +28,7 @@
     "baseUrl": ".",
     "paths": {
       "~/app/*": ["./app/*"],
-      "~/*": ["./web/*"]
+      "~/*": ["./*"]
     }
   },
   "include": [
@@ -39,5 +39,5 @@
     "**/*.js",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "web/generated", "temp", ".next", ".cache"]
+  "exclude": ["node_modules", "generated", ".next", ".cache"]
 }

@@ -3,7 +3,7 @@
   "vcs": {
     "enabled": true,
     "clientKind": "git",
-    "useIgnoreFile": true
+    "useIgnoreFile": false
   },
   "files": {
     "ignoreUnknown": false,
@@ -12,10 +12,23 @@
       "app/**/*.tsx",
       "app/**/*.js",
       "app/**/*.jsx",
-      "web/**/*.ts",
-      "web/**/*.tsx",
-      "web/**/*.js",
-      "web/**/*.jsx"
+      "contracts/**/*.ts",
+      "contracts/**/*.tsx",
+      "contracts/**/*.js",
+      "contracts/**/*.jsx",
+      "server/**/*.ts",
+      "server/**/*.tsx",
+      "server/**/*.js",
+      "server/**/*.jsx",
+      "tooling/**/*.ts",
+      "tooling/**/*.js",
+      "trpc/**/*.ts",
+      "trpc/**/*.tsx",
+      "trpc/**/*.js",
+      "trpc/**/*.jsx",
+      "env.js",
+      "next.config.js",
+      "postcss.config.js"
     ]
   },
   "formatter": {

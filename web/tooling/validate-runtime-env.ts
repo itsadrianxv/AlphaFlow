@@ -1,4 +1,4 @@
-import { validatePrimaryAuthSecret } from "../web/server/auth/secret-utils";
+import { validatePrimaryAuthSecret } from "../server/auth/secret-utils";
 
 const validationError = validatePrimaryAuthSecret({
   nodeEnv: process.env.NODE_ENV,

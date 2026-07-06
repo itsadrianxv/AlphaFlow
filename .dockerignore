@@ -1,7 +1,9 @@
 .git
 .next
+web/.next
 .runlogs
 .cache
+web/.cache
 .codex
 .kiro
 temp/*
@@ -15,6 +17,7 @@ temp/-v3/backend/app/*
 temp/-v3/backend/app/utils/*
 !temp/-v3/backend/app/utils/indicators_mapping.py
 node_modules
+web/node_modules
 npm-debug.log*
 
 .env

@@ -1,46 +1,43 @@
 import { randomUUID } from "node:crypto";
 import { env } from "~/env";
-import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
-import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
-import { WorkflowExecutionService } from "~/server/application/workflow/execution-service";
-import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
-import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
+import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
+import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
 import { QuickResearchWorkflowService } from "~/server/application/intelligence/quick-research-workflow-service";
+import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
+import { KronosForecastWorkflowService } from "~/server/application/timing/kronos-forecast-workflow-service";
 import { MarketRegimeService } from "~/server/application/timing/market-regime-service";
+import { PositionContextService } from "~/server/application/timing/position-context-service";
 import { TimingAnalysisService } from "~/server/application/timing/timing-analysis-service";
 import { TimingFeedbackService } from "~/server/application/timing/timing-feedback-service";
-import { KronosForecastWorkflowService } from "~/server/application/timing/kronos-forecast-workflow-service";
-import { PositionContextService } from "~/server/application/timing/position-context-service";
 import { TimingReviewSchedulingService } from "~/server/application/timing/timing-review-scheduling-service";
 import { WatchlistPortfolioManagerService } from "~/server/application/timing/watchlist-portfolio-manager-service";
 import { WatchlistRiskManagerService } from "~/server/application/timing/watchlist-risk-manager-service";
+import { WorkflowExecutionService } from "~/server/application/workflow/execution-service";
 import { db } from "~/server/db";
-import { InsightQualityService } from "~/server/domain/intelligence/services/insight-quality-service";
-import { ReviewPlanPolicy } from "~/server/domain/intelligence/services/review-plan-policy";
 import { TimingActionPolicy } from "~/server/domain/timing/services/timing-action-policy";
 import { TimingConfidencePolicy } from "~/server/domain/timing/services/timing-confidence-policy";
 import { TimingReviewPolicy } from "~/server/domain/timing/services/timing-review-policy";
-import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
+import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
 import { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
 import { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
 import { PrismaWatchListRepository } from "~/server/infrastructure/screening/prisma-watch-list-repository";
-import { PrismaPortfolioSnapshotRepository } from "~/server/infrastructure/timing/prisma-portfolio-snapshot-repository";
-import { PrismaTimingFeedbackObservationRepository } from "~/server/infrastructure/timing/prisma-timing-feedback-observation-repository";
-import { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
-import { PrismaTimingPresetRepository } from "~/server/infrastructure/timing/prisma-timing-preset-repository";
-import { PrismaTimingPresetAdjustmentSuggestionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-adjustment-suggestion-repository";
-import { PrismaTimingReviewRecordRepository } from "~/server/infrastructure/timing/prisma-timing-review-record-repository";
 import { KronosForecastClient } from "~/server/infrastructure/timing/kronos-forecast-client";
-import { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
-import { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
+import { PrismaPortfolioSnapshotRepository } from "~/server/infrastructure/timing/prisma-portfolio-snapshot-repository";
 import { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
+import { PrismaTimingFeedbackObservationRepository } from "~/server/infrastructure/timing/prisma-timing-feedback-observation-repository";
+import { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
+import { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
+import { PrismaTimingPresetAdjustmentSuggestionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-adjustment-suggestion-repository";
+import { PrismaTimingPresetRepository } from "~/server/infrastructure/timing/prisma-timing-preset-repository";
 import { PrismaTimingRecommendationRepository } from "~/server/infrastructure/timing/prisma-timing-recommendation-repository";
+import { PrismaTimingReviewRecordRepository } from "~/server/infrastructure/timing/prisma-timing-review-record-repository";
 import { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
+import { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
 import {
   CompanyResearchContractLangGraph,
   CompanyResearchLangGraph,
@@ -48,10 +45,10 @@ import {
   ODRCompanyResearchLangGraph,
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
 import { QuickResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
-import { TimingSignalPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-signal-graph";
 import { TimingReviewLoopLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-review-loop-graph";
-import { WatchlistTimingPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/watchlist-timing-graph";
+import { TimingSignalPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-signal-graph";
 import { WatchlistTimingCardsPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/watchlist-timing-cards-graph";
+import { WatchlistTimingPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/watchlist-timing-graph";
 import { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
 
@@ -97,20 +94,17 @@ const timingFeedbackObservationRepository =
 const timingPresetAdjustmentSuggestionRepository =
   new PrismaTimingPresetAdjustmentSuggestionRepository(db);
 const timingReviewRecordRepository = new PrismaTimingReviewRecordRepository(db);
-const timingSignalSnapshotRepository =
-  new PrismaTimingSignalSnapshotRepository(db);
+const timingSignalSnapshotRepository = new PrismaTimingSignalSnapshotRepository(
+  db,
+);
 const timingAnalysisCardRepository = new PrismaTimingAnalysisCardRepository(db);
-const timingRecommendationRepository =
-  new PrismaTimingRecommendationRepository(db);
+const timingRecommendationRepository = new PrismaTimingRecommendationRepository(
+  db,
+);
 const kronosForecastSnapshotRepository =
   new PrismaTimingKronosForecastSnapshotRepository(db);
 const reminderSchedulingService = new ReminderSchedulingService({
   reminderRepository,
-});
-const synthesisService = new InsightSynthesisService({
-  completionClient: deepSeekClient,
-  reviewPlanPolicy: new ReviewPlanPolicy(),
-  qualityService: new InsightQualityService(),
 });
 const timingAnalysisService = new TimingAnalysisService({
   confidencePolicy: new TimingConfidencePolicy(),
@@ -187,7 +181,8 @@ const executionService = new WorkflowExecutionService({
   ],
 });
 
-const workerId = process.env.WORKFLOW_WORKER_ID ?? `workflow-worker-${randomUUID()}`;
+const workerId =
+  process.env.WORKFLOW_WORKER_ID ?? `workflow-worker-${randomUUID()}`;
 const pollIntervalMs = env.WORKFLOW_WORKER_POLL_INTERVAL_MS;
 
 let shuttingDown = false;
@@ -219,7 +214,8 @@ async function main() {
 
   while (!shuttingDown) {
     try {
-      const recovered = await executionService.executeRecoverableRunningRun(workerId);
+      const recovered =
+        await executionService.executeRecoverableRunningRun(workerId);
 
       if (recovered) {
         continue;

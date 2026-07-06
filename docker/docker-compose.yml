@@ -35,7 +35,7 @@ services:
   python-service:
     build:
       context: ..
-      dockerfile: deploy/python/Dockerfile
+      dockerfile: docker/python/Dockerfile
       args:
         INSTALL_REFCHECKER: ${REFCHECKER_ENABLED:-false}
     restart: unless-stopped
@@ -97,7 +97,7 @@ services:
   kronos-service:
     build:
       context: ..
-      dockerfile: deploy/kronos/Dockerfile
+      dockerfile: docker/kronos/Dockerfile
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: "1"
@@ -130,7 +130,7 @@ services:
   web:
     build:
       context: ..
-      dockerfile: deploy/web/Dockerfile
+      dockerfile: docker/web/Dockerfile
       args:
         SKIP_ENV_VALIDATION: "1"
     restart: unless-stopped
@@ -174,9 +174,9 @@ services:
     ports:
       - "${WEB_PORT:-3000}:3000"
     volumes:
-      - ..:/app
-      - web_node_modules:/app/node_modules
-      - web_next:/app/.next
+      - ../web:/repo/web
+      - web_node_modules:/repo/web/node_modules
+      - web_next:/repo/web/.next
     command:
       [
         "sh",
@@ -187,7 +187,7 @@ services:
   workflow-worker:
     build:
       context: ..
-      dockerfile: deploy/web/Dockerfile
+      dockerfile: docker/web/Dockerfile
       args:
         SKIP_ENV_VALIDATION: "1"
     restart: unless-stopped
@@ -220,9 +220,9 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       WORKFLOW_WORKER_POLL_INTERVAL_MS: ${WORKFLOW_WORKER_POLL_INTERVAL_MS:-2000}
     volumes:
-      - ..:/app
-      - web_node_modules:/app/node_modules
-      - web_next:/app/.next
+      - ../web:/repo/web
+      - web_node_modules:/repo/web/node_modules
+      - web_next:/repo/web/.next
     command:
       ["sh", "-c", "npm run validate:runtime && npm run worker:workflow"]
 volumes:

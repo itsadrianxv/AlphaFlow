@@ -1,5 +1,4 @@
 @import "tailwindcss" source(none);
-@source "../../app";
 @source "..";
 
 @theme {

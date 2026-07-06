@@ -36,7 +36,7 @@ describe("HomePage server boundary", () => {
 
   it("loads the dark editorial theme from the root layout and global styles", () => {
     const layoutSource = readSource("app/layout.tsx");
-    const globalsSource = readSource("web/styles/globals.css");
+    const globalsSource = readSource("styles/globals.css");
 
     expect(layoutSource).toContain("Cormorant_Garamond");
     expect(layoutSource).toContain("Space_Grotesk");
@@ -48,11 +48,10 @@ describe("HomePage server boundary", () => {
     expect(globalsSource).toContain("--app-border: rgba(214, 235, 253, 0.19)");
   });
 
-  it("keeps Tailwind scanning both routed pages and shared web modules", () => {
-    const globalsSource = readSource("web/styles/globals.css");
+  it("keeps Tailwind scanning the web subproject", () => {
+    const globalsSource = readSource("styles/globals.css");
 
     expect(globalsSource).toContain('@import "tailwindcss" source(none)');
-    expect(globalsSource).toContain('@source "../../app"');
     expect(globalsSource).toContain('@source ".."');
   });
 });

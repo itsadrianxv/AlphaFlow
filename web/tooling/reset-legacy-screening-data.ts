@@ -1,5 +1,5 @@
-import { db } from "~/server/db";
 import { resetLegacyScreeningData } from "~/server/application/screening/reset-legacy-screening-data";
+import { db } from "~/server/db";
 
 async function main() {
   const result = await resetLegacyScreeningData(db);
