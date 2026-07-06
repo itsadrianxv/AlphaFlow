@@ -17,6 +17,9 @@ type MovingAverageVisibility = {
   ema120: boolean;
 };
 
+const MISSING_DATA = "-" as const;
+type MissingData = typeof MISSING_DATA;
+
 export type TimingReportChartInput = {
   bars: Pick<
     TimingBar,
@@ -70,9 +73,9 @@ function calculateStandardDeviation(values: number[], windowSize: number) {
 function lineSeriesData(
   line: TimingChartLinePoint[],
   dates: string[],
-): Array<number | null> {
+): Array<number | MissingData> {
   const valueByDate = new Map(line.map((item) => [item.tradeDate, item.value]));
-  return dates.map((date) => valueByDate.get(date) ?? null);
+  return dates.map((date) => valueByDate.get(date) ?? MISSING_DATA);
 }
 
 function buildHorizontalLine(
@@ -97,8 +100,8 @@ function buildHorizontalLine(
   };
 }
 
-function nulls(length: number) {
-  return Array.from({ length }, () => null);
+function missingValues(length: number) {
+  return Array.from({ length }, () => MISSING_DATA);
 }
 
 function finiteNumbers(values: Array<number | null | undefined>) {
@@ -138,7 +141,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
   const dates = input.bars.map((bar) => bar.tradeDate);
   const forecastDates =
     input.forecast?.points.map((point) => point.tradeDate) ?? [];
-  const allDates = [...dates, ...forecastDates];
+  const allDates = [...new Set([...dates, ...forecastDates])];
   const priceAxisBounds = buildHistoricalPriceAxisBounds(input);
   const closeValues = input.bars.map((bar) => bar.close);
   const bollingerMiddle = calculateSimpleMovingAverage(closeValues, 20);
@@ -158,7 +161,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
       type: "candlestick",
       data: allDates.map((date) => {
         const bar = input.bars.find((item) => item.tradeDate === date);
-        return bar ? [bar.open, bar.close, bar.low, bar.high] : null;
+        return bar ? [bar.open, bar.close, bar.low, bar.high] : MISSING_DATA;
       }),
       itemStyle: {
         color: "#11ff99",
@@ -177,7 +180,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             data: allDates.map(
               (date) =>
                 input.bars.find((bar) => bar.tradeDate === date)?.volume ??
-                null,
+                MISSING_DATA,
             ),
             xAxisIndex: 1,
             yAxisIndex: 1,
@@ -237,21 +240,30 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
           {
             name: "BOLL 上轨",
             type: "line",
-            data: [...bollingerUpper, ...nulls(forecastDates.length)],
+            data: [
+              ...bollingerUpper,
+              ...missingValues(allDates.length - dates.length),
+            ],
             symbol: "none",
             lineStyle: { color: "rgba(255,255,255,0.34)", width: 1 },
           },
           {
             name: "BOLL 中轨",
             type: "line",
-            data: [...bollingerMiddle, ...nulls(forecastDates.length)],
+            data: [
+              ...bollingerMiddle,
+              ...missingValues(allDates.length - dates.length),
+            ],
             symbol: "none",
             lineStyle: { color: "rgba(255,255,255,0.24)", width: 1 },
           },
           {
             name: "BOLL 下轨",
             type: "line",
-            data: [...bollingerLower, ...nulls(forecastDates.length)],
+            data: [
+              ...bollingerLower,
+              ...missingValues(allDates.length - dates.length),
+            ],
             symbol: "none",
             lineStyle: { color: "rgba(255,255,255,0.34)", width: 1 },
           },
@@ -278,7 +290,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
               const point = input.forecast?.points.find(
                 (item) => item.tradeDate === date,
               );
-              return point ? point.low : null;
+              return point ? point.low : MISSING_DATA;
             }),
             symbol: "none",
             lineStyle: { opacity: 0 },
@@ -295,7 +307,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
               const point = input.forecast?.points.find(
                 (item) => item.tradeDate === date,
               );
-              return point ? point.high - point.low : null;
+              return point ? point.high - point.low : MISSING_DATA;
             }),
             symbol: "none",
             lineStyle: { opacity: 0 },
@@ -312,7 +324,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
               const point = input.forecast?.points.find(
                 (item) => item.tradeDate === date,
               );
-              return point ? point.close : null;
+              return point ? point.close : MISSING_DATA;
             }),
             symbol: "none",
             lineStyle: {

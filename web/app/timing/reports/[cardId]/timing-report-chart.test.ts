@@ -112,6 +112,38 @@ describe("timing report chart helpers", () => {
     );
   });
 
+  it("uses ECharts missing-value markers instead of null values with forecast dates", () => {
+    const option = buildTimingReportChartOption({
+      ...sampleInput,
+      forecast: {
+        modelName: "NeoQuasar/Kronos-base",
+        predictionLength: 60,
+        warnings: [],
+        summary: {
+          expectedReturnPct: 6,
+          maxDrawdownPct: -2.5,
+          upsidePct: 7.2,
+          volatilityProxy: 0.2,
+          direction: "bullish",
+          confidence: 0.7,
+        },
+        points: [
+          {
+            tradeDate: "2026-03-09",
+            open: 1682,
+            high: 1704,
+            low: 1672,
+            close: 1698,
+            volume: 2200,
+            amount: 3_700_000,
+          },
+        ],
+      },
+    });
+
+    expect(JSON.stringify(option.series)).not.toContain("null");
+  });
+
   it("keeps the price axis anchored to historical bars when Kronos forecast is extreme", () => {
     const option = buildTimingReportChartOption({
       ...sampleInput,
