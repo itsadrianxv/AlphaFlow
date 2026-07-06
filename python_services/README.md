@@ -1,13 +1,13 @@
 ﻿# Stock Screening Python Service
 
-Python FastAPI 微服务，向主应用提供 iFinD 主用、AkShare 兜底的数据接口。
+Python FastAPI 微服务，向主应用提供 TuShare、AkShare 与情报工作流所需的数据接口。
 
-默认推荐通过 `deploy/docker-compose.yml` 运行本服务，保证与 Web / Worker 使用一致的 Python 3.11 容器环境；本地 `.venv` 更适合做单独调试和测试。
+默认推荐通过 `docker/docker-compose.yml` 运行本服务，保证与 Web / Worker 使用一致的 Python 3.11 容器环境；本地 `.venv` 更适合做单独调试和测试。
 
 ## 能力概览
 
 - 股票基础数据：代码列表、批量行情、历史指标、行业列表
-- Screening 兼容链路：legacy `/api/stocks/*` 默认优先走 iFinD，失败后按配置回退 AkShare
+- Screening v1 链路：通过 TuShare provider 查询选股工作台数据
 - Workflow 情报数据：主题资讯、候选股、公司证据（含批量）
 - 主题词 -> A 股概念映射：白名单/黑名单 + 智谱 Web Search + 本地自动匹配
 - 智能降级：AkShare 请求失败时优先读缓存，再走兜底数据
@@ -25,7 +25,6 @@ python_services/
       admin.py
     routers/
       admin_jobs.py
-      stock_data.py
       intelligence_data.py
       market_data.py
       intelligence_v1.py
@@ -42,7 +41,7 @@ python_services/
     providers/
       screening/
         factory.py
-        ifind_provider.py
+        tushare_provider.py
     jobs/
       refresh_universe.py
       refresh_concepts.py
@@ -70,7 +69,6 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 说明：
 
-- `iFinDPy` 如需手工安装，可在运行环境中额外安装；未安装或登录失败时，screening legacy 接口会按配置自动回退到 AkShare。
 - 如需运行 Python 测试，可额外执行 `pip install -r requirements-dev.txt`。
 - 如需启用 RefChecker 运行时，可额外执行 `pip install -r requirements-refchecker.txt`；未安装时，可信度分析接口会自动回退到内置 heuristic fallback。
 
@@ -118,10 +116,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Screening provider：
 
-- `IFIND_USERNAME`：iFinD 登录用户名
-- `IFIND_PASSWORD`：iFinD 登录密码
-- `SCREENING_PRIMARY_PROVIDER`：screening legacy 接口主 provider（默认 `ifind`）
-- `SCREENING_ENABLE_AKSHARE_FALLBACK`：是否开启 AkShare 兜底（默认 `true`）
+- `TUSHARE_TOKEN`：TuShare 数据接口 Token
+- `SCREENING_ENABLE_AKSHARE_FALLBACK`：是否开启 AkShare 兜底（默认 `false`）
 
 缓存与降级：
 
@@ -142,7 +138,7 @@ Screening provider：
 
 Web / Worker 调用预算：
 
-- `PYTHON_SERVICE_TIMEOUT_MS`：T3 侧 screening legacy 数据接口超时预算（默认 `60000`）
+- `PYTHON_SERVICE_TIMEOUT_MS`：T3 侧 Python 数据接口超时预算（默认 `60000`）
 - `PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS`：T3 侧 intelligence 数据接口超时预算（默认 `300000`）
 
 可信度分析：

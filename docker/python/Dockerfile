@@ -17,7 +17,7 @@ RUN set -eux; \
 
 COPY python_services/requirements.txt ./requirements.txt
 COPY python_services/requirements-refchecker.txt ./requirements-refchecker.txt
-COPY deploy/python/vendor ./vendor
+COPY docker/python/vendor ./vendor
 RUN pip install --default-timeout=1200 --no-cache-dir -r requirements.txt \
   && case "${INSTALL_REFCHECKER}" in \
     1|true|TRUE|yes|YES|on|ON) \
@@ -28,7 +28,6 @@ RUN pip install --default-timeout=1200 --no-cache-dir -r requirements.txt \
       echo "Skipping optional RefChecker dependencies."; \
       ;; \
     esac \
-  && site_packages="$(python -c 'import site; print(site.getsitepackages()[0])')" \
   && found=0 \
   && for pkg in vendor/*.whl vendor/*.tar.gz vendor/*.zip; do \
     if [ -f "$pkg" ]; then \
@@ -37,23 +36,9 @@ RUN pip install --default-timeout=1200 --no-cache-dir -r requirements.txt \
       found=1; \
     fi; \
   done \
-  && if [ -f vendor/iFinDPy.py ]; then \
-    echo "Installing vendored iFinDPy.py into ${site_packages}"; \
-    cp vendor/iFinDPy.py "${site_packages}/iFinDPy.py"; \
-    found=1; \
-  fi \
-  && if [ -d vendor/iFinDAPI ]; then \
-    echo "Installing vendored iFinDAPI package tree into ${site_packages}"; \
-    rm -rf "${site_packages}/iFinDAPI"; \
-    cp -R vendor/iFinDAPI "${site_packages}/iFinDAPI"; \
-    find "${site_packages}/iFinDAPI/Linux/bin64" -maxdepth 1 -name '*.so' -exec ln -sf {} /usr/local/lib/ \; ; \
-    ldconfig; \
-    found=1; \
-  fi \
   && if [ "$found" -eq 0 ]; then \
-    echo "No vendor iFinD package provided; continuing without iFinDPy."; \
+    echo "No vendor Python package provided."; \
   fi \
-  && python -c "import importlib.util; print('iFinDPy spec:', importlib.util.find_spec('iFinDPy'))" \
   && rm -rf vendor requirements-refchecker.txt
 
 EXPOSE 8000

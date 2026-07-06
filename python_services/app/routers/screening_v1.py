@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.providers.screening.factory import get_strict_screening_provider
 from app.services.screening_catalog import load_indicator_catalog
 from app.services.screening_formula_engine import SafeFormulaEngine
-from app.services.screening_ifind_gateway import resolve_periods
+from app.services.screening_periods import resolve_periods
 from app.services.screening_query_service import ScreeningQueryService
 from app.services.screening_universe import ScreeningStockSearcher
 

@@ -69,10 +69,9 @@ async def health_check():
 
 
 # Register routers
-from app.routers import admin_jobs, capabilities_v1, intelligence_data, stock_data
+from app.routers import admin_jobs, capabilities_v1, intelligence_data
 from app.routers import intelligence_v1, market_context_v1, market_data, screening_v1, timing_v1
 
-app.include_router(stock_data.router, prefix="/api", tags=["stocks"])
 app.include_router(
     intelligence_data.router, prefix="/api", tags=["intelligence"]
 )

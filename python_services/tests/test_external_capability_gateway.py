@@ -236,14 +236,6 @@ def test_screening_query_capability_uses_strict_screening_provider(monkeypatch):
         ) -> dict[str, dict[str, dict[str, float | None]]]:
             return {stock_code: {} for stock_code in stock_codes}
 
-    monkeypatch.setenv("SCREENING_PRIMARY_PROVIDER", "ifind")
-    monkeypatch.setattr(
-        "app.gateway.external_capability_gateway.get_screening_provider",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("capability gateway should use strict screening provider")
-        ),
-        raising=False,
-    )
     monkeypatch.setattr(
         "app.gateway.external_capability_gateway.get_strict_screening_provider",
         lambda: StrictProvider(),

@@ -68,7 +68,6 @@ docker compose --env-file docker/.env -f docker/docker-compose.yml down -v
 - `FIRECRAWL_API_KEY`
 - `TAVILY_API_KEY`
 - `ZHIPU_API_KEY`
-- `IFIND_USERNAME` / `IFIND_PASSWORD`
 - `TUSHARE_TOKEN`
 - `REFCHECKER_*`
 

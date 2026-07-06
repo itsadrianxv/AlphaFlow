@@ -32,14 +32,6 @@ def test_screening_query_route_uses_strict_provider(monkeypatch):
         ) -> dict[str, dict[str, dict[str, float | None]]]:
             return {stock_code: {} for stock_code in stock_codes}
 
-    monkeypatch.setenv("SCREENING_PRIMARY_PROVIDER", "ifind")
-    monkeypatch.setattr(
-        "app.routers.screening_v1.get_screening_provider",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("screening v1 route should use strict screening provider")
-        ),
-        raising=False,
-    )
     monkeypatch.setattr(
         "app.routers.screening_v1.get_strict_screening_provider",
         lambda: StrictProvider(),

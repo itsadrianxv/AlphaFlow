@@ -33,7 +33,6 @@ cp docker/.env.example docker/.env
 - `FIRECRAWL_API_KEY`
 - `TAVILY_API_KEY`
 - `ZHIPU_API_KEY`
-- `IFIND_USERNAME` / `IFIND_PASSWORD`
 - `TUSHARE_TOKEN`
 - `REFCHECKER_*`
 

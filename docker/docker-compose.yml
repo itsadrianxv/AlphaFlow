@@ -49,10 +49,7 @@ services:
       GATEWAY_REDIS_URL: ${GATEWAY_REDIS_URL:-redis://redis:6379}
       GATEWAY_REDIS_PREFIX: ${GATEWAY_REDIS_PREFIX:-gateway-cache}
       GATEWAY_HOT_THEMES: ${GATEWAY_HOT_THEMES:-AI,算力,机器人}
-      IFIND_USERNAME: ${IFIND_USERNAME:-}
-      IFIND_PASSWORD: ${IFIND_PASSWORD:-}
       TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
-      SCREENING_PRIMARY_PROVIDER: ${SCREENING_PRIMARY_PROVIDER:-tushare}
       SCREENING_ENABLE_AKSHARE_FALLBACK: "false"
       TAVILY_API_KEY: ${TAVILY_API_KEY:-}
       TAVILY_BASE_URL: ${TAVILY_BASE_URL:-https://api.tavily.com}
@@ -101,6 +98,7 @@ services:
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: "1"
+      WATCHFILES_FORCE_POLLING: "true"
       KRONOS_MODEL_NAME: ${KRONOS_MODEL_NAME:-NeoQuasar/Kronos-base}
       KRONOS_TOKENIZER_NAME: ${KRONOS_TOKENIZER_NAME:-NeoQuasar/Kronos-Tokenizer-base}
       KRONOS_DEVICE: ${KRONOS_DEVICE:-auto}
@@ -113,6 +111,7 @@ services:
     volumes:
       - ../python_services/kronos_service:/app/kronos_service
       - kronos_model_cache:/models/huggingface
+      - ../.models/huggingface:/models/huggingface
     command:
       ["uvicorn", "kronos_service.app:app", "--host", "0.0.0.0", "--port", "8010", "--reload"]
     healthcheck:

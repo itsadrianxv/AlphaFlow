@@ -11,7 +11,6 @@ import pandas as pd
 
 from app.providers.screening.akshare_provider import AkShareScreeningProvider
 from app.providers.screening.base import ScreeningDataProvider
-from app.providers.screening.ifind_provider import IFindScreeningProvider
 from app.providers.screening.tushare_provider import TushareScreeningProvider
 
 LOGGER = logging.getLogger(__name__)
@@ -309,20 +308,6 @@ class FallbackScreeningProvider(ScreeningDataProvider):
         if _now_timestamp() - cached_at > 300:
             return None
         return industries
-
-
-@lru_cache(maxsize=1)
-def get_screening_provider() -> ScreeningDataProvider:
-    primary_provider_name = os.getenv("SCREENING_PRIMARY_PROVIDER", "tushare").strip().lower()
-    if primary_provider_name == "akshare":
-        return AkShareScreeningProvider()
-    if primary_provider_name == "tushare":
-        return _build_tushare_provider()
-
-    enable_fallback = _env_bool("SCREENING_ENABLE_AKSHARE_FALLBACK", False)
-    primary_provider = IFindScreeningProvider()
-    fallback_provider = AkShareScreeningProvider() if enable_fallback else None
-    return FallbackScreeningProvider(primary=primary_provider, fallback=fallback_provider)
 
 
 @lru_cache(maxsize=1)

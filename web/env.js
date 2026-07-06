@@ -66,10 +66,7 @@ export const env = createEnv({
       .int()
       .positive()
       .default(60),
-    IFIND_USERNAME: z.string().optional(),
-    IFIND_PASSWORD: z.string().optional(),
     TUSHARE_TOKEN: z.string().optional(),
-    SCREENING_PRIMARY_PROVIDER: z.string().optional(),
     SCREENING_ENABLE_AKSHARE_FALLBACK: z.string().optional(),
     STOCK_CODES_CSV_PATH: z.string().optional(),
     DEEPSEEK_API_KEY: z.string().optional(),
@@ -152,10 +149,7 @@ export const env = createEnv({
       process.env.KRONOS_DEFAULT_PREDICTION_LENGTH,
       60,
     ),
-    IFIND_USERNAME: process.env.IFIND_USERNAME,
-    IFIND_PASSWORD: process.env.IFIND_PASSWORD,
     TUSHARE_TOKEN: process.env.TUSHARE_TOKEN,
-    SCREENING_PRIMARY_PROVIDER: process.env.SCREENING_PRIMARY_PROVIDER,
     SCREENING_ENABLE_AKSHARE_FALLBACK:
       process.env.SCREENING_ENABLE_AKSHARE_FALLBACK,
     STOCK_CODES_CSV_PATH: process.env.STOCK_CODES_CSV_PATH,

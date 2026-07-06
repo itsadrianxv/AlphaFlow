@@ -11,7 +11,7 @@ from typing import Any, Generic, TypeVar
 
 from app.providers.screening.factory import get_strict_screening_provider
 from app.services.firecrawl_capability_client import FirecrawlCapabilityClient
-from app.services.screening_ifind_gateway import resolve_periods
+from app.services.screening_periods import resolve_periods
 from app.services.screening_query_service import ScreeningQueryService
 from app.services.tavily_capability_client import TavilyCapabilityClient
 from app.services.zhipu_search_client import ZhipuSearchClient
@@ -76,7 +76,6 @@ class ExternalCapabilityGateway:
         provider_name = "tushare"
         diagnostics = {
             "provider": provider_name,
-            "configuredPrimaryProvider": os.getenv("SCREENING_PRIMARY_PROVIDER", "").strip().lower(),
             "hasToken": bool(os.getenv("TUSHARE_TOKEN", "").strip()),
             "sdkAvailable": find_spec("tushare") is not None,
             "requestFingerprint": _fingerprint(payload),
