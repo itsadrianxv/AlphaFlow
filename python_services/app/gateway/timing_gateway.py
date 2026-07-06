@@ -28,7 +28,6 @@ from app.contracts.timing import (
 from app.gateway.common import GatewayError, build_meta, execute_cached, gateway_cache
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
-from app.providers.akshare.client import AkShareProviderClient
 from app.providers.timing.base import TimingSignalDataProvider
 from app.providers.timing.tushare_provider import TushareTimingProvider
 from app.services.timing_indicators import timing_indicators_service
@@ -46,10 +45,10 @@ class TimingGateway:
     def __init__(
         self,
         signal_data_provider: TimingSignalDataProvider | None = None,
-        market_context_provider: AkShareProviderClient | None = None,
+        market_context_provider: TushareTimingProvider | None = None,
     ) -> None:
         self._signal_data_provider = signal_data_provider or TushareTimingProvider()
-        self._market_context_provider = market_context_provider or AkShareProviderClient()
+        self._market_context_provider = market_context_provider or TushareTimingProvider()
         self._retry_policy = RetryPolicy()
         self._cache = gateway_cache
 
@@ -385,7 +384,9 @@ class TimingGateway:
         *,
         as_of_date: str | None,
     ) -> MarketContextSnapshotData:
-        universe = self._market_context_provider.get_stock_universe()
+        universe = self._market_context_provider.get_stock_universe(
+            as_of_date=as_of_date,
+        )
 
         change_values = [
             float(item.get("changePercent") or 0)
@@ -400,7 +401,7 @@ class TimingGateway:
 
         index_frames: dict[str, pd.DataFrame] = {}
         indexes: list[MarketIndexSnapshot] = []
-        resolved_as_of = as_of_date
+        resolved_as_of = self._resolve_universe_as_of(universe) or as_of_date
 
         for code, fallback_name in MARKET_PROXY_CODES:
             stock = self._market_context_provider.get_stock_snapshot(code)
@@ -653,6 +654,13 @@ class TimingGateway:
         if close <= ema20 <= ema60:
             return "bearish"
         return "neutral"
+
+    def _resolve_universe_as_of(self, universe: list[dict]) -> str | None:
+        for item in universe:
+            value = item.get("tradeDate") or item.get("dataDate")
+            if value:
+                return str(value)
+        return None
 
     def _resolve_start_date(
         self,

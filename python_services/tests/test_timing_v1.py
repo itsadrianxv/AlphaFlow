@@ -14,7 +14,7 @@ client = TestClient(app)
 
 
 def _sample_history(stock_code: str = "600519") -> pd.DataFrame:
-    dates = pd.date_range("2025-01-02", periods=280, freq="B")
+    dates = pd.date_range(end="2026-07-06", periods=280, freq="B")
     records: list[dict[str, object]] = []
 
     for index, value in enumerate(dates):
@@ -212,34 +212,37 @@ def test_get_timing_bars_rejects_invalid_timeframe() -> None:
 def test_get_market_context_success() -> None:
     with (
         patch(
-            "app.providers.akshare.client.AkShareProviderClient.get_stock_universe",
+            "app.providers.timing.tushare_provider.TushareTimingProvider.get_stock_universe",
             return_value=[
                 {
                     "code": "600519",
                     "name": "Moutai",
+                    "tradeDate": "2026-07-06",
                     "changePercent": 2.5,
                     "turnoverRate": 1.1,
                 },
                 {
                     "code": "000001",
                     "name": "PingAn",
+                    "tradeDate": "2026-07-06",
                     "changePercent": -1.6,
                     "turnoverRate": 0.8,
                 },
                 {
                     "code": "300750",
                     "name": "CATL",
+                    "tradeDate": "2026-07-06",
                     "changePercent": 5.8,
                     "turnoverRate": 2.4,
                 },
             ],
         ),
         patch(
-            "app.providers.akshare.client.AkShareProviderClient.get_stock_snapshot",
+            "app.providers.timing.tushare_provider.TushareTimingProvider.get_stock_snapshot",
             side_effect=lambda stock_code: {"code": stock_code, "name": stock_code},
         ),
         patch(
-            "app.providers.akshare.client.AkShareProviderClient.get_stock_bars",
+            "app.providers.timing.tushare_provider.TushareTimingProvider.get_stock_bars",
             return_value=_sample_history(),
         ),
     ):
@@ -247,7 +250,8 @@ def test_get_market_context_success() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["meta"]["provider"] == "akshare"
+    assert payload["meta"]["provider"] == "tushare"
+    assert payload["data"]["asOfDate"] == "2026-07-06"
     assert payload["data"]["latestBreadth"]["totalCount"] == 3
     assert len(payload["data"]["indexes"]) == 4
     assert payload["data"]["features"]["benchmarkStrength"] >= 0

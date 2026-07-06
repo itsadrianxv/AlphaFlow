@@ -27,13 +27,15 @@ class FakeProClient:
         return self.stock_basic_frame.copy()
 
     def daily(self, **kwargs):
-        return self.daily_frames.get(kwargs["ts_code"], pd.DataFrame()).copy()
+        key = kwargs.get("ts_code") or kwargs.get("trade_date")
+        return self.daily_frames.get(key, pd.DataFrame()).copy()
 
     def adj_factor(self, **kwargs):
         return self.adj_factor_frames.get(kwargs["ts_code"], pd.DataFrame()).copy()
 
     def daily_basic(self, **kwargs):
-        return self.daily_basic_frames.get(kwargs["ts_code"], pd.DataFrame()).copy()
+        key = kwargs.get("ts_code") or kwargs.get("trade_date")
+        return self.daily_basic_frames.get(key, pd.DataFrame()).copy()
 
     def index_daily(self, **kwargs):
         return self.index_daily_frames.get(kwargs["ts_code"], pd.DataFrame()).copy()
@@ -201,6 +203,112 @@ def test_tushare_timing_provider_resolves_index_benchmarks(monkeypatch):
 
     assert bars.iloc[0]["股票代码"] == "510300"
     assert bars.iloc[0]["收盘"] == 4020.0
+
+
+def test_tushare_timing_provider_builds_market_snapshot(monkeypatch):
+    fake_client = FakeProClient(
+        stock_basic_frame=pd.DataFrame(
+            {
+                "ts_code": ["600519.SH", "000001.SZ"],
+                "symbol": ["600519", "000001"],
+                "name": ["Moutai", "PingAn"],
+                "industry": ["Liquor", "Bank"],
+            }
+        ),
+        daily_frames={
+            "20260706": pd.DataFrame(
+                {
+                    "ts_code": ["600519.SH", "000001.SZ"],
+                    "trade_date": ["20260706", "20260706"],
+                    "open": [100.0, 10.0],
+                    "high": [103.0, 10.5],
+                    "low": [99.0, 9.8],
+                    "close": [102.0, 10.3],
+                    "pre_close": [100.0, 10.0],
+                    "change": [2.0, 0.3],
+                    "pct_chg": [2.0, 3.0],
+                    "vol": [1000.0, 2000.0],
+                    "amount": [102000.0, 20600.0],
+                }
+            )
+        },
+        adj_factor_frames={},
+        daily_basic_frames={
+            "20260706": pd.DataFrame(
+                {
+                    "ts_code": ["600519.SH", "000001.SZ"],
+                    "trade_date": ["20260706", "20260706"],
+                    "close": [102.0, 10.3],
+                    "turnover_rate": [1.1, 0.8],
+                    "turnover_rate_f": [1.4, 1.0],
+                    "volume_ratio": [1.2, 0.9],
+                    "total_mv": [2_000_000.0, 300_000.0],
+                    "circ_mv": [1_800_000.0, 280_000.0],
+                }
+            )
+        },
+        index_daily_frames={},
+    )
+
+    monkeypatch.setenv("TUSHARE_TOKEN", "token-1")
+    monkeypatch.setattr(
+        timing_module,
+        "_create_tushare_client",
+        lambda _token: fake_client,
+    )
+
+    snapshot = TushareTimingProvider().get_stock_universe("2026-07-06")
+
+    assert snapshot[0]["code"] == "600519"
+    assert snapshot[0]["name"] == "Moutai"
+    assert snapshot[0]["tradeDate"] == "2026-07-06"
+    assert snapshot[0]["changePercent"] == 2.0
+    assert snapshot[0]["turnoverRate"] == 1.1
+    assert snapshot[0]["marketCap"] == 2_000_000.0
+
+
+def test_tushare_timing_provider_market_snapshot_rolls_back_to_recent_trade_date(monkeypatch):
+    fake_client = FakeProClient(
+        stock_basic_frame=pd.DataFrame(
+            {
+                "ts_code": ["600519.SH"],
+                "symbol": ["600519"],
+                "name": ["Moutai"],
+                "industry": ["Liquor"],
+            }
+        ),
+        daily_frames={
+            "20260703": pd.DataFrame(
+                {
+                    "ts_code": ["600519.SH"],
+                    "trade_date": ["20260703"],
+                    "open": [100.0],
+                    "high": [101.0],
+                    "low": [99.0],
+                    "close": [100.5],
+                    "pre_close": [100.0],
+                    "change": [0.5],
+                    "pct_chg": [0.5],
+                    "vol": [1000.0],
+                    "amount": [100500.0],
+                }
+            )
+        },
+        adj_factor_frames={},
+        daily_basic_frames={},
+        index_daily_frames={},
+    )
+
+    monkeypatch.setenv("TUSHARE_TOKEN", "token-1")
+    monkeypatch.setattr(
+        timing_module,
+        "_create_tushare_client",
+        lambda _token: fake_client,
+    )
+
+    snapshot = TushareTimingProvider().get_stock_universe("2026-07-05")
+
+    assert snapshot[0]["tradeDate"] == "2026-07-03"
 
 
 def test_tushare_timing_provider_rejects_unknown_stock_code(monkeypatch):

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from importlib.util import find_spec
 import os
 from typing import Any
@@ -12,12 +13,21 @@ from app.gateway.common import GatewayError
 
 _UNIVERSE_CACHE_TTL_SECONDS = 86_400
 _FRAME_CACHE_TTL_SECONDS = 3_600
+_MARKET_SNAPSHOT_CACHE_TTL_SECONDS = 3_600
+_MARKET_SNAPSHOT_LOOKBACK_DAYS = 10
 
 INDEX_BENCHMARK_TS_CODES = {
     "510300": "000300.SH",
     "510500": "000905.SH",
     "159915": "399006.SZ",
     "588000": "000688.SH",
+}
+
+INDEX_PROXY_NAMES = {
+    "510300": "沪深300",
+    "510500": "中证500",
+    "159915": "创业板指",
+    "588000": "科创50",
 }
 
 
@@ -54,9 +64,21 @@ class TushareTimingProvider:
             tuple[str, str | None, str | None],
             tuple[float, pd.DataFrame],
         ] = {}
+        self._market_snapshot_cache: dict[
+            str | None,
+            tuple[float, list[dict[str, Any]]],
+        ] = {}
 
     def get_stock_snapshot(self, stock_code: str) -> dict[str, Any]:
         normalized_code = self._normalize_stock_code(stock_code)
+        if normalized_code in INDEX_PROXY_NAMES:
+            return {
+                "code": normalized_code,
+                "name": INDEX_PROXY_NAMES[normalized_code],
+                "industry": "指数代理",
+                "stockName": INDEX_PROXY_NAMES[normalized_code],
+            }
+
         record = self._lookup_stock_record(normalized_code)
         return {
             "code": normalized_code,
@@ -88,6 +110,13 @@ class TushareTimingProvider:
         adjust: str,
     ) -> pd.DataFrame:
         normalized_code = self._normalize_stock_code(stock_code)
+        if normalized_code in INDEX_BENCHMARK_TS_CODES:
+            return self.get_benchmark_bars(
+                benchmark_code=normalized_code,
+                start_date=start_date,
+                end_date=end_date,
+            )
+
         if adjust not in {"", "qfq", "hfq"}:
             raise GatewayError(
                 code="invalid_adjust",
@@ -150,6 +179,22 @@ class TushareTimingProvider:
 
         return self._to_timing_history_frame(frame, normalized_code)
 
+    def get_stock_universe(self, as_of_date: str | None = None) -> list[dict[str, Any]]:
+        cache_key = self._normalize_ymd(as_of_date) if as_of_date else None
+        cached = self._market_snapshot_cache.get(cache_key)
+        if (
+            cached is not None
+            and _now_timestamp() - cached[0] <= _MARKET_SNAPSHOT_CACHE_TTL_SECONDS
+        ):
+            return [dict(item) for item in cached[1]]
+
+        snapshot = self._load_market_snapshot(as_of_date)
+        self._market_snapshot_cache[cache_key] = (
+            _now_timestamp(),
+            [dict(item) for item in snapshot],
+        )
+        return snapshot
+
     def _get_client(self):
         if self._client is not None:
             return self._client
@@ -196,6 +241,81 @@ class TushareTimingProvider:
                 provider=self.provider_name,
             )
         return record
+
+    def _load_market_snapshot(self, as_of_date: str | None) -> list[dict[str, Any]]:
+        client = self._get_client()
+        universe_map = self._load_universe_map()
+
+        for trade_date in self._candidate_trade_dates(as_of_date):
+            daily_frame = client.daily(
+                trade_date=trade_date,
+                fields="ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount",
+            )
+            if daily_frame is None or daily_frame.empty:
+                continue
+
+            daily_basic_frame = client.daily_basic(
+                trade_date=trade_date,
+                fields="ts_code,trade_date,close,turnover_rate,turnover_rate_f,volume_ratio,total_mv,circ_mv",
+            )
+            if daily_basic_frame is None:
+                daily_basic_frame = pd.DataFrame()
+
+            merged = daily_frame.copy()
+            if not daily_basic_frame.empty:
+                merged = merged.merge(
+                    daily_basic_frame.drop(columns=["trade_date"], errors="ignore"),
+                    on="ts_code",
+                    how="left",
+                    suffixes=("", "_basic"),
+                )
+
+            results: list[dict[str, Any]] = []
+            for _, row in merged.iterrows():
+                stock_code = self._normalize_stock_code(row.get("ts_code"))
+                if not stock_code:
+                    continue
+
+                record = universe_map.get(stock_code, {})
+                formatted_trade_date = self._format_ymd(
+                    row.get("trade_date") or trade_date,
+                )
+                results.append(
+                    {
+                        "code": stock_code,
+                        "stockCode": stock_code,
+                        "name": record.get("name") or stock_code,
+                        "stockName": record.get("name") or stock_code,
+                        "industry": record.get("industry") or "",
+                        "tradeDate": formatted_trade_date,
+                        "dataDate": formatted_trade_date,
+                        "open": self._safe_float(row.get("open")),
+                        "high": self._safe_float(row.get("high")),
+                        "low": self._safe_float(row.get("low")),
+                        "close": self._safe_float(row.get("close")),
+                        "preClose": self._safe_float(row.get("pre_close")),
+                        "changeAmount": self._safe_float(row.get("change")),
+                        "changePercent": self._safe_float(row.get("pct_chg")),
+                        "volume": self._safe_float(row.get("vol")),
+                        "amount": self._safe_float(row.get("amount")),
+                        "turnoverRate": self._safe_float(row.get("turnover_rate")),
+                        "turnoverRateFree": self._safe_float(row.get("turnover_rate_f")),
+                        "volumeRatio": self._safe_float(row.get("volume_ratio")),
+                        "marketCap": self._safe_float(row.get("total_mv")),
+                        "floatMarketCap": self._safe_float(row.get("circ_mv")),
+                    },
+                )
+
+            if results:
+                return results
+
+        requested = as_of_date or datetime.now(UTC).strftime("%Y-%m-%d")
+        raise GatewayError(
+            code="market_snapshot_unavailable",
+            message=f"TuShare market snapshot unavailable near {requested}",
+            status_code=503,
+            provider=self.provider_name,
+        )
 
     def _load_daily_frame(
         self,
@@ -414,3 +534,29 @@ class TushareTimingProvider:
 
     def _normalize_ymd(self, raw_date: str) -> str:
         return raw_date.replace("-", "")
+
+    def _candidate_trade_dates(self, as_of_date: str | None) -> list[str]:
+        if as_of_date:
+            base = datetime.strptime(as_of_date, "%Y-%m-%d")
+        else:
+            base = datetime.now(UTC).replace(tzinfo=None)
+        return [
+            (base - timedelta(days=offset)).strftime("%Y%m%d")
+            for offset in range(_MARKET_SNAPSHOT_LOOKBACK_DAYS + 1)
+        ]
+
+    def _format_ymd(self, raw_date: Any) -> str:
+        text = str(raw_date or "").replace("-", "").strip()
+        if len(text) == 8 and text.isdigit():
+            return f"{text[:4]}-{text[4:6]}-{text[6:8]}"
+        return text
+
+    def _safe_float(self, value: Any) -> float | None:
+        if value is None:
+            return None
+        try:
+            if pd.isna(value):
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None

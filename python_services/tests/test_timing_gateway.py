@@ -79,9 +79,10 @@ class FakeSignalProvider:
 
 
 class FakeMarketContextProvider:
-    provider_name = "akshare"
+    provider_name = "tushare"
 
-    def get_stock_universe(self):
+    def get_stock_universe(self, as_of_date: str | None = None):
+        del as_of_date
         return []
 
     def get_stock_snapshot(self, stock_code: str):
