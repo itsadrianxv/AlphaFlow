@@ -1,0 +1,236 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-stock-screening-boost}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-stock-screening-boost}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  python-service:
+    build:
+      context: ..
+      dockerfile: deploy/python/Dockerfile
+      args:
+        INSTALL_REFCHECKER: ${REFCHECKER_ENABLED:-false}
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      INTELLIGENCE_CACHE_TTL_SECONDS: ${INTELLIGENCE_CACHE_TTL_SECONDS:-300}
+      INTELLIGENCE_CACHE_STALE_SECONDS: ${INTELLIGENCE_CACHE_STALE_SECONDS:-1800}
+      INTELLIGENCE_SPOT_CACHE_TTL_SECONDS: ${INTELLIGENCE_SPOT_CACHE_TTL_SECONDS:-120}
+      INTELLIGENCE_ENABLE_MOCK_FALLBACK: ${INTELLIGENCE_ENABLE_MOCK_FALLBACK:-true}
+      GATEWAY_REDIS_URL: ${GATEWAY_REDIS_URL:-redis://redis:6379}
+      GATEWAY_REDIS_PREFIX: ${GATEWAY_REDIS_PREFIX:-gateway-cache}
+      GATEWAY_HOT_THEMES: ${GATEWAY_HOT_THEMES:-AI,算力,机器人}
+      IFIND_USERNAME: ${IFIND_USERNAME:-}
+      IFIND_PASSWORD: ${IFIND_PASSWORD:-}
+      TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
+      SCREENING_PRIMARY_PROVIDER: ${SCREENING_PRIMARY_PROVIDER:-tushare}
+      SCREENING_ENABLE_AKSHARE_FALLBACK: "false"
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      TAVILY_BASE_URL: ${TAVILY_BASE_URL:-https://api.tavily.com}
+      TAVILY_TIMEOUT_MS: ${TAVILY_TIMEOUT_MS:-15000}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+      FIRECRAWL_BASE_URL: ${FIRECRAWL_BASE_URL:-https://api.firecrawl.dev}
+      FIRECRAWL_TIMEOUT_MS: ${FIRECRAWL_TIMEOUT_MS:-15000}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY:-}
+      ZHIPU_WEB_SEARCH_MODEL: ${ZHIPU_WEB_SEARCH_MODEL:-glm-4-plus}
+      ZHIPU_WEB_SEARCH_ENDPOINT: ${ZHIPU_WEB_SEARCH_ENDPOINT:-https://open.bigmodel.cn/api/paas/v4/chat/completions}
+      ZHIPU_WEB_SEARCH_TIMEOUT_SECONDS: ${ZHIPU_WEB_SEARCH_TIMEOUT_SECONDS:-8}
+      ZHIPU_WEB_SEARCH_RETRIES: ${ZHIPU_WEB_SEARCH_RETRIES:-2}
+      REFCHECKER_ENABLED: ${REFCHECKER_ENABLED:-false}
+      REFCHECKER_MODEL: ${REFCHECKER_MODEL:-}
+      REFCHECKER_API_BASE: ${REFCHECKER_API_BASE:-}
+      REFCHECKER_TIMEOUT_SECONDS: ${REFCHECKER_TIMEOUT_SECONDS:-20}
+      REFCHECKER_BATCH_SIZE: ${REFCHECKER_BATCH_SIZE:-4}
+      INTELLIGENCE_CONCEPT_CATALOG_FILE: ${INTELLIGENCE_CONCEPT_CATALOG_FILE:-/app/data/ths_concept_catalog.csv}
+      INTELLIGENCE_THEME_CONCEPT_RULES_FILE: ${INTELLIGENCE_THEME_CONCEPT_RULES_FILE:-/data/theme-concept-rules/theme_concept_rules.json}
+    ports:
+      - "${PYTHON_SERVICE_PORT:-8000}:8000"
+    volumes:
+      - ../python_services/app:/app/app
+      - ../python_services/scripts:/app/scripts
+      - ../temp:/app/temp
+      - ../data:/app/data
+      - python_theme_rules_data:/data/theme-concept-rules
+    command:
+      ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as r; r.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  kronos-service:
+    build:
+      context: ..
+      dockerfile: deploy/kronos/Dockerfile
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      KRONOS_MODEL_NAME: ${KRONOS_MODEL_NAME:-NeoQuasar/Kronos-base}
+      KRONOS_TOKENIZER_NAME: ${KRONOS_TOKENIZER_NAME:-NeoQuasar/Kronos-Tokenizer-base}
+      KRONOS_DEVICE: ${KRONOS_DEVICE:-auto}
+      KRONOS_DEFAULT_PREDICTION_LENGTH: ${KRONOS_DEFAULT_PREDICTION_LENGTH:-60}
+      KRONOS_MAX_CONTEXT: ${KRONOS_MAX_CONTEXT:-512}
+      KRONOS_TIMEOUT_MS: ${KRONOS_TIMEOUT_MS:-120000}
+      HF_HOME: ${HF_HOME:-/models/huggingface}
+    ports:
+      - "${KRONOS_SERVICE_PORT:-8010}:8010"
+    volumes:
+      - ../python_services/kronos_service:/app/kronos_service
+      - kronos_model_cache:/models/huggingface
+    command:
+      ["uvicorn", "kronos_service.app:app", "--host", "0.0.0.0", "--port", "8010", "--reload"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request as r; r.urlopen('http://localhost:8010/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        SKIP_ENV_VALIDATION: "1"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-service:
+        condition: service_healthy
+      kronos-service:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_SECRET_1: ${AUTH_SECRET_1:-}
+      AUTH_SECRET_2: ${AUTH_SECRET_2:-}
+      AUTH_SECRET_3: ${AUTH_SECRET_3:-}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
+      NEXTAUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      AUTH_WECHAT_ID: ${AUTH_WECHAT_ID:-}
+      AUTH_WECHAT_SECRET: ${AUTH_WECHAT_SECRET:-}
+      AUTH_QQ_ID: ${AUTH_QQ_ID:-}
+      AUTH_QQ_SECRET: ${AUTH_QQ_SECRET:-}
+      AUTH_CREDENTIALS_USERNAME: ${AUTH_CREDENTIALS_USERNAME:-admin}
+      AUTH_CREDENTIALS_PASSWORD: ${AUTH_CREDENTIALS_PASSWORD:-admin123456}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PYTHON_SERVICE_URL: ${PYTHON_SERVICE_URL:-http://python-service:8000}
+      PYTHON_SERVICE_TIMEOUT_MS: ${PYTHON_SERVICE_TIMEOUT_MS:-60000}
+      PYTHON_INTELLIGENCE_SERVICE_URL: ${PYTHON_INTELLIGENCE_SERVICE_URL:-http://python-service:8000}
+      PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS: ${PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS:-300000}
+      KRONOS_SERVICE_URL: ${KRONOS_SERVICE_URL:-http://kronos-service:8010}
+      KRONOS_SERVICE_TIMEOUT_MS: ${KRONOS_SERVICE_TIMEOUT_MS:-120000}
+      KRONOS_FORECAST_ENABLED: ${KRONOS_FORECAST_ENABLED:-false}
+      KRONOS_DEFAULT_PREDICTION_LENGTH: ${KRONOS_DEFAULT_PREDICTION_LENGTH:-60}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - ..:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
+    command:
+      [
+        "sh",
+        "-c",
+        "npm run validate:runtime && npm run db:push -- --accept-data-loss && npm run dev",
+      ]
+
+  workflow-worker:
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
+      args:
+        SKIP_ENV_VALIDATION: "1"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-service:
+        condition: service_healthy
+      kronos-service:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      AUTH_SECRET_1: ${AUTH_SECRET_1:-}
+      AUTH_SECRET_2: ${AUTH_SECRET_2:-}
+      AUTH_SECRET_3: ${AUTH_SECRET_3:-}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PYTHON_SERVICE_URL: ${PYTHON_SERVICE_URL:-http://python-service:8000}
+      PYTHON_SERVICE_TIMEOUT_MS: ${PYTHON_SERVICE_TIMEOUT_MS:-60000}
+      PYTHON_INTELLIGENCE_SERVICE_URL: ${PYTHON_INTELLIGENCE_SERVICE_URL:-http://python-service:8000}
+      PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS: ${PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS:-300000}
+      KRONOS_SERVICE_URL: ${KRONOS_SERVICE_URL:-http://kronos-service:8010}
+      KRONOS_SERVICE_TIMEOUT_MS: ${KRONOS_SERVICE_TIMEOUT_MS:-120000}
+      KRONOS_FORECAST_ENABLED: ${KRONOS_FORECAST_ENABLED:-false}
+      KRONOS_DEFAULT_PREDICTION_LENGTH: ${KRONOS_DEFAULT_PREDICTION_LENGTH:-60}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      WORKFLOW_WORKER_POLL_INTERVAL_MS: ${WORKFLOW_WORKER_POLL_INTERVAL_MS:-2000}
+    volumes:
+      - ..:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
+    command:
+      ["sh", "-c", "npm run validate:runtime && npm run worker:workflow"]
+volumes:
+  postgres_data:
+  redis_data:
+  python_theme_rules_data:
+  kronos_model_cache:
+  web_node_modules:
+  web_next:
+
+
