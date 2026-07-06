@@ -449,7 +449,21 @@ export function syncTimingReportChart(params: {
 }) {
   const chart = params.init(params.element);
   const option = buildTimingReportChartOption(params.input);
-  chart.setOption(option, true);
+  let disposed = false;
+  let frameId: number | undefined;
+
+  const applyOption = () => {
+    if (disposed) {
+      return;
+    }
+    chart.setOption(option, true);
+  };
+
+  if (typeof window !== "undefined") {
+    frameId = window.requestAnimationFrame(applyOption);
+  } else {
+    applyOption();
+  }
 
   const handleResize = () => {
     chart.resize?.();
@@ -460,7 +474,11 @@ export function syncTimingReportChart(params: {
   }
 
   return () => {
+    disposed = true;
     if (typeof window !== "undefined") {
+      if (frameId !== undefined) {
+        window.cancelAnimationFrame(frameId);
+      }
       window.removeEventListener("resize", handleResize);
     }
     chart.dispose();
@@ -486,6 +504,7 @@ export function TimingReportChart(props: {
 
   useEffect(() => {
     let cleanup: (() => void) | undefined;
+    let cancelled = false;
 
     async function renderChart() {
       if (!containerRef.current) {
@@ -498,6 +517,11 @@ export function TimingReportChart(props: {
         import("echarts/components"),
         import("echarts/renderers"),
       ]);
+
+      if (cancelled || !containerRef.current) {
+        return;
+      }
+
       use([
         charts.BarChart,
         charts.CandlestickChart,
@@ -526,6 +550,7 @@ export function TimingReportChart(props: {
     void renderChart();
 
     return () => {
+      cancelled = true;
       cleanup?.();
     };
   }, [
