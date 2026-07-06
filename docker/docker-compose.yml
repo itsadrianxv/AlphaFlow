@@ -170,11 +170,13 @@ services:
       KRONOS_SERVICE_TIMEOUT_MS: ${KRONOS_SERVICE_TIMEOUT_MS:-120000}
       KRONOS_FORECAST_ENABLED: ${KRONOS_FORECAST_ENABLED:-false}
       KRONOS_DEFAULT_PREDICTION_LENGTH: ${KRONOS_DEFAULT_PREDICTION_LENGTH:-60}
+      STOCK_CODES_CSV_PATH: ${STOCK_CODES_CSV_PATH:-/repo/data/stock_codes.csv}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
     ports:
       - "${WEB_PORT:-3000}:3000"
     volumes:
       - ../web:/repo/web
+      - ../data:/repo/data:ro
       - web_node_modules:/repo/web/node_modules
       - web_next:/repo/web/.next
     command:
@@ -217,10 +219,12 @@ services:
       KRONOS_SERVICE_TIMEOUT_MS: ${KRONOS_SERVICE_TIMEOUT_MS:-120000}
       KRONOS_FORECAST_ENABLED: ${KRONOS_FORECAST_ENABLED:-false}
       KRONOS_DEFAULT_PREDICTION_LENGTH: ${KRONOS_DEFAULT_PREDICTION_LENGTH:-60}
+      STOCK_CODES_CSV_PATH: ${STOCK_CODES_CSV_PATH:-/repo/data/stock_codes.csv}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       WORKFLOW_WORKER_POLL_INTERVAL_MS: ${WORKFLOW_WORKER_POLL_INTERVAL_MS:-2000}
     volumes:
       - ../web:/repo/web
+      - ../data:/repo/data:ro
       - web_node_modules:/repo/web/node_modules
       - web_next:/repo/web/.next
     command:

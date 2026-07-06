@@ -1,12 +1,24 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import type { SearchStockResult } from "~/contracts/screening";
+import { env } from "~/env";
 
 const DEFAULT_STOCK_CODES_CSV_PATH = path.resolve(
   process.cwd(),
+  path.basename(process.cwd()) === "web" ? ".." : ".",
   "data",
   "stock_codes.csv",
 );
+
+function resolveStockCodesCsvPath(configuredPath?: string) {
+  if (!configuredPath) {
+    return DEFAULT_STOCK_CODES_CSV_PATH;
+  }
+
+  return path.isAbsolute(configuredPath)
+    ? configuredPath
+    : path.resolve(process.cwd(), configuredPath);
+}
 
 type CsvStockRecord = {
   stockCode: string;
@@ -98,7 +110,7 @@ export class LocalStockSearchService {
   } | null = null;
 
   constructor(
-    private readonly csvPath = DEFAULT_STOCK_CODES_CSV_PATH,
+    private readonly csvPath = resolveStockCodesCsvPath(env.STOCK_CODES_CSV_PATH),
     fileAccess?: Partial<FileAccess>,
   ) {
     this.fileAccess = {
