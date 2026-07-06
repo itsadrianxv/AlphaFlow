@@ -1,6 +1,6 @@
 # 热点洞察：watchlist-timing-graph.ts
 
-- 源文件: `src/server/infrastructure/workflow/langgraph/watchlist-timing-graph.ts`
+- 源文件: `web/server/infrastructure/workflow/langgraph/watchlist-timing-graph.ts`
 - 实际阅读入口: `WatchlistTimingPipelineLangGraph`
 - 推荐阅读顺序: [`workflow-command-service`](../workflow-command-service/workflow-command-service.md) -> 当前页 -> [`watchlist-risk-manager-service`](../timing/watchlist-risk-manager-service.md) -> [`watchlist-portfolio-manager-service`](../timing/watchlist-portfolio-manager-service.md) -> [`timing-feedback-service`](../timing/timing-feedback-service.md)
 - 这页重点: 搞清楚“自选股 + 组合快照 + 预设”是如何被 LangGraph 串成一次完整的组合建议运行

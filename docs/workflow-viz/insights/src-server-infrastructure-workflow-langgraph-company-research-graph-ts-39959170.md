@@ -1,6 +1,6 @@
 # 热点洞察: company-research-graph.ts
 
-- 源文件: `src/server/infrastructure/workflow/langgraph/company-research-graph.ts`
+- 源文件: `web/server/infrastructure/workflow/langgraph/company-research-graph.ts`
 - 热点分数: `77`
 - 推荐阅读入口: `CompanyResearchContractLangGraph` 和 `ODRCompanyResearchLangGraph`
 - 为什么难: 一个文件里同时维护了 V1、V2、V3、V4 四代公司研究图

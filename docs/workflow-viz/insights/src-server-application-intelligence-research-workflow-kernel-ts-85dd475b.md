@@ -1,6 +1,6 @@
 # 热点洞察: research-workflow-kernel.ts
 
-- 源文件: `src/server/application/intelligence/research-workflow-kernel.ts`
+- 源文件: `web/server/application/intelligence/research-workflow-kernel.ts`
 - 热点分数: `65`
 - 主入口: `writeTaskContract()`、`writeResearchBrief()`、`planResearchUnits()`、`analyzeResearchGaps()`
 - 为什么难: 它不直接做 I/O，却定义了工作流的默认策略、角色、单元、补洞和降级规则

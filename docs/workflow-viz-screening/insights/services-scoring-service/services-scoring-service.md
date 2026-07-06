@@ -1,6 +1,6 @@
 # 热点洞察：scoring-service.ts
 
-- 源文件: `src/server/domain/screening/services/scoring-service.ts`
+- 源文件: `web/server/domain/screening/services/scoring-service.ts`
 - 热点分数: `60`
 - 主入口: `scoreStocks`
 - 触发原因: `嵌套深度 >= 4 且判定点 >= 6 (normalizeIndicators: nesting=4, decisions=8)；主编排函数存在 >= 5 个顺序步骤 (normalizeIndicators calls=19)`

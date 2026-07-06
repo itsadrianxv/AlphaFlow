@@ -1,6 +1,6 @@
 # 热点洞察：company-research-client.tsx
 
-- 源文件: `src/app/company-research/company-research-client.tsx`
+- 源文件: `app/company-research/company-research-client.tsx`
 - 热点分数: `78`
 - 为什么难: 同一个组件同时承载表单状态、历史 run 列表、取消动作、URL 查询参数回填和启动后的跳转。
 - 建议先看函数: `CompanyResearchClient`、`handleStart`、`CompanyRunCard`

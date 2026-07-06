@@ -1,6 +1,6 @@
 # 热点洞察：company-research-workflow-service.ts
 
-- 源文件: `src/server/application/intelligence/company-research-workflow-service.ts`
+- 源文件: `web/server/application/intelligence/company-research-workflow-service.ts`
 - 热点分数: `85`
 - 为什么难: 它既负责规划研究单元，又负责真实采集执行、并发批处理、gap loop 和最终报告收束，是 V4 的执行中枢。
 - 建议先看函数: `planUnits`、`runCollectorUnit`、`executeUnits`、`runGapLoop`、`finalizeReport`

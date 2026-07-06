@@ -1,6 +1,6 @@
 # 热点洞察：screening-insight-pipeline-graph.ts
 
-- 源文件: `src/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph.ts`
+- 源文件: `web/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph.ts`
 - 热点分数: `79`
 - 主入口: `countNeedsReview`
 - 触发原因: `峰值函数圈复杂度 >= 10 (WorkflowPauseError=26)；嵌套深度 >= 4 且判定点 >= 6 (WorkflowPauseError: nesting=4, decisions=25)；显式状态/生命周期复杂 (1 states, 26 transitions)`

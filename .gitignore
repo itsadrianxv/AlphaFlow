@@ -39,14 +39,14 @@ yarn-error.log*
 # do not commit any .env files to git, except for the .env.example file. https://create.t3.gg/en/usage/env-variables#using-environment-variables
 .env
 .env*.local
-deploy/.env
-deploy/python/vendor/*
-!deploy/python/vendor/README.md
-!deploy/python/vendor/iFinDPy.py
-!deploy/python/vendor/iFinDAPI/
-!deploy/python/vendor/iFinDAPI/**
-deploy/python/vendor/iFinDAPI/**/__pycache__/
-deploy/python/vendor/iFinDAPI/**/*.pyc
+docker/.env
+docker/python/vendor/*
+!docker/python/vendor/README.md
+!docker/python/vendor/iFinDPy.py
+!docker/python/vendor/iFinDAPI/
+!docker/python/vendor/iFinDAPI/**
+docker/python/vendor/iFinDAPI/**/__pycache__/
+docker/python/vendor/iFinDAPI/**/*.pyc
 
 # vercel
 .vercel
@@ -55,7 +55,7 @@ deploy/python/vendor/iFinDAPI/**/*.pyc
 *.tsbuildinfo
 
 # prisma client output
-/src/generated/
+/web/generated/
 
 # idea files
 .idea
@@ -64,3 +64,13 @@ temp/
 
 data/*
 !data/ths_concept_catalog.csv
+
+
+.superpowers/
+.pytest_cache/
+clay/
+.agents/
+DESIGN.md
+design-system/
+
+temp/

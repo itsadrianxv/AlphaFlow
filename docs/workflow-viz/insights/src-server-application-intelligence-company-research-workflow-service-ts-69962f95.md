@@ -1,6 +1,6 @@
 # 热点洞察: company-research-workflow-service.ts
 
-- 源文件: `src/server/application/intelligence/company-research-workflow-service.ts`
+- 源文件: `web/server/application/intelligence/company-research-workflow-service.ts`
 - 热点分数: `85`
 - 主入口: `planUnits()`、`executeUnits()`、`runGapLoop()`、`finalizeReport()`
 - 为什么难: 一个类同时承担计划前准备、研究单元执行、补洞循环和最终报告编排

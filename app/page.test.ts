@@ -11,13 +11,13 @@ describe("HomePage server boundary", () => {
   it("keeps statusTone in a server-safe shared module", () => {
     const sharedHelperPath = path.resolve(
       process.cwd(),
-      "src/app/_components/status-tone.ts",
+      "app/_components/status-tone.ts",
     );
 
     expect(existsSync(sharedHelperPath)).toBe(true);
 
-    const homePageSource = readSource("src/app/page.tsx");
-    const uiSource = readSource("src/app/_components/ui.tsx");
+    const homePageSource = readSource("app/page.tsx");
+    const uiSource = readSource("app/_components/ui.tsx");
 
     expect(homePageSource).toContain('from "~/app/_components/status-tone"');
     expect(homePageSource).not.toContain(
@@ -27,7 +27,7 @@ describe("HomePage server boundary", () => {
   });
 
   it("keeps home header actions focused on the primary CTA instead of repeating module navigation", () => {
-    const homePageSource = readSource("src/app/page.tsx");
+    const homePageSource = readSource("app/page.tsx");
 
     expect(homePageSource).toContain(
       'actions={\n          <Link href={primaryHref} className="app-button app-button-primary">',
@@ -35,8 +35,8 @@ describe("HomePage server boundary", () => {
   });
 
   it("loads the dark editorial theme from the root layout and global styles", () => {
-    const layoutSource = readSource("src/app/layout.tsx");
-    const globalsSource = readSource("src/styles/globals.css");
+    const layoutSource = readSource("app/layout.tsx");
+    const globalsSource = readSource("web/styles/globals.css");
 
     expect(layoutSource).toContain("Cormorant_Garamond");
     expect(layoutSource).toContain("Space_Grotesk");

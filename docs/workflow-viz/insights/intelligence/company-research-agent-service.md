@@ -1,6 +1,6 @@
 # 热点洞察：company-research-agent-service.ts
 
-- 源文件: `src/server/application/intelligence/company-research-agent-service.ts`
+- 源文件: `web/server/application/intelligence/company-research-agent-service.ts`
 - 热点分数: `82`
 - 为什么难: 这个文件同时保留了旧版 collector 逻辑和 V4 仍在复用的后处理逻辑，很容易把“采集”和“证据收束”混为一谈。
 - 建议先看函数: `groundSources`、`curateEvidence`、`enrichReferences`、`answerQuestions`、`buildVerdict`

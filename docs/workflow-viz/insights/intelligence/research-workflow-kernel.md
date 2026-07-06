@@ -1,6 +1,6 @@
 # 热点洞察：research-workflow-kernel.ts
 
-- 源文件: `src/server/application/intelligence/research-workflow-kernel.ts`
+- 源文件: `web/server/application/intelligence/research-workflow-kernel.ts`
 - 热点分数: `65`
 - 为什么难: 这里没有真正执行任何采集，但几乎所有“研究计划长什么样”的规则都写在这里，而且 LLM 规划和 fallback 规则混在一个文件里。
 - 建议先看函数: `clarifyResearchScope`、`writeTaskContract`、`writeResearchBrief`、`planResearchUnits`、`analyzeResearchGaps`、`compressResearchFindings`

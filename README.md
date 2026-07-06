@@ -66,8 +66,8 @@ AlphaFlow 将选股筛选、行业研究、公司研究与异步任务编排整�
 项目已提供完整的多服务编排，适合首次体验或联调：
 
 ```bash
-cp deploy/.env.example deploy/.env
-docker compose --env-file deploy/.env -f deploy/docker-compose.yml up -d --build
+cp docker/.env.example docker/.env
+docker compose --env-file docker/.env -f docker/docker-compose.yml up -d --build
 ```
 
 启动后默认服务：
@@ -216,11 +216,11 @@ flowchart LR
 
 ### DDD 分层与边界上下文
 
-- `src/server/domain/screening/`：筛选策略、筛选会话、自选股聚合与领域服务。
-- `src/server/domain/workflow/`：工作流模板、运行状态、事件流与错误模型。
-- `src/server/domain/intelligence/`：面向研究流程的情报领域类型。
-- `src/server/api/routers/`：tRPC 作为应用入口，仅负责输入校验、编排与错误映射。
-- `src/server/infrastructure/`：Prisma 仓储、Python HTTP Client、LangGraph 运行时、Redis 状态存储。
+- `web/server/domain/screening/`：筛选策略、筛选会话、自选股聚合与领域服务。
+- `web/server/domain/workflow/`：工作流模板、运行状态、事件流与错误模型。
+- `web/server/domain/intelligence/`：面向研究流程的情报领域类型。
+- `web/server/api/routers/`：tRPC 作为应用入口，仅负责输入校验、编排与错误映射。
+- `web/server/infrastructure/`：Prisma 仓储、Python HTTP Client、LangGraph 运行时、Redis 状态存储。
 
 ### 数据持久化模型
 
@@ -240,7 +240,7 @@ Prisma 当前已覆盖这些核心模型：
 
 ```text
 AlphaFlow/
-├─ src/
+├─ web/
 │  ├─ app/                          # Next.js App Router 页面与客户端组件
 │  ├─ contracts/                    # 前后端共享输入输出约束
 │  ├─ server/
@@ -259,7 +259,7 @@ AlphaFlow/
 ├─ tooling/
 │  ├─ vitest.config.ts
 │  └─ workers/                      # screening-worker / workflow-worker
-├─ deploy/                          # Docker Compose 与镜像构建
+├─ docker/                          # Docker Compose 与镜像构建
 ├─ docs/                            # 方案、计划与上下文文档
 └─ README.md
 ```
@@ -301,7 +301,7 @@ AlphaFlow/
 
 ## 延伸阅读
 
-- [Docker Desktop 部署说明](./deploy/README.md)
+- [Docker Desktop 部署说明](./docker/README.md)
 - [Python 数据服务说明](./python_services/README.md)
 - [产品与方案文档](./docs/)
 <!-- readme-gen:end:health -->

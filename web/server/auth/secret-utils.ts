@@ -73,7 +73,7 @@ export const validatePrimaryAuthSecret = (
   }
 
   if (primarySecret === AUTH_SECRET_EXAMPLE_VALUE) {
-    return "AUTH_SECRET is still using the example placeholder. Generate a real secret with `npx auth secret`. If you are rotating from an older deployment, keep the previous value in AUTH_SECRET_1 so existing sessions can still be decrypted.";
+    return "AUTH_SECRET is still using the example placeholder. Generate a real secret with `npx auth secret`. If you are rotating from an older dockerment, keep the previous value in AUTH_SECRET_1 so existing sessions can still be decrypted.";
   }
 
   if (primarySecret.length < MIN_PRODUCTION_AUTH_SECRET_LENGTH) {

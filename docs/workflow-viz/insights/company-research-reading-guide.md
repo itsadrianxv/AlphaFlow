@@ -63,44 +63,44 @@
 
 如果你只想先搞懂“现在线上的公司研究怎么跑”，按这条链路追最省时间：
 
-1. `src/app/company-research/company-research-client.tsx:295`
+1. `app/company-research/company-research-client.tsx:295`
    `handleStart()` 会把公司名、关键问题、补充链接和 `researchPreferences` 整理成 `startCompanyResearch` 的输入。
-2. `src/server/application/workflow/command-service.ts:190`
+2. `web/server/application/workflow/command-service.ts:190`
    `startCompanyResearch()` 只做输入整理，真正复杂的是统一入口 `startWorkflow()`。
-3. `src/server/application/workflow/command-service.ts:428`
+3. `web/server/application/workflow/command-service.ts:428`
    `startWorkflow()` 负责幂等校验、确保公司研究模板存在，并创建 run。
-4. `src/server/infrastructure/workflow/langgraph/company-research-graph.ts:1045`
+4. `web/server/infrastructure/workflow/langgraph/company-research-graph.ts:1045`
    从 `CompanyResearchContractLangGraph` 开始读 V4，不要先陷进 V1/V2/V3。
-5. `src/server/infrastructure/workflow/langgraph/company-research-graph.ts:1122`
+5. `web/server/infrastructure/workflow/langgraph/company-research-graph.ts:1122`
    `agent2_plan_research_units` 委托 `CompanyResearchWorkflowService.planUnits()`。
-6. `src/server/infrastructure/workflow/langgraph/company-research-graph.ts:1235-1249`
+6. `web/server/infrastructure/workflow/langgraph/company-research-graph.ts:1235-1249`
    图层在首轮采集后走 `reference_enrichment -> finalize_report -> reflection`，补洞循环发生在它之前。
-7. `src/server/application/intelligence/company-research-workflow-service.ts:358`
+7. `web/server/application/intelligence/company-research-workflow-service.ts:358`
    `planUnits()` 先做 concept mapping 和 deep questions，再向 kernel 申请 `researchUnits`。
-8. `src/server/application/intelligence/company-research-workflow-service.ts:393`
+8. `web/server/application/intelligence/company-research-workflow-service.ts:393`
    `runCollectorUnit()` 才是真正的采集执行器，会把 capability 映射成 collectorKey、查询词和工具调用。
-9. `src/server/application/intelligence/company-research-workflow-service.ts:798`
+9. `web/server/application/intelligence/company-research-workflow-service.ts:798`
    `runGapLoop()` 会在首轮证据整合之后压缩 findings、识别缺口、追加 follow-up units。
-10. `src/server/application/intelligence/company-research-agent-service.ts:1326`
+10. `web/server/application/intelligence/company-research-agent-service.ts:1326`
     `curateEvidence()` 负责打分、去重、生成 references，是“证据收束”的核心。
-11. `src/server/application/intelligence/company-research-workflow-service.ts:970`
+11. `web/server/application/intelligence/company-research-workflow-service.ts:970`
     `finalizeReport()` 最终把 findings、verdict、confidenceAnalysis、reflection 汇成结果。
 
 ## `industry_search` 怎么跑
 
 如果你关心“行业研究”这一支，直接追下面几处：
 
-1. `src/server/application/intelligence/research-workflow-kernel.ts:421`
+1. `web/server/application/intelligence/research-workflow-kernel.ts:421`
    `buildUnitPlanFallback()` 默认会生成 `industry_landscape`，它的 capability 就是 `industry_search`。
-2. `src/server/application/intelligence/research-workflow-kernel.ts:789`
+2. `web/server/application/intelligence/research-workflow-kernel.ts:789`
    `planResearchUnits()` 会用大模型规划，但最终仍会裁剪到允许的 capability 集合里。
-3. `src/server/infrastructure/workflow/langgraph/company-research-graph.ts:1182`
+3. `web/server/infrastructure/workflow/langgraph/company-research-graph.ts:1182`
    `collector_industry_sources` 会从 `researchUnits` 里找到 `industry_search` 对应的 unit。
-4. `src/server/application/intelligence/company-research-workflow-service.ts:494`
+4. `web/server/application/intelligence/company-research-workflow-service.ts:494`
    `runCollectorUnit()` 把这个 unit 映射成 `collectorKey = industry_sources`，并构造行业格局检索词。
-5. `src/server/application/intelligence/research-tool-registry.ts:117`
+5. `web/server/application/intelligence/research-tool-registry.ts:117`
    `searchWeb()` 会并发搜索多个 query、按 canonical URL 去重，再把网页内容压成简短摘要。
-6. `src/server/application/intelligence/company-research-agent-service.ts:1326`
+6. `web/server/application/intelligence/company-research-agent-service.ts:1326`
    `curateEvidence()` 会把行业证据和其他 collector 的材料一起打分、去重、裁剪成最终引用集合。
 
 ## 为什么这块代码容易读乱

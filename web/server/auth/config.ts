@@ -94,7 +94,7 @@ const authLogger: NonNullable<NextAuthConfig["logger"]> = {
       ) {
         if (!hasLoggedSecretRotationWarning) {
           console.warn(
-            "[auth][warn] Detected a stale session cookie encrypted with a previous AUTH_SECRET. Auth.js will clear it automatically. After a Docker deploy, keep AUTH_SECRET stable or copy the previous secret into AUTH_SECRET_1 during rotation.",
+            "[auth][warn] Detected a stale session cookie encrypted with a previous AUTH_SECRET. Auth.js will clear it automatically. After a Docker docker, keep AUTH_SECRET stable or copy the previous secret into AUTH_SECRET_1 during rotation.",
           );
           hasLoggedSecretRotationWarning = true;
         }

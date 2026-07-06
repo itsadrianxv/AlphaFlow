@@ -1,6 +1,6 @@
 # 热点洞察：research-tool-registry.ts
 
-- 源文件: `src/server/application/intelligence/research-tool-registry.ts`
+- 源文件: `web/server/application/intelligence/research-tool-registry.ts`
 - 热点分数: `68`
 - 为什么难: 它把 Firecrawl、Python intelligence 和 DeepSeek 压缩统一藏在一个薄门面后面，调用方很容易误以为“只是搜一下网页”。
 - 建议先看函数: `searchWeb`、`fetchPage`、`getFinancialPack`

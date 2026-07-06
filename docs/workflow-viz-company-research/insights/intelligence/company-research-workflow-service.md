@@ -1,6 +1,6 @@
 # 热点洞察：company-research-workflow-service.ts
 
-- 源文件: `src/server/application/intelligence/company-research-workflow-service.ts`
+- 源文件: `web/server/application/intelligence/company-research-workflow-service.ts`
 - 热点分数: `85`
 - 主入口: `uniqueStrings`
 - 触发原因: `峰值函数圈复杂度 >= 10 (evidence=12)；嵌套深度 >= 4 且判定点 >= 6 (evidence: nesting=4, decisions=11)；显式状态/生命周期复杂 (2 states, 6 transitions)`

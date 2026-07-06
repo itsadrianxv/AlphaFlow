@@ -1,6 +1,6 @@
 # 热点洞察：timing-feedback-service.ts
 
-- 源文件: `src/server/application/timing/timing-feedback-service.ts`
+- 源文件: `web/server/application/timing/timing-feedback-service.ts`
 - 实际阅读入口: `buildContext()` 与 `refreshSuggestions()`
 - 推荐配套阅读: [`watchlist-timing-graph`](../langgraph-watchlist-timing-graph/analysis.md) / [`watchlist-portfolio-manager-service`](./watchlist-portfolio-manager-service.md)
 - 这页重点: 搞清楚反馈层怎样把历史复盘样本重新转成 preset 调整建议

@@ -1,6 +1,6 @@
 # 热点洞察: company-research-agent-service.ts
 
-- 源文件: `src/server/application/intelligence/company-research-agent-service.ts`
+- 源文件: `web/server/application/intelligence/company-research-agent-service.ts`
 - 热点分数: `82`
 - 主入口: `groundSources()`、`curateEvidence()`、`enrichReferences()`、`answerQuestions()`、`buildVerdict()`
 - 为什么难: 新版仍在使用的整理逻辑和旧版直接采集逻辑混在同一个大文件里

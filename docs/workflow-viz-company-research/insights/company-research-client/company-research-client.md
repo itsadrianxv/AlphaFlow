@@ -1,6 +1,6 @@
 # 热点洞察：company-research-client.tsx
 
-- 源文件: `src/app/company-research/company-research-client.tsx`
+- 源文件: `app/company-research/company-research-client.tsx`
 - 热点分数: `78`
 - 主入口: `formatDate`
 - 触发原因: `峰值函数圈复杂度 >= 10 (handleStart=12)；嵌套深度 >= 4 且判定点 >= 6 (handleStart: nesting=4, decisions=11)；显式状态/生命周期复杂 (3 states, 7 transitions)`

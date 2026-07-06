@@ -1,6 +1,6 @@
 # 热点洞察：research-tool-registry.ts
 
-- 源文件: `src/server/application/intelligence/research-tool-registry.ts`
+- 源文件: `web/server/application/intelligence/research-tool-registry.ts`
 - 热点分数: `68`
 - 主入口: `canonicalizeUrl`
 - 触发原因: `主编排函数存在 >= 5 个顺序步骤 (searchWeb calls=22)`

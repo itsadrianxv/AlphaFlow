@@ -9,10 +9,10 @@ function readSource(relativePath: string) {
 describe("run-to-space entry points", () => {
   it("adds a manual add-to-space entry on the investor run detail page and workflow history view", () => {
     const investorDetailSource = readSource(
-      "src/app/workflows/[runId]/run-investor-client.tsx",
+      "app/workflows/[runId]/run-investor-client.tsx",
     );
     const workflowHistorySource = readSource(
-      "src/app/_components/workflow-history-client.tsx",
+      "app/_components/workflow-history-client.tsx",
     );
 
     expect(investorDetailSource).toContain("/spaces?addRunId=");
@@ -21,7 +21,7 @@ describe("run-to-space entry points", () => {
 
   it("surfaces timing report entry points on the investor run detail page", () => {
     const investorDetailSource = readSource(
-      "src/app/workflows/[runId]/run-investor-client.tsx",
+      "app/workflows/[runId]/run-investor-client.tsx",
     );
 
     expect(investorDetailSource).toContain("/timing/reports/");

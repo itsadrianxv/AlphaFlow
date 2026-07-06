@@ -1,6 +1,6 @@
 # 热点洞察：screening-strategy.ts
 
-- 源文件: `src/server/domain/screening/aggregates/screening-strategy.ts`
+- 源文件: `web/server/domain/screening/aggregates/screening-strategy.ts`
 - 热点分数: `65`
 - 主入口: `execute`
 - 触发原因: `主编排函数存在 >= 5 个顺序步骤 (create calls=20)`

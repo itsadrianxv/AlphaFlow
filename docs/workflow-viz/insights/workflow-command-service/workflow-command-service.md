@@ -1,6 +1,6 @@
 # 热点洞察：command-service.ts
 
-- 源文件: `src/server/application/workflow/command-service.ts`
+- 源文件: `web/server/application/workflow/command-service.ts`
 - 热点分数: `81`
 - 为什么难: 这是一个通用工作流入口，既要处理公司研究，也要处理筛选、择时等多条流水线；公司研究只是其中一支。
 - 建议先看函数: `startCompanyResearch`、`startWorkflow`、`cancelRun`

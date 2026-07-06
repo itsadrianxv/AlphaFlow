@@ -1,6 +1,6 @@
 # 热点洞察：company-research-graph.ts
 
-- 源文件: `src/server/infrastructure/workflow/langgraph/company-research-graph.ts`
+- 源文件: `web/server/infrastructure/workflow/langgraph/company-research-graph.ts`
 - 热点分数: `77`
 - 主入口: `mergeStringArrays`
 - 触发原因: `峰值函数圈复杂度 >= 10 (WorkflowPauseError=21)；嵌套深度 >= 4 且判定点 >= 6 (WorkflowPauseError: nesting=4, decisions=20)；显式状态/生命周期复杂 (2 states, 55 transitions)`

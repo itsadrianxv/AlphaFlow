@@ -1,6 +1,6 @@
 # 热点洞察：watchlist-risk-manager-service.ts
 
-- 源文件: `src/server/application/timing/watchlist-risk-manager-service.ts`
+- 源文件: `web/server/application/timing/watchlist-risk-manager-service.ts`
 - 实际阅读入口: `buildRiskPlan()`
 - 推荐配套阅读: [`watchlist-timing-graph`](../langgraph-watchlist-timing-graph/analysis.md) / [`watchlist-portfolio-manager-service`](./watchlist-portfolio-manager-service.md)
 - 这页重点: 搞清楚组合建议之前，系统是如何先把“可出手的风险预算”算出来的

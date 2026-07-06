@@ -11,13 +11,13 @@
 
 | 页面 | 主要回答的问题 | 对应源码 |
 | --- | --- | --- |
-| [公司研究前端入口](./company-research-client/company-research-client.md) | 页面把哪些输入送进工作流？ | `src/app/company-research/company-research-client.tsx` |
-| [工作流启动入口](./workflow-command-service/workflow-command-service.md) | run 是怎么创建并绑定到 V4 模板的？ | `src/server/application/workflow/command-service.ts` |
-| [LangGraph 总控页](./langgraph-company-research-graph/langgraph-company-research-graph.md) | 节点顺序、fan-out、pause/resume、gap loop 在哪？ | `src/server/infrastructure/workflow/langgraph/company-research-graph.ts` |
-| [workflow service 核心](./intelligence/company-research-workflow-service.md) | `researchUnits` 是如何规划、执行、补洞、收束的？ | `src/server/application/intelligence/company-research-workflow-service.ts` |
-| [kernel 规则内核](./intelligence/research-workflow-kernel.md) | brief、task contract、unit plan、gap analysis 是怎么被规划出来的？ | `src/server/application/intelligence/research-workflow-kernel.ts` |
-| [tool registry 工具门面](./intelligence/research-tool-registry.md) | Web 搜索、页面抓取、财务 pack 是如何统一封装的？ | `src/server/application/intelligence/research-tool-registry.ts` |
-| [agent service 后处理](./intelligence/company-research-agent-service.md) | 证据如何去重、补引用、回答问题并变成 verdict？ | `src/server/application/intelligence/company-research-agent-service.ts` |
+| [公司研究前端入口](./company-research-client/company-research-client.md) | 页面把哪些输入送进工作流？ | `app/company-research/company-research-client.tsx` |
+| [工作流启动入口](./workflow-command-service/workflow-command-service.md) | run 是怎么创建并绑定到 V4 模板的？ | `web/server/application/workflow/command-service.ts` |
+| [LangGraph 总控页](./langgraph-company-research-graph/langgraph-company-research-graph.md) | 节点顺序、fan-out、pause/resume、gap loop 在哪？ | `web/server/infrastructure/workflow/langgraph/company-research-graph.ts` |
+| [workflow service 核心](./intelligence/company-research-workflow-service.md) | `researchUnits` 是如何规划、执行、补洞、收束的？ | `web/server/application/intelligence/company-research-workflow-service.ts` |
+| [kernel 规则内核](./intelligence/research-workflow-kernel.md) | brief、task contract、unit plan、gap analysis 是怎么被规划出来的？ | `web/server/application/intelligence/research-workflow-kernel.ts` |
+| [tool registry 工具门面](./intelligence/research-tool-registry.md) | Web 搜索、页面抓取、财务 pack 是如何统一封装的？ | `web/server/application/intelligence/research-tool-registry.ts` |
+| [agent service 后处理](./intelligence/company-research-agent-service.md) | 证据如何去重、补引用、回答问题并变成 verdict？ | `web/server/application/intelligence/company-research-agent-service.ts` |
 
 ## 最省时间的阅读路径
 

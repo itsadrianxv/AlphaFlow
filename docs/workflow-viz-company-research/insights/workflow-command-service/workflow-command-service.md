@@ -1,6 +1,6 @@
 # 热点洞察：command-service.ts
 
-- 源文件: `src/server/application/workflow/command-service.ts`
+- 源文件: `web/server/application/workflow/command-service.ts`
 - 热点分数: `81`
 - 主入口: `cancelRun`
 - 触发原因: `峰值函数圈复杂度 >= 10 (startWorkflow=28)；嵌套深度 >= 4 且判定点 >= 6 (startWorkflow: nesting=4, decisions=27)；主编排函数存在 >= 5 个顺序步骤 (startWorkflow calls=26)`

@@ -1,6 +1,6 @@
 # 热点洞察：timing-client.tsx
 
-- 源文件: `src/app/timing/timing-client.tsx`
+- 源文件: `app/timing/timing-client.tsx`
 - 实际阅读入口: `TimingClient`
 - 推荐阅读顺序: 当前页 -> [`workflow-command-service`](../workflow-command-service/workflow-command-service.md) -> [`watchlist-timing-graph`](../langgraph-watchlist-timing-graph/analysis.md)
 - 这页重点: 搞清楚前端工作台如何收集上下文、触发 workflow，并把最新一次组合建议重新组织成可读界面

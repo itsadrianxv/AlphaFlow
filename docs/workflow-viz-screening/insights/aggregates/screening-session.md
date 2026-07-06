@@ -1,6 +1,6 @@
 # 热点洞察：screening-session.ts
 
-- 源文件: `src/server/domain/screening/aggregates/screening-session.ts`
+- 源文件: `web/server/domain/screening/aggregates/screening-session.ts`
 - 热点分数: `45`
 - 主入口: `constructor`
 - 触发原因: `主编排函数存在 >= 5 个顺序步骤 (ScreeningSession calls=45)`

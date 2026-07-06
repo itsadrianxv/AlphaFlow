@@ -1,6 +1,6 @@
 # 热点洞察：company-research-agent-service.ts
 
-- 源文件: `src/server/application/intelligence/company-research-agent-service.ts`
+- 源文件: `web/server/application/intelligence/company-research-agent-service.ts`
 - 热点分数: `82`
 - 主入口: `inferRegistrableDomain`
 - 触发原因: `峰值函数圈复杂度 >= 10 (enrichReferences=14)；嵌套深度 >= 4 且判定点 >= 6 (enrichReferences: nesting=4, decisions=13)；异常/重试/降级路径 >= 3 (3)`

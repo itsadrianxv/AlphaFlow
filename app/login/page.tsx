@@ -216,7 +216,7 @@ export default async function LoginPage(props: {
               <p className="mt-2">
                 如果你是第一次通过 Docker 启动，记得先在{" "}
                 <code className="px-1 text-[var(--app-brand-strong)]">
-                  deploy/.env
+                  docker/.env
                 </code>{" "}
                 中补好{" "}
                 <code className="px-1 text-[var(--app-brand-strong)]">

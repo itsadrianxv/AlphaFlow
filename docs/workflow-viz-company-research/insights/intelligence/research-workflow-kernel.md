@@ -1,6 +1,6 @@
 # 热点洞察：research-workflow-kernel.ts
 
-- 源文件: `src/server/application/intelligence/research-workflow-kernel.ts`
+- 源文件: `web/server/application/intelligence/research-workflow-kernel.ts`
 - 热点分数: `65`
 - 主入口: `uniqueStrings`
 - 触发原因: `峰值函数圈复杂度 >= 10 (acceptanceCriteriaFor=26)；异常/重试/降级路径 >= 3 (16)`

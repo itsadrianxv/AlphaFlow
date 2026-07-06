@@ -1,6 +1,6 @@
 # 热点洞察：screening-execution-service.ts
 
-- 源文件: `src/server/application/screening/screening-execution-service.ts`
+- 源文件: `web/server/application/screening/screening-execution-service.ts`
 - 热点分数: `83`
 - 主入口: `enqueueStrategyExecution`
 - 触发原因: `峰值函数圈复杂度 >= 10 (NoCandidateStocksError=14)；异常/重试/降级路径 >= 3 (3)；主编排函数存在 >= 5 个顺序步骤 (NoCandidateStocksError calls=46)`

@@ -1,6 +1,6 @@
 # 热点洞察：watchlist-portfolio-manager-service.ts
 
-- 源文件: `src/server/application/timing/watchlist-portfolio-manager-service.ts`
+- 源文件: `web/server/application/timing/watchlist-portfolio-manager-service.ts`
 - 实际阅读入口: `buildRecommendations()`
 - 推荐配套阅读: [`watchlist-risk-manager-service`](./watchlist-risk-manager-service.md) / [`timing-feedback-service`](./timing-feedback-service.md) / [`watchlist-timing-graph`](../langgraph-watchlist-timing-graph/analysis.md)
 - 这页重点: 搞清楚单股 timing card 是怎样被翻译成带仓位区间、优先级和解释文本的组合建议

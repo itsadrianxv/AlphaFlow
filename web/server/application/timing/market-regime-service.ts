@@ -174,7 +174,7 @@ export class MarketRegimeService {
         ? [
             "Prefer WATCH/HOLD/TRIM over aggressive ADD actions.",
             "Tighten invalidation discipline and keep cash flexibility.",
-            "Require stronger relative strength before deploying new risk.",
+            "Require stronger relative strength before dockering new risk.",
           ]
         : state === "RISK_ON"
           ? [

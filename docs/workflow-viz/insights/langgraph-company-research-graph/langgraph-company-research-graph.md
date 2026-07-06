@@ -1,6 +1,6 @@
 # 热点洞察：company-research-graph.ts
 
-- 源文件: `src/server/infrastructure/workflow/langgraph/company-research-graph.ts`
+- 源文件: `web/server/infrastructure/workflow/langgraph/company-research-graph.ts`
 - 热点分数: `77`
 - 为什么难: 一个文件里同时堆了 V1/V2/V3/V4 四代图，还把 pause/resume、节点输出映射和 fan-out/join 都写在了一起。
 - 建议先看节点: `CompanyResearchContractLangGraph`、`agent0_clarify_scope`、`agent2_plan_research_units`、`collector_industry_sources`、`agent5_gap_analysis_and_replan`

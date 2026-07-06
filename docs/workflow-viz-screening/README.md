@@ -53,17 +53,17 @@ flowchart LR
 
 ## 哪几个文件最容易误解
 
-- `src/server/api/routers/screening.ts`
+- `web/server/api/routers/screening.ts`
   这是应用层入口，只做输入校验、权限判断、仓储装配和 enqueue，不做真正的股票扫描。
 - `tooling/workers/screening-worker.ts`
   这是后台执行壳层。它每轮总是先尝试恢复 `RUNNING` 会话，再领取新的 `PENDING` 会话。
-- `src/server/application/screening/screening-execution-service.ts`
+- `web/server/application/screening/screening-execution-service.ts`
   这是线上真实筛选主流程。分块拉股票、检查取消、过滤、评分、落库、触发下游，都在这里。
-- `src/server/domain/screening/aggregates/screening-session.ts`
+- `web/server/domain/screening/aggregates/screening-session.ts`
   这是状态和结果快照的中心。取消不是立刻中断执行线程，而是先打标记，再由 worker 在下一次检查时收敛。
-- `src/server/domain/screening/services/scoring-service.ts`
+- `web/server/domain/screening/services/scoring-service.ts`
   真正难点不在“加权求和”，而在“先按当前候选集合做归一化，再按方向翻转，再裁剪到 `[0,1]`”。
-- `src/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph.ts`
+- `web/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph.ts`
   这是筛选后的第二阶段。它不是补充日志，而是新的 LangGraph 工作流。
 
 ## 一条最重要的区分
