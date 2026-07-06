@@ -1,4 +1,5 @@
 import { Annotation, StateGraph } from "@langchain/langgraph";
+import type { KronosForecastWorkflowService } from "~/server/application/timing/kronos-forecast-workflow-service";
 import type { TimingAnalysisService } from "~/server/application/timing/timing-analysis-service";
 import { resolveTimingPresetConfig } from "~/server/domain/timing/preset";
 import type {
@@ -70,6 +71,7 @@ export class TimingSignalPipelineLangGraph extends BaseWorkflowLangGraph<
     presetRepository: PrismaTimingPresetRepository;
     signalSnapshotRepository: PrismaTimingSignalSnapshotRepository;
     analysisCardRepository: PrismaTimingAnalysisCardRepository;
+    kronosForecastWorkflowService?: KronosForecastWorkflowService;
   }) {
     const nodeExecutors: Record<TimingSignalPipelineNodeKey, NodeExecutor> = {
       load_targets: async (state) => {
@@ -120,6 +122,28 @@ export class TimingSignalPipelineLangGraph extends BaseWorkflowLangGraph<
           technicalAssessments: state.technicalAssessments,
         }),
       }),
+      kronos_forecast_agent: async (state) => {
+        if (!deps.kronosForecastWorkflowService) {
+          return {
+            cards: state.cards,
+            errors: ["kronos:Kronos forecast service is not configured."],
+          };
+        }
+
+        const result = await deps.kronosForecastWorkflowService.enrichCards({
+          userId: state.userId,
+          workflowRunId: state.runId,
+          sourceType: "single",
+          sourceId: state.timingInput.stockCode,
+          cards: state.cards,
+          signalSnapshots: state.signalSnapshots,
+        });
+
+        return {
+          cards: result.cards,
+          errors: result.warnings.map((warning) => `kronos:${warning}`),
+        };
+      },
       persist_cards: async (state) => {
         const persistedSignalSnapshots =
           await deps.signalSnapshotRepository.createMany({
@@ -208,6 +232,8 @@ export class TimingSignalPipelineLangGraph extends BaseWorkflowLangGraph<
         return { technicalAssessments: timingState.technicalAssessments };
       case "timing_synthesis_agent":
         return { cards: timingState.cards };
+      case "kronos_forecast_agent":
+        return { cards: timingState.cards, errors: timingState.errors };
       default:
         return {
           persistedSignalSnapshots: timingState.persistedSignalSnapshots,

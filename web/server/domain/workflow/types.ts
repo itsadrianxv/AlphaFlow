@@ -135,6 +135,7 @@ export const TIMING_SIGNAL_PIPELINE_NODE_KEYS = [
   "fetch_signal_snapshots",
   "technical_signal_agent",
   "timing_synthesis_agent",
+  "kronos_forecast_agent",
   "persist_cards",
 ] as const;
 
@@ -173,7 +174,8 @@ export const TIMING_REVIEW_LOOP_NODE_KEYS = [
   "schedule_next_review",
 ] as const;
 
-export type IndustryResearchNodeKey = (typeof INDUSTRY_RESEARCH_NODE_KEYS)[number];
+export type IndustryResearchNodeKey =
+  (typeof INDUSTRY_RESEARCH_NODE_KEYS)[number];
 export type CompanyResearchNodeKey =
   | (typeof COMPANY_RESEARCH_V1_NODE_KEYS)[number]
   | (typeof COMPANY_RESEARCH_NODE_KEYS)[number]

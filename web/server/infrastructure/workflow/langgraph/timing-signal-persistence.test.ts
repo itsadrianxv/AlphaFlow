@@ -239,6 +239,103 @@ describe("timing signal persistence graphs", () => {
     );
   });
 
+  it("enriches single-stock timing cards with Kronos before persistence", async () => {
+    const baseCard = buildCardDraft({
+      stockCode: "600519",
+      sourceType: "single",
+      sourceId: "600519",
+    });
+    const enrichedCard: TimingCardDraft = {
+      ...baseCard,
+      reasoning: {
+        ...baseCard.reasoning,
+        kronosForecast: {
+          direction: "bullish",
+          expectedReturnPct: 3.2,
+          maxDrawdownPct: -1.1,
+          upsidePct: 4.4,
+          volatilityProxy: 1.6,
+          confidence: 0.72,
+        },
+        kronosWarnings: [],
+      },
+    };
+    const getSignal = vi.fn().mockResolvedValue(buildSignalData("600519"));
+    const enrichCards = vi.fn().mockResolvedValue({
+      cards: [enrichedCard],
+      warnings: [],
+    });
+    const createManyCards = vi.fn().mockResolvedValue([
+      buildPersistedCard({
+        stockCode: "600519",
+        sourceType: "single",
+        sourceId: "600519",
+      }),
+    ]);
+
+    const graph = new TimingSignalPipelineLangGraph({
+      timingDataClient: {
+        getSignal,
+      },
+      analysisService: {
+        buildTechnicalAssessments: vi.fn().mockReturnValue([]),
+        buildCards: vi.fn().mockReturnValue([baseCard]),
+      },
+      presetRepository: {
+        getByIdForUser: vi.fn().mockResolvedValue(null),
+      },
+      signalSnapshotRepository: {
+        createMany: vi.fn().mockResolvedValue([
+          buildSnapshotRecord({
+            stockCode: "600519",
+            sourceType: "single",
+            sourceId: "600519",
+          }),
+        ]),
+      },
+      analysisCardRepository: {
+        createMany: createManyCards,
+      },
+      kronosForecastWorkflowService: {
+        enrichCards,
+      },
+    } as never);
+
+    const initialState = graph.buildInitialState({
+      runId: "run_1",
+      userId: "user_1",
+      query: "timing 600519",
+      input: {
+        stockCode: "600519",
+        asOfDate: "2026-03-06",
+      },
+      progressPercent: 0,
+    });
+
+    await graph.execute({
+      initialState,
+    });
+
+    expect(enrichCards).toHaveBeenCalledWith({
+      userId: "user_1",
+      workflowRunId: "run_1",
+      sourceType: "single",
+      sourceId: "600519",
+      cards: [baseCard],
+      signalSnapshots: [buildSignalData("600519")],
+    });
+    expect(createManyCards).toHaveBeenCalledWith({
+      items: [
+        expect.objectContaining({
+          stockCode: "600519",
+          reasoning: expect.objectContaining({
+            kronosForecast: enrichedCard.reasoning.kronosForecast,
+          }),
+        }),
+      ],
+    });
+  });
+
   it("requests bars for watchlist timing cards and persists them", async () => {
     const getSignalsBatch = vi.fn().mockResolvedValue({
       items: [buildSignalData("600519"), buildSignalData("000001")],

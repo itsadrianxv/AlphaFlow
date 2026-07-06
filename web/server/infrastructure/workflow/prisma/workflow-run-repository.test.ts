@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { INDUSTRY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
+import {
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
+  TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
+} from "~/server/domain/workflow/types";
 import { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 
 describe("PrismaWorkflowRunRepository", () => {
@@ -53,5 +56,41 @@ describe("PrismaWorkflowRunRepository", () => {
       }),
     );
     expect(template.version).toBe(3);
+  });
+
+  it("creates timing signal v1 templates with the Kronos forecast node", async () => {
+    const upsert = vi.fn(
+      async (params: { create: { graphConfig: unknown } }) => ({
+        id: "tpl_timing_v1",
+        code: TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
+        version: 1,
+        graphConfig: params.create.graphConfig,
+        inputSchema: {},
+        isActive: true,
+      }),
+    );
+    const prisma = {
+      workflowTemplate: {
+        upsert,
+      },
+    };
+    const repository = new PrismaWorkflowRunRepository(prisma as never);
+
+    await repository.ensureTimingSignalPipelineTemplate();
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          graphConfig: {
+            nodes: expect.arrayContaining(["kronos_forecast_agent"]),
+          },
+        }),
+        update: expect.objectContaining({
+          graphConfig: {
+            nodes: expect.arrayContaining(["kronos_forecast_agent"]),
+          },
+        }),
+      }),
+    );
   });
 });

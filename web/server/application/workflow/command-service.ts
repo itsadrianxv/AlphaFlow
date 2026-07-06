@@ -496,6 +496,19 @@ export class WorkflowCommandService {
     }
 
     if (
+      template &&
+      command.templateCode === TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE &&
+      (command.templateVersion === undefined || command.templateVersion === 1)
+    ) {
+      const timingSignalNodeKeys = getWorkflowNodeKeysFromGraphConfig(
+        template.graphConfig,
+      );
+      if (!timingSignalNodeKeys.includes("kronos_forecast_agent")) {
+        template = await this.repository.ensureTimingSignalPipelineTemplate();
+      }
+    }
+
+    if (
       !template &&
       command.templateCode === WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE
     ) {
