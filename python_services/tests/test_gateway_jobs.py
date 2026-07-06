@@ -201,6 +201,45 @@ def test_prewarm_hot_themes_uses_recorded_hot_themes() -> None:
     assert summary.stats["warmedResearchPacks"] == 1
 
 
+def test_prewarm_hot_themes_skips_when_no_themes_are_available() -> None:
+    fake_market_gateway = FakeMarketGateway()
+    fake_intelligence_gateway = FakeIntelligenceGateway()
+
+    summary = PrewarmHotThemesJob(
+        market_data_gateway=fake_market_gateway,
+        intelligence_data_gateway=fake_intelligence_gateway,
+        recorder=metrics_recorder,
+    ).run(max_themes=5, evidence_per_theme=1)
+
+    assert summary.job == "prewarm-hot-themes"
+    assert summary.stats["themes"] == []
+    assert summary.stats["warmedNews"] == 0
+    assert summary.stats["warmedCandidates"] == 0
+    assert summary.stats["warmedConcepts"] == 0
+    assert summary.stats["warmedEvidence"] == 0
+    assert summary.stats["warmedResearchPacks"] == 0
+    assert fake_market_gateway.requested_themes == []
+    assert fake_intelligence_gateway.news_themes == []
+    assert fake_intelligence_gateway.concept_themes == []
+    assert fake_intelligence_gateway.evidence_calls == []
+    assert fake_intelligence_gateway.research_pack_calls == []
+
+
+def test_prewarm_hot_themes_prefers_explicit_themes() -> None:
+    fake_market_gateway = FakeMarketGateway()
+    fake_intelligence_gateway = FakeIntelligenceGateway()
+
+    summary = PrewarmHotThemesJob(
+        market_data_gateway=fake_market_gateway,
+        intelligence_data_gateway=fake_intelligence_gateway,
+        recorder=metrics_recorder,
+    ).run(themes=["  机器人  ", "AI"], max_themes=1, evidence_per_theme=1)
+
+    assert summary.stats["themes"] == ["机器人"]
+    assert fake_market_gateway.requested_themes == ["机器人"]
+    assert fake_intelligence_gateway.news_themes == ["机器人"]
+
+
 def test_refresh_concepts_job_tracks_batches_and_failures() -> None:
     summary = RefreshConceptsJob(provider_client=FakeConceptProvider()).run(batch_size=2)
 

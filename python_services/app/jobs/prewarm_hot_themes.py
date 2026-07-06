@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 from app.gateway.intelligence_gateway import IntelligenceGateway, intelligence_gateway
 from app.gateway.market_gateway import MarketGateway, market_gateway
 from app.infrastructure.metrics.recorder import MetricsRecorder, metrics_recorder
@@ -12,14 +10,6 @@ from app.jobs.common import build_job_summary, iso_now
 _DEFAULT_NEWS_DAYS = 7
 _DEFAULT_NEWS_LIMIT = 20
 _DEFAULT_CONCEPT_LIMIT = 5
-
-
-def _default_hot_themes() -> list[str]:
-    return [
-        item.strip()
-        for item in os.getenv("GATEWAY_HOT_THEMES", "AI,算力,机器人").split(",")
-        if item.strip()
-    ]
 
 
 class PrewarmHotThemesJob:
@@ -113,4 +103,4 @@ class PrewarmHotThemesJob:
         if ranked_themes:
             return ranked_themes
 
-        return _default_hot_themes()[:max_themes]
+        return []

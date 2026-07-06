@@ -130,6 +130,9 @@ def test_market_context_gateway_builds_snapshot_from_macro_flow_and_hot_themes()
 
 
 def test_market_context_gateway_marks_partial_when_macro_snapshot_is_unavailable():
+    recorder = MetricsRecorder()
+    recorder.record_theme_request(dataset="theme_news", theme="AI")
+
     gateway = MarketContextGateway(
         macro_provider=SimpleNamespace(
             get_macro_snapshot=lambda: (_ for _ in ()).throw(RuntimeError("macro unavailable")),
@@ -151,7 +154,7 @@ def test_market_context_gateway_marks_partial_when_macro_snapshot_is_unavailable
         market_data_gateway=SimpleNamespace(
             get_theme_candidates=lambda **kwargs: _theme_candidates(kwargs["theme"]),
         ),
-        recorder=MetricsRecorder(),
+        recorder=recorder,
     )
 
     response = gateway.get_snapshot(request_id="req-2")
@@ -161,3 +164,45 @@ def test_market_context_gateway_marks_partial_when_macro_snapshot_is_unavailable
     assert response.data.availability.regime.warning is not None
     assert response.data.availability.flow.available is True
     assert response.data.availability.hotThemes.available is True
+
+
+def test_market_context_gateway_returns_partial_without_recorded_hot_themes():
+    gateway = MarketContextGateway(
+        macro_provider=SimpleNamespace(
+            get_macro_snapshot=lambda: {
+                "asOf": "2026-04-18T00:00:00+00:00",
+                "gdpYoY": 5.4,
+                "m2YoY": 8.3,
+                "socialFinancingIncrement": 5200.0,
+                "manufacturingPmi": 50.8,
+            },
+            get_hsgt_flow_snapshot=lambda: {
+                "asOf": "2026-04-18T00:00:00+00:00",
+                "northboundNetAmount": 1762.62,
+                "southboundNetAmount": -664.0,
+            },
+        ),
+        intelligence_data_gateway=SimpleNamespace(
+            get_theme_news=lambda **kwargs: (_ for _ in ()).throw(
+                AssertionError("不应在没有真实热门主题时请求主题新闻")
+            ),
+            get_theme_concepts=lambda **kwargs: (_ for _ in ()).throw(
+                AssertionError("不应在没有真实热门主题时请求主题概念")
+            ),
+        ),
+        market_data_gateway=SimpleNamespace(
+            get_theme_candidates=lambda **kwargs: (_ for _ in ()).throw(
+                AssertionError("不应在没有真实热门主题时请求候选股")
+            ),
+        ),
+        recorder=MetricsRecorder(),
+    )
+
+    response = gateway.get_snapshot(request_id="req-3")
+
+    assert response.data.status == "partial"
+    assert response.data.hotThemes == []
+    assert response.data.availability.regime.available is True
+    assert response.data.availability.flow.available is True
+    assert response.data.availability.hotThemes.available is False
+    assert response.data.availability.hotThemes.warning == "no hot themes available"

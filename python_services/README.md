@@ -127,7 +127,6 @@ Screening provider：
 - `INTELLIGENCE_ENABLE_MOCK_FALLBACK`：是否启用兜底数据（默认 `true`）
 - `GATEWAY_REDIS_URL`：Redis 连接串，配置后启用 L2 分布式缓存（可选）
 - `GATEWAY_REDIS_PREFIX`：Redis key 前缀（默认 `gateway-cache`）
-- `GATEWAY_HOT_THEMES`：热门主题预热回退列表，逗号分隔（默认 `AI,算力,机器人`）
 
 智谱 Web Search：
 
@@ -239,6 +238,8 @@ curl -X POST "http://localhost:8000/api/admin/jobs/refresh-concepts" \
 ```
 
 ### 6) 预热热门主题缓存
+
+未传 `themes` 时，任务只会使用当前进程 metrics 中记录过的热门主题；如果没有真实主题统计，则不会预热任何主题。
 
 ```bash
 curl -X POST "http://localhost:8000/api/admin/jobs/prewarm-hot-themes" \

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import time
 
 from app.contracts.market_context import (
@@ -23,14 +22,6 @@ from app.infrastructure.metrics.recorder import MetricsRecorder, metrics_recorde
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
 from app.providers.market_context.tushare_provider import TushareMarketContextProvider
-
-
-def _default_hot_themes() -> list[str]:
-    return [
-        item.strip()
-        for item in os.getenv("GATEWAY_HOT_THEMES", "AI,算力,机器人").split(",")
-        if item.strip()
-    ]
 
 
 def _average(values: list[float]) -> float | None:
@@ -348,10 +339,7 @@ class MarketContextGateway:
         return "unavailable"
 
     def _select_themes(self, limit: int) -> list[str]:
-        ranked = self._recorder.top_themes(limit=limit)
-        if ranked:
-            return ranked[:limit]
-        return _default_hot_themes()[:limit]
+        return self._recorder.top_themes(limit=limit)[:limit]
 
 
 market_context_gateway = MarketContextGateway()
