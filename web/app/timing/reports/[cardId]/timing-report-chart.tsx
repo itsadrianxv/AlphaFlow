@@ -101,11 +101,45 @@ function nulls(length: number) {
   return Array.from({ length }, () => null);
 }
 
+function finiteNumbers(values: Array<number | null | undefined>) {
+  return values.filter(
+    (value): value is number =>
+      typeof value === "number" && Number.isFinite(value),
+  );
+}
+
+function buildHistoricalPriceAxisBounds(input: TimingReportChartInput) {
+  const values = finiteNumbers([
+    ...input.bars.flatMap((bar) => [bar.high, bar.low, bar.open, bar.close]),
+    input.chartLevels.recentHigh60d,
+    input.chartLevels.recentLow20d,
+    ...input.chartLevels.ema5.map((point) => point.value),
+    ...input.chartLevels.ema20.map((point) => point.value),
+    ...input.chartLevels.ema60.map((point) => point.value),
+    ...input.chartLevels.ema120.map((point) => point.value),
+  ]);
+
+  if (values.length === 0) {
+    return {};
+  }
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, Math.abs(max) * 0.02, 1);
+  const padding = range * 0.12;
+
+  return {
+    min: Math.max(0, Math.floor((min - padding) * 100) / 100),
+    max: Math.ceil((max + padding) * 100) / 100,
+  };
+}
+
 export function buildTimingReportChartOption(input: TimingReportChartInput) {
   const dates = input.bars.map((bar) => bar.tradeDate);
   const forecastDates =
     input.forecast?.points.map((point) => point.tradeDate) ?? [];
   const allDates = [...dates, ...forecastDates];
+  const priceAxisBounds = buildHistoricalPriceAxisBounds(input);
   const closeValues = input.bars.map((bar) => bar.close);
   const bollingerMiddle = calculateSimpleMovingAverage(closeValues, 20);
   const bollingerStd = calculateStandardDeviation(closeValues, 20);
@@ -362,6 +396,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
     yAxis: [
       {
         scale: true,
+        ...priceAxisBounds,
         axisLine: {
           lineStyle: {
             color: "rgba(214, 235, 253, 0.16)",

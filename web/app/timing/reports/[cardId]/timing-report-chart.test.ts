@@ -112,6 +112,48 @@ describe("timing report chart helpers", () => {
     );
   });
 
+  it("keeps the price axis anchored to historical bars when Kronos forecast is extreme", () => {
+    const option = buildTimingReportChartOption({
+      ...sampleInput,
+      forecast: {
+        modelName: "NeoQuasar/Kronos-base",
+        predictionLength: 60,
+        warnings: [],
+        summary: {
+          expectedReturnPct: 6000,
+          maxDrawdownPct: -2.5,
+          upsidePct: 7000,
+          volatilityProxy: 0.2,
+          direction: "bullish",
+          confidence: 0.7,
+        },
+        points: [
+          {
+            tradeDate: "2026-03-09",
+            open: 168_200,
+            high: 170_400,
+            low: 167_200,
+            close: 169_800,
+            volume: 2200,
+            amount: 3_700_000,
+          },
+        ],
+      },
+    });
+
+    const priceAxis = option.yAxis[0] as { min: number; max: number };
+    expect(priceAxis.min).toBeLessThan(1652);
+    expect(priceAxis.max).toBeLessThan(2000);
+    expect(option.series).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "价格",
+          data: expect.arrayContaining([[1660, 1674, 1652, 1684]]),
+        }),
+      ]),
+    );
+  });
+
   it("applies chart updates and disposes cleanly through the imperative sync helper", () => {
     const setOption = vi.fn();
     const resize = vi.fn();
