@@ -120,7 +120,7 @@ export function WorkflowsClient() {
       description="先把问题写成可验证的投资判断，避免把后续步骤浪费在泛主题上。"
     >
       <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
-        本轮要回答什么
+        本轮要回答什么？
         <textarea
           value={query}
           onChange={(event) => setQuery(event.target.value)}

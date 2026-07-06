@@ -58,7 +58,7 @@ function formatHeatConclusion(score: number): string {
     return "行业热度中性偏强，建议结合估值与事件窗口择时。";
   }
 
-  return "行业热度偏弱，建议控制仓位并优先跟踪防守型标的。";
+  return "行业热度偏弱，建议控制仓位并优先跟踪防御型标的。";
 }
 
 function mapEvidenceToCredibility(
@@ -124,7 +124,7 @@ export class IntelligenceAgentService {
           {
             role: "system",
             content:
-              "你是股票投研助手，请输出一段不超过120字的行业概览，避免空话，强调关键驱动因素。",
+              "你是股票投研助手，请输出一段不超过 120 字的行业概览，避免空话，强调关键驱动因素。",
           },
           {
             role: "user",
@@ -165,7 +165,7 @@ export class IntelligenceAgentService {
           {
             role: "system",
             content:
-              "你是量化投研助理，请基于热度分数输出一句结论，控制在40字以内。",
+              "你是量化投研助理，请基于热度分数输出一句结论，控制在 50 字以内。",
           },
           {
             role: "user",
@@ -221,7 +221,7 @@ export class IntelligenceAgentService {
           stockCode: candidate.stockCode,
           credibilityScore: Math.max(55, candidate.score - index * 4),
           highlights: [candidate.reason],
-          risks: ["缺少近期公告佐证，需要补充核验"],
+          risks: ["缺少近期公告佐证，需要补充核验。"],
         }
       );
     });
@@ -256,7 +256,7 @@ export class IntelligenceAgentService {
           {
             role: "system",
             content:
-              "你是产业研究员，请输出一句竞争格局总结（40字以内），突出龙头优势与边际风险。",
+              "你是产业研究员，请输出一句竞争格局总结（50 字以内），突出龙头优势与边际风险。",
           },
           {
             role: "user",
@@ -282,7 +282,9 @@ export class IntelligenceAgentService {
     news: ThemeNewsItem[];
     evidenceList: CompanyEvidence[];
   }) {
-    return this.confidenceAnalysisService.analyzeIndustryResearchOverall(params);
+    return this.confidenceAnalysisService.analyzeIndustryResearchOverall(
+      params,
+    );
   }
 
   buildFinalReport(params: {

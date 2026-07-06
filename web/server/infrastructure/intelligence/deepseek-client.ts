@@ -383,7 +383,8 @@ export class DeepSeekClient {
           ...messages,
           {
             role: "user",
-            content: "璇峰彧杩斿洖鍚堟硶 JSON锛屼笉瑕佸寘鍚换浣曢濆鏂囨湰銆?",
+            content:
+              "上一次输出不是合法 JSON。请只返回可解析的 JSON，不要包含额外文本。",
           },
         ];
       }
