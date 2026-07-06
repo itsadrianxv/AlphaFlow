@@ -99,6 +99,7 @@ services:
     environment:
       PYTHONUNBUFFERED: "1"
       WATCHFILES_FORCE_POLLING: "true"
+      KRONOS_REPO_PATH: /opt/kronos
       KRONOS_MODEL_NAME: ${KRONOS_MODEL_NAME:-NeoQuasar/Kronos-base}
       KRONOS_TOKENIZER_NAME: ${KRONOS_TOKENIZER_NAME:-NeoQuasar/Kronos-Tokenizer-base}
       KRONOS_DEVICE: ${KRONOS_DEVICE:-auto}
@@ -111,6 +112,7 @@ services:
     volumes:
       - ../python_services/kronos_service:/app/kronos_service
       - kronos_model_cache:/models/huggingface
+      - ../.models/Kronos:/opt/kronos:ro
       - ../.models/huggingface:/models/huggingface
     command:
       ["uvicorn", "kronos_service.app:app", "--host", "0.0.0.0", "--port", "8010", "--reload"]
