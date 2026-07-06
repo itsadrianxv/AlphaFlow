@@ -21,7 +21,7 @@ const runLinks: ResearchSpaceRunLink[] = [
       createdAt: "2026-04-10T08:00:00.000Z",
       startedAt: "2026-04-10T08:01:00.000Z",
       completedAt: "2026-04-10T08:05:00.000Z",
-      templateCode: "quick_industry_research",
+      templateCode: "industry_research",
       templateVersion: 3,
     },
   },

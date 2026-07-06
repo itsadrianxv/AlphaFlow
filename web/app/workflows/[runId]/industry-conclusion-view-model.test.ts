@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { buildIndustryConclusionViewModel } from "~/app/workflows/[runId]/industry-conclusion-view-model";
 
 describe("industry-conclusion-view-model", () => {
-  it("maps a quick research result into the document-style sections", () => {
+  it("maps a industry research result into the document-style sections", () => {
     const model = buildIndustryConclusionViewModel({
-      runId: "run_quick_1",
+      runId: "run_industry_1",
       query: "AI infra",
       result: {
         overview: "AI 基建景气度仍在兑现，但适合继续聚焦到少数关键受益标的。",
@@ -152,9 +152,9 @@ describe("industry-conclusion-view-model", () => {
     expect(model?.risks.nextActions).toContain("补充公告与财报验证");
   });
 
-  it("falls back gracefully when optional quick research fields are missing", () => {
+  it("falls back gracefully when optional industry research fields are missing", () => {
     const model = buildIndustryConclusionViewModel({
-      runId: "run_quick_2",
+      runId: "run_industry_2",
       query: "机器人产业链",
       result: {
         overview: "主题仍需继续跟踪。",

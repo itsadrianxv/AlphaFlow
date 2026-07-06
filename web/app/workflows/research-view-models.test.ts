@@ -3,15 +3,15 @@ import {
   buildResearchDigest,
   extractConfidenceAnalysis,
   extractTimingReportCardIds,
-  getQuickResearchModePills,
+  getIndustryResearchModePills,
 } from "~/app/workflows/research-view-models";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
-  QUICK_RESEARCH_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
 } from "~/server/domain/workflow/types";
 
 describe("research-view-models", () => {
-  it("extracts confidence analysis from quick research results", () => {
+  it("extracts confidence analysis from industry research results", () => {
     const result = {
       overview: "Overview",
       heatScore: 80,
@@ -46,7 +46,7 @@ describe("research-view-models", () => {
     expect(extractConfidenceAnalysis(result)?.finalScore).toBe(88);
     expect(
       buildResearchDigest({
-        templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+        templateCode: INDUSTRY_RESEARCH_TEMPLATE_CODE,
         query: "AI",
         status: "SUCCEEDED",
         result,
@@ -56,7 +56,7 @@ describe("research-view-models", () => {
 
   it("keeps generic digest working for legacy results without confidence", () => {
     const digest = buildResearchDigest({
-      templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+      templateCode: INDUSTRY_RESEARCH_TEMPLATE_CODE,
       query: "Legacy run",
       status: "SUCCEEDED",
       result: {
@@ -68,9 +68,9 @@ describe("research-view-models", () => {
     expect(digest.metrics.length).toBeGreaterThanOrEqual(0);
   });
 
-  it("downgrades quick research digest to warning when clarification is still needed", () => {
+  it("downgrades industry research digest to warning when clarification is still needed", () => {
     const digest = buildResearchDigest({
-      templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+      templateCode: INDUSTRY_RESEARCH_TEMPLATE_CODE,
       query: "AI infra",
       status: "SUCCEEDED",
       result: {
@@ -114,9 +114,9 @@ describe("research-view-models", () => {
     expect(digest.gaps).toContain("query");
   });
 
-  it("builds quick research mode pills for standard, deep, and escalated runs", () => {
+  it("builds industry research mode pills for standard, deep, and escalated runs", () => {
     expect(
-      getQuickResearchModePills({
+      getIndustryResearchModePills({
         overview: "Overview",
         heatScore: 80,
         heatConclusion: "Conclusion",
@@ -133,7 +133,7 @@ describe("research-view-models", () => {
       }),
     ).toEqual(["标准模式", "已自动升级"]);
     expect(
-      getQuickResearchModePills({
+      getIndustryResearchModePills({
         overview: "Overview",
         heatScore: 80,
         heatConclusion: "Conclusion",

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildQuickResearchStartInput } from "~/app/workflows/quick-research-form";
+import { buildIndustryResearchStartInput } from "~/app/workflows/industry-research-form";
 
-describe("quick-research-form", () => {
+describe("industry-research-form", () => {
   it("keeps standard mode payload free of an explicit deep task contract", () => {
     expect(
-      buildQuickResearchStartInput({
+      buildIndustryResearchStartInput({
         query: "AI infra",
         idempotencyKey: "",
         researchGoal: "Find monetization",
@@ -19,7 +19,7 @@ describe("quick-research-form", () => {
 
   it("adds an explicit deep task contract when the deep mode switch is on", () => {
     expect(
-      buildQuickResearchStartInput({
+      buildIndustryResearchStartInput({
         query: "AI infra",
         idempotencyKey: "",
         researchGoal: "Find monetization",

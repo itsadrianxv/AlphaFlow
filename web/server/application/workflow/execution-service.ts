@@ -4,7 +4,7 @@ import { CompanyResearchWorkflowService } from "~/server/application/intelligenc
 import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
-import { QuickResearchWorkflowService } from "~/server/application/intelligence/quick-research-workflow-service";
+import { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
 import { InsightQualityService } from "~/server/domain/intelligence/services/insight-quality-service";
@@ -33,7 +33,7 @@ import {
   ODRCompanyResearchLangGraph,
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
 import { WorkflowGraphRegistry } from "~/server/infrastructure/workflow/langgraph/graph-registry";
-import { QuickResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
+import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
 import { ScreeningInsightPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph";
 import type { WorkflowGraphRunner } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
 import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
@@ -115,7 +115,7 @@ export function createWorkflowExecutionService(
     pythonCapabilityGatewayClient: capabilityGatewayClient,
     pythonIntelligenceDataClient: intelligenceDataClient,
   });
-  const quickResearchWorkflowService = new QuickResearchWorkflowService({
+  const industryResearchWorkflowService = new IndustryResearchWorkflowService({
     client: deepSeekClient,
     intelligenceService,
   });
@@ -138,7 +138,7 @@ export function createWorkflowExecutionService(
     repository,
     runtimeStore: options?.runtimeStore ?? new RedisWorkflowRuntimeStore(),
     graphs: options?.graphs ?? [
-      new QuickResearchLangGraph(quickResearchWorkflowService),
+      new IndustryResearchLangGraph(industryResearchWorkflowService),
       new LegacyCompanyResearchLangGraph(companyResearchService),
       new CompanyResearchLangGraph(companyResearchService),
       new ODRCompanyResearchLangGraph(companyResearchWorkflowService),

@@ -9,7 +9,7 @@ import { WorkflowExecutionService } from "~/server/application/workflow/executio
 import { WorkflowPauseError } from "~/server/domain/workflow/errors";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
-  QUICK_RESEARCH_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   type WorkflowGraphState,
 } from "~/server/domain/workflow/types";
@@ -276,7 +276,7 @@ class ReviewPauseGraph implements WorkflowGraphRunner {
 }
 
 class ClarificationPauseGraph implements WorkflowGraphRunner {
-  readonly templateCode = QUICK_RESEARCH_TEMPLATE_CODE;
+  readonly templateCode = INDUSTRY_RESEARCH_TEMPLATE_CODE;
   readonly templateVersion = 2;
 
   getNodeOrder() {

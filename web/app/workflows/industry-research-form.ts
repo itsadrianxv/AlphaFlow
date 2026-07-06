@@ -1,6 +1,6 @@
-import { buildQuickResearchTaskContract } from "~/server/domain/workflow/research";
+import { buildIndustryResearchTaskContract } from "~/server/domain/workflow/research";
 
-type QuickResearchFormInput = {
+type IndustryResearchFormInput = {
   query: string;
   idempotencyKey: string;
   researchGoal: string;
@@ -18,11 +18,11 @@ function splitLines(value: string) {
     .filter(Boolean);
 }
 
-export function buildQuickResearchStartInput(input: QuickResearchFormInput) {
+export function buildIndustryResearchStartInput(input: IndustryResearchFormInput) {
   return {
     query: input.query.trim(),
     taskContract: input.deepMode
-      ? buildQuickResearchTaskContract("deep")
+      ? buildIndustryResearchTaskContract("deep")
       : undefined,
     researchPreferences:
       input.researchGoal.trim() ||

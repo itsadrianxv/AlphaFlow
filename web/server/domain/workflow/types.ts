@@ -44,7 +44,7 @@ import {
   resolveResearchRuntimeConfig,
 } from "~/server/domain/workflow/research";
 
-export const QUICK_RESEARCH_TEMPLATE_CODE = "quick_industry_research";
+export const INDUSTRY_RESEARCH_TEMPLATE_CODE = "industry_research";
 export const COMPANY_RESEARCH_TEMPLATE_CODE = "company_research_center";
 export const SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE =
   "screening_insight_pipeline_v1";
@@ -56,7 +56,7 @@ export const WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE =
 export const SCREENING_TO_TIMING_TEMPLATE_CODE = "screening_to_timing_v1";
 export const TIMING_REVIEW_LOOP_TEMPLATE_CODE = "timing_review_loop_v1";
 
-export const QUICK_RESEARCH_NODE_KEYS = [
+export const INDUSTRY_RESEARCH_NODE_KEYS = [
   "agent0_clarify_scope",
   "agent1_extract_research_spec",
   "agent2_trend_analysis",
@@ -173,7 +173,7 @@ export const TIMING_REVIEW_LOOP_NODE_KEYS = [
   "schedule_next_review",
 ] as const;
 
-export type QuickResearchNodeKey = (typeof QUICK_RESEARCH_NODE_KEYS)[number];
+export type IndustryResearchNodeKey = (typeof INDUSTRY_RESEARCH_NODE_KEYS)[number];
 export type CompanyResearchNodeKey =
   | (typeof COMPANY_RESEARCH_V1_NODE_KEYS)[number]
   | (typeof COMPANY_RESEARCH_NODE_KEYS)[number]
@@ -192,7 +192,7 @@ export type ScreeningToTimingNodeKey =
 export type TimingReviewLoopNodeKey =
   (typeof TIMING_REVIEW_LOOP_NODE_KEYS)[number];
 export type WorkflowNodeKey =
-  | QuickResearchNodeKey
+  | IndustryResearchNodeKey
   | CompanyResearchNodeKey
   | ScreeningInsightPipelineNodeKey
   | TimingSignalPipelineNodeKey
@@ -202,39 +202,39 @@ export type WorkflowNodeKey =
   | TimingReviewLoopNodeKey
   | string;
 
-export type QuickResearchStructuredModel =
+export type IndustryResearchStructuredModel =
   | "deepseek-chat"
   | "deepseek-reasoner";
 
-export type QuickResearchAutoEscalationReason =
+export type IndustryResearchAutoEscalationReason =
   | "gap_followup"
   | "reflection_fail";
 
-export type QuickResearchExecutionMetadata = {
+export type IndustryResearchExecutionMetadata = {
   requestedDepth: ResearchAnalysisDepth;
   autoEscalated: boolean;
-  autoEscalationReason: QuickResearchAutoEscalationReason | null;
-  structuredModelInitial: QuickResearchStructuredModel;
-  structuredModelFinal: QuickResearchStructuredModel;
+  autoEscalationReason: IndustryResearchAutoEscalationReason | null;
+  structuredModelInitial: IndustryResearchStructuredModel;
+  structuredModelFinal: IndustryResearchStructuredModel;
 };
 
-export function resolveQuickResearchRequestedDepth(
+export function resolveIndustryResearchRequestedDepth(
   taskContract?: ResearchTaskContract,
 ): ResearchAnalysisDepth {
   return taskContract?.analysisDepth === "deep" ? "deep" : "standard";
 }
 
-export function resolveQuickResearchStructuredModel(
+export function resolveIndustryResearchStructuredModel(
   requestedDepth: ResearchAnalysisDepth,
-): QuickResearchStructuredModel {
+): IndustryResearchStructuredModel {
   return requestedDepth === "deep" ? "deepseek-reasoner" : "deepseek-chat";
 }
 
-export function buildQuickResearchExecutionMetadata(
+export function buildIndustryResearchExecutionMetadata(
   taskContract?: ResearchTaskContract,
-): QuickResearchExecutionMetadata {
-  const requestedDepth = resolveQuickResearchRequestedDepth(taskContract);
-  const model = resolveQuickResearchStructuredModel(requestedDepth);
+): IndustryResearchExecutionMetadata {
+  const requestedDepth = resolveIndustryResearchRequestedDepth(taskContract);
+  const model = resolveIndustryResearchStructuredModel(requestedDepth);
 
   return {
     requestedDepth,
@@ -246,7 +246,7 @@ export function buildQuickResearchExecutionMetadata(
 }
 
 export type WorkflowTemplateCode =
-  | typeof QUICK_RESEARCH_TEMPLATE_CODE
+  | typeof INDUSTRY_RESEARCH_TEMPLATE_CODE
   | typeof COMPANY_RESEARCH_TEMPLATE_CODE
   | typeof SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE
   | typeof TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE
@@ -292,20 +292,20 @@ export type WorkflowGraphState = Record<string, unknown> & {
   missingRequirements?: string[];
 };
 
-export type QuickResearchInput = {
+export type IndustryResearchInput = {
   query: string;
   researchPreferences?: ResearchPreferenceInput;
   taskContract?: ResearchTaskContract;
 };
 
-export type QuickResearchCandidate = {
+export type IndustryResearchCandidate = {
   stockCode: string;
   stockName: string;
   reason: string;
   score: number;
 };
 
-export type QuickResearchCredibility = {
+export type IndustryResearchCredibility = {
   stockCode: string;
   credibilityScore: number;
   highlights: string[];
@@ -313,19 +313,19 @@ export type QuickResearchCredibility = {
   confidenceAnalysis?: ConfidenceAnalysis;
 };
 
-export type QuickResearchTopPick = {
+export type IndustryResearchTopPick = {
   stockCode: string;
   stockName: string;
   reason: string;
 };
 
-export type QuickResearchResultDto = {
+export type IndustryResearchResultDto = {
   overview: string;
   heatScore: number;
   heatConclusion: string;
-  candidates: QuickResearchCandidate[];
-  credibility: QuickResearchCredibility[];
-  topPicks: QuickResearchTopPick[];
+  candidates: IndustryResearchCandidate[];
+  credibility: IndustryResearchCredibility[];
+  topPicks: IndustryResearchTopPick[];
   competitionSummary: string;
   confidenceAnalysis?: ConfidenceAnalysis;
   brief?: ResearchBriefV2;
@@ -341,7 +341,7 @@ export type QuickResearchResultDto = {
   qualityFlags?: string[];
   missingRequirements?: string[];
   generatedAt: string;
-} & Partial<QuickResearchExecutionMetadata>;
+} & Partial<IndustryResearchExecutionMetadata>;
 
 export type WorkflowStreamEvent = {
   runId: string;
@@ -353,9 +353,9 @@ export type WorkflowStreamEvent = {
   payload: Record<string, unknown>;
 };
 
-export type QuickResearchGraphState = WorkflowGraphState & {
-  currentNodeKey?: QuickResearchNodeKey;
-  researchInput?: QuickResearchInput;
+export type IndustryResearchGraphState = WorkflowGraphState & {
+  currentNodeKey?: IndustryResearchNodeKey;
+  researchInput?: IndustryResearchInput;
   intent?: string;
   industryOverview?: string;
   news?: ThemeNewsItem[];
@@ -363,12 +363,12 @@ export type QuickResearchGraphState = WorkflowGraphState & {
     heatScore: number;
     heatConclusion: string;
   };
-  candidates?: QuickResearchCandidate[];
-  credibility?: QuickResearchCredibility[];
+  candidates?: IndustryResearchCandidate[];
+  credibility?: IndustryResearchCredibility[];
   evidenceList?: CompanyEvidence[];
   competition?: string;
-  finalReport?: QuickResearchResultDto;
-} & Partial<QuickResearchExecutionMetadata>;
+  finalReport?: IndustryResearchResultDto;
+} & Partial<IndustryResearchExecutionMetadata>;
 
 export type CompanyResearchInput = {
   companyName: string;

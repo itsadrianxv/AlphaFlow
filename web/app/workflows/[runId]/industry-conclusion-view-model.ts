@@ -1,14 +1,14 @@
 import {
   buildResearchDigest,
   extractConfidenceAnalysis,
-  getQuickResearchModePills,
+  getIndustryResearchModePills,
   type InvestorTone,
-  isQuickResearchResult,
+  isIndustryResearchResult,
 } from "~/app/workflows/research-view-models";
 import type { ConfidenceClaimAnalysis } from "~/server/domain/intelligence/confidence";
 import {
-  QUICK_RESEARCH_TEMPLATE_CODE,
-  type QuickResearchResultDto,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
+  type IndustryResearchResultDto,
 } from "~/server/domain/workflow/types";
 
 export type IndustryConclusionSectionId =
@@ -180,7 +180,7 @@ function buildCompanyResearchHref(params: {
   return `/company-research?${search.toString()}`;
 }
 
-function buildResearchPlan(result: QuickResearchResultDto) {
+function buildResearchPlan(result: IndustryResearchResultDto) {
   const runByUnitId = new Map(
     (result.researchUnitRuns ?? []).map((item) => [item.unitId, item] as const),
   );
@@ -201,13 +201,13 @@ export function buildIndustryConclusionViewModel(params: {
   result?: unknown;
   timingReportCardIds?: string[];
 }): IndustryConclusionViewModel | null {
-  if (!isQuickResearchResult(params.result)) {
+  if (!isIndustryResearchResult(params.result)) {
     return null;
   }
 
   const result = params.result;
   const digest = buildResearchDigest({
-    templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+    templateCode: INDUSTRY_RESEARCH_TEMPLATE_CODE,
     query: params.query,
     status: params.status,
     result,
@@ -296,7 +296,7 @@ export function buildIndustryConclusionViewModel(params: {
     verdictTone: digest.verdictTone,
     activeSectionId: "overview",
     statusLabel: statusLabelMap[params.status ?? ""] ?? "可查看",
-    modePills: getQuickResearchModePills(result, params.input),
+    modePills: getIndustryResearchModePills(result, params.input),
     metricStrip: [
       {
         label: "可信度",

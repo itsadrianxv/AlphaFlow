@@ -230,8 +230,8 @@ export type WorkflowTemplateGraphConfig = {
   };
 };
 
-const QUICK_RESEARCH_REQUIRED_SOURCES = ["news", "financial"] as const;
-const QUICK_RESEARCH_REQUIRED_SECTIONS = [
+const INDUSTRY_RESEARCH_REQUIRED_SOURCES = ["news", "financial"] as const;
+const INDUSTRY_RESEARCH_REQUIRED_SECTIONS = [
   "research_spec",
   "trend_analysis",
   "candidate_screening",
@@ -264,12 +264,12 @@ export const DEFAULT_RESEARCH_RUNTIME_CONFIG: ResearchRuntimeConfig = {
   },
 };
 
-export function buildQuickResearchTaskContract(
+export function buildIndustryResearchTaskContract(
   analysisDepth: ResearchAnalysisDepth = "standard",
 ): ResearchTaskContract {
   return {
-    requiredSources: [...QUICK_RESEARCH_REQUIRED_SOURCES],
-    requiredSections: [...QUICK_RESEARCH_REQUIRED_SECTIONS],
+    requiredSources: [...INDUSTRY_RESEARCH_REQUIRED_SOURCES],
+    requiredSections: [...INDUSTRY_RESEARCH_REQUIRED_SECTIONS],
     citationRequired: false,
     analysisDepth,
     deadlineMinutes: 30,

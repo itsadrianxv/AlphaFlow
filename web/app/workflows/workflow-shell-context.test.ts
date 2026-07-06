@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { resolveWorkflowShellContext } from "~/app/workflows/workflow-shell-context";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
-  QUICK_RESEARCH_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
@@ -55,7 +55,7 @@ describe("resolveWorkflowShellContext", () => {
   });
 
   it("falls back to the workflows shell for other templates", () => {
-    expect(resolveWorkflowShellContext(QUICK_RESEARCH_TEMPLATE_CODE)).toEqual({
+    expect(resolveWorkflowShellContext(INDUSTRY_RESEARCH_TEMPLATE_CODE)).toEqual({
       section: "workflows",
       backHref: "/workflows",
       historyHref: "/workflows/history",

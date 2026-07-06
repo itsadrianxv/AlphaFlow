@@ -19,8 +19,8 @@ import type {
   CompanyResearchBrief,
   CompanyResearchReferenceItem,
   CompanyResearchVerdict,
-  QuickResearchCandidate,
-  QuickResearchCredibility,
+  IndustryResearchCandidate,
+  IndustryResearchCredibility,
 } from "~/server/domain/workflow/types";
 import type { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
 
@@ -157,9 +157,9 @@ function buildCompanyResearchText(params: {
   ]).join("\n");
 }
 
-function buildQuickResearchCandidateText(params: {
-  candidate: QuickResearchCandidate;
-  credibility: QuickResearchCredibility;
+function buildIndustryResearchCandidateText(params: {
+  candidate: IndustryResearchCandidate;
+  credibility: IndustryResearchCredibility;
 }) {
   return sanitizeLines([
     `Candidate: ${params.candidate.stockName} (${params.candidate.stockCode})`,
@@ -169,11 +169,11 @@ function buildQuickResearchCandidateText(params: {
   ]).join("\n");
 }
 
-function buildQuickResearchOverallText(params: {
+function buildIndustryResearchOverallText(params: {
   overview: string;
   heatConclusion: string;
-  candidates: QuickResearchCandidate[];
-  credibility: QuickResearchCredibility[];
+  candidates: IndustryResearchCandidate[];
+  credibility: IndustryResearchCredibility[];
   competitionSummary: string;
 }) {
   const credibilityByCode = new Map(
@@ -244,10 +244,10 @@ export class ConfidenceAnalysisService {
     });
   }
 
-  async analyzeQuickResearchCandidates(params: {
+  async analyzeIndustryResearchCandidates(params: {
     query: string;
-    candidates: QuickResearchCandidate[];
-    credibility: QuickResearchCredibility[];
+    candidates: IndustryResearchCandidate[];
+    credibility: IndustryResearchCredibility[];
     evidenceList: CompanyEvidence[];
   }): Promise<Map<string, ConfidenceAnalysis>> {
     const credibilityByCode = new Map(
@@ -270,7 +270,7 @@ export class ConfidenceAnalysisService {
         return {
           module: "quick_research",
           question: params.query,
-          responseText: buildQuickResearchCandidateText({
+          responseText: buildIndustryResearchCandidateText({
             candidate,
             credibility,
           }),
@@ -291,12 +291,12 @@ export class ConfidenceAnalysisService {
     );
   }
 
-  async analyzeQuickResearchOverall(params: {
+  async analyzeIndustryResearchOverall(params: {
     query: string;
     overview: string;
     heatConclusion: string;
-    candidates: QuickResearchCandidate[];
-    credibility: QuickResearchCredibility[];
+    candidates: IndustryResearchCandidate[];
+    credibility: IndustryResearchCredibility[];
     competitionSummary: string;
     news: ThemeNewsItem[];
     evidenceList: CompanyEvidence[];
@@ -304,7 +304,7 @@ export class ConfidenceAnalysisService {
     return this.analyzeRequest({
       module: "quick_research",
       question: params.query,
-      responseText: buildQuickResearchOverallText(params),
+      responseText: buildIndustryResearchOverallText(params),
       referenceItems: dedupeReferences([
         ...params.news.map((item) => buildThemeNewsReference(item)),
         ...params.evidenceList.map((item) =>

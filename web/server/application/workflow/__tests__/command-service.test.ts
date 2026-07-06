@@ -6,10 +6,10 @@ import {
 } from "~/server/domain/workflow/errors";
 
 describe("WorkflowCommandService", () => {
-  it("rejects legacy quick research template versions", async () => {
+  it("rejects legacy industry research template versions", async () => {
     const getTemplateByCodeAndVersion = vi.fn(async () => ({
       id: "tpl_v2",
-      code: "quick_industry_research",
+      code: "industry_research",
       version: 2,
       graphConfig: {
         nodes: ["agent0_clarify_scope"],
@@ -23,7 +23,7 @@ describe("WorkflowCommandService", () => {
     const service = new WorkflowCommandService(repository as never);
 
     await expect(
-      service.startQuickResearch({
+      service.startIndustryResearch({
         userId: "user_1",
         query: "AI infra",
         templateVersion: 2,

@@ -12,8 +12,8 @@ import {
   COMPANY_RESEARCH_V1_NODE_KEYS,
   COMPANY_RESEARCH_V3_NODE_KEYS,
   COMPANY_RESEARCH_V4_NODE_KEYS,
-  QUICK_RESEARCH_NODE_KEYS,
-  QUICK_RESEARCH_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_NODE_KEYS,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_NODE_KEYS,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_NODE_KEYS,
@@ -78,7 +78,7 @@ export class PrismaWorkflowRunRepository {
     });
   }
 
-  async ensureQuickResearchTemplate() {
+  async ensureIndustryResearchTemplate() {
     const inputSchema = {
       type: "object",
       required: ["query"],
@@ -122,7 +122,7 @@ export class PrismaWorkflowRunRepository {
 
     await this.prisma.workflowTemplate.updateMany({
       where: {
-        code: QUICK_RESEARCH_TEMPLATE_CODE,
+        code: INDUSTRY_RESEARCH_TEMPLATE_CODE,
         version: {
           not: 3,
         },
@@ -135,19 +135,19 @@ export class PrismaWorkflowRunRepository {
     return this.prisma.workflowTemplate.upsert({
       where: {
         code_version: {
-          code: QUICK_RESEARCH_TEMPLATE_CODE,
+          code: INDUSTRY_RESEARCH_TEMPLATE_CODE,
           version: 3,
         },
       },
       create: {
-        code: QUICK_RESEARCH_TEMPLATE_CODE,
+        code: INDUSTRY_RESEARCH_TEMPLATE_CODE,
         version: 3,
-        graphConfig: buildResearchGraphConfig(QUICK_RESEARCH_NODE_KEYS),
+        graphConfig: buildResearchGraphConfig(INDUSTRY_RESEARCH_NODE_KEYS),
         inputSchema,
         isActive: true,
       },
       update: {
-        graphConfig: buildResearchGraphConfig(QUICK_RESEARCH_NODE_KEYS),
+        graphConfig: buildResearchGraphConfig(INDUSTRY_RESEARCH_NODE_KEYS),
         inputSchema,
         isActive: true,
       },

@@ -36,13 +36,13 @@ import {
   buildResearchDigest,
   extractConfidenceAnalysis,
   extractTimingReportCardIds,
-  getQuickResearchModePills,
+  getIndustryResearchModePills,
   isCompanyResearchResult,
 } from "~/app/workflows/research-view-models";
 import { resolveWorkflowShellContext } from "~/app/workflows/workflow-shell-context";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
-  QUICK_RESEARCH_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
   TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
@@ -97,7 +97,7 @@ function getTitle(templateCode?: string) {
     return "公司结论";
   }
 
-  if (templateCode === QUICK_RESEARCH_TEMPLATE_CODE) {
+  if (templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE) {
     return "行业结论";
   }
 
@@ -178,7 +178,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
   const workflowHistoryQuery = api.workflow.listRuns.useQuery(
     {
       limit: 8,
-      templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+      templateCode: INDUSTRY_RESEARCH_TEMPLATE_CODE,
     },
     {
       enabled: shellContext.historyQueryKind === "workflows",
@@ -236,9 +236,9 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
     status: run?.status,
     hasCompanyDetailModel: companyDetailModel !== null,
   });
-  const quickResearchModePills =
-    run?.template.code === QUICK_RESEARCH_TEMPLATE_CODE
-      ? getQuickResearchModePills(run?.result, run?.input)
+  const industryResearchModePills =
+    run?.template.code === INDUSTRY_RESEARCH_TEMPLATE_CODE
+      ? getIndustryResearchModePills(run?.result, run?.input)
       : [];
   const timingReportCardIds = extractTimingReportCardIds(run?.result);
   const nextSectionItems =
@@ -252,7 +252,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
     timingReportCardIds,
   });
   const showIndustryConclusion =
-    run?.template.code === QUICK_RESEARCH_TEMPLATE_CODE &&
+    run?.template.code === INDUSTRY_RESEARCH_TEMPLATE_CODE &&
     run?.status === "SUCCEEDED" &&
     industryConclusionModel !== null;
 
@@ -378,7 +378,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
                     label={digest.verdictLabel}
                     tone={digest.verdictTone}
                   />
-                  {quickResearchModePills.map((label) => (
+                  {industryResearchModePills.map((label) => (
                     <StatusPill
                       key={label}
                       label={label}

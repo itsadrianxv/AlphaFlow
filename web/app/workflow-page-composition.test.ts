@@ -130,7 +130,7 @@ describe("workflow page composition", () => {
     expect(timingSource).toContain("MarketContextSection");
   });
 
-  it("uses a dedicated document-style quick research detail component", () => {
+  it("uses a dedicated document-style industry research detail component", () => {
     const investorDetailSource = readSource(
       "./workflows/[runId]/run-investor-client.tsx",
     );

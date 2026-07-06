@@ -9,7 +9,7 @@ import type {
   ResearchUnitCapability,
   ResearchUnitPlan,
 } from "~/server/domain/workflow/research";
-import { buildQuickResearchTaskContract } from "~/server/domain/workflow/research";
+import { buildIndustryResearchTaskContract } from "~/server/domain/workflow/research";
 import {
   compressedFindingsSchema,
   researchBriefSchema,
@@ -23,7 +23,7 @@ import type {
   DeepSeekMessage,
 } from "~/server/infrastructure/intelligence/deepseek-client";
 
-type ResearchSubject = "quick" | "company";
+type ResearchSubject = "industry" | "company";
 
 function uniqueStrings(items: string[], limit = 8) {
   return [...new Set(items.map((item) => item.trim()).filter(Boolean))].slice(
@@ -290,7 +290,7 @@ function buildClarificationFallback(params: {
   if (params.subject === "company" && !params.companyName?.trim()) {
     missingScopeFields.push("companyName");
   }
-  if (params.subject === "quick" && params.query.trim().length < 2) {
+  if (params.subject === "industry" && params.query.trim().length < 2) {
     missingScopeFields.push("query");
   }
   if (
@@ -311,7 +311,7 @@ function buildClarificationFallback(params: {
     verification:
       params.subject === "company"
         ? "Scope captured. I will turn it into a research brief before the company workflow continues."
-        : "Scope captured. I will turn it into a research brief before the quick research workflow continues.",
+        : "Scope captured. I will turn it into a research brief before the industry research workflow continues.",
     missingScopeFields,
     suggestedInputPatch:
       params.subject === "company"
@@ -416,7 +416,7 @@ function buildTaskContractFallback(params: {
     } satisfies ResearchTaskContract;
   }
 
-  return buildQuickResearchTaskContract();
+  return buildIndustryResearchTaskContract();
 }
 
 function buildUnitPlanFallback(params: {
@@ -425,7 +425,7 @@ function buildUnitPlanFallback(params: {
   allowedCapabilities: ResearchUnitCapability[];
   maxUnitsPerPlan: number;
 }) {
-  if (params.subject === "quick") {
+  if (params.subject === "industry") {
     const units: ResearchUnitPlan[] = [
       {
         id: "theme_overview",
@@ -857,7 +857,7 @@ export async function analyzeResearchGaps(params: {
   structuredModel?: string;
 }) {
   const effectiveContract = buildTaskContractFallback({
-    subject: params.brief.companyName ? "company" : "quick",
+    subject: params.brief.companyName ? "company" : "industry",
     taskContract: params.taskContract,
   });
   const fallback = buildGapFallback({
@@ -940,7 +940,7 @@ export async function compressResearchFindings(params: {
   structuredModel?: string;
 }) {
   const effectiveContract = buildTaskContractFallback({
-    subject: params.brief.companyName ? "company" : "quick",
+    subject: params.brief.companyName ? "company" : "industry",
     taskContract: params.taskContract,
   });
   const fallback = buildCompressionFallback(params);

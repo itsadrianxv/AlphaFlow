@@ -9,7 +9,7 @@ import {
   WORKFLOW_ERROR_CODES,
 } from "~/server/domain/workflow/errors";
 import {
-  QUICK_RESEARCH_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
@@ -96,7 +96,7 @@ async function assertTimingPresetExists(params: {
   return preset;
 }
 
-const startQuickResearchInput = z.object({
+const startIndustryResearchInput = z.object({
   taskContract: z
     .object({
       requiredSources: z.array(z.string().min(1)).max(8),
@@ -120,7 +120,7 @@ const startQuickResearchInput = z.object({
     })
     .optional(),
   query: z.string().min(1, "query 涓嶈兘涓虹┖"),
-  templateCode: z.string().default(QUICK_RESEARCH_TEMPLATE_CODE),
+  templateCode: z.string().default(INDUSTRY_RESEARCH_TEMPLATE_CODE),
   templateVersion: z.number().int().positive().optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
 });
@@ -252,14 +252,14 @@ const approveScreeningInsightsInput = z.object({
 });
 
 export const workflowRouter = createTRPCRouter({
-  startQuickResearch: protectedProcedure
-    .input(startQuickResearchInput)
+  startIndustryResearch: protectedProcedure
+    .input(startIndustryResearchInput)
     .mutation(async ({ ctx, input }) => {
       try {
         const repository = new PrismaWorkflowRunRepository(ctx.db);
         const commandService = new WorkflowCommandService(repository);
 
-        return await commandService.startQuickResearch({
+        return await commandService.startIndustryResearch({
           userId: ctx.session.user.id,
           query: input.query,
           taskContract: input.taskContract,

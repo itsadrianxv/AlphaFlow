@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QuickResearchGraphState } from "~/server/domain/workflow/types";
-import { QuickResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
+import type { IndustryResearchGraphState } from "~/server/domain/workflow/types";
+import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
 
-function createQuickResearchServiceStub() {
+function createIndustryResearchServiceStub() {
   return {
     generateIndustryOverview: vi.fn(async () => ({
       overview: "overview",
@@ -33,7 +33,7 @@ function createQuickResearchServiceStub() {
       evidenceList: [],
     })),
     summarizeCompetition: vi.fn(async () => "competition"),
-    analyzeQuickResearchOverall: vi.fn(async () => ({
+    analyzeIndustryResearchOverall: vi.fn(async () => ({
       status: "COMPLETE",
       finalScore: 80,
       level: "high",
@@ -227,10 +227,10 @@ function createQuickResearchServiceStub() {
   };
 }
 
-describe("quick-research-graph", () => {
-  it("runs quick research on template v3 only", async () => {
-    const graph = new QuickResearchLangGraph(
-      createQuickResearchServiceStub() as never,
+describe("industry-research-graph", () => {
+  it("runs industry research on template v3 only", async () => {
+    const graph = new IndustryResearchLangGraph(
+      createIndustryResearchServiceStub() as never,
     );
     const finalState = (await graph.execute({
       initialState: graph.buildInitialState({
@@ -243,7 +243,7 @@ describe("quick-research-graph", () => {
           nodes: graph.getNodeOrder(),
         },
       }),
-    })) as QuickResearchGraphState;
+    })) as IndustryResearchGraphState;
 
     expect(graph.templateVersion).toBe(3);
     expect(finalState.taskContract?.deadlineMinutes).toBe(30);
@@ -252,7 +252,7 @@ describe("quick-research-graph", () => {
   });
 
   it("keeps running when clarification is required and carries the warning forward", async () => {
-    const service = createQuickResearchServiceStub();
+    const service = createIndustryResearchServiceStub();
     service.clarifyScope = vi.fn(async () => ({
       needClarification: true,
       question: "Need more detail",
@@ -264,7 +264,7 @@ describe("quick-research-graph", () => {
         },
       },
     }));
-    const graph = new QuickResearchLangGraph(service as never);
+    const graph = new IndustryResearchLangGraph(service as never);
     const finalState = (await graph.execute({
       initialState: graph.buildInitialState({
         runId: "run-2",
@@ -276,7 +276,7 @@ describe("quick-research-graph", () => {
           nodes: graph.getNodeOrder(),
         },
       }),
-    })) as QuickResearchGraphState;
+    })) as IndustryResearchGraphState;
 
     expect(finalState.clarificationRequest).toEqual(
       expect.objectContaining({
@@ -300,8 +300,8 @@ describe("quick-research-graph", () => {
   });
 
   it("emits clarification payload for the clarify node", () => {
-    const graph = new QuickResearchLangGraph(
-      createQuickResearchServiceStub() as never,
+    const graph = new IndustryResearchLangGraph(
+      createIndustryResearchServiceStub() as never,
     );
 
     expect(
@@ -335,8 +335,8 @@ describe("quick-research-graph", () => {
   });
 
   it("keeps structured nodes on chat by default even when researchGoal exists", async () => {
-    const service = createQuickResearchServiceStub();
-    const graph = new QuickResearchLangGraph(service as never);
+    const service = createIndustryResearchServiceStub();
+    const graph = new IndustryResearchLangGraph(service as never);
 
     await graph.execute({
       initialState: graph.buildInitialState({
@@ -381,8 +381,8 @@ describe("quick-research-graph", () => {
   });
 
   it("uses reasoner for structured nodes on the first pass when deep is explicit", async () => {
-    const service = createQuickResearchServiceStub();
-    const graph = new QuickResearchLangGraph(service as never);
+    const service = createIndustryResearchServiceStub();
+    const graph = new IndustryResearchLangGraph(service as never);
 
     const finalState = (await graph.execute({
       initialState: graph.buildInitialState({
@@ -410,7 +410,7 @@ describe("quick-research-graph", () => {
           nodes: graph.getNodeOrder(),
         },
       }),
-    })) as QuickResearchGraphState;
+    })) as IndustryResearchGraphState;
 
     expect(service.buildTaskContract).toHaveBeenCalledWith(
       expect.anything(),
@@ -425,7 +425,7 @@ describe("quick-research-graph", () => {
   });
 
   it("auto-escalates to reasoner once when gap follow-up remains", async () => {
-    const service = createQuickResearchServiceStub();
+    const service = createIndustryResearchServiceStub();
     service.runGapAnalysis = vi
       .fn()
       .mockResolvedValueOnce({
@@ -456,7 +456,7 @@ describe("quick-research-graph", () => {
         replanRecords: [],
         snapshot: {},
       });
-    const graph = new QuickResearchLangGraph(service as never);
+    const graph = new IndustryResearchLangGraph(service as never);
 
     const finalState = (await graph.execute({
       initialState: graph.buildInitialState({
@@ -469,7 +469,7 @@ describe("quick-research-graph", () => {
           nodes: graph.getNodeOrder(),
         },
       }),
-    })) as QuickResearchGraphState;
+    })) as IndustryResearchGraphState;
 
     expect(service.runGapAnalysis).toHaveBeenNthCalledWith(
       1,
@@ -505,7 +505,7 @@ describe("quick-research-graph", () => {
   });
 
   it("auto-escalates to reasoner once when reflection fails but not on warn", async () => {
-    const service = createQuickResearchServiceStub();
+    const service = createIndustryResearchServiceStub();
     service.runGapAnalysis = vi
       .fn()
       .mockResolvedValueOnce({
@@ -588,7 +588,7 @@ describe("quick-research-graph", () => {
         qualityFlags: [],
         missingRequirements: [],
       });
-    const graph = new QuickResearchLangGraph(service as never);
+    const graph = new IndustryResearchLangGraph(service as never);
 
     const finalState = (await graph.execute({
       initialState: graph.buildInitialState({
@@ -601,7 +601,7 @@ describe("quick-research-graph", () => {
           nodes: graph.getNodeOrder(),
         },
       }),
-    })) as QuickResearchGraphState;
+    })) as IndustryResearchGraphState;
 
     expect(service.runGapAnalysis).toHaveBeenCalledTimes(2);
     expect(service.runGapAnalysis).toHaveBeenNthCalledWith(
@@ -620,7 +620,7 @@ describe("quick-research-graph", () => {
   });
 
   it("does not auto-escalate when reflection only warns", async () => {
-    const service = createQuickResearchServiceStub();
+    const service = createIndustryResearchServiceStub();
     service.finalizeReport = vi.fn(async (params) => ({
       overview: "overview",
       heatScore: 72,
@@ -673,7 +673,7 @@ describe("quick-research-graph", () => {
       qualityFlags: ["missing_required_sections"],
       missingRequirements: ["missing_section:top_picks"],
     }));
-    const graph = new QuickResearchLangGraph(service as never);
+    const graph = new IndustryResearchLangGraph(service as never);
 
     const finalState = (await graph.execute({
       initialState: graph.buildInitialState({
@@ -686,7 +686,7 @@ describe("quick-research-graph", () => {
           nodes: graph.getNodeOrder(),
         },
       }),
-    })) as QuickResearchGraphState;
+    })) as IndustryResearchGraphState;
 
     expect(service.runGapAnalysis).toHaveBeenCalledTimes(1);
     expect(service.finalizeReport).toHaveBeenCalledTimes(1);

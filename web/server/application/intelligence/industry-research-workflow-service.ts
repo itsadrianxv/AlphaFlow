@@ -1,5 +1,5 @@
 import type { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
-import { reflectQuickResearch } from "~/server/application/intelligence/research-reflection";
+import { reflectIndustryResearch } from "~/server/application/intelligence/research-reflection";
 import {
   analyzeResearchGaps,
   buildDefaultTaskContract,
@@ -24,15 +24,15 @@ import type {
   ResearchUnitRun,
 } from "~/server/domain/workflow/research";
 import type {
-  QuickResearchCredibility,
-  QuickResearchGraphState,
-  QuickResearchInput,
-  QuickResearchResultDto,
-  QuickResearchStructuredModel,
+  IndustryResearchCredibility,
+  IndustryResearchGraphState,
+  IndustryResearchInput,
+  IndustryResearchResultDto,
+  IndustryResearchStructuredModel,
 } from "~/server/domain/workflow/types";
 import type { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 
-type QuickResearchWorkflowServiceDependencies = {
+type IndustryResearchWorkflowServiceDependencies = {
   client: DeepSeekClient;
   intelligenceService: IntelligenceAgentService;
 };
@@ -40,15 +40,15 @@ type QuickResearchWorkflowServiceDependencies = {
 type QuickExecutionSnapshot = {
   industryOverview?: string;
   news?: ThemeNewsItem[];
-  heatAnalysis?: QuickResearchGraphState["heatAnalysis"];
-  candidates?: QuickResearchGraphState["candidates"];
-  credibility?: QuickResearchCredibility[];
+  heatAnalysis?: IndustryResearchGraphState["heatAnalysis"];
+  candidates?: IndustryResearchGraphState["candidates"];
+  credibility?: IndustryResearchCredibility[];
   evidenceList?: CompanyEvidence[];
   competition?: string;
 };
 
 type QuickStructuredRequestOptions = {
-  structuredModel?: QuickResearchStructuredModel;
+  structuredModel?: IndustryResearchStructuredModel;
 };
 
 const QUICK_ALLOWED_CAPABILITIES: ResearchUnitCapability[] = [
@@ -84,7 +84,7 @@ function buildNote(params: {
   };
 }
 
-function buildFallbackBrief(state: QuickResearchGraphState) {
+function buildFallbackBrief(state: IndustryResearchGraphState) {
   return {
     query: state.query,
     researchGoal: state.query,
@@ -95,37 +95,37 @@ function buildFallbackBrief(state: QuickResearchGraphState) {
     preferredSources: [],
     freshnessWindowDays: 180,
     scopeAssumptions: [],
-  } satisfies QuickResearchResultDto["brief"];
+  } satisfies IndustryResearchResultDto["brief"];
 }
 
-function resolveTaskContract(state: QuickResearchGraphState) {
+function resolveTaskContract(state: IndustryResearchGraphState) {
   return (
     state.taskContract ??
     buildDefaultTaskContract({
-      subject: "quick",
+      subject: "industry",
       preferences: state.researchInput?.researchPreferences,
       taskContract: state.researchInput?.taskContract,
     })
   );
 }
 
-export class QuickResearchWorkflowService {
+export class IndustryResearchWorkflowService {
   private readonly client: DeepSeekClient;
   private readonly intelligenceService: IntelligenceAgentService;
 
-  constructor(dependencies: QuickResearchWorkflowServiceDependencies) {
+  constructor(dependencies: IndustryResearchWorkflowServiceDependencies) {
     this.client = dependencies.client;
     this.intelligenceService = dependencies.intelligenceService;
   }
 
   async buildTaskContract(
-    input: QuickResearchInput,
+    input: IndustryResearchInput,
     runtimeConfig: ResearchRuntimeConfig,
     options?: QuickStructuredRequestOptions,
   ) {
     return writeTaskContract({
       client: this.client,
-      subject: "quick",
+      subject: "industry",
       preferences: input.researchPreferences,
       taskContract: input.taskContract,
       runtimeConfig,
@@ -134,12 +134,12 @@ export class QuickResearchWorkflowService {
   }
 
   async clarifyScope(
-    input: QuickResearchInput,
+    input: IndustryResearchInput,
     runtimeConfig: ResearchRuntimeConfig,
   ) {
     return clarifyResearchScope({
       client: this.client,
-      subject: "quick",
+      subject: "industry",
       query: input.query,
       preferences: input.researchPreferences,
       runtimeConfig,
@@ -147,14 +147,14 @@ export class QuickResearchWorkflowService {
   }
 
   async buildBrief(
-    input: QuickResearchInput,
+    input: IndustryResearchInput,
     runtimeConfig: ResearchRuntimeConfig,
     clarificationSummary?: string,
     options?: QuickStructuredRequestOptions,
   ) {
     return writeResearchBrief({
       client: this.client,
-      subject: "quick",
+      subject: "industry",
       query: input.query,
       preferences: input.researchPreferences,
       taskContract: input.taskContract,
@@ -165,13 +165,13 @@ export class QuickResearchWorkflowService {
   }
 
   async planUnits(
-    state: QuickResearchGraphState,
+    state: IndustryResearchGraphState,
     runtimeConfig: ResearchRuntimeConfig,
     options?: QuickStructuredRequestOptions,
   ) {
     return planResearchUnits({
       client: this.client,
-      subject: "quick",
+      subject: "industry",
       brief: state.researchBrief ?? {
         query: state.query,
         researchGoal: state.query,
@@ -186,7 +186,7 @@ export class QuickResearchWorkflowService {
       taskContract:
         state.taskContract ??
         buildDefaultTaskContract({
-          subject: "quick",
+          subject: "industry",
           preferences: state.researchInput?.researchPreferences,
           taskContract: state.researchInput?.taskContract,
         }),
@@ -427,7 +427,7 @@ export class QuickResearchWorkflowService {
   }
 
   async executeUnits(params: {
-    state: QuickResearchGraphState;
+    state: IndustryResearchGraphState;
     runtimeConfig: ResearchRuntimeConfig;
     units: ResearchUnitPlan[];
   }) {
@@ -490,7 +490,7 @@ export class QuickResearchWorkflowService {
 
   async runGapAnalysis(
     params: {
-      state: QuickResearchGraphState;
+      state: IndustryResearchGraphState;
       runtimeConfig: ResearchRuntimeConfig;
     },
     options?: QuickStructuredRequestOptions,
@@ -557,7 +557,7 @@ export class QuickResearchWorkflowService {
       replanRecords = [
         ...replanRecords,
         {
-          replanId: `quick_gap_${gapIteration + 1}`,
+          replanId: `industry_gap_${gapIteration + 1}`,
           iteration: gapIteration + 1,
           triggerNodeKey: "agent4_credibility_and_competition",
           reason: "material_research_gap",
@@ -580,7 +580,7 @@ export class QuickResearchWorkflowService {
           competition: snapshot.competition,
           researchNotes: notes,
           researchUnitRuns: unitRuns,
-        } as QuickResearchGraphState,
+        } as IndustryResearchGraphState,
         runtimeConfig: params.runtimeConfig,
         units: gapAnalysis.followupUnits,
       });
@@ -610,7 +610,7 @@ export class QuickResearchWorkflowService {
   }
 
   async compressFindings(
-    state: QuickResearchGraphState,
+    state: IndustryResearchGraphState,
     runtimeConfig: ResearchRuntimeConfig,
     gapAnalysis?: ResearchGapAnalysis,
     options?: QuickStructuredRequestOptions,
@@ -627,9 +627,9 @@ export class QuickResearchWorkflowService {
   }
 
   async finalizeReport(params: {
-    state: QuickResearchGraphState;
+    state: IndustryResearchGraphState;
     runtimeConfig: ResearchRuntimeConfig;
-  }): Promise<QuickResearchResultDto> {
+  }): Promise<IndustryResearchResultDto> {
     const taskContract = resolveTaskContract(params.state);
     const overview =
       params.state.industryOverview ??
@@ -666,7 +666,7 @@ export class QuickResearchWorkflowService {
       }));
 
     const confidenceAnalysis =
-      await this.intelligenceService.analyzeQuickResearchOverall({
+      await this.intelligenceService.analyzeIndustryResearchOverall({
         query: params.state.query,
         overview,
         heatConclusion: heatAnalysis.heatConclusion,
@@ -695,8 +695,8 @@ export class QuickResearchWorkflowService {
       compressedFindings: params.state.compressedFindings,
       gapAnalysis: params.state.gapAnalysis,
       replanRecords: params.state.replanRecords,
-    } satisfies QuickResearchResultDto;
-    const reflection = reflectQuickResearch({
+    } satisfies IndustryResearchResultDto;
+    const reflection = reflectIndustryResearch({
       taskContract,
       result: report,
     });

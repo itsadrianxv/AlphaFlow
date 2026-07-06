@@ -33,7 +33,7 @@ const model: IndustryConclusionViewModel = {
       href: "/company-research?companyName=%E4%B8%AD%E9%99%85%E6%97%AD%E5%88%9B",
       variant: "primary",
     },
-    { label: "加入研究空间", href: "/spaces?addRunId=run_quick_1" },
+    { label: "加入研究空间", href: "/spaces?addRunId=run_industry_1" },
   ],
   notices: [
     {

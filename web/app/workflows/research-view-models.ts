@@ -3,8 +3,8 @@ import type { ConfidenceAnalysis } from "~/server/domain/intelligence/confidence
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   type CompanyResearchResultDto,
-  QUICK_RESEARCH_TEMPLATE_CODE,
-  type QuickResearchResultDto,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
+  type IndustryResearchResultDto,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
   TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
   WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
@@ -122,7 +122,7 @@ function buildConfidenceMetrics(
 
 export function getTemplateLabel(templateCode?: string) {
   switch (templateCode) {
-    case QUICK_RESEARCH_TEMPLATE_CODE:
+    case INDUSTRY_RESEARCH_TEMPLATE_CODE:
       return "行业判断";
     case COMPANY_RESEARCH_TEMPLATE_CODE:
       return "公司判断";
@@ -131,9 +131,9 @@ export function getTemplateLabel(templateCode?: string) {
   }
 }
 
-export function isQuickResearchResult(
+export function isIndustryResearchResult(
   value: unknown,
-): value is QuickResearchResultDto {
+): value is IndustryResearchResultDto {
   if (!isRecord(value)) {
     return false;
   }
@@ -146,14 +146,14 @@ export function isQuickResearchResult(
   );
 }
 
-export function getQuickResearchModePills(
+export function getIndustryResearchModePills(
   result: unknown,
   input?: unknown,
 ): string[] {
   let requestedDepth: "standard" | "deep" | undefined;
   let autoEscalated = false;
 
-  if (isQuickResearchResult(result)) {
+  if (isIndustryResearchResult(result)) {
     requestedDepth = result.requestedDepth ?? "standard";
     autoEscalated = Boolean(result.autoEscalated);
   } else if (isRecord(input) && isRecord(input.taskContract)) {
@@ -189,8 +189,8 @@ export function isCompanyResearchResult(
   );
 }
 
-function buildQuickResearchDigest(
-  result: QuickResearchResultDto,
+function buildIndustryResearchDigest(
+  result: IndustryResearchResultDto,
 ): ResearchDigest {
   const topPicks = result.topPicks.slice(0, 3);
   const credibilityHighlights = result.credibility.flatMap(
@@ -696,10 +696,10 @@ function buildTimingWorkflowDigest(params: {
   return null;
 }
 
-function buildQuickResearchClarificationDigest(
-  result: QuickResearchResultDto,
+function buildIndustryResearchClarificationDigest(
+  result: IndustryResearchResultDto,
 ): ResearchDigest {
-  const base = buildQuickResearchDigest(result);
+  const base = buildIndustryResearchDigest(result);
   const clarificationSummary = result.brief?.clarificationSummary?.trim();
 
   return {
@@ -725,12 +725,12 @@ export function buildResearchDigest(params: {
   currentNodeKey?: string | null;
   result?: unknown;
 }): ResearchDigest {
-  if (params.templateCode === QUICK_RESEARCH_TEMPLATE_CODE) {
-    if (isQuickResearchResult(params.result)) {
+  if (params.templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE) {
+    if (isIndustryResearchResult(params.result)) {
       if (params.result.clarificationRequest?.needClarification) {
-        return buildQuickResearchClarificationDigest(params.result);
+        return buildIndustryResearchClarificationDigest(params.result);
       }
-      return buildQuickResearchDigest(params.result);
+      return buildIndustryResearchDigest(params.result);
     }
   }
 
@@ -759,7 +759,7 @@ export function buildResearchDigest(params: {
 export function extractConfidenceAnalysis(
   result: unknown,
 ): ConfidenceAnalysis | null {
-  if (isQuickResearchResult(result)) {
+  if (isIndustryResearchResult(result)) {
     return result.confidenceAnalysis ?? null;
   }
 

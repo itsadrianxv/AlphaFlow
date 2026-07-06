@@ -10,7 +10,7 @@ import type {
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   getWorkflowNodeKeysFromGraphConfig,
-  QUICK_RESEARCH_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
@@ -23,7 +23,7 @@ import {
 import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
 
-export type StartQuickResearchCommand = {
+export type StartIndustryResearchCommand = {
   userId: string;
   query: string;
   taskContract?: ResearchTaskContract;
@@ -172,11 +172,11 @@ export class WorkflowCommandService {
     private readonly runtimeStore = new RedisWorkflowRuntimeStore(),
   ) {}
 
-  async startQuickResearch(command: StartQuickResearchCommand) {
+  async startIndustryResearch(command: StartIndustryResearchCommand) {
     return this.startWorkflow({
       userId: command.userId,
       query: command.query,
-      templateCode: command.templateCode ?? QUICK_RESEARCH_TEMPLATE_CODE,
+      templateCode: command.templateCode ?? INDUSTRY_RESEARCH_TEMPLATE_CODE,
       templateVersion: command.templateVersion,
       input: {
         query: command.query,
@@ -427,13 +427,13 @@ export class WorkflowCommandService {
 
   private async startWorkflow(command: StartWorkflowCommand) {
     if (
-      command.templateCode === QUICK_RESEARCH_TEMPLATE_CODE &&
+      command.templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE &&
       command.templateVersion !== undefined &&
       command.templateVersion !== 3
     ) {
       throw new WorkflowDomainError(
         WORKFLOW_ERROR_CODES.WORKFLOW_TEMPLATE_NOT_FOUND,
-        `quick research 仅支持模板版本 3: ${command.templateVersion}`,
+        `industry research 仅支持模板版本 3: ${command.templateVersion}`,
       );
     }
 
@@ -458,11 +458,11 @@ export class WorkflowCommandService {
     );
 
     if (
-      command.templateCode === QUICK_RESEARCH_TEMPLATE_CODE &&
+      command.templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE &&
       command.templateVersion === undefined &&
       (!template || template.version < 3)
     ) {
-      template = await this.repository.ensureQuickResearchTemplate();
+      template = await this.repository.ensureIndustryResearchTemplate();
     }
 
     if (
@@ -473,8 +473,8 @@ export class WorkflowCommandService {
       template = await this.repository.ensureCompanyResearchTemplate();
     }
 
-    if (!template && command.templateCode === QUICK_RESEARCH_TEMPLATE_CODE) {
-      template = await this.repository.ensureQuickResearchTemplate();
+    if (!template && command.templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE) {
+      template = await this.repository.ensureIndustryResearchTemplate();
     }
 
     if (!template && command.templateCode === COMPANY_RESEARCH_TEMPLATE_CODE) {

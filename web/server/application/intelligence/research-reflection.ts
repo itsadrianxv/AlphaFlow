@@ -4,7 +4,7 @@ import type {
 } from "~/server/domain/workflow/research";
 import type {
   CompanyResearchResultDto,
-  QuickResearchResultDto,
+  IndustryResearchResultDto,
 } from "~/server/domain/workflow/types";
 
 function coverageRatio(hitCount: number, totalCount: number) {
@@ -49,9 +49,9 @@ function toStatus(
   return "fail";
 }
 
-export function reflectQuickResearch(params: {
+export function reflectIndustryResearch(params: {
   taskContract: ResearchTaskContract;
-  result: QuickResearchResultDto;
+  result: IndustryResearchResultDto;
 }) {
   const availableSections = [
     "research_spec",
@@ -102,8 +102,8 @@ export function reflectQuickResearch(params: {
     status: toStatus(contractScore, qualityFlags.length),
     summary:
       qualityFlags.length > 0
-        ? "Quick research completed with quality warnings that should be reviewed before reuse."
-        : "Quick research satisfies the default contract checks.",
+        ? "Industry research completed with quality warnings that should be reviewed before reuse."
+        : "Industry research satisfies the default contract checks.",
     contractScore,
     citationCoverage,
     firstPartyRatio,

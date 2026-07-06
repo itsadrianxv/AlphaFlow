@@ -1,21 +1,21 @@
 import { Annotation, StateGraph } from "@langchain/langgraph";
-import type { QuickResearchWorkflowService } from "~/server/application/intelligence/quick-research-workflow-service";
+import type { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
 import type { ResearchPreferenceInput } from "~/server/domain/workflow/research";
 import { parseResearchTaskContract } from "~/server/domain/workflow/research";
 import type {
-  QuickResearchAutoEscalationReason,
-  QuickResearchGraphState,
-  QuickResearchInput,
-  QuickResearchNodeKey,
-  QuickResearchStructuredModel,
+  IndustryResearchAutoEscalationReason,
+  IndustryResearchGraphState,
+  IndustryResearchInput,
+  IndustryResearchNodeKey,
+  IndustryResearchStructuredModel,
   WorkflowGraphState,
   WorkflowNodeKey,
 } from "~/server/domain/workflow/types";
 import {
-  buildQuickResearchExecutionMetadata,
-  QUICK_RESEARCH_NODE_KEYS,
-  QUICK_RESEARCH_TEMPLATE_CODE,
-  resolveQuickResearchStructuredModel,
+  buildIndustryResearchExecutionMetadata,
+  INDUSTRY_RESEARCH_NODE_KEYS,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
+  resolveIndustryResearchStructuredModel,
   resolveResearchRuntimeConfig,
 } from "~/server/domain/workflow/types";
 import type { WorkflowGraphBuildInitialStateParams } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
@@ -33,56 +33,56 @@ const WorkflowState = Annotation.Root({
   progressPercent: Annotation<number>,
   resumeFromNodeKey: Annotation<WorkflowNodeKey | undefined>,
   currentNodeKey: Annotation<WorkflowNodeKey | undefined>,
-  researchInput: Annotation<QuickResearchInput | undefined>,
+  researchInput: Annotation<IndustryResearchInput | undefined>,
   intent: Annotation<string | undefined>,
   clarificationRequest: Annotation<
-    QuickResearchGraphState["clarificationRequest"]
+    IndustryResearchGraphState["clarificationRequest"]
   >,
-  taskContract: Annotation<QuickResearchGraphState["taskContract"]>,
+  taskContract: Annotation<IndustryResearchGraphState["taskContract"]>,
   researchRuntimeConfig: Annotation<
-    QuickResearchGraphState["researchRuntimeConfig"]
+    IndustryResearchGraphState["researchRuntimeConfig"]
   >,
-  researchBrief: Annotation<QuickResearchGraphState["researchBrief"]>,
-  researchUnits: Annotation<QuickResearchGraphState["researchUnits"]>,
-  researchUnitRuns: Annotation<QuickResearchGraphState["researchUnitRuns"]>,
-  researchNotes: Annotation<QuickResearchGraphState["researchNotes"]>,
-  compressedFindings: Annotation<QuickResearchGraphState["compressedFindings"]>,
-  gapAnalysis: Annotation<QuickResearchGraphState["gapAnalysis"]>,
-  replanRecords: Annotation<QuickResearchGraphState["replanRecords"]>,
-  reflection: Annotation<QuickResearchGraphState["reflection"]>,
-  contractScore: Annotation<QuickResearchGraphState["contractScore"]>,
-  qualityFlags: Annotation<QuickResearchGraphState["qualityFlags"]>,
+  researchBrief: Annotation<IndustryResearchGraphState["researchBrief"]>,
+  researchUnits: Annotation<IndustryResearchGraphState["researchUnits"]>,
+  researchUnitRuns: Annotation<IndustryResearchGraphState["researchUnitRuns"]>,
+  researchNotes: Annotation<IndustryResearchGraphState["researchNotes"]>,
+  compressedFindings: Annotation<IndustryResearchGraphState["compressedFindings"]>,
+  gapAnalysis: Annotation<IndustryResearchGraphState["gapAnalysis"]>,
+  replanRecords: Annotation<IndustryResearchGraphState["replanRecords"]>,
+  reflection: Annotation<IndustryResearchGraphState["reflection"]>,
+  contractScore: Annotation<IndustryResearchGraphState["contractScore"]>,
+  qualityFlags: Annotation<IndustryResearchGraphState["qualityFlags"]>,
   missingRequirements: Annotation<
-    QuickResearchGraphState["missingRequirements"]
+    IndustryResearchGraphState["missingRequirements"]
   >,
-  requestedDepth: Annotation<QuickResearchGraphState["requestedDepth"]>,
-  autoEscalated: Annotation<QuickResearchGraphState["autoEscalated"]>,
+  requestedDepth: Annotation<IndustryResearchGraphState["requestedDepth"]>,
+  autoEscalated: Annotation<IndustryResearchGraphState["autoEscalated"]>,
   autoEscalationReason: Annotation<
-    QuickResearchGraphState["autoEscalationReason"]
+    IndustryResearchGraphState["autoEscalationReason"]
   >,
   structuredModelInitial: Annotation<
-    QuickResearchGraphState["structuredModelInitial"]
+    IndustryResearchGraphState["structuredModelInitial"]
   >,
   structuredModelFinal: Annotation<
-    QuickResearchGraphState["structuredModelFinal"]
+    IndustryResearchGraphState["structuredModelFinal"]
   >,
   industryOverview: Annotation<string | undefined>,
-  news: Annotation<QuickResearchGraphState["news"]>,
-  heatAnalysis: Annotation<QuickResearchGraphState["heatAnalysis"]>,
-  candidates: Annotation<QuickResearchGraphState["candidates"]>,
-  credibility: Annotation<QuickResearchGraphState["credibility"]>,
-  evidenceList: Annotation<QuickResearchGraphState["evidenceList"]>,
+  news: Annotation<IndustryResearchGraphState["news"]>,
+  heatAnalysis: Annotation<IndustryResearchGraphState["heatAnalysis"]>,
+  candidates: Annotation<IndustryResearchGraphState["candidates"]>,
+  credibility: Annotation<IndustryResearchGraphState["credibility"]>,
+  evidenceList: Annotation<IndustryResearchGraphState["evidenceList"]>,
   competition: Annotation<string | undefined>,
-  finalReport: Annotation<QuickResearchGraphState["finalReport"]>,
+  finalReport: Annotation<IndustryResearchGraphState["finalReport"]>,
   errors: Annotation<string[]>({
     reducer: (left, right) => left.concat(right),
     default: () => [],
   }),
 });
 
-type QuickResearchNodeExecutor = (
-  state: QuickResearchGraphState,
-) => Promise<Partial<QuickResearchGraphState>>;
+type IndustryResearchNodeExecutor = (
+  state: IndustryResearchGraphState,
+) => Promise<Partial<IndustryResearchGraphState>>;
 
 function toResearchPreferences(
   input: Record<string, unknown>,
@@ -126,19 +126,19 @@ function toResearchInput(input: Record<string, unknown>, query: string) {
         : query,
     researchPreferences: toResearchPreferences(input),
     taskContract: parseResearchTaskContract(input.taskContract),
-  } satisfies QuickResearchInput;
+  } satisfies IndustryResearchInput;
 }
 
 function selectUnitsByCapabilities(
-  units: QuickResearchGraphState["researchUnits"],
+  units: IndustryResearchGraphState["researchUnits"],
   capabilities: string[],
 ) {
   return (units ?? []).filter((unit) => capabilities.includes(unit.capability));
 }
 
 function resolveCurrentStructuredModel(
-  state: QuickResearchGraphState,
-): QuickResearchStructuredModel {
+  state: IndustryResearchGraphState,
+): IndustryResearchStructuredModel {
   if (state.structuredModelFinal) {
     return state.structuredModelFinal;
   }
@@ -147,14 +147,14 @@ function resolveCurrentStructuredModel(
     return state.structuredModelInitial;
   }
 
-  return resolveQuickResearchStructuredModel(
+  return resolveIndustryResearchStructuredModel(
     state.requestedDepth ?? "standard",
   );
 }
 
 function buildEscalationMetadata(
-  state: QuickResearchGraphState,
-  reason: QuickResearchAutoEscalationReason,
+  state: IndustryResearchGraphState,
+  reason: IndustryResearchAutoEscalationReason,
 ) {
   return {
     requestedDepth: state.requestedDepth ?? "standard",
@@ -162,22 +162,22 @@ function buildEscalationMetadata(
     autoEscalationReason: reason,
     structuredModelInitial:
       state.structuredModelInitial ??
-      resolveQuickResearchStructuredModel(state.requestedDepth ?? "standard"),
+      resolveIndustryResearchStructuredModel(state.requestedDepth ?? "standard"),
     structuredModelFinal: "deepseek-reasoner" as const,
   };
 }
 
-abstract class QuickResearchLangGraphBase extends BaseWorkflowLangGraph<
-  QuickResearchGraphState,
-  QuickResearchNodeKey
+abstract class IndustryResearchLangGraphBase extends BaseWorkflowLangGraph<
+  IndustryResearchGraphState,
+  IndustryResearchNodeKey
 > {
-  readonly templateCode = QUICK_RESEARCH_TEMPLATE_CODE;
+  readonly templateCode = INDUSTRY_RESEARCH_TEMPLATE_CODE;
 
   buildInitialState(
     params: WorkflowGraphBuildInitialStateParams,
-  ): QuickResearchGraphState {
+  ): IndustryResearchGraphState {
     const researchInput = toResearchInput(params.input, params.query);
-    const executionMetadata = buildQuickResearchExecutionMetadata(
+    const executionMetadata = buildIndustryResearchExecutionMetadata(
       researchInput.taskContract,
     );
     return {
@@ -211,21 +211,21 @@ abstract class QuickResearchLangGraphBase extends BaseWorkflowLangGraph<
   }
 
   getRunResult(state: WorkflowGraphState): Record<string, unknown> {
-    const quickState = state as QuickResearchGraphState;
+    const industryState = state as IndustryResearchGraphState;
 
-    return (quickState.finalReport ?? {
+    return (industryState.finalReport ?? {
       generatedAt: new Date().toISOString(),
     }) as Record<string, unknown>;
   }
 }
 
-export class QuickResearchLangGraph extends QuickResearchLangGraphBase {
+export class IndustryResearchLangGraph extends IndustryResearchLangGraphBase {
   readonly templateVersion = 3;
 
-  constructor(workflowService: QuickResearchWorkflowService) {
+  constructor(workflowService: IndustryResearchWorkflowService) {
     const nodeExecutors: Record<
-      QuickResearchNodeKey,
-      QuickResearchNodeExecutor
+      IndustryResearchNodeKey,
+      IndustryResearchNodeExecutor
     > = {
       agent0_clarify_scope: async (state) => {
         const runtimeConfig = state.researchRuntimeConfig;
@@ -268,7 +268,7 @@ export class QuickResearchLangGraph extends QuickResearchLangGraphBase {
           ...state,
           taskContract,
           researchBrief,
-        } as QuickResearchGraphState;
+        } as IndustryResearchGraphState;
         const researchUnits = await workflowService.planUnits(
           planningState,
           state.researchRuntimeConfig,
@@ -344,7 +344,7 @@ export class QuickResearchLangGraph extends QuickResearchLangGraphBase {
           ...state,
           ...execution,
           researchUnits: state.researchUnits,
-        } as QuickResearchGraphState;
+        } as IndustryResearchGraphState;
         let gapAnalysis = await workflowService.runGapAnalysis(
           {
             state: gapState,
@@ -366,7 +366,7 @@ export class QuickResearchLangGraph extends QuickResearchLangGraphBase {
                 researchUnitRuns: gapAnalysis.researchUnitRuns,
                 researchUnits: gapAnalysis.researchUnits,
                 replanRecords: gapAnalysis.replanRecords,
-              } as QuickResearchGraphState,
+              } as IndustryResearchGraphState,
               runtimeConfig: state.researchRuntimeConfig,
             },
             {
@@ -430,7 +430,7 @@ export class QuickResearchLangGraph extends QuickResearchLangGraphBase {
                 ...state,
                 compressedFindings,
                 finalReport,
-              } as QuickResearchGraphState,
+              } as IndustryResearchGraphState,
               runtimeConfig: state.researchRuntimeConfig,
             },
             {
@@ -446,7 +446,7 @@ export class QuickResearchLangGraph extends QuickResearchLangGraphBase {
             researchUnits: escalatedGapAnalysis.researchUnits,
             replanRecords: escalatedGapAnalysis.replanRecords,
             ...buildEscalationMetadata(state, "reflection_fail"),
-          } as QuickResearchGraphState;
+          } as IndustryResearchGraphState;
 
           compressedFindings = await workflowService.compressFindings(
             escalatedState,
@@ -512,138 +512,138 @@ export class QuickResearchLangGraph extends QuickResearchLangGraphBase {
 
     const graphBuilder = new StateGraph(WorkflowState) as StateGraph<
       unknown,
-      QuickResearchGraphState,
-      Partial<QuickResearchGraphState>,
+      IndustryResearchGraphState,
+      Partial<IndustryResearchGraphState>,
       string
     >;
-    addWorkflowNodes(graphBuilder, QUICK_RESEARCH_NODE_KEYS, nodeExecutors);
-    addResumeStart(graphBuilder, QUICK_RESEARCH_NODE_KEYS);
-    addSequentialEdges(graphBuilder, QUICK_RESEARCH_NODE_KEYS);
+    addWorkflowNodes(graphBuilder, INDUSTRY_RESEARCH_NODE_KEYS, nodeExecutors);
+    addResumeStart(graphBuilder, INDUSTRY_RESEARCH_NODE_KEYS);
+    addSequentialEdges(graphBuilder, INDUSTRY_RESEARCH_NODE_KEYS);
 
     super({
       graph: graphBuilder.compile(),
-      nodeOrder: QUICK_RESEARCH_NODE_KEYS,
+      nodeOrder: INDUSTRY_RESEARCH_NODE_KEYS,
     });
   }
 
   getNodeOutput(nodeKey: WorkflowNodeKey, state: WorkflowGraphState) {
-    const quickState = state as QuickResearchGraphState;
+    const industryState = state as IndustryResearchGraphState;
 
     if (nodeKey === "agent0_clarify_scope") {
       return {
-        clarificationRequest: quickState.clarificationRequest,
+        clarificationRequest: industryState.clarificationRequest,
       };
     }
 
     if (nodeKey === "agent1_extract_research_spec") {
       return {
-        taskContract: quickState.taskContract,
-        researchBrief: quickState.researchBrief,
-        plannedUnitCount: quickState.researchUnits?.length ?? 0,
-        requestedDepth: quickState.requestedDepth,
-        structuredModelInitial: quickState.structuredModelInitial,
+        taskContract: industryState.taskContract,
+        researchBrief: industryState.researchBrief,
+        plannedUnitCount: industryState.researchUnits?.length ?? 0,
+        requestedDepth: industryState.requestedDepth,
+        structuredModelInitial: industryState.structuredModelInitial,
       };
     }
 
     if (nodeKey === "agent2_trend_analysis") {
       return {
-        industryOverview: quickState.industryOverview,
-        heatAnalysis: quickState.heatAnalysis,
+        industryOverview: industryState.industryOverview,
+        heatAnalysis: industryState.heatAnalysis,
       };
     }
 
     if (nodeKey === "agent3_candidate_screening") {
       return {
-        candidateCount: quickState.candidates?.length ?? 0,
+        candidateCount: industryState.candidates?.length ?? 0,
       };
     }
 
     if (nodeKey === "agent4_credibility_and_competition") {
       return {
-        credibilityCount: quickState.credibility?.length ?? 0,
-        gapAnalysis: quickState.gapAnalysis,
-        replanCount: quickState.replanRecords?.length ?? 0,
-        autoEscalated: quickState.autoEscalated,
-        autoEscalationReason: quickState.autoEscalationReason,
-        structuredModelFinal: quickState.structuredModelFinal,
+        credibilityCount: industryState.credibility?.length ?? 0,
+        gapAnalysis: industryState.gapAnalysis,
+        replanCount: industryState.replanRecords?.length ?? 0,
+        autoEscalated: industryState.autoEscalated,
+        autoEscalationReason: industryState.autoEscalationReason,
+        structuredModelFinal: industryState.structuredModelFinal,
       };
     }
 
     if (nodeKey === "agent5_report_synthesis") {
       return {
-        compressedFindings: quickState.compressedFindings,
-        finalReport: quickState.finalReport,
-        autoEscalated: quickState.autoEscalated,
-        autoEscalationReason: quickState.autoEscalationReason,
-        structuredModelFinal: quickState.structuredModelFinal,
+        compressedFindings: industryState.compressedFindings,
+        finalReport: industryState.finalReport,
+        autoEscalated: industryState.autoEscalated,
+        autoEscalationReason: industryState.autoEscalationReason,
+        structuredModelFinal: industryState.structuredModelFinal,
       };
     }
 
     return {
-      reflection: quickState.reflection,
-      contractScore: quickState.contractScore,
-      qualityFlags: quickState.qualityFlags,
-      missingRequirements: quickState.missingRequirements,
-      autoEscalated: quickState.autoEscalated,
-      autoEscalationReason: quickState.autoEscalationReason,
-      structuredModelFinal: quickState.structuredModelFinal,
+      reflection: industryState.reflection,
+      contractScore: industryState.contractScore,
+      qualityFlags: industryState.qualityFlags,
+      missingRequirements: industryState.missingRequirements,
+      autoEscalated: industryState.autoEscalated,
+      autoEscalationReason: industryState.autoEscalationReason,
+      structuredModelFinal: industryState.structuredModelFinal,
     };
   }
 
   getNodeEventPayload(nodeKey: WorkflowNodeKey, state: WorkflowGraphState) {
-    const quickState = state as QuickResearchGraphState;
+    const industryState = state as IndustryResearchGraphState;
 
     if (nodeKey === "agent0_clarify_scope") {
       return {
         clarificationRequired:
-          quickState.clarificationRequest?.needClarification ?? false,
+          industryState.clarificationRequest?.needClarification ?? false,
         missingScopeFields:
-          quickState.clarificationRequest?.missingScopeFields ?? [],
-        question: quickState.clarificationRequest?.question,
-        verification: quickState.clarificationRequest?.verification,
+          industryState.clarificationRequest?.missingScopeFields ?? [],
+        question: industryState.clarificationRequest?.question,
+        verification: industryState.clarificationRequest?.verification,
         suggestedInputPatch:
-          quickState.clarificationRequest?.suggestedInputPatch ?? {},
+          industryState.clarificationRequest?.suggestedInputPatch ?? {},
       };
     }
 
     if (nodeKey === "agent1_extract_research_spec") {
       return {
-        plannedUnitCount: quickState.researchUnits?.length ?? 0,
-        analysisDepth: quickState.taskContract?.analysisDepth ?? "standard",
-        structuredModelInitial: quickState.structuredModelInitial,
+        plannedUnitCount: industryState.researchUnits?.length ?? 0,
+        analysisDepth: industryState.taskContract?.analysisDepth ?? "standard",
+        structuredModelInitial: industryState.structuredModelInitial,
       };
     }
 
     if (nodeKey === "agent2_trend_analysis") {
       return {
-        heatScore: quickState.heatAnalysis?.heatScore ?? null,
+        heatScore: industryState.heatAnalysis?.heatScore ?? null,
       };
     }
 
     if (nodeKey === "agent3_candidate_screening") {
       return {
-        candidateCount: quickState.candidates?.length ?? 0,
+        candidateCount: industryState.candidates?.length ?? 0,
       };
     }
 
     if (nodeKey === "agent4_credibility_and_competition") {
       return {
-        credibilityCount: quickState.credibility?.length ?? 0,
-        requiresFollowup: quickState.gapAnalysis?.requiresFollowup ?? false,
-        replanCount: quickState.replanRecords?.length ?? 0,
-        autoEscalated: quickState.autoEscalated ?? false,
-        autoEscalationReason: quickState.autoEscalationReason ?? null,
-        structuredModelFinal: quickState.structuredModelFinal,
+        credibilityCount: industryState.credibility?.length ?? 0,
+        requiresFollowup: industryState.gapAnalysis?.requiresFollowup ?? false,
+        replanCount: industryState.replanRecords?.length ?? 0,
+        autoEscalated: industryState.autoEscalated ?? false,
+        autoEscalationReason: industryState.autoEscalationReason ?? null,
+        structuredModelFinal: industryState.structuredModelFinal,
       };
     }
 
     if (nodeKey === "agent6_reflection") {
       return {
-        contractScore: quickState.contractScore ?? null,
-        qualityFlags: quickState.qualityFlags ?? [],
-        autoEscalated: quickState.autoEscalated ?? false,
-        autoEscalationReason: quickState.autoEscalationReason ?? null,
-        structuredModelFinal: quickState.structuredModelFinal,
+        contractScore: industryState.contractScore ?? null,
+        qualityFlags: industryState.qualityFlags ?? [],
+        autoEscalated: industryState.autoEscalated ?? false,
+        autoEscalationReason: industryState.autoEscalationReason ?? null,
+        structuredModelFinal: industryState.structuredModelFinal,
       };
     }
 

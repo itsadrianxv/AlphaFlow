@@ -1,7 +1,7 @@
 import type { WorkspaceSection } from "~/app/_components/workspace-shell";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
-  QUICK_RESEARCH_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
@@ -62,7 +62,7 @@ export function resolveWorkflowShellContext(templateCode?: string): {
   return {
     section: "workflows",
     backHref:
-      templateCode === QUICK_RESEARCH_TEMPLATE_CODE
+      templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE
         ? "/workflows"
         : "/workflows",
     historyHref: "/workflows/history",

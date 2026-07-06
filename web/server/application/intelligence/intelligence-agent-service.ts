@@ -4,9 +4,9 @@ import type {
   ThemeNewsItem,
 } from "~/server/domain/intelligence/types";
 import type {
-  QuickResearchCandidate,
-  QuickResearchCredibility,
-  QuickResearchResultDto,
+  IndustryResearchCandidate,
+  IndustryResearchCredibility,
+  IndustryResearchResultDto,
 } from "~/server/domain/workflow/types";
 import type { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import type {
@@ -21,7 +21,7 @@ export type MarketHeatAnalysis = {
 };
 
 export type CandidateCredibilityResult = {
-  credibility: QuickResearchCredibility[];
+  credibility: IndustryResearchCredibility[];
   evidenceList: CompanyEvidence[];
 };
 
@@ -64,7 +64,7 @@ function formatHeatConclusion(score: number): string {
 function mapEvidenceToCredibility(
   evidence: CompanyEvidence,
   fallbackScore: number,
-): QuickResearchCredibility {
+): IndustryResearchCredibility {
   return {
     stockCode: evidence.stockCode,
     credibilityScore: evidence.credibilityScore || fallbackScore,
@@ -76,11 +76,11 @@ function mapEvidenceToCredibility(
   };
 }
 
-function mapCandidateToQuickResearch(
+function mapCandidateToIndustryResearch(
   candidate: IntelligenceCandidateItem,
   heatScore: number,
   index: number,
-): QuickResearchCandidate {
+): IndustryResearchCandidate {
   const blended = Math.round(
     heatScore * 0.55 + candidate.heat * 0.45 - index * 3,
   );
@@ -186,7 +186,7 @@ export class IntelligenceAgentService {
   async screenCandidates(
     query: string,
     heatScore: number,
-  ): Promise<QuickResearchCandidate[]> {
+  ): Promise<IndustryResearchCandidate[]> {
     const sourcedCandidates = await this.dataClient.getCandidates({
       theme: query,
       limit: 8,
@@ -195,13 +195,13 @@ export class IntelligenceAgentService {
     return sourcedCandidates
       .slice(0, 6)
       .map((candidate, index) =>
-        mapCandidateToQuickResearch(candidate, heatScore, index),
+        mapCandidateToIndustryResearch(candidate, heatScore, index),
       );
   }
 
   async evaluateCredibility(
     concept: string,
-    candidates: QuickResearchCandidate[],
+    candidates: IndustryResearchCandidate[],
   ): Promise<CandidateCredibilityResult> {
     const evidenceList = await this.dataClient.getEvidenceBatch({
       concept,
@@ -227,7 +227,7 @@ export class IntelligenceAgentService {
     });
 
     const analyses =
-      await this.confidenceAnalysisService.analyzeQuickResearchCandidates({
+      await this.confidenceAnalysisService.analyzeIndustryResearchCandidates({
         query: concept,
         candidates,
         credibility,
@@ -245,8 +245,8 @@ export class IntelligenceAgentService {
 
   async summarizeCompetition(params: {
     query: string;
-    candidates: QuickResearchCandidate[];
-    credibility: QuickResearchCredibility[];
+    candidates: IndustryResearchCandidate[];
+    credibility: IndustryResearchCredibility[];
   }): Promise<string> {
     const fallback = `${params.query}赛道竞争呈现头部集中趋势，建议优先关注盈利质量和订单持续性。`;
 
@@ -272,28 +272,28 @@ export class IntelligenceAgentService {
       .catch(() => fallback);
   }
 
-  async analyzeQuickResearchOverall(params: {
+  async analyzeIndustryResearchOverall(params: {
     query: string;
     overview: string;
     heatConclusion: string;
-    candidates: QuickResearchCandidate[];
-    credibility: QuickResearchCredibility[];
+    candidates: IndustryResearchCandidate[];
+    credibility: IndustryResearchCredibility[];
     competitionSummary: string;
     news: ThemeNewsItem[];
     evidenceList: CompanyEvidence[];
   }) {
-    return this.confidenceAnalysisService.analyzeQuickResearchOverall(params);
+    return this.confidenceAnalysisService.analyzeIndustryResearchOverall(params);
   }
 
   buildFinalReport(params: {
     overview: string;
     heatScore: number;
     heatConclusion: string;
-    candidates: QuickResearchCandidate[];
-    credibility: QuickResearchCredibility[];
+    candidates: IndustryResearchCandidate[];
+    credibility: IndustryResearchCredibility[];
     competitionSummary: string;
-    confidenceAnalysis?: QuickResearchResultDto["confidenceAnalysis"];
-  }): QuickResearchResultDto {
+    confidenceAnalysis?: IndustryResearchResultDto["confidenceAnalysis"];
+  }): IndustryResearchResultDto {
     const topCredibility = [...params.credibility].sort(
       (left, right) => right.credibilityScore - left.credibilityScore,
     );

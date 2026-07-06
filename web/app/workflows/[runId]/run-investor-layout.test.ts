@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { shouldShowRunDigestBanner } from "~/app/workflows/[runId]/run-investor-layout";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
-  QUICK_RESEARCH_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
 } from "~/server/domain/workflow/types";
 
 describe("run-investor-layout", () => {
@@ -36,7 +36,7 @@ describe("run-investor-layout", () => {
 
     expect(
       shouldShowRunDigestBanner({
-        templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+        templateCode: INDUSTRY_RESEARCH_TEMPLATE_CODE,
         status: "SUCCEEDED",
         hasCompanyDetailModel: false,
       }),

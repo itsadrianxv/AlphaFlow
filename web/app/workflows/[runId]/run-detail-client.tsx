@@ -23,8 +23,8 @@ import { resolveWorkflowShellContext } from "~/app/workflows/workflow-shell-cont
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   type CompanyResearchResultDto,
-  QUICK_RESEARCH_TEMPLATE_CODE,
-  type QuickResearchResultDto,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
+  type IndustryResearchResultDto,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
 } from "~/server/domain/workflow/types";
 import { api } from "~/trpc/react";
@@ -118,7 +118,7 @@ function getClarificationPayloadFromResult(
     return null;
   }
 
-  const candidate = (value as QuickResearchResultDto).clarificationRequest;
+  const candidate = (value as IndustryResearchResultDto).clarificationRequest;
   return isRecord(candidate) && candidate.needClarification === true
     ? candidate
     : null;
@@ -407,7 +407,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
   const workflowHistoryQuery = api.workflow.listRuns.useQuery(
     {
       limit: 8,
-      templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+      templateCode: INDUSTRY_RESEARCH_TEMPLATE_CODE,
     },
     {
       enabled: shellContext.historyQueryKind === "workflows",

@@ -4,7 +4,7 @@ import { CompanyResearchAgentService } from "~/server/application/intelligence/c
 import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
 import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
-import { QuickResearchWorkflowService } from "~/server/application/intelligence/quick-research-workflow-service";
+import { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
 import { KronosForecastWorkflowService } from "~/server/application/timing/kronos-forecast-workflow-service";
@@ -44,7 +44,7 @@ import {
   LegacyCompanyResearchLangGraph,
   ODRCompanyResearchLangGraph,
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
-import { QuickResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/quick-research-graph";
+import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
 import { TimingReviewLoopLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-review-loop-graph";
 import { TimingSignalPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-signal-graph";
 import { WatchlistTimingCardsPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/watchlist-timing-cards-graph";
@@ -70,7 +70,7 @@ const researchToolRegistry = new ResearchToolRegistry({
   pythonCapabilityGatewayClient: capabilityGatewayClient,
   pythonIntelligenceDataClient: pythonDataClient,
 });
-const quickResearchWorkflowService = new QuickResearchWorkflowService({
+const industryResearchWorkflowService = new IndustryResearchWorkflowService({
   client: deepSeekClient,
   intelligenceService: new IntelligenceAgentService({
     deepSeekClient,
@@ -132,7 +132,7 @@ const executionService = new WorkflowExecutionService({
   repository: workflowRepository,
   runtimeStore: new RedisWorkflowRuntimeStore(),
   graphs: [
-    new QuickResearchLangGraph(quickResearchWorkflowService),
+    new IndustryResearchLangGraph(industryResearchWorkflowService),
     new CompanyResearchLangGraph(companyResearchService),
     new LegacyCompanyResearchLangGraph(companyResearchService),
     new ODRCompanyResearchLangGraph(companyResearchWorkflowService),

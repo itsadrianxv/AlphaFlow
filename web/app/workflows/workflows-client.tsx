@@ -11,12 +11,12 @@ import {
 } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-history";
-import { buildQuickResearchStartInput } from "~/app/workflows/quick-research-form";
+import { buildIndustryResearchStartInput } from "~/app/workflows/industry-research-form";
 import { workflowsStageTabs } from "~/app/workflows/workflows-stage-tabs";
-import { QUICK_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
+import { INDUSTRY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { api } from "~/trpc/react";
 
-const quickPrompts = [
+const industryPrompts = [
   "半导体设备国产替代里，未来 12 个月最关键的兑现节点是什么？",
   "创新药出海链条里，哪些商业化指标最值得持续跟踪？",
   "AI 算力基础设施的盈利兑现节奏，应该看哪些领先指标？",
@@ -70,14 +70,14 @@ export function WorkflowsClient() {
 
   const runsQuery = api.workflow.listRuns.useQuery({
     limit: 20,
-    templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+    templateCode: INDUSTRY_RESEARCH_TEMPLATE_CODE,
   });
 
-  const startMutation = api.workflow.startQuickResearch.useMutation({
+  const startMutation = api.workflow.startIndustryResearch.useMutation({
     onSuccess: async (result) => {
       await utils.workflow.listRuns.invalidate({
         limit: 20,
-        templateCode: QUICK_RESEARCH_TEMPLATE_CODE,
+        templateCode: INDUSTRY_RESEARCH_TEMPLATE_CODE,
       });
       router.push(`/workflows/${result.runId}`);
     },
@@ -101,7 +101,7 @@ export function WorkflowsClient() {
     }
 
     await startMutation.mutateAsync(
-      buildQuickResearchStartInput({
+      buildIndustryResearchStartInput({
         query,
         idempotencyKey,
         researchGoal,
@@ -217,13 +217,13 @@ export function WorkflowsClient() {
     </SectionCard>
   );
 
-  const quickPromptPanel = (
+  const industryPromptPanel = (
     <SectionCard
       title="常用问题模板"
       description="点击填入后可以继续补充约束，再直接发起研究。"
     >
       <div className="grid gap-3">
-        {quickPrompts.map((prompt) => (
+        {industryPrompts.map((prompt) => (
           <button
             key={prompt}
             type="button"
@@ -309,7 +309,7 @@ export function WorkflowsClient() {
         </div>
       </SectionCard>
 
-      {quickPromptPanel}
+      {industryPromptPanel}
     </div>
   );
 

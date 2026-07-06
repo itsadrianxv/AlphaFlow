@@ -113,7 +113,7 @@ function createMockDb() {
         generatedAt: "2026-04-08T08:05:00.000Z",
       },
       template: {
-        code: "quick_industry_research",
+        code: "industry_research",
         version: 3,
       },
     },
@@ -160,7 +160,7 @@ function createMockDb() {
         generatedAt: "2026-04-10T08:02:00.000Z",
       },
       template: {
-        code: "quick_industry_research",
+        code: "industry_research",
         version: 3,
       },
     },

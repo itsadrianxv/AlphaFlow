@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { WorkflowHistoryClient } from "~/app/_components/workflow-history-client";
-import { QUICK_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
+import { INDUSTRY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 
 export default function WorkflowsHistoryPage() {
   return (
@@ -14,7 +14,7 @@ export default function WorkflowsHistoryPage() {
         searchPlaceholder="搜索主题、问题、节点或报错"
         moduleHref="/workflows"
         moduleLabel="返回行业判断"
-        templateCode={QUICK_RESEARCH_TEMPLATE_CODE}
+        templateCode={INDUSTRY_RESEARCH_TEMPLATE_CODE}
       />
     </Suspense>
   );
