@@ -47,4 +47,12 @@ describe("HomePage server boundary", () => {
     expect(globalsSource).toContain("--app-text: #f0f0f0");
     expect(globalsSource).toContain("--app-border: rgba(214, 235, 253, 0.19)");
   });
+
+  it("keeps Tailwind scanning both routed pages and shared web modules", () => {
+    const globalsSource = readSource("web/styles/globals.css");
+
+    expect(globalsSource).toContain('@import "tailwindcss" source(none)');
+    expect(globalsSource).toContain('@source "../../app"');
+    expect(globalsSource).toContain('@source ".."');
+  });
 });
