@@ -855,7 +855,7 @@ export function ScreeningStudioClient() {
               setDraftMode(false);
               setSelectedWorkspaceId(nextId);
             }}
-            className="app-input min-w-[220px]"
+            className="app-input !w-[260px] max-w-full shrink-0"
           >
             <option value="">选择已保存工作台</option>
             {workspaceOptions.map((workspace: WorkspaceSummary) => (
@@ -867,14 +867,14 @@ export function ScreeningStudioClient() {
           <button
             type="button"
             onClick={resetWorkspaceDraft}
-            className="app-button"
+            className="app-button shrink-0"
           >
             新建工作台
           </button>
           <button
             type="button"
             onClick={() => void handleSaveWorkspace()}
-            className="app-button app-button-primary"
+            className="app-button app-button-primary shrink-0"
             disabled={
               createWorkspaceMutation.isPending ||
               updateWorkspaceMutation.isPending

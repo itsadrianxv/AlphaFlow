@@ -525,7 +525,7 @@ export function WorkspaceShell(props: {
     <>
       {actions}
       {showWatchlistsAction ? (
-        <Link href="/watchlists" className="app-button">
+        <Link href="/watchlists" className="app-button shrink-0">
           自选股列表
         </Link>
       ) : null}
