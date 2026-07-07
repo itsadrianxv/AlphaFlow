@@ -160,9 +160,6 @@ export default async function Home() {
     <HydrateClient>
       <WorkspaceShell
         section="home"
-        eyebrow="Mistral Workflow"
-        title="用一条流程完成筛选、研究、判断和组合动作。"
-        description="这不是看板。首页只保留今天最该继续的动作、四个主阶段的入口，以及最近已经形成结论的工作流。"
         actions={
           <Link href={primaryHref} className="app-button app-button-primary">
             {primaryLabel}

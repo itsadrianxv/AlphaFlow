@@ -410,7 +410,7 @@ function SidebarRail(props: {
 
 function PageHeader(props: {
   eyebrow?: string;
-  title: string;
+  title?: string;
   description?: string;
   actions?: ReactNode;
   titleSize?: "default" | "compact";
@@ -423,19 +423,21 @@ function PageHeader(props: {
 
   return (
     <header className="app-page-header flex flex-col gap-5 border-b border-[var(--app-border-soft)] pb-6 lg:flex-row lg:items-start lg:justify-between">
-      <div className="min-w-0">
-        {eyebrow ? (
-          <div className="mb-4 font-[family-name:var(--font-heading)] text-[11px] tracking-[0.18em] text-[var(--app-text-subtle)]">
-            {eyebrow}
-          </div>
-        ) : null}
-        <h1 className={titleClassName}>{title}</h1>
-        {description ? (
-          <p className="mt-4 max-w-4xl text-sm leading-7 text-[var(--app-text-muted)] sm:text-base">
-            {description}
-          </p>
-        ) : null}
-      </div>
+      {eyebrow || title || description ? (
+        <div className="min-w-0">
+          {eyebrow ? (
+            <div className="mb-4 font-[family-name:var(--font-heading)] text-[11px] tracking-[0.18em] text-[var(--app-text-subtle)]">
+              {eyebrow}
+            </div>
+          ) : null}
+          {title ? <h1 className={titleClassName}>{title}</h1> : null}
+          {description ? (
+            <p className="mt-4 max-w-4xl text-sm leading-7 text-[var(--app-text-muted)] sm:text-base">
+              {description}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {actions ? (
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           {actions}
@@ -449,7 +451,7 @@ export function WorkspaceShell(props: {
   section: WorkspaceSection;
   sectionView?: WorkspaceSectionView;
   eyebrow?: string;
-  title: string;
+  title?: string;
   description?: string;
   actions?: ReactNode;
   showWatchlistsAction?: boolean;
