@@ -840,9 +840,6 @@ export function TimingClient() {
                   <div className="text-base font-medium text-[var(--app-text)]">
                     单股判断
                   </div>
-                  <div className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
-                    适合已经有明确目标，只想先看一只股票当前处在什么节奏。
-                  </div>
                 </button>
                 <button
                   type="button"
@@ -857,9 +854,7 @@ export function TimingClient() {
                   <div className="text-base font-medium text-[var(--app-text)]">
                     自选股列表
                   </div>
-                  <div className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
-                    适合在一组候选里挑优先级，再结合组合约束生成建议。
-                  </div>
+
                 </button>
               </div>
 

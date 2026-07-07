@@ -136,10 +136,6 @@ export function ResearchSpacesListSection(props: {
         <div className="font-[family-name:var(--font-heading)] text-[24px] leading-none text-[var(--app-text-strong)]">
           已有研究空间
         </div>
-        <p className="max-w-3xl text-sm leading-6 text-[var(--app-text-muted)]">
-          Space 是长期研究容器。运行记录、自选股和股票需要你主动归档或关联，避免
-          thesis 被短期会话稀释。
-        </p>
       </div>
 
       {isLoading ? (
@@ -147,7 +143,6 @@ export function ResearchSpacesListSection(props: {
       ) : spaces.length === 0 ? (
         <EmptyState
           title="还没有 Research Space"
-          description="先创建一个长期研究容器，再把 thesis、关键问题和归档上下文沉淀进去。"
           actions={createAction}
         />
       ) : (
@@ -590,7 +585,6 @@ export function SpacesClient() {
       section="spaces"
       eyebrow="Research Space"
       title="研究空间"
-      description="把 thesis、关键问题、关联标的和归档过的 session 聚合到一个长期研究容器里。"
       actions={
         <SpacesHeaderActions onOpenCreate={() => setCreateDialogOpen(true)} />
       }

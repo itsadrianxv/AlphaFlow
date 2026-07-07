@@ -4,16 +4,16 @@ export const workflowsStageTabs: WorkflowStageTab[] = [
   {
     id: "question",
     label: "研究问题",
-    summary: "先把问题写成可验证的投资判断。",
+    summary: "",
   },
   {
     id: "constraints",
     label: "研究约束",
-    summary: "限定信源、必答问题与时效窗口。",
+    summary: "",
   },
   {
     id: "launch",
     label: "发起执行",
-    summary: "确认输入后发起本轮研究。",
+    summary: "",
   },
 ];

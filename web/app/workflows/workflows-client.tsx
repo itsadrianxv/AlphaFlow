@@ -117,7 +117,6 @@ export function WorkflowsClient() {
   const questionPanel = (
     <SectionCard
       title="研究问题"
-      description="先把问题写成可验证的投资判断，避免把后续步骤浪费在泛主题上。"
     >
       <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
         本轮要回答什么？
@@ -321,7 +320,6 @@ export function WorkflowsClient() {
       historyLoading={runsQuery.isLoading}
       historyEmptyText="还没有行业研究记录"
       title="行业研究"
-      description="把研究问题和约束收进一条连续流程里，减少在多个页面之间切换。"
       actions={
         <>
           <Link href="/" className="app-button">

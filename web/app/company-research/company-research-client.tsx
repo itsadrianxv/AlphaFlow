@@ -163,7 +163,6 @@ export function CompanyResearchClient() {
     <Panel
       className={stageCanvasClassName}
       title="研究目标"
-      description="先锁定公司、代码和当前最想验证的核心判断。"
     >
       <div className="grid gap-4">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">

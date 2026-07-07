@@ -211,7 +211,6 @@ export default async function Home() {
 
         <SectionCard
           title="主流程"
-          description="每个阶段都指向一个明确动作，而不是堆叠指标卡片。"
         >
           <div className="grid gap-4 lg:grid-cols-4">
             {primaryWorkflowStages.map((stage, index) => {
@@ -258,7 +257,6 @@ export default async function Home() {
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <SectionCard
             title="继续当前研究"
-            description="优先展示正在推进中的工作，而不是总览式统计。"
             actions={
               <Link href="/workflows" className="app-button">
                 打开研究入口
@@ -334,7 +332,6 @@ export default async function Home() {
 
           <SectionCard
             title="最近结论"
-            description="最近一轮已经形成动作建议的输出，适合快速回到结论页面。"
             actions={
               <Link href="/timing" className="app-button">
                 查看组合建议
@@ -346,7 +343,6 @@ export default async function Home() {
             ) : latestRecommendations.length === 0 ? (
               <EmptyState
                 title="还没有新的组合建议"
-                description="先完成筛选或研究，再让工作流输出动作和区间。"
               />
             ) : (
               <div className="grid gap-4">
