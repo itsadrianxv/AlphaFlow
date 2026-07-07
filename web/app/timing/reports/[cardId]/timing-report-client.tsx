@@ -52,11 +52,6 @@ export function TimingReportClient(props: { cardId: string }) {
           ? `${report.card.stockCode} ${report.card.stockName} · 择时研究报告`
           : "单股择时研究报告"
       }
-      description={
-        report
-          ? `报告默认冻结在 ${report.card.asOfDate ?? report.card.signalSnapshot?.asOfDate ?? "-"} 的日线视角，用价格结构、证据引擎和复盘时间线解释当前判断。`
-          : "从现有择时卡片进入详情，查看完整的单股研究报告。"
-      }
       actions={
         <Link href="/timing" className="app-button">
           返回择时工作台

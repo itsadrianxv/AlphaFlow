@@ -54,7 +54,9 @@ export function WorkflowStageSwitcher(props: {
               <div className="mt-3 font-[family-name:var(--font-heading)] text-xl leading-none text-[var(--app-text-strong)]">
                 {tab.label}
               </div>
-              <div className="mt-3 text-sm leading-6">{tab.summary}</div>
+              {tab.summary ? (
+                <div className="mt-3 text-sm leading-6">{tab.summary}</div>
+              ) : null}
             </button>
           );
         })}

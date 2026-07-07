@@ -65,22 +65,22 @@ export const timingReportStageTabs: Array<
   {
     id: "summary",
     label: "当前结论",
-    summary: "先看操作倾向、图表与关键快照，快速判断现在该怎么做。",
+    summary: "",
   },
   {
     id: "evidence",
     label: "结构证据",
-    summary: "拆开结构解释与六大证据引擎，回答为什么当前偏这个方向。",
+    summary: "",
   },
   {
     id: "execution",
     label: "执行风控",
-    summary: "集中查看触发条件、失效条件、市场环境与风险标签。",
+    summary: "",
   },
   {
     id: "review",
     label: "复盘跟踪",
-    summary: "回看后续验证结果，确认这次择时结论是否兑现。",
+    summary: "",
   },
 ];
 
@@ -159,11 +159,7 @@ function SummaryTab(props: { report: TimingReportPayload }) {
 
   return (
     <div className="grid gap-6">
-      <Panel
-        title="当前结论"
-        description="先看摘要、行动理由和关键快照，再结合首屏价格结构图判断现在该怎么做。"
-        surface="inset"
-      >
+      <Panel title="当前结论" surface="inset">
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center gap-2">
@@ -216,10 +212,7 @@ function SummaryTab(props: { report: TimingReportPayload }) {
         </div>
       </Panel>
 
-      <Panel
-        title="价格结构"
-        description="首屏保留完整价格结构图，用趋势、均线与量能确认当前交易背景。"
-      >
+      <Panel title="价格结构">
         <TimingReportChart
           bars={report.bars}
           chartLevels={report.chartLevels}
@@ -235,10 +228,7 @@ function EvidenceTab(props: { report: TimingReportPayload }) {
 
   return (
     <div className="grid gap-6">
-      <Panel
-        title="价格结构"
-        description="在结构证据里复用同一套价格结构图，方便把图表与证据引擎对照阅读。"
-      >
+      <Panel title="价格结构">
         <TimingReportChart
           bars={report.bars}
           chartLevels={report.chartLevels}
@@ -432,10 +422,7 @@ function ReviewTab(props: { report: TimingReportPayload }) {
   return (
     <Panel title="轻量复盘时间线">
       {report.reviewTimeline.length === 0 ? (
-        <EmptyState
-          title="暂无已完成复盘记录"
-          description="这只股票的历史证明会在后续复盘写回后出现在这里。"
-        />
+        <EmptyState title="暂无已完成复盘记录" />
       ) : (
         <div className="grid gap-3">
           {report.reviewTimeline.map((item) => (
