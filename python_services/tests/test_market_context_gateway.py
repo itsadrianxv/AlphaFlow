@@ -124,6 +124,9 @@ def test_market_context_gateway_builds_snapshot_from_macro_flow_and_hot_themes()
     assert response.data.downstreamHints.workflows.suggestedQuestion.startswith(
         "围绕 AI"
     )
+    assert response.data.downstreamHints.workflows.summary
+    assert response.data.downstreamHints.companyResearch.summary
+    assert response.data.downstreamHints.screening.summary
     assert response.data.availability.regime.available is True
     assert response.data.availability.flow.available is True
     assert response.data.availability.hotThemes.available is True

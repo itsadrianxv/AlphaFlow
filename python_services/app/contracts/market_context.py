@@ -38,7 +38,7 @@ class MarketFlowSummary(BaseModel):
 
 
 class SectionHint(BaseModel):
-    summary: str
+    summary: str = Field(..., min_length=1)
     suggestedQuestion: str | None = None
     suggestedDraftName: str | None = None
 

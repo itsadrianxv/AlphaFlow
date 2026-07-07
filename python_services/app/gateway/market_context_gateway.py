@@ -307,14 +307,14 @@ class MarketContextGateway:
 
         return MarketContextDownstreamHints(
             workflows=SectionHint(
-                summary=f"优先围绕 {top_theme} 这类高热主题发起行业研究。",
+                summary=f"优先围绕 {top_theme} 拆解产业链景气扩散和受益环节。",
                 suggestedQuestion=f"围绕 {top_theme} 产业链，当前景气扩散到哪些环节？",
             ),
             companyResearch=SectionHint(
-                summary=f"公司研究优先确认 {top_theme} 主题兑现链条和订单传导。",
+                summary=f"优先挑选 {top_theme} 相关公司，验证订单、业绩和估值兑现路径。",
             ),
             screening=SectionHint(
-                summary="优先从热门主题候选股缩小选股范围，再补估值和质量约束。",
+                summary=f"优先从 {top_theme} 相关候选股开始缩小观察范围。",
                 suggestedDraftName=f"{top_theme} 热门主题候选池",
             ),
             timing=SectionHint(
