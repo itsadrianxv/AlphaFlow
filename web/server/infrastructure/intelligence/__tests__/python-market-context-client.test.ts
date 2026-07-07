@@ -97,6 +97,107 @@ describe("PythonMarketContextClient", () => {
     );
   });
 
+  it("retries with force refresh when cached snapshot fails schema parsing", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            asOf: "2026-04-18T00:00:00+00:00",
+            status: "partial",
+            regime: {
+              overallTone: "unknown",
+              growthTone: "unknown",
+              liquidityTone: "unknown",
+              riskTone: "unknown",
+              summary: "macro unavailable",
+              drivers: [],
+            },
+            flow: {
+              northboundNetAmount: null,
+              direction: "unknown",
+              summary: "flow unavailable",
+            },
+            hotThemes: [],
+            downstreamHints: {
+              workflows: { summary: "" },
+              companyResearch: { summary: "" },
+              screening: { summary: "" },
+              timing: { summary: "timing summary" },
+            },
+            availability: {
+              regime: { available: false },
+              flow: { available: false },
+              hotThemes: { available: false },
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: {
+            asOf: "2026-04-18T00:00:00+00:00",
+            status: "partial",
+            regime: {
+              overallTone: "unknown",
+              growthTone: "unknown",
+              liquidityTone: "unknown",
+              riskTone: "unknown",
+              summary: "macro unavailable",
+              drivers: [],
+            },
+            flow: {
+              northboundNetAmount: null,
+              direction: "unknown",
+              summary: "flow unavailable",
+            },
+            hotThemes: [],
+            downstreamHints: {
+              workflows: { summary: "workflow summary" },
+              companyResearch: { summary: "company summary" },
+              screening: { summary: "screening summary" },
+              timing: { summary: "timing summary" },
+            },
+            availability: {
+              regime: { available: false },
+              flow: { available: false },
+              hotThemes: { available: false },
+            },
+          },
+        }),
+      });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const PythonMarketContextClient = await loadClient();
+    const client = new PythonMarketContextClient({
+      baseUrl: "http://127.0.0.1:8000/api/v1",
+      timeoutMs: 500,
+    });
+
+    await expect(client.getSnapshot()).resolves.toMatchObject({
+      downstreamHints: {
+        workflows: {
+          summary: "workflow summary",
+        },
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "http://127.0.0.1:8000/api/v1/market-context/snapshot",
+      expect.anything(),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:8000/api/v1/market-context/snapshot?forceRefresh=true",
+      expect.anything(),
+    );
+  });
+
   it("accepts nullable downstream hints and availability warnings from python", async () => {
     vi.stubGlobal(
       "fetch",

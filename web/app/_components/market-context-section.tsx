@@ -49,9 +49,12 @@ export function MarketContextSection(props: {
   currentStockCodes?: string[];
 }) {
   const { section, currentStockCodes = [] } = props;
-  const snapshotQuery = api.marketContext.getSnapshot.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-  });
+  const snapshotQuery = api.marketContext.getSnapshot.useQuery(
+    {},
+    {
+      refetchOnWindowFocus: false,
+    },
+  );
 
   if (snapshotQuery.isLoading) {
     return (

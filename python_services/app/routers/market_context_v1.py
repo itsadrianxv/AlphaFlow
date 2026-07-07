@@ -12,4 +12,8 @@ router = APIRouter(prefix="/api/v1/market-context")
 
 @router.get("/snapshot", response_model=MarketContextSnapshotResponse)
 async def get_market_context_snapshot(request: Request):
-    return market_context_gateway.get_snapshot(request_id=request.state.request_id)
+    force_refresh = request.query_params.get("forceRefresh") == "true"
+    return market_context_gateway.get_snapshot(
+        request_id=request.state.request_id,
+        force_refresh=force_refresh,
+    )

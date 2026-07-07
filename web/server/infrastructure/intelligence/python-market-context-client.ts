@@ -1,3 +1,4 @@
+import { ZodError } from "zod";
 import { marketContextSnapshotSchema } from "~/contracts/market-context";
 import { env } from "~/env";
 import {
@@ -48,6 +49,10 @@ export type PythonMarketContextClientConfig = {
   timeoutMs?: number;
 };
 
+export type MarketContextSnapshotRequest = {
+  forceRefresh?: boolean;
+};
+
 export class PythonMarketContextClient {
   private readonly baseUrl: string;
   private readonly marketContextBasePath: string;
@@ -64,24 +69,37 @@ export class PythonMarketContextClient {
       config?.timeoutMs ?? env.PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS;
   }
 
-  async getSnapshot() {
-    return this.request("/snapshot");
+  async getSnapshot(input?: MarketContextSnapshotRequest) {
+    return this.request("/snapshot", {
+      forceRefresh: input?.forceRefresh ?? false,
+      retryWithForceRefreshOnParseError: true,
+    });
   }
 
-  private async request(path: string) {
+  private async request(
+    path: string,
+    options?: {
+      forceRefresh?: boolean;
+      retryWithForceRefreshOnParseError?: boolean;
+    },
+  ) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
-      const response = await fetch(
+      const url = new URL(
         `${this.baseUrl}${this.marketContextBasePath}${path}`,
-        {
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        },
       );
+      if (options?.forceRefresh) {
+        url.searchParams.set("forceRefresh", "true");
+      }
+
+      const response = await fetch(url.toString(), {
+        signal: controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "Unknown error");
@@ -101,7 +119,22 @@ export class PythonMarketContextClient {
       }
 
       const payload = (await response.json()) as { data?: unknown };
-      return marketContextSnapshotSchema.parse(payload.data);
+      const parsed = marketContextSnapshotSchema.safeParse(payload.data);
+      if (parsed.success) {
+        return parsed.data;
+      }
+
+      if (
+        !options?.forceRefresh &&
+        options?.retryWithForceRefreshOnParseError
+      ) {
+        return this.request(path, {
+          forceRefresh: true,
+          retryWithForceRefreshOnParseError: false,
+        });
+      }
+
+      throw parsed.error;
     } catch (error) {
       if (error instanceof WorkflowDomainError) {
         throw error;
@@ -116,10 +149,20 @@ export class PythonMarketContextClient {
 
       throw new WorkflowDomainError(
         WORKFLOW_ERROR_CODES.INTELLIGENCE_DATA_UNAVAILABLE,
-        `Market context request failed: ${(error as Error).message}`,
+        `Market context request failed: ${formatMarketContextRequestError(error)}`,
       );
     } finally {
       clearTimeout(timer);
     }
   }
+}
+
+function formatMarketContextRequestError(error: unknown) {
+  if (error instanceof ZodError) {
+    return error.issues
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+      .join("; ");
+  }
+
+  return (error as Error).message;
 }

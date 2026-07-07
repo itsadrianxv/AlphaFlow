@@ -95,5 +95,31 @@ describe("marketContextRouter.getSnapshot", () => {
       status: "complete",
     });
     expect(getSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(getSnapshotMock).toHaveBeenCalledWith({ forceRefresh: false });
+  });
+
+  it("passes force refresh to the python client", async () => {
+    getSnapshotMock.mockResolvedValue({
+      status: "partial",
+    });
+
+    const { marketContextRouter } = await import(
+      "~/server/api/routers/market-context"
+    );
+    const procedure = marketContextRouter.getSnapshot as unknown as {
+      handler(args: {
+        input?: { forceRefresh?: boolean };
+        ctx: { session: { user: { id: string } } };
+      }): Promise<unknown>;
+    };
+
+    await procedure.handler({
+      input: { forceRefresh: true },
+      ctx: {
+        session: { user: { id: "user_1" } },
+      },
+    });
+
+    expect(getSnapshotMock).toHaveBeenCalledWith({ forceRefresh: true });
   });
 });
