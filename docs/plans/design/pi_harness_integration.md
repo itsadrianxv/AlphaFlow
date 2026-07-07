@@ -89,7 +89,7 @@ node scripts/cli.mjs call <server_type> <tool_name> <params_json>
 
 ## 推荐目录结构
 
-建议把 `agent-runtime` 作为独立的 Node/TypeScript sidecar，而不是放入 `python_services/`。原因是 Pi 与 wind skill 的执行链路主要在 Node 生态中，放入 Python service 会制造跨语言边界和部署职责混乱。
+建议把 `agent-runtime` 作为独立的 Node/TypeScript sidecar，而不是放入 `python_services/`。
 
 推荐结构：
 
@@ -148,11 +148,7 @@ web/app/agent-runtime/
 
 ## Pi 源码与依赖策略
 
-不建议第一阶段把 Pi 源码 clone 到 `python_services/agent_harness` 后再删除 TUI。Pi 是 TypeScript/Node 生态，直接放入 Python 服务目录会让职责、镜像、依赖和升级边界都变得模糊。
-
-优先级建议如下：
-
-1. 第一优先：依赖 Pi 的核心包
+- 依赖 Pi 的核心包
 
    在 `agent_runtime/package.json` 中引入 Pi 的 core 能力，例如：
 
@@ -167,27 +163,6 @@ web/app/agent-runtime/
 
    本项目只写薄 adapter：把 AlphaFlow 的任务、skill registry、工具 allowlist、事件流和审计模型接到 Pi 的 agent loop 上。
 
-2. 第二优先：固定 commit 的 vendor 目录
-
-   如果 npm 包能力不足，或者需要审计和锁定上游实现，可以把 Pi 以固定 commit 引入：
-
-   ```txt
-   vendor/
-     pi/
-   ```
-
-   这比放到 `python_services/` 更清晰。`vendor/pi` 应保持接近上游，只在 `agent_runtime/src/pi-adapter.ts` 中做适配。
-
-3. 第三优先：fork 并裁剪
-
-   只有在以下情况才考虑 fork/裁剪 Pi：
-
-   - Pi core 没有暴露足够的状态恢复、事件、tool call hook；
-   - 需要对 tool loop 做强约束，但官方扩展点不够；
-   - TUI/CLI 依赖显著增加镜像体积或攻击面；
-   - 需要长期维护与 AlphaFlow 深度绑定的 agent runtime。
-
-即使 fork，也不应直接修改成项目私有逻辑散落在业务代码中。推荐保留一个小而明确的 `pi-adapter` 层，把上游 Pi 与本项目运行时隔离。
 
 ## agent-runtime 容器边界
 
@@ -222,57 +197,13 @@ POST /runs/:runId/cancel
 - 临时目录使用 `tmpfs` 或专门 volume；
 - 只注入 `agent-runtime` 需要的凭证，例如 `WIND_API_KEY`；
 - 不继承 Web/worker 容器的全部环境变量；
-- 通过 allowlist 限制 skill、server_type、tool_name 和参数 schema；
 - 限制单次任务超时、最大工具调用次数、最大 token、最大输出体积；
 - 保存 tool call、参数摘要、错误、耗时和数据来源，支持后续审计。
 
-需要明确：Docker 容器是隔离执行环境，但默认不是完整安全沙箱。更准确的表述是：
-
-> `agent-runtime` 是一个 Docker 隔离的受控 agent 执行环境，通过只读挂载、最小凭证、工具 allowlist、资源限制和审计日志来降低风险。
 
 ## Docker Compose 与 Dockerfile 草案
 
 `docker/docker-compose.yml` 中可以新增 `agent-runtime`：
-
-```yaml
-agent-runtime:
-  build:
-    context: ..
-    dockerfile: docker/agent-runtime/Dockerfile
-  restart: unless-stopped
-  environment:
-    NODE_ENV: development
-    PORT: "8020"
-    AGENT_RUNTIME_WORKDIR: /tmp/agent-runs
-    WIND_API_KEY: ${WIND_API_KEY:-}
-    PYTHON_SERVICE_URL: ${PYTHON_SERVICE_URL:-http://python-service:8000}
-  read_only: true
-  tmpfs:
-    - /tmp
-  volumes:
-    - ../agent_runtime:/app/agent_runtime
-    - ../agent_runtime/skills:/app/skills:ro
-    - agent_runtime_cache:/app/cache
-  cap_drop:
-    - ALL
-  security_opt:
-    - no-new-privileges:true
-  mem_limit: 1g
-  cpus: 1.0
-  ports:
-    - "${AGENT_RUNTIME_PORT:-8020}:8020"
-  healthcheck:
-    test:
-      [
-        "CMD",
-        "node",
-        "-e",
-        "fetch('http://localhost:8020/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
-      ]
-    interval: 15s
-    timeout: 5s
-    retries: 10
-```
 
 同时在 `web` 和 `workflow-worker` 中增加：
 
@@ -282,73 +213,12 @@ AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL:-http://agent-runtime:8020}
 
 并在 `depends_on` 中依赖 `agent-runtime` 的 healthcheck。
 
-`docker/agent-runtime/Dockerfile` 第一版可以保持简单：
+`docker/agent-runtime/Dockerfile` 保持简单：
 
-```dockerfile
-FROM node:22-bookworm-slim
 
-WORKDIR /app/agent_runtime
+开发期需要热更新，请通过 compose 挂载 `../agent_runtime:/app/agent_runtime` 并运行 `npm run dev`。
 
-COPY agent_runtime/package*.json ./
-RUN npm ci
 
-COPY agent_runtime ./
-
-ENV NODE_ENV=production
-ENV PORT=8020
-
-EXPOSE 8020
-
-CMD ["npm", "run", "start"]
-```
-
-开发期如果需要热更新，可以通过 compose 挂载 `../agent_runtime:/app/agent_runtime` 并运行 `npm run dev`。生产镜像则应复制固定版本代码和固定版本 skill，不依赖宿主机目录。
-
-如果接入 `wind-mcp-skill`，Dockerfile 或构建脚本还需要确保：
-
-- 容器内有 Node 运行时；
-- skill 的 npm 依赖已安装；
-- skill 目录位于固定路径，例如 `/app/skills/wind-mcp-skill`；
-- CLI 调用路径固定，不从用户输入拼接任意路径；
-- Wind 相关凭证只通过环境变量或受控 secret 注入。
-
-## Skill Registry 与工具策略
-
-需要一个显式 skill manifest，避免 agent 自行扫描和执行未知 skill：
-
-```yaml
-skills:
-  - id: wind-mcp
-    name: Wind MCP Skill
-    type: tool
-    path: /app/skills/wind-mcp-skill
-    entry:
-      kind: node-cli
-      command: node
-      args:
-        - scripts/cli.mjs
-        - call
-    allowed_tools:
-      - server_type: stock
-        tool_name: stock_data
-      - server_type: financial
-        tool_name: financial_indicators
-    required_credentials:
-      - WIND_API_KEY
-    timeout_ms: 30000
-    max_calls_per_run: 20
-```
-
-工具执行时必须经过 `tool-policy.ts`：
-
-- 校验 skill 是否启用；
-- 校验用户是否有权限；
-- 校验 `server_type` 和 `tool_name` 是否在 allowlist 中；
-- 使用 schema 校验参数；
-- 为每次调用设置 timeout；
-- 记录工具调用事件；
-- 对错误进行结构化归因，而不是把 CLI stderr 直接暴露给前端；
-- 对返回数据做大小限制和必要脱敏。
 
 ## T3 任务状态模型
 
