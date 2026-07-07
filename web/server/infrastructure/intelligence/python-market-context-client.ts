@@ -1,5 +1,8 @@
 import { ZodError } from "zod";
-import { marketContextSnapshotSchema } from "~/contracts/market-context";
+import {
+  marketContextSnapshotSchema,
+  type MarketContextSnapshot,
+} from "~/contracts/market-context";
 import { env } from "~/env";
 import {
   WORKFLOW_ERROR_CODES,
@@ -69,7 +72,9 @@ export class PythonMarketContextClient {
       config?.timeoutMs ?? env.PYTHON_INTELLIGENCE_SERVICE_TIMEOUT_MS;
   }
 
-  async getSnapshot(input?: MarketContextSnapshotRequest) {
+  async getSnapshot(
+    input?: MarketContextSnapshotRequest,
+  ): Promise<MarketContextSnapshot> {
     return this.request("/snapshot", {
       forceRefresh: input?.forceRefresh ?? false,
       retryWithForceRefreshOnParseError: true,
@@ -82,7 +87,7 @@ export class PythonMarketContextClient {
       forceRefresh?: boolean;
       retryWithForceRefreshOnParseError?: boolean;
     },
-  ) {
+  ): Promise<MarketContextSnapshot> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 

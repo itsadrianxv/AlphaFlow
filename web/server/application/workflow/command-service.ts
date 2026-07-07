@@ -11,6 +11,7 @@ import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   getWorkflowNodeKeysFromGraphConfig,
   INDUSTRY_RESEARCH_TEMPLATE_CODE,
+  PI_AGENT_RUN_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
@@ -102,6 +103,16 @@ export type StartTimingReviewLoopCommand = {
   userId: string;
   date?: string;
   limit?: number;
+  templateVersion?: number;
+  idempotencyKey?: string;
+};
+
+export type StartPiAgentRunCommand = {
+  userId: string;
+  skillId: string;
+  prompt: string;
+  title?: string;
+  context?: Record<string, unknown>;
   templateVersion?: number;
   idempotencyKey?: string;
 };
@@ -326,6 +337,26 @@ export class WorkflowCommandService {
     });
   }
 
+  async startPiAgentRun(command: StartPiAgentRunCommand) {
+    const title = command.title?.trim() || command.prompt.trim().slice(0, 80);
+
+    return this.startWorkflow({
+      userId: command.userId,
+      query: `Pi Agent - ${title}`,
+      templateCode: PI_AGENT_RUN_TEMPLATE_CODE,
+      templateVersion: command.templateVersion,
+      input: {
+        skillId: command.skillId,
+        prompt: command.prompt,
+        title,
+        context: command.context,
+      },
+      idempotencyKey:
+        command.idempotencyKey ??
+        `pi-agent:${command.userId}:${command.skillId}:${title}`,
+    });
+  }
+
   async cancelRun(userId: string, runId: string) {
     const run = await this.repository.requestCancellation(runId, userId);
 
@@ -536,6 +567,10 @@ export class WorkflowCommandService {
       command.templateCode === TIMING_REVIEW_LOOP_TEMPLATE_CODE
     ) {
       template = await this.repository.ensureTimingReviewLoopTemplate();
+    }
+
+    if (!template && command.templateCode === PI_AGENT_RUN_TEMPLATE_CODE) {
+      template = await this.repository.ensurePiAgentRunTemplate();
     }
 
     if (!template) {

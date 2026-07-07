@@ -566,6 +566,8 @@ model WorkflowRun {
     timingRecommendations   TimingRecommendation[]
     timingKronosForecastSnapshots TimingKronosForecastSnapshot[]
     spaceLinks              ResearchSpaceRunLink[]
+    agentToolCalls          AgentToolCall[]
+    agentArtifacts          AgentArtifact[]
 
     @@index([templateId])
     @@index([userId, createdAt])
@@ -638,4 +640,42 @@ model WorkflowEvent {
 
     @@unique([runId, sequence])
     @@index([runId, occurredAt])
+}
+
+model AgentToolCall {
+    id                 String      @id @default(cuid())
+    workflowRunId      String
+    skillId            String
+    externalToolCallId String?
+    toolName           String
+    inputSummary       Json?
+    outputSummary      Json?
+    status             String
+    durationMs         Int?
+    errorCode          String?
+    errorMessage       String?
+    createdAt          DateTime    @default(now())
+    updatedAt          DateTime    @updatedAt
+
+    workflowRun        WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+
+    @@index([workflowRunId, createdAt])
+    @@index([workflowRunId, externalToolCallId])
+    @@index([skillId, createdAt])
+}
+
+model AgentArtifact {
+    id            String      @id @default(cuid())
+    workflowRunId String
+    kind          String
+    title         String
+    contentType   String
+    uri           String?
+    payload       Json?
+    createdAt     DateTime    @default(now())
+
+    workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+
+    @@index([workflowRunId, createdAt])
+    @@index([kind, createdAt])
 }
