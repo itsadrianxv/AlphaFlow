@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
 import { StockSearchPicker } from "~/app/_components/stock-search-picker";
 import {
   EmptyState,
@@ -27,6 +28,7 @@ import {
   quarterlyPresetOptions,
   type ResultMissingValueMode,
 } from "~/app/screening/screening-ui";
+import type { ResearchTargetRef } from "~/contracts/research-target";
 import type {
   WorkspaceFilterRule,
   WorkspaceResult,
@@ -137,6 +139,11 @@ export function ScreeningStudioClient() {
   const [resultSnapshot, setResultSnapshot] = useState<WorkspaceResult | null>(
     null,
   );
+  const [snapshotTargetRef, setSnapshotTargetRef] =
+    useState<ResearchTargetRef | null>(null);
+  const [selectedSnapshotStockCodes, setSelectedSnapshotStockCodes] = useState<
+    string[]
+  >([]);
   const [lastFetchedAt, setLastFetchedAt] = useState<string | undefined>();
   const [stockSearchKeyword, setStockSearchKeyword] = useState("");
   const [stockFilterQuery, setStockFilterQuery] = useState("");
@@ -295,6 +302,20 @@ export function ScreeningStudioClient() {
           (visibleOrder.get(right.stockCode) ?? 0),
       );
   }, [resultSnapshot, visibleLatestRows]);
+  const selectedSnapshotRows = useMemo(
+    () =>
+      visibleRows.filter((row) =>
+        selectedSnapshotStockCodes.includes(row.stockCode),
+      ),
+    [selectedSnapshotStockCodes, visibleRows],
+  );
+  const selectedLatestSnapshotRows = useMemo(
+    () =>
+      visibleLatestRows.filter((row) =>
+        selectedSnapshotStockCodes.includes(row.stockCode),
+      ),
+    [selectedSnapshotStockCodes, visibleLatestRows],
+  );
   const filterMetricOptions = useMemo(
     () =>
       Array.from(
@@ -331,6 +352,7 @@ export function ScreeningStudioClient() {
         ...workspaceResult,
         warnings: workspaceResult.warnings ?? [],
       });
+      setSelectedSnapshotStockCodes([]);
       setLastFetchedAt(new Date().toISOString());
       setSelectedStocks((current) =>
         current.map((stock) => {
@@ -380,6 +402,23 @@ export function ScreeningStudioClient() {
     },
     onError: (error) => setNotice({ tone: "error", text: error.message }),
   });
+  const createFinancialSnapshotMutation =
+    api.researchTarget.createFinancialSnapshot.useMutation({
+      onSuccess: async (snapshot) => {
+        setNotice({ tone: "success", text: "财务快照已保存" });
+        await utils.researchTarget.listFinancialSnapshots.invalidate();
+        return snapshot;
+      },
+      onError: (error) => setNotice({ tone: "error", text: error.message }),
+    });
+  const generateComparisonArtifactMutation =
+    api.researchTarget.generateComparisonArtifact.useMutation({
+      onSuccess: async () => {
+        setNotice({ tone: "success", text: "比较报告已生成" });
+        await utils.researchTarget.listArtifacts.invalidate();
+      },
+      onError: (error) => setNotice({ tone: "error", text: error.message }),
+    });
 
   function resetFormulaEditor() {
     setEditingFormulaId(null);
@@ -402,6 +441,8 @@ export function ScreeningStudioClient() {
     setFilterRules([]);
     setSortState(null);
     setResultSnapshot(null);
+    setSnapshotTargetRef(null);
+    setSelectedSnapshotStockCodes([]);
     setLastFetchedAt(undefined);
     setStockFilterQuery("");
     setMissingValueMode("keep");
@@ -614,6 +655,27 @@ export function ScreeningStudioClient() {
     setColumnQuickFilterDraft(null);
   }
 
+  function toggleSnapshotStock(stockCode: string) {
+    setSelectedSnapshotStockCodes((current) =>
+      current.includes(stockCode)
+        ? current.filter((item) => item !== stockCode)
+        : [...current, stockCode],
+    );
+  }
+
+  function toggleAllVisibleSnapshotStocks() {
+    setSelectedSnapshotStockCodes((current) => {
+      const visibleCodes = visibleRows.map((row) => row.stockCode);
+      const allVisibleSelected =
+        visibleCodes.length > 0 &&
+        visibleCodes.every((stockCode) => current.includes(stockCode));
+      if (allVisibleSelected) {
+        return current.filter((stockCode) => !visibleCodes.includes(stockCode));
+      }
+      return [...new Set([...current, ...visibleCodes])];
+    });
+  }
+
   function toggleSortForMetric(metricId: string) {
     setSortState((current) => {
       if (!current || current.metricId !== metricId) {
@@ -738,6 +800,65 @@ export function ScreeningStudioClient() {
       indicatorIds: selectedIndicatorIds,
       formulaIds: selectedFormulaIds,
       timeConfig,
+    });
+  }
+
+  function buildSelectedFinancialSnapshot() {
+    if (!resultSnapshot || !snapshotTargetRef) {
+      return null;
+    }
+
+    const selectedCodes = new Set(selectedSnapshotStockCodes);
+    const rawSnapshot: WorkspaceResult = {
+      ...resultSnapshot,
+      rows: resultSnapshot.rows.filter((row) =>
+        selectedCodes.has(row.stockCode),
+      ),
+      latestSnapshotRows: resultSnapshot.latestSnapshotRows.filter((row) =>
+        selectedCodes.has(row.stockCode),
+      ),
+    };
+
+    return {
+      targetRef: snapshotTargetRef,
+      companyRefs: selectedLatestSnapshotRows.map((row) => ({
+        stockCode: row.stockCode,
+        stockName: row.stockName,
+      })),
+      metricSet: resultSnapshot.indicatorMeta,
+      periodRange: {
+        periods: resultSnapshot.periods,
+        timeConfig,
+      },
+      rawSnapshot,
+      source: {
+        kind: "screening_workspace",
+        workspaceId: selectedWorkspaceId,
+        workspaceName,
+        selectedStockCodes: selectedSnapshotStockCodes,
+      },
+    };
+  }
+
+  async function handleSaveFinancialSnapshot() {
+    const payload = buildSelectedFinancialSnapshot();
+    if (!payload) {
+      setNotice({ tone: "error", text: "请先选择归档目标和股票行" });
+      return null;
+    }
+
+    return await createFinancialSnapshotMutation.mutateAsync(payload);
+  }
+
+  async function handleGenerateComparisonReport() {
+    const snapshot = await handleSaveFinancialSnapshot();
+    if (!snapshot) {
+      return;
+    }
+
+    await generateComparisonArtifactMutation.mutateAsync({
+      financialSnapshotId: snapshot.id,
+      title: `${workspaceName || "筛选结果"} - 财务比较报告`,
     });
   }
 
@@ -1561,6 +1682,62 @@ export function ScreeningStudioClient() {
                   />
                 ))}
               </div>
+              <div className="mt-4 rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4">
+                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
+                  <ResearchTargetPicker
+                    label="财务快照归档目标"
+                    value={snapshotTargetRef}
+                    onChange={setSnapshotTargetRef}
+                    allowedTypes={["company", "industry", "watchlist", "space"]}
+                    compact
+                  />
+                  <div className="flex flex-wrap items-end gap-2">
+                    <button
+                      type="button"
+                      className="app-button"
+                      onClick={toggleAllVisibleSnapshotStocks}
+                      disabled={visibleRows.length === 0}
+                    >
+                      {visibleRows.length > 0 &&
+                      visibleRows.every((row) =>
+                        selectedSnapshotStockCodes.includes(row.stockCode),
+                      )
+                        ? "取消全选"
+                        : "选择当前结果"}
+                    </button>
+                    <button
+                      type="button"
+                      className="app-button app-button-primary"
+                      disabled={
+                        !snapshotTargetRef ||
+                        selectedSnapshotRows.length === 0 ||
+                        createFinancialSnapshotMutation.isPending
+                      }
+                      onClick={() => void handleSaveFinancialSnapshot()}
+                    >
+                      保存快照
+                    </button>
+                    <button
+                      type="button"
+                      className="app-button app-button-success"
+                      disabled={
+                        !snapshotTargetRef ||
+                        selectedSnapshotRows.length === 0 ||
+                        createFinancialSnapshotMutation.isPending ||
+                        generateComparisonArtifactMutation.isPending
+                      }
+                      onClick={() => void handleGenerateComparisonReport()}
+                    >
+                      生成比较报告
+                    </button>
+                  </div>
+                </div>
+                <p className="mt-3 text-sm text-[var(--app-text-muted)]">
+                  已选择 {selectedSnapshotRows.length}{" "}
+                  家公司。单家公司可以保存为公司快照，多家公司适合挂到行业、自选股或
+                  Space。
+                </p>
+              </div>
               <details
                 className="mt-4 rounded-[12px] border border-[var(--app-border-soft)] p-4"
                 open={
@@ -1834,6 +2011,21 @@ export function ScreeningStudioClient() {
                   <table className="app-table min-w-[980px]">
                     <thead>
                       <tr>
+                        <th>
+                          <input
+                            type="checkbox"
+                            aria-label="选择当前全部结果"
+                            checked={
+                              visibleRows.length > 0 &&
+                              visibleRows.every((row) =>
+                                selectedSnapshotStockCodes.includes(
+                                  row.stockCode,
+                                ),
+                              )
+                            }
+                            onChange={toggleAllVisibleSnapshotStocks}
+                          />
+                        </th>
                         <th>股票</th>
                         <th>代码</th>
                         {resultColumns.map((column, columnIndex) => {
@@ -1888,6 +2080,18 @@ export function ScreeningStudioClient() {
                     <tbody>
                       {visibleRows.map((row) => (
                         <tr key={row.stockCode}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              aria-label={`选择 ${row.stockName}`}
+                              checked={selectedSnapshotStockCodes.includes(
+                                row.stockCode,
+                              )}
+                              onChange={() =>
+                                toggleSnapshotStock(row.stockCode)
+                              }
+                            />
+                          </td>
                           <td>{row.stockName}</td>
                           <td>{row.stockCode}</td>
                           {resultColumns.map((column) => {

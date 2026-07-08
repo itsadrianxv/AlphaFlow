@@ -27,6 +27,7 @@ import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redi
 export type StartIndustryResearchCommand = {
   userId: string;
   query: string;
+  targetRef?: { type: string; id: string };
   taskContract?: ResearchTaskContract;
   researchPreferences?: ResearchPreferenceInput;
   templateCode?: string;
@@ -37,6 +38,7 @@ export type StartIndustryResearchCommand = {
 export type StartCompanyResearchCommand = {
   userId: string;
   companyName: string;
+  targetRef?: { type: string; id: string };
   stockCode?: string;
   officialWebsite?: string;
   focusConcepts?: string[];
@@ -60,6 +62,7 @@ export type StartScreeningInsightPipelineCommand = {
 export type StartTimingSignalPipelineCommand = {
   userId: string;
   stockCode: string;
+  targetRef?: { type: string; id: string };
   asOfDate?: string;
   presetId?: string;
   templateVersion?: number;
@@ -69,6 +72,7 @@ export type StartTimingSignalPipelineCommand = {
 export type StartWatchlistTimingCardsPipelineCommand = {
   userId: string;
   watchListId: string;
+  targetRef?: { type: string; id: string };
   asOfDate?: string;
   presetId?: string;
   watchListName?: string;
@@ -80,6 +84,7 @@ export type StartWatchlistTimingPipelineCommand = {
   userId: string;
   watchListId: string;
   portfolioSnapshotId: string;
+  targetRef?: { type: string; id: string };
   asOfDate?: string;
   presetId?: string;
   watchListName?: string;
@@ -194,6 +199,7 @@ export class WorkflowCommandService {
       templateVersion: command.templateVersion,
       input: {
         query: command.query,
+        targetRef: command.targetRef,
         researchPreferences: command.researchPreferences,
         taskContract: command.taskContract,
       },
@@ -209,6 +215,7 @@ export class WorkflowCommandService {
       templateVersion: command.templateVersion,
       input: {
         companyName: command.companyName,
+        targetRef: command.targetRef,
         stockCode: command.stockCode,
         officialWebsite: command.officialWebsite,
         focusConcepts: command.focusConcepts,
@@ -249,6 +256,7 @@ export class WorkflowCommandService {
       templateVersion: command.templateVersion,
       input: {
         stockCode: command.stockCode,
+        targetRef: command.targetRef,
         asOfDate: command.asOfDate,
         presetId: command.presetId,
       },
@@ -270,6 +278,7 @@ export class WorkflowCommandService {
       templateVersion: command.templateVersion,
       input: {
         watchListId: command.watchListId,
+        targetRef: command.targetRef,
         asOfDate: command.asOfDate,
         presetId: command.presetId,
       },
@@ -292,6 +301,7 @@ export class WorkflowCommandService {
       templateVersion: command.templateVersion,
       input: {
         watchListId: command.watchListId,
+        targetRef: command.targetRef,
         portfolioSnapshotId: command.portfolioSnapshotId,
         asOfDate: command.asOfDate,
         presetId: command.presetId,

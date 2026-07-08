@@ -42,7 +42,8 @@ export type WorkspaceSection =
   | "timing"
   | "watchlists"
   | "companyResearch"
-  | "spaces";
+  | "spaces"
+  | "researchTargets";
 
 export type WorkspaceSectionView = "default" | "history";
 
@@ -102,6 +103,12 @@ const sidebarNavItems: Array<{
     href: "/watchlists",
     label: "自选股",
     icon: WatchlistsIcon,
+  },
+  {
+    key: "researchTargets",
+    href: "/research-targets",
+    label: "投研收藏",
+    icon: ResearchSpacesIcon,
   },
   {
     key: "spaces",

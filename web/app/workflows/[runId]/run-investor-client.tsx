@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-
+import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { MarkdownContent } from "~/app/_components/markdown-content";
 import { statusTone } from "~/app/_components/status-tone";
 import {
@@ -40,6 +40,7 @@ import {
   isCompanyResearchResult,
 } from "~/app/workflows/research-view-models";
 import { resolveWorkflowShellContext } from "~/app/workflows/workflow-shell-context";
+import type { ResearchTargetRef } from "~/contracts/research-target";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   INDUSTRY_RESEARCH_TEMPLATE_CODE,
@@ -113,6 +114,35 @@ function getTitle(templateCode?: string) {
   return "研究结论";
 }
 
+function readTargetRef(value: unknown): ResearchTargetRef | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const targetRef = (value as { targetRef?: unknown }).targetRef;
+  if (
+    typeof targetRef !== "object" ||
+    targetRef === null ||
+    Array.isArray(targetRef)
+  ) {
+    return null;
+  }
+  const type = (targetRef as { type?: unknown }).type;
+  const id = (targetRef as { id?: unknown }).id;
+  if (
+    typeof id !== "string" ||
+    !(
+      type === "company" ||
+      type === "industry" ||
+      type === "watchlist" ||
+      type === "space" ||
+      type === "workflow_run"
+    )
+  ) {
+    return null;
+  }
+  return { type, id };
+}
+
 export function RunInvestorClient({ runId }: RunInvestorClientProps) {
   const utils = api.useUtils();
 
@@ -148,6 +178,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
   });
 
   const run = runQuery.data;
+  const targetRef = readTargetRef(run?.input);
   const shellContext = resolveWorkflowShellContext(run?.template.code);
   const screeningHistoryQuery = api.screening.listWorkspaces.useQuery(
     { limit: 8, offset: 0 },
@@ -364,9 +395,17 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
           description="该任务可能已被删除，或当前账号没有访问权限。"
         />
       ) : showIndustryConclusion && industryConclusionModel ? (
-        <IndustryConclusionDetail model={industryConclusionModel} />
+        <HighlightToNote
+          targetRef={targetRef}
+          source={{ kind: "workflow_run", runId }}
+        >
+          <IndustryConclusionDetail model={industryConclusionModel} />
+        </HighlightToNote>
       ) : (
-        <>
+        <HighlightToNote
+          targetRef={targetRef}
+          source={{ kind: "workflow_run", runId }}
+        >
           {showDigestBanner ? (
             <ActionBanner
               title={digest.headline}
@@ -733,7 +772,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
               ) : null}
             </>
           )}
-        </>
+        </HighlightToNote>
       )}
     </WorkspaceShell>
   );

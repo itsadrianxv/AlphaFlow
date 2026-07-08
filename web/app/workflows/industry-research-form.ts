@@ -1,3 +1,4 @@
+import type { ResearchTargetRef } from "~/contracts/research-target";
 import { buildIndustryResearchTaskContract } from "~/server/domain/workflow/research";
 
 type IndustryResearchFormInput = {
@@ -9,6 +10,7 @@ type IndustryResearchFormInput = {
   preferredSources: string;
   freshnessWindowDays: string;
   deepMode: boolean;
+  targetRef?: ResearchTargetRef | null;
 };
 
 function splitLines(value: string) {
@@ -18,9 +20,12 @@ function splitLines(value: string) {
     .filter(Boolean);
 }
 
-export function buildIndustryResearchStartInput(input: IndustryResearchFormInput) {
+export function buildIndustryResearchStartInput(
+  input: IndustryResearchFormInput,
+) {
   return {
     query: input.query.trim(),
+    targetRef: input.targetRef ?? undefined,
     taskContract: input.deepMode
       ? buildIndustryResearchTaskContract("deep")
       : undefined,

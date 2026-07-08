@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { MarkdownContent } from "~/app/_components/markdown-content";
+import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
 import {
   EmptyState,
   InlineNotice,
@@ -11,6 +13,7 @@ import {
   WorkspaceShell,
 } from "~/app/_components/ui";
 import type { WorkspaceHistoryItem } from "~/app/_components/workspace-shell";
+import type { ResearchTargetRef } from "~/contracts/research-target";
 import { api, type RouterOutputs } from "~/trpc/react";
 
 type Conversation = NonNullable<
@@ -69,7 +72,11 @@ function latestRunningRunId(conversation?: Conversation) {
     .at(-1)?.workflowRunId;
 }
 
-function ChatMessage(props: { message: Message; liveText?: string }) {
+function ChatMessage(props: {
+  message: Message;
+  liveText?: string;
+  targetRef?: ResearchTargetRef | null;
+}) {
   const { message, liveText } = props;
   const isUser = message.role === "USER";
   const content = messageText(message, liveText);
@@ -93,10 +100,19 @@ function ChatMessage(props: { message: Message; liveText?: string }) {
     <div className="flex justify-start">
       <div className="min-w-0 max-w-full text-[var(--app-text-strong)]">
         {content ? (
-          <MarkdownContent
-            content={content}
-            className="max-w-none [&>*+*]:mt-4"
-          />
+          <HighlightToNote
+            targetRef={props.targetRef}
+            source={{
+              kind: "pi_agent_message",
+              messageId: message.id,
+              workflowRunId: message.workflowRunId,
+            }}
+          >
+            <MarkdownContent
+              content={content}
+              className="max-w-none [&>*+*]:mt-4"
+            />
+          </HighlightToNote>
         ) : (
           <div className="text-sm text-[var(--app-text-subtle)]">
             正在准备回复
@@ -129,6 +145,7 @@ export function AgentRuntimeClientPage() {
   const [prompt, setPrompt] = useState("");
   const [liveMessages, setLiveMessages] = useState<Record<string, string>>({});
   const [activeRunId, setActiveRunId] = useState("");
+  const [targetRef, setTargetRef] = useState<ResearchTargetRef | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const migrationRequestedRef = useRef(false);
 
@@ -286,6 +303,7 @@ export function AgentRuntimeClientPage() {
       skillId,
       prompt,
       title: prompt.trim().slice(0, 80),
+      context: targetRef ? { targetRef } : undefined,
     });
   };
 
@@ -333,6 +351,7 @@ export function AgentRuntimeClientPage() {
                   key={message.id}
                   message={message}
                   liveText={liveMessages[message.id]}
+                  targetRef={targetRef}
                 />
               ))}
               <div ref={messagesEndRef} />
@@ -365,6 +384,14 @@ export function AgentRuntimeClientPage() {
               {runningRunId ? (
                 <StatusPill tone="info" label="正在生成" />
               ) : null}
+            </div>
+            <div className="mb-3">
+              <ResearchTargetPicker
+                value={targetRef}
+                onChange={setTargetRef}
+                allowedTypes={["company", "industry", "watchlist", "space"]}
+                compact
+              />
             </div>
             <div className="flex gap-3">
               <textarea

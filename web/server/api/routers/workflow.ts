@@ -120,6 +120,18 @@ const startIndustryResearchInput = z.object({
     })
     .optional(),
   query: z.string().min(1, "query 涓嶈兘涓虹┖"),
+  targetRef: z
+    .object({
+      type: z.enum([
+        "company",
+        "industry",
+        "watchlist",
+        "space",
+        "workflow_run",
+      ]),
+      id: z.string().min(1),
+    })
+    .optional(),
   templateCode: z.string().default(INDUSTRY_RESEARCH_TEMPLATE_CODE),
   templateVersion: z.number().int().positive().optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
@@ -149,6 +161,18 @@ const startCompanyResearchInput = z.object({
     })
     .optional(),
   companyName: z.string().min(1, "companyName 涓嶈兘涓虹┖"),
+  targetRef: z
+    .object({
+      type: z.enum([
+        "company",
+        "industry",
+        "watchlist",
+        "space",
+        "workflow_run",
+      ]),
+      id: z.string().min(1),
+    })
+    .optional(),
   stockCode: z.string().trim().min(1).optional(),
   officialWebsite: z.string().url().optional(),
   focusConcepts: z.array(z.string().min(1)).max(8).optional(),
@@ -174,6 +198,18 @@ const startTimingSignalPipelineInput = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   presetId: z.string().cuid().optional(),
+  targetRef: z
+    .object({
+      type: z.enum([
+        "company",
+        "industry",
+        "watchlist",
+        "space",
+        "workflow_run",
+      ]),
+      id: z.string().min(1),
+    })
+    .optional(),
   templateCode: z.string().default(TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE),
   templateVersion: z.number().int().positive().optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
@@ -186,6 +222,18 @@ const startWatchlistTimingCardsPipelineInput = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   presetId: z.string().cuid().optional(),
+  targetRef: z
+    .object({
+      type: z.enum([
+        "company",
+        "industry",
+        "watchlist",
+        "space",
+        "workflow_run",
+      ]),
+      id: z.string().min(1),
+    })
+    .optional(),
   templateCode: z
     .string()
     .default(WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE),
@@ -201,6 +249,18 @@ const startWatchlistTimingPipelineInput = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   presetId: z.string().cuid().optional(),
+  targetRef: z
+    .object({
+      type: z.enum([
+        "company",
+        "industry",
+        "watchlist",
+        "space",
+        "workflow_run",
+      ]),
+      id: z.string().min(1),
+    })
+    .optional(),
   templateCode: z.string().default(WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE),
   templateVersion: z.number().int().positive().optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
@@ -262,6 +322,7 @@ export const workflowRouter = createTRPCRouter({
         return await commandService.startIndustryResearch({
           userId: ctx.session.user.id,
           query: input.query,
+          targetRef: input.targetRef,
           taskContract: input.taskContract,
           researchPreferences: input.researchPreferences,
           templateCode: input.templateCode,
@@ -283,6 +344,7 @@ export const workflowRouter = createTRPCRouter({
         return await commandService.startCompanyResearch({
           userId: ctx.session.user.id,
           companyName: input.companyName,
+          targetRef: input.targetRef,
           stockCode: input.stockCode,
           officialWebsite: input.officialWebsite,
           focusConcepts: input.focusConcepts,
@@ -322,6 +384,7 @@ export const workflowRouter = createTRPCRouter({
         return await commandService.startTimingSignalPipeline({
           userId: ctx.session.user.id,
           stockCode: input.stockCode,
+          targetRef: input.targetRef,
           asOfDate: input.asOfDate,
           presetId: input.presetId,
           templateVersion: input.templateVersion,
@@ -367,6 +430,7 @@ export const workflowRouter = createTRPCRouter({
         return await commandService.startWatchlistTimingCardsPipeline({
           userId: ctx.session.user.id,
           watchListId: input.watchListId,
+          targetRef: input.targetRef,
           asOfDate: input.asOfDate,
           presetId: input.presetId,
           watchListName: watchList.name,
@@ -435,6 +499,7 @@ export const workflowRouter = createTRPCRouter({
           userId: ctx.session.user.id,
           watchListId: input.watchListId,
           portfolioSnapshotId: input.portfolioSnapshotId,
+          targetRef: input.targetRef,
           asOfDate: input.asOfDate,
           presetId: input.presetId,
           watchListName: watchList.name,

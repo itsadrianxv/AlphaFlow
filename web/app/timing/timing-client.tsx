@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
 import { StockSearchPicker } from "~/app/_components/stock-search-picker";
 import {
   cn,
@@ -28,6 +29,7 @@ import {
   parsePortfolioForm,
   strategyStyleCards,
 } from "~/app/timing/timing-wizard-view-models";
+import type { ResearchTargetRef } from "~/contracts/research-target";
 import {
   DEFAULT_TIMING_PRESET_CONFIG,
   resolveTimingPresetConfig,
@@ -166,6 +168,7 @@ export function TimingClient() {
   const [presetDirty, setPresetDirty] = useState(false);
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   const [autoRefreshUntil, setAutoRefreshUntil] = useState<number | null>(null);
+  const [targetRef, setTargetRef] = useState<ResearchTargetRef | null>(null);
 
   const singleStock = singleStocks[0] ?? null;
 
@@ -472,6 +475,11 @@ export function TimingClient() {
     watchListsQuery.data?.find(
       (item: WatchListItem) => item.id === watchListId,
     ) ?? null;
+  const effectiveTargetRef =
+    targetRef ??
+    (sourceMode === "watchlist" && watchListId
+      ? ({ type: "watchlist", id: watchListId } as const)
+      : null);
   const activeStyle = inferStrategyStyleKey({
     name: presetName,
     description: presetDescription,
@@ -579,6 +587,7 @@ export function TimingClient() {
     await startSingleMutation.mutateAsync({
       stockCode: singleStock.stockCode,
       presetId: selectedPresetId || undefined,
+      targetRef: effectiveTargetRef ?? undefined,
     });
   }
 
@@ -590,6 +599,7 @@ export function TimingClient() {
     await startWatchlistCardsMutation.mutateAsync({
       watchListId,
       presetId: selectedPresetId || undefined,
+      targetRef: effectiveTargetRef ?? undefined,
     });
   }
 
@@ -602,6 +612,7 @@ export function TimingClient() {
       watchListId,
       portfolioSnapshotId: selectedPortfolioId,
       presetId: selectedPresetId || undefined,
+      targetRef: effectiveTargetRef ?? undefined,
     });
   }
 
@@ -864,6 +875,12 @@ export function TimingClient() {
                   </select>
                 </label>
               )}
+              <ResearchTargetPicker
+                label="归档目标"
+                value={effectiveTargetRef}
+                onChange={setTargetRef}
+                allowedTypes={["company", "industry", "watchlist", "space"]}
+              />
             </div>
           </Panel>
 

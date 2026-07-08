@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
 import {
   InlineNotice,
   SectionCard,
@@ -13,6 +14,7 @@ import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-histor
 import { buildIndustryResearchStartInput } from "~/app/workflows/industry-research-form";
 import { WorkflowVisualizationPanel } from "~/app/workflows/workflow-visualization-panel";
 import { workflowsStageTabs } from "~/app/workflows/workflows-stage-tabs";
+import type { ResearchTargetRef } from "~/contracts/research-target";
 import { INDUSTRY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { api } from "~/trpc/react";
 
@@ -34,6 +36,7 @@ export function WorkflowsClient() {
   const [preferredSources, setPreferredSources] = useState("");
   const [freshnessWindowDays, setFreshnessWindowDays] = useState("180");
   const [deepMode, setDeepMode] = useState(false);
+  const [targetRef, setTargetRef] = useState<ResearchTargetRef | null>(null);
   const [activeTabId, setActiveTabId] = useState(
     workflowsStageTabs[0]?.id ?? "question",
   );
@@ -110,6 +113,7 @@ export function WorkflowsClient() {
         preferredSources,
         freshnessWindowDays,
         deepMode,
+        targetRef,
       }),
     );
   };
@@ -140,6 +144,14 @@ export function WorkflowsClient() {
       description="限制信源、必答问题和时效窗口，让模型围绕当前判断收敛。"
     >
       <div className="grid gap-4 lg:grid-cols-2">
+        <div className="lg:col-span-2">
+          <ResearchTargetPicker
+            label="归档目标"
+            value={targetRef}
+            onChange={setTargetRef}
+            allowedTypes={["industry", "company", "watchlist", "space"]}
+          />
+        </div>
         <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
           研究目标
           <textarea

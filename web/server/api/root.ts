@@ -2,6 +2,7 @@ import { agentRuntimeRouter } from "~/server/api/routers/agent-runtime";
 import { intelligenceRouter } from "~/server/api/routers/intelligence";
 import { marketContextRouter } from "~/server/api/routers/market-context";
 import { postRouter } from "~/server/api/routers/post";
+import { researchTargetRouter } from "~/server/api/routers/research-target";
 import { screeningRouter } from "~/server/api/routers/screening";
 import { spaceRouter } from "~/server/api/routers/space";
 import { timingRouter } from "~/server/api/routers/timing";
@@ -19,6 +20,7 @@ export const appRouter = createTRPCRouter({
   intelligence: intelligenceRouter,
   marketContext: marketContextRouter,
   post: postRouter,
+  researchTarget: researchTargetRouter,
   screening: screeningRouter,
   space: spaceRouter,
   timing: timingRouter,

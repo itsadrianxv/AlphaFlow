@@ -39,6 +39,7 @@ const historyHrefBySection: Record<WorkspaceSection, string | undefined> = {
   watchlists: undefined,
   companyResearch: "/company-research/history",
   spaces: undefined,
+  researchTargets: undefined,
 };
 
 const statusLabelMap: Record<string, string> = {

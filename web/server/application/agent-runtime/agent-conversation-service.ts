@@ -17,6 +17,7 @@ export class AgentConversationService {
     prompt: string;
     skillId: string;
     title?: string;
+    context?: Record<string, unknown>;
     idempotencyKey?: string;
   }) {
     let turn: Awaited<
@@ -52,6 +53,7 @@ export class AgentConversationService {
       conversationId: turn.conversation.id,
       userMessageId: turn.userMessage.id,
       assistantMessageId: turn.assistantMessage.id,
+      context: params.context,
       idempotencyKey:
         params.idempotencyKey ??
         `pi-agent-message:${params.userId}:${turn.assistantMessage.id}`,

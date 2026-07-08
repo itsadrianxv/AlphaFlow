@@ -72,6 +72,7 @@ const sendMessageInput = z.object({
   skillId: z.string().trim().min(1),
   prompt: z.string().trim().min(1),
   title: z.string().trim().min(1).max(120).optional(),
+  context: z.record(z.unknown()).optional(),
   idempotencyKey: z.string().min(8).max(128).optional(),
 });
 
@@ -164,6 +165,7 @@ export const agentRuntimeRouter = createTRPCRouter({
           skillId: input.skillId,
           prompt: input.prompt,
           title: input.title,
+          context: input.context,
           idempotencyKey: input.idempotencyKey,
         });
       } catch (error) {
