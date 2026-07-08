@@ -288,6 +288,22 @@ select:focus {
   resize: vertical;
 }
 
+.pi-agent-composer select {
+  border-radius: 18px;
+}
+
+@media (min-width: 1024px) {
+  [data-workflow-shell="mistral"][data-sidebar-collapsed="false"]
+    .pi-agent-composer {
+    left: 258px;
+  }
+
+  [data-workflow-shell="mistral"][data-sidebar-collapsed="true"]
+    .pi-agent-composer {
+    left: 88px;
+  }
+}
+
 .glass-panel,
 .app-panel {
   background: var(--app-panel);

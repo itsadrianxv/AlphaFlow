@@ -136,6 +136,38 @@ function ChatMessage(props: {
   );
 }
 
+function SendIcon(props: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      className={props.className}
+    >
+      <path
+        d="M10 15V5m0 0 4 4m-4-4L6 9"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function StopIcon(props: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      className={props.className}
+    >
+      <rect x="6" y="6" width="8" height="8" rx="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function AgentRuntimeClientPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -292,7 +324,8 @@ export function AgentRuntimeClientPage() {
     },
   });
 
-  const canSend = Boolean(skillId && prompt.trim() && !runningRunId);
+  const activeGenerationRunId = runningRunId ?? activeRunId;
+  const canSend = Boolean(skillId && prompt.trim() && !activeGenerationRunId);
 
   const handleSend = async () => {
     if (!canSend) {
@@ -330,20 +363,7 @@ export function AgentRuntimeClientPage() {
       titleSize="compact"
     >
       <div className="flex min-h-[calc(100vh-150px)] flex-col">
-        {runningRunId ? (
-          <div className="mb-3 flex justify-end">
-            <button
-              type="button"
-              className="app-button app-button-danger"
-              disabled={cancelMutation.isPending}
-              onClick={() => cancelMutation.mutate({ runId: runningRunId })}
-            >
-              停止
-            </button>
-          </div>
-        ) : null}
-
-        <div className="flex-1 overflow-y-auto pb-5">
+        <div className="flex-1 pb-[260px]">
           {selectedConversation ? (
             <div className="mx-auto grid w-full max-w-[820px] gap-6 px-1 sm:px-4">
               {selectedConversation.messages.map((message) => (
@@ -367,13 +387,13 @@ export function AgentRuntimeClientPage() {
           )}
         </div>
 
-        <div className="sticky bottom-0 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4">
+        <div className="pi-agent-composer fixed right-0 bottom-0 left-0 z-30 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4">
           <div className="mx-auto w-full max-w-[820px] px-1 sm:px-4">
             <div className="mb-3 flex flex-wrap items-center gap-3">
               <select
                 value={skillId}
                 onChange={(event) => setSkillId(event.target.value)}
-                className="max-w-[280px]"
+                className="max-w-[280px] rounded-[18px]"
               >
                 {(skillsQuery.data?.items ?? []).map((skill) => (
                   <option key={skill.id} value={skill.id}>
@@ -381,7 +401,7 @@ export function AgentRuntimeClientPage() {
                   </option>
                 ))}
               </select>
-              {runningRunId ? (
+              {activeGenerationRunId ? (
                 <StatusPill tone="info" label="正在生成" />
               ) : null}
             </div>
@@ -393,9 +413,9 @@ export function AgentRuntimeClientPage() {
                 compact
               />
             </div>
-            <div className="flex gap-3">
+            <div className="relative rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] transition-[border-color,box-shadow,background-color] focus-within:border-[var(--app-accent-strong)] focus-within:bg-[var(--app-bg-elevated)] focus-within:shadow-[0_0_0_3px_rgba(59,158,255,0.16)]">
               <textarea
-                className="app-textarea min-h-[72px] flex-1 resize-none"
+                className="min-h-[82px] w-full resize-none rounded-[22px] border-0 bg-transparent py-4 pr-16 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder="输入下一条消息"
@@ -409,14 +429,31 @@ export function AgentRuntimeClientPage() {
                   }
                 }}
               />
-              <button
-                type="button"
-                className="app-button app-button-primary self-end"
-                disabled={!canSend || sendMutation.isPending}
-                onClick={handleSend}
-              >
-                {sendMutation.isPending ? "发送中" : "发送"}
-              </button>
+              {activeGenerationRunId ? (
+                <button
+                  type="button"
+                  aria-label="停止生成"
+                  title="停止生成"
+                  className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(255,255,255,0.18)] bg-[var(--app-danger)] text-white transition-colors hover:bg-[#e6002e] disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={cancelMutation.isPending}
+                  onClick={() =>
+                    cancelMutation.mutate({ runId: activeGenerationRunId })
+                  }
+                >
+                  <StopIcon className="h-5 w-5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="发送消息"
+                  title="发送"
+                  className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white bg-white text-black transition-colors hover:bg-[rgba(255,255,255,0.86)] disabled:cursor-not-allowed disabled:border-[var(--app-border-soft)] disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
+                  disabled={!canSend || sendMutation.isPending}
+                  onClick={handleSend}
+                >
+                  <SendIcon className="h-5 w-5" />
+                </button>
+              )}
             </div>
           </div>
           {sendMutation.error ? (
