@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import {
   EmptyState,
   InlineNotice,
@@ -69,7 +70,19 @@ export function TimingReportClient(props: { cardId: string }) {
       {!reportQuery.isLoading && !reportQuery.error && !report ? (
         <EmptyState title="未找到对应的择时报告" />
       ) : null}
-      {report ? <TimingReportView report={report} /> : null}
+      {report ? (
+        <HighlightToNote
+          floatingToolbar
+          source={{
+            kind: "timing_report",
+            cardId,
+            stockCode: report.card.stockCode,
+            stockName: report.card.stockName,
+          }}
+        >
+          <TimingReportView report={report} />
+        </HighlightToNote>
+      ) : null}
     </WorkspaceShell>
   );
 }

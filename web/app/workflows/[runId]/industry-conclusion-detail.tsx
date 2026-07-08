@@ -190,7 +190,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
           title="证据校验"
           description="先看支持/不足/冲突和覆盖率，再按需下看断言与研究单元。"
         />
-        <dl className="grid border border-[var(--app-border-soft)] sm:grid-cols-2 xl:grid-cols-4">
+        <dl className="grid overflow-hidden rounded-[14px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] sm:grid-cols-2 xl:grid-cols-4">
           <div className="border-b border-[var(--app-border-soft)] px-4 py-4 xl:border-r xl:border-b-0">
             <dt className="text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
               可信度
@@ -387,7 +387,7 @@ export function IndustryConclusionDetail(props: {
     <article
       data-industry-conclusion-detail="true"
       data-active-section={activeSectionId}
-      className="overflow-hidden border border-[var(--app-border-soft)] bg-[var(--app-surface)]"
+      className="overflow-hidden rounded-[16px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] shadow-[var(--app-shadow-sm)]"
     >
       <div className="border-b border-[var(--app-border-soft)] px-5 py-6 sm:px-6">
         <div className="flex flex-wrap items-center gap-2">
@@ -422,7 +422,7 @@ export function IndustryConclusionDetail(props: {
       </div>
 
       {model.notices.length > 0 ? (
-        <div className="border-b border-[var(--app-border-soft)]">
+        <div className="overflow-hidden border-b border-[var(--app-border-soft)]">
           {model.notices.map((notice, index) => (
             <div
               key={`${notice.title}-${index + 1}`}
@@ -454,7 +454,7 @@ export function IndustryConclusionDetail(props: {
         </div>
       ) : null}
 
-      <dl className="grid border-b border-[var(--app-border-soft)] sm:grid-cols-2 xl:grid-cols-5">
+      <dl className="grid overflow-hidden border-b border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] sm:grid-cols-2 xl:grid-cols-5">
         {model.metricStrip.map((metric, index) => (
           <div
             key={`${metric.label}-${metric.value}`}
@@ -470,7 +470,7 @@ export function IndustryConclusionDetail(props: {
         ))}
       </dl>
 
-      <div className="grid gap-px border-b border-[var(--app-border-soft)] bg-[var(--app-border-soft)] sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-px overflow-hidden border-b border-[var(--app-border-soft)] bg-[var(--app-border-soft)] sm:grid-cols-2 xl:grid-cols-4">
         {model.sections.map((section, index) => {
           const active = section.id === activeSectionId;
 
