@@ -18,12 +18,6 @@ import type { ResearchTargetRef } from "~/contracts/research-target";
 import { INDUSTRY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { api } from "~/trpc/react";
 
-const industryPrompts = [
-  "半导体设备国产替代里，未来 12 个月最关键的兑现节点是什么？",
-  "创新药出海链条里，哪些商业化指标最值得持续跟踪？",
-  "AI 算力基础设施的盈利兑现节奏，应该看哪些领先指标？",
-];
-
 export function WorkflowsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -232,37 +226,8 @@ export function WorkflowsClient() {
     </SectionCard>
   );
 
-  const industryPromptPanel = (
-    <SectionCard
-      title="常用问题模板"
-      description="点击填入后可以继续补充约束，再直接发起研究。"
-    >
-      <div className="grid gap-3">
-        {industryPrompts.map((prompt) => (
-          <button
-            key={prompt}
-            type="button"
-            onClick={() => setQuery(prompt)}
-            className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-3 text-left text-sm leading-6 text-[var(--app-text-muted)] transition-colors hover:border-[var(--app-flame)] hover:text-[var(--app-text-strong)]"
-          >
-            {prompt}
-          </button>
-        ))}
-
-        <div className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4">
-          <div className="text-sm text-[var(--app-text-strong)]">使用建议</div>
-          <ul className="mt-3 grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
-            <li>把问题写成可验证的投资判断，而不是泛泛主题。</li>
-            <li>如果已经有假设，可以放到“必答问题”里让结果更聚焦。</li>
-            <li>当研究对时效敏感时，缩短窗口以减少旧证据干扰。</li>
-          </ul>
-        </div>
-      </div>
-    </SectionCard>
-  );
-
   const launchPanel = (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_360px]">
+    <div className="grid gap-6">
       <SectionCard
         title="发起执行"
         description="确认当前问题和约束后，再启动这一轮行业研究。"
@@ -323,8 +288,6 @@ export function WorkflowsClient() {
           ) : null}
         </div>
       </SectionCard>
-
-      {industryPromptPanel}
     </div>
   );
 
