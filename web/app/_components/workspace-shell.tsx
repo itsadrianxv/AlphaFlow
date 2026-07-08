@@ -106,7 +106,7 @@ const sidebarNavItems: Array<{
   {
     key: "spaces",
     href: "/spaces",
-    label: "Research Spaces",
+    label: "研究空间",
     icon: ResearchSpacesIcon,
   },
 ];
@@ -442,7 +442,7 @@ function PageHeader(props: {
         </div>
       ) : null}
       {actions ? (
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {actions}
         </div>
       ) : null}

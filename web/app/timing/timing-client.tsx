@@ -1097,9 +1097,6 @@ export function TimingClient() {
                     <div className="text-base font-medium text-[var(--app-text)]">
                       当前持仓
                     </div>
-                    <div className="mt-1 text-sm text-[var(--app-text-muted)]">
-                      通过股票搜索把已有持仓加入组合草稿，再补齐数量、成本和当前仓位。
-                    </div>
                   </div>
                   <StatusPill
                     label={`${positionDrafts.length} 只持仓`}
@@ -1113,14 +1110,11 @@ export function TimingClient() {
                   onKeywordChange={setPositionSearchKeyword}
                   selectedStocks={[]}
                   onToggleStock={handleAddPositionFromSearch}
-                  emptyHint="搜索股票后把它加入当前组合，再补齐数量、成本和仓位。"
+                  emptyHint=""
                 />
 
                 {positionDrafts.length === 0 ? (
-                  <EmptyState
-                    title="还没有录入持仓"
-                    description="如果当前组合是空仓，也可以只填写现金和风险边界后直接继续下一步。"
-                  />
+                  <EmptyState title="还没有录入持仓" />
                 ) : (
                   <div className="grid gap-4">
                     {positionDrafts.map((position) => (
@@ -1146,24 +1140,20 @@ export function TimingClient() {
                 <SummaryMetric
                   label="可动用现金"
                   value={formatPct(portfolioRiskSummary.availableCashPct)}
-                  hint="按现金 / 总资产粗略估算"
                 />
                 <SummaryMetric
                   label="当前单票上限"
                   value={formatPct(portfolioRiskSummary.maxSingleNamePct)}
-                  hint="若已有市场状态，会按风险计划收紧"
                 />
                 <SummaryMetric
                   label="默认试仓"
                   value={formatPct(portfolioRiskSummary.defaultProbePct)}
-                  hint="试仓区间会围绕这个比例给出"
                 />
                 <SummaryMetric
                   label="本轮风险预算"
                   value={formatPct(
                     portfolioRiskSummary.maxPortfolioRiskBudgetPct,
                   )}
-                  hint="生成建议后会结合市场状态再次校准"
                 />
               </div>
 
@@ -1207,22 +1197,13 @@ export function TimingClient() {
                   本轮解读
                 </div>
                 <ul className="mt-3 grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
-                  <li>
-                    -{" "}
-                    {portfolioDirty
-                      ? "组合草稿还未保存，结果页不会使用最新修改。"
-                      : "当前快照已经就绪，可以继续选择策略。"}
-                  </li>
-                  <li>
-                    -{" "}
-                    {positionDrafts.length > 0
-                      ? "有持仓时，系统会优先判断继续持有、减仓还是退出。"
-                      : "空仓时，系统会更关注试仓和新开仓信号。"}
-                  </li>
-                  {(portfolioRiskSummary.notes.length > 0
-                    ? portfolioRiskSummary.notes
-                    : ["生成建议后会在这里补充市场状态和风险计划笔记。"]
-                  ).map((note) => (
+                  {portfolioDirty ? (
+                    <li>- 组合草稿还未保存，结果页不会使用最新修改。</li>
+                  ) : null}
+                  {positionDrafts.length > 0 ? (
+                    <li>- 有持仓时，系统会优先判断继续持有、减仓还是退出。</li>
+                  ) : null}
+                  {portfolioRiskSummary.notes.map((note) => (
                     <li key={note}>- {note}</li>
                   ))}
                 </ul>

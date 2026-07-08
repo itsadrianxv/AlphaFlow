@@ -68,6 +68,8 @@ const defaultColumnState = {
 
 const stageCanvasClassName =
   "min-h-[calc(100vh-17rem)] xl:min-h-[calc(100vh-15rem)]";
+const stockSearchCanvasClassName =
+  "min-h-[calc(66.667vh-11.333rem)] xl:min-h-[calc(66.667vh-10rem)]";
 
 function emptyFilterRule(): FilterRuleDraft {
   return {
@@ -907,7 +909,7 @@ export function ScreeningStudioClient() {
           title="股票搜索多选"
           className={
             activeTabId === "stocks"
-              ? `xl:col-span-12 ${stageCanvasClassName}`
+              ? `xl:col-span-12 ${stockSearchCanvasClassName}`
               : "hidden"
           }
         >

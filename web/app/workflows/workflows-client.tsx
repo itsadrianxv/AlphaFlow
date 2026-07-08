@@ -130,7 +130,6 @@ export function WorkflowsClient() {
       <WorkflowVisualizationPanel
         templateCode={INDUSTRY_RESEARCH_TEMPLATE_CODE}
         title="行业研究 Agent 状态图"
-        description="发起前先查看完整 Agent 拓扑；运行后结果页会高亮当前节点。"
       />
     </>
   );
