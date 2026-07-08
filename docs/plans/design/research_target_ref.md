@@ -1,72 +1,68 @@
-# 统一投研对象引用模型设计
+# 统一投研对象引用模型
 
-## 背景
+## 结论
 
-AlphaFlow 已经有 `自选股`、`行业研究`、`公司判断`、`Pi Agent`、`筛选` 和 `Research Space` 等投研模块。随着用户在不同页面之间沉淀更多结论，需要一个统一方式引用“正在研究什么”，避免页面之间只靠文本复制或临时参数传递。
+保留 `ResearchTargetRef`，但不要让 `SavedCompany`、`SavedIndustry`、`WatchList` 继承某个统一父类。
 
-本设计聚焦三个核心对象的定位：
+推荐模型是三层：
 
-- 收藏公司
-- 收藏行业
-- 自选股
+```text
+第一层：真实业务对象
+SavedCompany / SavedIndustry / WatchList / ResearchSpace / WorkflowRun
 
-目标不是把三者合并成同一种列表，而是明确各自职责，并提供统一引用模型，让 `Pi Agent`、`筛选`、`行业研究`、`公司判断` 等页面都能引用这些对象。
+第二层：统一引用
+ResearchTargetRef = { type, id }
 
-## 核心定位
+第三层：附属内容
+ResearchNote / FinancialSnapshot / ResearchArtifact
+```
 
-### 1. 收藏公司
+`ResearchTargetRef` 是“指向某个投研对象的地址”。笔记、财务快照、AI 报告等附属内容通过这个地址挂到具体对象上。
 
-收藏公司不是“自选股里的某只股票”的重复概念，而是公司级长期研究档案。
+## 三类核心对象
 
-它应该保存：
+### 收藏公司
+
+`SavedCompany` 是公司级长期研究档案，不是自选股成员的重复字段。
+
+它主要负责稳定身份信息和轻量元信息，例如：
 
 - 股票代码
 - 公司名
 - 关注理由
 - 标签
-- 核心假设
-- 风险点
-- 最近研究结论
-- 关联 workflow runs
-- 是否加入某些自选股
 
-收藏公司偏知识层，重点是长期跟踪单个公司的投资逻辑、证据、风险和历史判断。
+公司相关的假设、风险、结论、摘录、报告和财务快照，不建议都做成 `SavedCompany` 的固定字段，而应沉淀为 `ResearchNote`、`FinancialSnapshot`、`ResearchArtifact`。
 
-### 2. 收藏行业
+### 收藏行业
 
-收藏行业是行业或主题级长期研究档案。
+`SavedIndustry` 是行业或主题级长期研究档案。
 
-它应该保存：
+它主要负责稳定身份信息和轻量元信息，例如：
 
-- 行业名
+- 行业名或主题名
 - 分类来源，例如申万、同花顺概念、自定义主题
 - 关注理由
-- 核心驱动
-- 相关公司
-- 关联行业研究 runs
-- 风险
-- 跟踪指标
+- 标签
 
-收藏行业偏研究层，重点是跟踪行业景气、主题演化、核心驱动、代表公司和后续验证指标。
+行业驱动、风险、跟踪指标、相关公司和研究结论也应优先通过灵活笔记和报告承载，而不是全部固化为预设字段。
 
-### 3. 自选股
+### 自选股
 
-自选股继续保留为“股票组合、候选池、择时输入”。
+`WatchList` 继续作为股票集合、候选池和操作输入。
 
-它偏操作层：一组股票，用来筛选、择时、组合建议。
+它偏操作层，用于：
 
-收藏公司偏知识层：单个公司长期跟踪。
+- 筛选
+- 择时
+- 组合建议
+- 候选池管理
 
-两者可以互相引用，但不要合并。例如：
+`SavedCompany` 偏知识层，`WatchList` 偏操作层。两者可以互相引用，但不要合并。
 
-- 一个收藏公司可以标记“已加入哪些自选股”；
-- 一个自选股列表可以展示其中哪些股票已有收藏公司档案；
-- 自选股可以作为筛选和择时输入；
-- 收藏公司可以作为公司判断和 Pi Agent 上下文输入。
+## ResearchTargetRef
 
-## 统一引用模型
-
-建议优先引入统一的投研对象引用类型：
+统一引用类型：
 
 ```ts
 type ResearchTargetRef =
@@ -77,227 +73,165 @@ type ResearchTargetRef =
   | { type: "workflow_run"; id: string };
 ```
 
-这个类型用于表达“当前任务引用了哪些投研对象”，而不是替代各对象自身的数据模型。
+在数据库中可以落成：
 
-## 设计原则
+```text
+targetType
+targetId
+```
 
-### 1. 业务实体显式建模
+例如：
 
-不要一开始就把所有东西塞进通用 `FavoriteEntity` 表。
+```text
+targetType = company
+targetId = saved_company_123
+```
 
-推荐显式建模：
+表示这条内容属于某个收藏公司。
 
-- `SavedCompany`
-- `SavedIndustry`
-- `WatchList`
-- `ResearchSpace`
-- `WorkflowRun`
+```text
+targetType = industry
+targetId = saved_industry_456
+```
 
-原因是这些对象的业务语义、字段结构和生命周期不同。显式建模更利于约束、权限校验、页面表达和后续扩展。
+表示这条内容属于某个收藏行业。
 
-### 2. 引用模型统一，实体模型分离
+```text
+targetType = watchlist
+targetId = watchlist_789
+```
 
-`ResearchTargetRef` 只负责跨模块传递引用：
+表示这条内容属于某个自选股列表。
 
-- Pi Agent 可以带着一个或多个 refs 开始对话；
-- 筛选可以从 watchlist 或 industry 引用生成候选范围；
-- 行业研究可以引用 SavedIndustry、相关公司和历史 workflow runs；
-- 公司判断可以引用 SavedCompany、所属行业和相关历史 runs；
-- Research Space 可以继续作为更高层的研究容器，聚合不同 refs。
+## 附属内容如何关联对象
 
-实体本身仍由各自的 model、router 和页面维护。
+`ResearchNote`、`FinancialSnapshot`、`ResearchArtifact` 不需要分别建成 `CompanyNote`、`IndustryNote`、`WatchListNote`。
 
-### 3. 自选股不承担知识档案职责
-
-自选股应保持轻量，主要表达“股票集合”和组合操作意图。
-
-不建议把公司长期研究字段直接塞到自选股成员里，否则会导致：
-
-- 同一家公司出现在多个自选股时，研究结论重复；
-- 公司研究历史和组合操作历史混在一起；
-- 后续公司判断、Pi Agent、Research Space 很难引用稳定的公司档案。
-
-### 4. 收藏行业不等于筛选条件
-
-收藏行业是研究对象，筛选条件是操作表达。
-
-例如“人形机器人”可以是一个收藏行业或主题，但在筛选中可能展开为：
-
-- 相关同花顺概念；
-- 申万行业；
-- 关键词命中的公司；
-- 用户手动维护的代表公司；
-- 最近研究结论中的候选公司。
-
-因此收藏行业应保存分类来源和相关公司，但不要被降级为单一筛选字段。
-
-## 页面接入建议
-
-### Pi Agent
-
-Pi Agent 应支持选择或注入 `ResearchTargetRef[]`，作为对话上下文。
-
-示例：
-
-- 引用某个收藏公司，让 Agent 回答“这家公司最近风险是否变化”；
-- 引用某个收藏行业，让 Agent 总结行业驱动和相关公司；
-- 引用某个自选股列表，让 Agent 生成组合观察或后续研究计划；
-- 引用某个 workflow run，让 Agent 基于已有结论继续追问。
-
-### 筛选
-
-筛选页可以引用：
-
-- `watchlist`：限制候选范围到某个自选股；
-- `industry`：从收藏行业展开候选公司或行业条件；
-- `company`：围绕单家公司生成同业对比或可比公司筛选。
-
-筛选结果也应支持把公司加入收藏公司或自选股。
-
-### 行业研究
-
-行业研究页应优先支持 `industry` 引用。
-
-当用户选择收藏行业后，页面可以自动带入：
-
-- 行业名；
-- 分类来源；
-- 关注理由；
-- 核心驱动；
-- 相关公司；
-- 历史行业研究 runs；
-- 跟踪指标。
-
-研究完成后，应能把新的 workflow run 关联回该收藏行业。
-
-### 公司判断
-
-公司判断页应优先支持 `company` 引用。
-
-当用户选择收藏公司后，页面可以自动带入：
-
-- 股票代码；
-- 公司名；
-- 关注理由；
-- 核心假设；
-- 风险点；
-- 最近研究结论；
-- 关联 workflow runs；
-- 所属自选股。
-
-判断完成后，应能把新的 workflow run 关联回该收藏公司。
-
-## 建议的数据模型方向
-
-第一阶段建议新增：
+它们统一保存 `targetType + targetId`：
 
 ```prisma
-model SavedCompany {
-  id              String   @id @default(cuid())
-  userId          String
-  stockCode       String
-  stockName       String
-  watchReason     String?
-  tags            String[] @default([])
-  coreHypotheses  Json     @default("[]")
-  riskPoints      Json     @default("[]")
-  latestConclusion Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+model ResearchNote {
+  id         String   @id @default(cuid())
+  userId     String
+  targetType String
+  targetId   String
+  title      String?
+  kind       String?
+  content    String
+  source     Json?
+  tags       String[] @default([])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  @@unique([userId, stockCode])
-  @@index([userId, updatedAt])
-  @@index([userId, stockName])
-}
-
-model SavedIndustry {
-  id              String   @id @default(cuid())
-  userId          String
-  name            String
-  taxonomySource  String
-  watchReason     String?
-  coreDrivers     Json     @default("[]")
-  relatedCompanies Json    @default("[]")
-  riskPoints      Json     @default("[]")
-  trackingMetrics Json     @default("[]")
-  latestConclusion Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@unique([userId, taxonomySource, name])
-  @@index([userId, updatedAt])
-  @@index([userId, name])
+  @@index([userId, targetType, targetId, updatedAt])
 }
 ```
 
-关联 workflow runs 可以使用独立 link 表，避免在主表里堆数组：
+同一张 `ResearchNote` 表可以表达：
 
-```prisma
-model SavedCompanyRunLink {
-  id             String   @id @default(cuid())
-  savedCompanyId String
-  runId          String
-  note           String?
-  createdAt      DateTime @default(now())
+- 某个公司的笔记
+- 某个行业的笔记
+- 某个自选股列表的笔记
+- 某个 Research Space 的笔记
+- 某次 Workflow Run 的笔记
 
-  @@unique([savedCompanyId, runId])
-  @@index([savedCompanyId, createdAt])
-  @@index([runId])
-}
+`FinancialSnapshot` 和 `ResearchArtifact` 也采用同样方式关联目标对象。
 
-model SavedIndustryRunLink {
-  id              String   @id @default(cuid())
-  savedIndustryId String
-  runId           String
-  note            String?
-  createdAt       DateTime @default(now())
+## 筛选页的财务快照与比较报告
 
-  @@unique([savedIndustryId, runId])
-  @@index([savedIndustryId, createdAt])
-  @@index([runId])
-}
+筛选页应支持保存单家公司或多家公司的财务数据快照。
+
+更重要的是多公司场景，因为筛选页天然是在做候选池比较。单公司财务快照可以视为多公司比较能力的特例。
+
+建议关系：
+
+```text
+FinancialSnapshot
+  targetType = company | watchlist | industry | workflow_run
+  targetId
+  companyRefs
+  metricSet
+  periodRange
+  rawSnapshot
 ```
 
-公司与自选股之间已有 `WatchList.stocks` 的 JSON 结构，第一阶段可以通过股票代码动态判断“是否加入某些自选股”。如果后续需要更强查询能力，再考虑把自选股成员拆成关系表。
+比较报告不要只保存最终文本，应保存为基于财务快照生成的 `ResearchArtifact`：
 
-## 分阶段实现建议
+```text
+FinancialSnapshot -> ResearchArtifact
+```
 
-### 第一阶段：打通对象和引用
+这样用户之后可以重新生成报告、换模板或继续让 AI 解读。
 
-- 新增 `SavedCompany`、`SavedIndustry` 及对应 router；
-- 新增 `ResearchTargetRef` contract；
-- 在公司判断支持选择收藏公司；
-- 在行业研究支持选择收藏行业；
-- 在 Pi Agent 消息或会话启动参数中支持 `ResearchTargetRef[]`。
+## 高亮文本加入笔记
 
-### 第二阶段：打通关联和回写
+在 `行业研究`、`公司分析`、`择时组合`、`Pi Agent` 等页面，用户可以高亮生成文本中的片段，并添加到某个对象的笔记。
 
-- 公司判断完成后，支持关联 run 到收藏公司；
-- 行业研究完成后，支持关联 run 到收藏行业；
-- 筛选结果支持加入收藏公司或自选股；
-- 收藏公司详情展示所属自选股；
-- 收藏行业详情展示相关公司和历史行业研究。
+目标对象通过 `ResearchTargetRef` 指定：
 
-### 第三阶段：增强上下文和自动化
+```text
+高亮片段 -> ResearchTargetRef -> ResearchNote
+```
 
-- Pi Agent 根据 refs 自动展开摘要上下文；
-- 筛选根据收藏行业自动生成候选范围；
-- 公司判断自动读取最近公司结论和相关行业结论；
-- 行业研究自动带入代表公司和跟踪指标；
-- Research Space 聚合 company、industry、watchlist、workflow_run 等对象。
+AI 可以帮助格式化高亮内容，例如：
 
-## 非目标
+- 保持原文
+- 整理为要点
+- 整理为假设
+- 整理为风险
+- 整理为待验证问题
+- 整理为跟踪指标
 
-第一阶段不建议做以下事情：
+这些分类应作为弱结构化的 `kind`、`tags` 或正文格式存在，不应变成强制 schema。
 
-- 不把收藏公司、自选股、收藏行业合并成一个通用收藏表；
-- 不重构现有自选股存储结构；
-- 不一次性改造所有页面 UI；
-- 不把收藏行业直接等同为某个单一数据源的行业分类；
-- 不要求 Pi Agent 一开始就自动理解所有 refs，先能显式传入和解析即可。
+## 为什么不用继承
 
-## 总结
+不建议建立一个父类或父表让 `SavedCompany`、`SavedIndustry`、`WatchList` 继承。
 
-推荐方向是：实体显式、引用统一、页面按场景接入。
+原因：
 
-`收藏公司` 是公司级知识档案，`收藏行业` 是行业或主题级研究档案，`自选股` 是股票集合和操作输入。`ResearchTargetRef` 则作为跨模块的轻量引用协议，把这些对象接入 Pi Agent、筛选、行业研究、公司判断和 Research Space。
+- 三者唯一约束不同；
+- 生命周期不同；
+- 页面行为不同；
+- `WatchList` 是操作集合，不是知识档案；
+- `WorkflowRun` 和 `ResearchSpace` 也可被引用，但不适合成为收藏对象的子类；
+- Prisma 中做继承式模型会让查询、权限和约束变复杂。
+
+更稳妥的方式是：业务对象显式建模，附属内容通过 `ResearchTargetRef` 统一关联。
+
+## 灵活 schema 原则
+
+投资者通常不是每次都需要完整研究框架。他们可能已经理解部分逻辑，只想保存新的增量信息。
+
+因此：
+
+- 实体表保存稳定身份和轻量元信息；
+- 研究内容保存为灵活的 note、snapshot、artifact；
+- AI 可以帮助整理格式，但不强迫用户填满预设字段；
+- 页面可以提供默认分组视图，例如假设、风险、催化、跟踪指标，但底层仍使用灵活笔记块。
+
+## 推荐关系
+
+```text
+SavedCompany
+  <- ResearchTargetRef { type: "company", id }
+      <- ResearchNote
+      <- FinancialSnapshot
+      <- ResearchArtifact
+
+SavedIndustry
+  <- ResearchTargetRef { type: "industry", id }
+      <- ResearchNote
+      <- FinancialSnapshot
+      <- ResearchArtifact
+
+WatchList
+  <- ResearchTargetRef { type: "watchlist", id }
+      <- ResearchNote
+      <- FinancialSnapshot
+      <- ResearchArtifact
+```
+
+简化成一句话：
+
+`SavedCompany`、`SavedIndustry`、`WatchList` 是被研究或操作的对象；`ResearchTargetRef` 是指向这些对象的地址；`ResearchNote`、`FinancialSnapshot`、`ResearchArtifact` 是贴在这个地址上的内容。
