@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { MarkdownContent } from "~/app/_components/markdown-content";
 import {
-  cn,
   EmptyState,
   InlineNotice,
   Panel,
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
-import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
-import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import type {
   ResearchTargetRef,
   ResearchTargetType,
@@ -26,12 +24,7 @@ type ResearchArtifact =
 
 const selectableTargetTypes = ["company", "industry", "watchlist"] as const;
 type SelectableTargetType = (typeof selectableTargetTypes)[number];
-
-const targetTabs: WorkflowStageTab[] = [
-  { id: "company", label: "收藏公司", summary: "" },
-  { id: "industry", label: "收藏行业", summary: "" },
-  { id: "watchlist", label: "自选股", summary: "" },
-];
+type CreateMode = SelectableTargetType;
 
 function splitTags(value: string) {
   return value
@@ -69,6 +62,18 @@ function targetTypeLabel(type: ResearchTargetType | string) {
 
 function serializeRef(ref: ResearchTargetRef) {
   return `${ref.type}:${ref.id}`;
+}
+
+function parseSerializedRef(value: string | null): ResearchTargetRef | null {
+  if (!value) {
+    return null;
+  }
+
+  const [type, id] = value.split(":");
+  if (!type || !id || !isSelectableTargetType(type)) {
+    return null;
+  }
+  return { type, id };
 }
 
 function isSelectableTargetType(value: string): value is SelectableTargetType {
@@ -188,41 +193,6 @@ function EditableMarkdownBlock(props: {
   );
 }
 
-function TargetCard(props: {
-  target: TargetSummary;
-  active: boolean;
-  onSelect: () => void;
-}) {
-  const { target, active, onSelect } = props;
-
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "rounded-[12px] border p-4 text-left transition-colors",
-        active
-          ? "border-[var(--app-border-strong)] bg-[var(--app-panel-soft)]"
-          : "border-[var(--app-border-soft)] bg-[var(--app-surface)] hover:border-[var(--app-border-strong)]",
-      )}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusPill label={targetTypeLabel(target.ref.type)} tone="info" />
-        {target.archived ? <StatusPill label="已归档" tone="warning" /> : null}
-      </div>
-      <div className="mt-3 text-base font-medium text-[var(--app-text-strong)]">
-        {target.label}
-      </div>
-      <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--app-text-muted)]">
-        {target.description || "暂无说明"}
-      </p>
-      <p className="mt-3 text-xs text-[var(--app-text-soft)]">
-        更新于 {formatDate(target.updatedAt)}
-      </p>
-    </button>
-  );
-}
-
 function CompanyCreateForm(props: {
   stockCode: string;
   setStockCode: (value: string) => void;
@@ -236,52 +206,50 @@ function CompanyCreateForm(props: {
   onSubmit: () => void;
 }) {
   return (
-    <Panel title="新建收藏公司" density="compact">
-      <div className="grid gap-3">
-        <div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">
-          <input
-            value={props.stockCode}
-            onChange={(event) =>
-              props.setStockCode(
-                event.target.value.replace(/\D/g, "").slice(0, 6),
-              )
-            }
-            placeholder="股票代码"
-            className="app-input"
-          />
-          <input
-            value={props.companyName}
-            onChange={(event) => props.setCompanyName(event.target.value)}
-            placeholder="公司名称"
-            className="app-input"
-          />
-        </div>
-        <textarea
-          value={props.companyReason}
-          onChange={(event) => props.setCompanyReason(event.target.value)}
-          placeholder="关注理由"
-          className="app-textarea min-h-[80px]"
-        />
+    <div className="grid gap-3">
+      <div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">
         <input
-          value={props.companyTags}
-          onChange={(event) => props.setCompanyTags(event.target.value)}
-          placeholder="标签，用逗号分隔"
+          value={props.stockCode}
+          onChange={(event) =>
+            props.setStockCode(
+              event.target.value.replace(/\D/g, "").slice(0, 6),
+            )
+          }
+          placeholder="股票代码"
           className="app-input"
         />
-        <button
-          type="button"
-          className="app-button app-button-primary justify-self-start"
-          disabled={
-            props.stockCode.length !== 6 ||
-            !props.companyName.trim() ||
-            props.pending
-          }
-          onClick={props.onSubmit}
-        >
-          {props.pending ? "保存中..." : "保存公司"}
-        </button>
+        <input
+          value={props.companyName}
+          onChange={(event) => props.setCompanyName(event.target.value)}
+          placeholder="公司名称"
+          className="app-input"
+        />
       </div>
-    </Panel>
+      <textarea
+        value={props.companyReason}
+        onChange={(event) => props.setCompanyReason(event.target.value)}
+        placeholder="关注理由"
+        className="app-textarea min-h-[80px]"
+      />
+      <input
+        value={props.companyTags}
+        onChange={(event) => props.setCompanyTags(event.target.value)}
+        placeholder="标签，用逗号分隔"
+        className="app-input"
+      />
+      <button
+        type="button"
+        className="app-button app-button-primary justify-self-start"
+        disabled={
+          props.stockCode.length !== 6 ||
+          !props.companyName.trim() ||
+          props.pending
+        }
+        onClick={props.onSubmit}
+      >
+        {props.pending ? "保存中..." : "保存公司"}
+      </button>
+    </div>
   );
 }
 
@@ -298,44 +266,42 @@ function IndustryCreateForm(props: {
   onSubmit: () => void;
 }) {
   return (
-    <Panel title="新建收藏行业" density="compact">
-      <div className="grid gap-3">
-        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px]">
-          <input
-            value={props.industryName}
-            onChange={(event) => props.setIndustryName(event.target.value)}
-            placeholder="行业或主题"
-            className="app-input"
-          />
-          <input
-            value={props.industrySource}
-            onChange={(event) => props.setIndustrySource(event.target.value)}
-            placeholder="来源"
-            className="app-input"
-          />
-        </div>
-        <textarea
-          value={props.industryReason}
-          onChange={(event) => props.setIndustryReason(event.target.value)}
-          placeholder="关注理由"
-          className="app-textarea min-h-[80px]"
-        />
+    <div className="grid gap-3">
+      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_160px]">
         <input
-          value={props.industryTags}
-          onChange={(event) => props.setIndustryTags(event.target.value)}
-          placeholder="标签，用逗号分隔"
+          value={props.industryName}
+          onChange={(event) => props.setIndustryName(event.target.value)}
+          placeholder="行业或主题"
           className="app-input"
         />
-        <button
-          type="button"
-          className="app-button app-button-primary justify-self-start"
-          disabled={!props.industryName.trim() || props.pending}
-          onClick={props.onSubmit}
-        >
-          {props.pending ? "保存中..." : "保存行业"}
-        </button>
+        <input
+          value={props.industrySource}
+          onChange={(event) => props.setIndustrySource(event.target.value)}
+          placeholder="来源"
+          className="app-input"
+        />
       </div>
-    </Panel>
+      <textarea
+        value={props.industryReason}
+        onChange={(event) => props.setIndustryReason(event.target.value)}
+        placeholder="关注理由"
+        className="app-textarea min-h-[80px]"
+      />
+      <input
+        value={props.industryTags}
+        onChange={(event) => props.setIndustryTags(event.target.value)}
+        placeholder="标签，用逗号分隔"
+        className="app-input"
+      />
+      <button
+        type="button"
+        className="app-button app-button-primary justify-self-start"
+        disabled={!props.industryName.trim() || props.pending}
+        onClick={props.onSubmit}
+      >
+        {props.pending ? "保存中..." : "保存行业"}
+      </button>
+    </div>
   );
 }
 
@@ -348,28 +314,129 @@ function WatchlistCreateForm(props: {
   onSubmit: () => void;
 }) {
   return (
-    <Panel title="新建自选股" density="compact">
-      <div className="grid gap-3">
-        <input
-          value={props.name}
-          onChange={(event) => props.setName(event.target.value)}
-          placeholder="列表名称"
-          className="app-input"
-        />
-        <input
-          value={props.description}
-          onChange={(event) => props.setDescription(event.target.value)}
-          placeholder="列表说明"
-          className="app-input"
-        />
-        <button
-          type="button"
-          className="app-button app-button-primary justify-self-start"
-          disabled={!props.name.trim() || props.pending}
-          onClick={props.onSubmit}
-        >
-          {props.pending ? "创建中..." : "创建列表"}
+    <div className="grid gap-3">
+      <input
+        value={props.name}
+        onChange={(event) => props.setName(event.target.value)}
+        placeholder="列表名称"
+        className="app-input"
+      />
+      <input
+        value={props.description}
+        onChange={(event) => props.setDescription(event.target.value)}
+        placeholder="列表说明"
+        className="app-input"
+      />
+      <button
+        type="button"
+        className="app-button app-button-primary justify-self-start"
+        disabled={!props.name.trim() || props.pending}
+        onClick={props.onSubmit}
+      >
+        {props.pending ? "创建中..." : "创建列表"}
+      </button>
+    </div>
+  );
+}
+
+function UnifiedCreatePanel(props: {
+  mode: CreateMode;
+  setMode: (mode: CreateMode) => void;
+  onClose: () => void;
+  stockCode: string;
+  setStockCode: (value: string) => void;
+  companyName: string;
+  setCompanyName: (value: string) => void;
+  companyReason: string;
+  setCompanyReason: (value: string) => void;
+  companyTags: string;
+  setCompanyTags: (value: string) => void;
+  companyPending: boolean;
+  onCreateCompany: () => void;
+  industryName: string;
+  setIndustryName: (value: string) => void;
+  industrySource: string;
+  setIndustrySource: (value: string) => void;
+  industryReason: string;
+  setIndustryReason: (value: string) => void;
+  industryTags: string;
+  setIndustryTags: (value: string) => void;
+  industryPending: boolean;
+  onCreateIndustry: () => void;
+  watchlistName: string;
+  setWatchlistName: (value: string) => void;
+  watchlistDescription: string;
+  setWatchlistDescription: (value: string) => void;
+  watchlistPending: boolean;
+  onCreateWatchlist: () => void;
+}) {
+  return (
+    <Panel
+      title="新建投研对象"
+      actions={
+        <button type="button" className="app-button" onClick={props.onClose}>
+          关闭
         </button>
+      }
+    >
+      <div className="grid gap-4">
+        <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
+          类型
+          <select
+            value={props.mode}
+            onChange={(event) => {
+              if (isSelectableTargetType(event.target.value)) {
+                props.setMode(event.target.value);
+              }
+            }}
+            className="app-input"
+          >
+            <option value="company">收藏公司</option>
+            <option value="industry">收藏行业</option>
+            <option value="watchlist">自选股</option>
+          </select>
+        </label>
+
+        {props.mode === "company" ? (
+          <CompanyCreateForm
+            stockCode={props.stockCode}
+            setStockCode={props.setStockCode}
+            companyName={props.companyName}
+            setCompanyName={props.setCompanyName}
+            companyReason={props.companyReason}
+            setCompanyReason={props.setCompanyReason}
+            companyTags={props.companyTags}
+            setCompanyTags={props.setCompanyTags}
+            pending={props.companyPending}
+            onSubmit={props.onCreateCompany}
+          />
+        ) : null}
+
+        {props.mode === "industry" ? (
+          <IndustryCreateForm
+            industryName={props.industryName}
+            setIndustryName={props.setIndustryName}
+            industrySource={props.industrySource}
+            setIndustrySource={props.setIndustrySource}
+            industryReason={props.industryReason}
+            setIndustryReason={props.setIndustryReason}
+            industryTags={props.industryTags}
+            setIndustryTags={props.setIndustryTags}
+            pending={props.industryPending}
+            onSubmit={props.onCreateIndustry}
+          />
+        ) : null}
+
+        {props.mode === "watchlist" ? (
+          <WatchlistCreateForm
+            name={props.watchlistName}
+            setName={props.setWatchlistName}
+            description={props.watchlistDescription}
+            setDescription={props.setWatchlistDescription}
+            pending={props.watchlistPending}
+            onSubmit={props.onCreateWatchlist}
+          />
+        ) : null}
       </div>
     </Panel>
   );
@@ -570,14 +637,10 @@ function TargetContentPanel(props: {
 
 export function ResearchTargetsClient() {
   const utils = api.useUtils();
-  const [activeType, setActiveType] = useState<SelectableTargetType>("company");
-  const [selectedKeyByType, setSelectedKeyByType] = useState<
-    Record<SelectableTargetType, string | null>
-  >({
-    company: null,
-    industry: null,
-    watchlist: null,
-  });
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<CreateMode>("company");
   const [stockCode, setStockCode] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [companyReason, setCompanyReason] = useState("");
@@ -590,33 +653,25 @@ export function ResearchTargetsClient() {
   const [watchlistDescription, setWatchlistDescription] = useState("");
 
   const targetsQuery = api.researchTarget.listTargets.useQuery({
-    types: [activeType],
+    types: ["company", "industry", "watchlist"],
     limit: 100,
   });
   const targets = useMemo(() => targetsQuery.data ?? [], [targetsQuery.data]);
-  const selectedKey = selectedKeyByType[activeType];
+  const requestedTargetRef = parseSerializedRef(searchParams.get("target"));
+  const requestedKey = requestedTargetRef
+    ? serializeRef(requestedTargetRef)
+    : null;
   const selectedTarget =
-    targets.find((target) => serializeRef(target.ref) === selectedKey) ?? null;
+    targets.find((target) => serializeRef(target.ref) === requestedKey) ??
+    targets[0] ??
+    null;
   const selectedTargetRef = selectedTarget?.ref ?? null;
-
-  useEffect(() => {
-    if (targetsQuery.isLoading) {
-      return;
-    }
-
-    const currentKey = selectedKeyByType[activeType];
-    const currentStillExists = targets.some(
-      (target) => serializeRef(target.ref) === currentKey,
-    );
-    if (currentStillExists) {
-      return;
-    }
-
-    setSelectedKeyByType((current) => ({
-      ...current,
-      [activeType]: targets[0] ? serializeRef(targets[0].ref) : null,
-    }));
-  }, [activeType, selectedKeyByType, targets, targetsQuery.isLoading]);
+  const selectedKey = selectedTarget ? serializeRef(selectedTarget.ref) : "";
+  const historyItems = targets.map((target) => ({
+    id: serializeRef(target.ref),
+    title: `[${targetTypeLabel(target.ref.type)}] ${target.label}`,
+    href: `/research-targets?target=${encodeURIComponent(serializeRef(target.ref))}`,
+  }));
 
   const notesQuery = api.researchTarget.listNotes.useQuery(
     {
@@ -649,10 +704,12 @@ export function ResearchTargetsClient() {
       setCompanyName("");
       setCompanyReason("");
       setCompanyTags("");
-      setSelectedKeyByType((current) => ({
-        ...current,
-        company: serializeRef({ type: "company", id: created.id }),
-      }));
+      setCreateOpen(false);
+      router.push(
+        `/research-targets?target=${encodeURIComponent(
+          serializeRef({ type: "company", id: created.id }),
+        )}`,
+      );
       await Promise.all([
         utils.researchTarget.listCompanies.invalidate(),
         utils.researchTarget.listTargets.invalidate(),
@@ -665,10 +722,12 @@ export function ResearchTargetsClient() {
       setIndustryReason("");
       setIndustryTags("");
       setIndustrySource("自定义主题");
-      setSelectedKeyByType((current) => ({
-        ...current,
-        industry: serializeRef({ type: "industry", id: created.id }),
-      }));
+      setCreateOpen(false);
+      router.push(
+        `/research-targets?target=${encodeURIComponent(
+          serializeRef({ type: "industry", id: created.id }),
+        )}`,
+      );
       await Promise.all([
         utils.researchTarget.listIndustries.invalidate(),
         utils.researchTarget.listTargets.invalidate(),
@@ -679,10 +738,12 @@ export function ResearchTargetsClient() {
     onSuccess: async (created) => {
       setWatchlistName("");
       setWatchlistDescription("");
-      setSelectedKeyByType((current) => ({
-        ...current,
-        watchlist: serializeRef({ type: "watchlist", id: created.id }),
-      }));
+      setCreateOpen(false);
+      router.push(
+        `/research-targets?target=${encodeURIComponent(
+          serializeRef({ type: "watchlist", id: created.id }),
+        )}`,
+      );
       await Promise.all([
         utils.watchlist.list.invalidate(),
         utils.researchTarget.listTargets.invalidate(),
@@ -717,120 +778,81 @@ export function ResearchTargetsClient() {
     },
   });
 
-  const emptyTitle =
-    activeType === "company"
-      ? "还没有收藏公司"
-      : activeType === "industry"
-        ? "还没有收藏行业"
-        : "还没有自选股";
-
   return (
     <WorkspaceShell
       section="researchTargets"
-      title="投研收藏"
-      description="统一管理收藏公司、收藏行业和自选股，并在每个对象中沉淀笔记、财务快照与研究报告。"
       contentWidth="wide"
       titleSize="compact"
-      actions={null}
+      historyHeading="投研对象"
+      historyItems={historyItems}
+      activeHistoryId={selectedKey}
+      historyItemLimit={100}
+      historyLoading={targetsQuery.isLoading}
+      historyEmptyText="暂无投研对象"
+      actions={
+        <button
+          type="button"
+          className="app-button app-button-primary"
+          onClick={() => setCreateOpen((current) => !current)}
+        >
+          新建
+        </button>
+      }
       showWatchlistsAction={false}
     >
-      <WorkflowStageSwitcher
-        tabs={targetTabs}
-        activeTabId={activeType}
-        onChange={(tabId) => {
-          if (isSelectableTargetType(tabId)) {
-            setActiveType(tabId);
-          }
-        }}
-        panels={{ company: null, industry: null, watchlist: null }}
-      />
-
-      <div className="grid gap-6 xl:grid-cols-[minmax(320px,0.85fr)_minmax(0,1.35fr)]">
-        <div className="grid content-start gap-6">
-          <Panel title={targetTabs.find((tab) => tab.id === activeType)?.label}>
-            <div className="grid gap-3">
-              {targetsQuery.isLoading ? (
-                <EmptyState title="正在加载投研对象" />
-              ) : targets.length === 0 ? (
-                <EmptyState title={emptyTitle} />
-              ) : (
-                targets.map((target) => (
-                  <TargetCard
-                    key={serializeRef(target.ref)}
-                    target={target}
-                    active={serializeRef(target.ref) === selectedKey}
-                    onSelect={() =>
-                      setSelectedKeyByType((current) => ({
-                        ...current,
-                        [activeType]: serializeRef(target.ref),
-                      }))
-                    }
-                  />
-                ))
-              )}
-            </div>
-          </Panel>
-
-          {activeType === "company" ? (
-            <CompanyCreateForm
-              stockCode={stockCode}
-              setStockCode={setStockCode}
-              companyName={companyName}
-              setCompanyName={setCompanyName}
-              companyReason={companyReason}
-              setCompanyReason={setCompanyReason}
-              companyTags={companyTags}
-              setCompanyTags={setCompanyTags}
-              pending={createCompanyMutation.isPending}
-              onSubmit={() =>
-                createCompanyMutation.mutate({
-                  stockCode,
-                  companyName: companyName.trim(),
-                  reason: companyReason.trim() || undefined,
-                  tags: splitTags(companyTags),
-                })
-              }
-            />
-          ) : null}
-
-          {activeType === "industry" ? (
-            <IndustryCreateForm
-              industryName={industryName}
-              setIndustryName={setIndustryName}
-              industrySource={industrySource}
-              setIndustrySource={setIndustrySource}
-              industryReason={industryReason}
-              setIndustryReason={setIndustryReason}
-              industryTags={industryTags}
-              setIndustryTags={setIndustryTags}
-              pending={createIndustryMutation.isPending}
-              onSubmit={() =>
-                createIndustryMutation.mutate({
-                  name: industryName.trim(),
-                  source: industrySource.trim() || "自定义主题",
-                  reason: industryReason.trim() || undefined,
-                  tags: splitTags(industryTags),
-                })
-              }
-            />
-          ) : null}
-
-          {activeType === "watchlist" ? (
-            <WatchlistCreateForm
-              name={watchlistName}
-              setName={setWatchlistName}
-              description={watchlistDescription}
-              setDescription={setWatchlistDescription}
-              pending={createWatchlistMutation.isPending}
-              onSubmit={() =>
-                createWatchlistMutation.mutate({
-                  name: watchlistName.trim(),
-                  description: watchlistDescription.trim() || undefined,
-                })
-              }
-            />
-          ) : null}
-        </div>
+      <div className="grid gap-6">
+        {createOpen ? (
+          <UnifiedCreatePanel
+            mode={createMode}
+            setMode={setCreateMode}
+            onClose={() => setCreateOpen(false)}
+            stockCode={stockCode}
+            setStockCode={setStockCode}
+            companyName={companyName}
+            setCompanyName={setCompanyName}
+            companyReason={companyReason}
+            setCompanyReason={setCompanyReason}
+            companyTags={companyTags}
+            setCompanyTags={setCompanyTags}
+            companyPending={createCompanyMutation.isPending}
+            onCreateCompany={() =>
+              createCompanyMutation.mutate({
+                stockCode,
+                companyName: companyName.trim(),
+                reason: companyReason.trim() || undefined,
+                tags: splitTags(companyTags),
+              })
+            }
+            industryName={industryName}
+            setIndustryName={setIndustryName}
+            industrySource={industrySource}
+            setIndustrySource={setIndustrySource}
+            industryReason={industryReason}
+            setIndustryReason={setIndustryReason}
+            industryTags={industryTags}
+            setIndustryTags={setIndustryTags}
+            industryPending={createIndustryMutation.isPending}
+            onCreateIndustry={() =>
+              createIndustryMutation.mutate({
+                name: industryName.trim(),
+                source: industrySource.trim() || "自定义主题",
+                reason: industryReason.trim() || undefined,
+                tags: splitTags(industryTags),
+              })
+            }
+            watchlistName={watchlistName}
+            setWatchlistName={setWatchlistName}
+            watchlistDescription={watchlistDescription}
+            setWatchlistDescription={setWatchlistDescription}
+            watchlistPending={createWatchlistMutation.isPending}
+            onCreateWatchlist={() =>
+              createWatchlistMutation.mutate({
+                name: watchlistName.trim(),
+                description: watchlistDescription.trim() || undefined,
+              })
+            }
+          />
+        ) : null}
 
         <TargetContentPanel
           selectedTarget={selectedTarget}

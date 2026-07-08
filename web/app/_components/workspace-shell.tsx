@@ -223,6 +223,7 @@ function SidebarHistoryList(props: {
   items: WorkspaceHistoryItem[];
   historyHref?: string;
   activeHistoryId?: string;
+  historyItemLimit?: number;
   historyLoading?: boolean;
   historyEmptyText?: string;
   sectionView: WorkspaceSectionView;
@@ -233,12 +234,13 @@ function SidebarHistoryList(props: {
     items,
     historyHref,
     activeHistoryId,
+    historyItemLimit = HISTORY_ITEM_LIMIT,
     historyLoading = false,
     historyEmptyText = "暂无历史记录",
     sectionView,
     onNavigate,
   } = props;
-  const recentItems = items.slice(0, HISTORY_ITEM_LIMIT);
+  const recentItems = items.slice(0, historyItemLimit);
 
   return (
     <section className="app-sidebar-history mt-auto min-w-0 overflow-hidden border-t border-[var(--app-border-soft)] pt-5">
@@ -301,6 +303,7 @@ function SidebarRail(props: {
   historyItems: WorkspaceHistoryItem[];
   historyHref?: string;
   activeHistoryId?: string;
+  historyItemLimit?: number;
   historyLoading?: boolean;
   historyEmptyText?: string;
   onNavigate?: () => void;
@@ -315,6 +318,7 @@ function SidebarRail(props: {
     historyItems,
     historyHref,
     activeHistoryId,
+    historyItemLimit,
     historyLoading,
     historyEmptyText,
     onNavigate,
@@ -405,6 +409,7 @@ function SidebarRail(props: {
           items={historyItems}
           historyHref={historyHref}
           activeHistoryId={activeHistoryId}
+          historyItemLimit={historyItemLimit}
           historyLoading={historyLoading}
           historyEmptyText={historyEmptyText}
           sectionView={sectionView}
@@ -468,6 +473,7 @@ export function WorkspaceShell(props: {
   historyHeading?: string;
   historyHref?: string;
   activeHistoryId?: string;
+  historyItemLimit?: number;
   historyLoading?: boolean;
   historyEmptyText?: string;
   initialDesktopCollapsed?: boolean;
@@ -489,6 +495,7 @@ export function WorkspaceShell(props: {
     historyHeading = "历史",
     historyHref,
     activeHistoryId,
+    historyItemLimit,
     historyLoading = false,
     historyEmptyText = "暂无历史记录",
     initialDesktopCollapsed,
@@ -572,6 +579,7 @@ export function WorkspaceShell(props: {
             historyItems={historyItems}
             historyHref={historyHref}
             activeHistoryId={activeHistoryId}
+            historyItemLimit={historyItemLimit}
             historyLoading={historyLoading}
             historyEmptyText={historyEmptyText}
             onToggleSidebar={() => setDesktopCollapsed((current) => !current)}
@@ -622,6 +630,7 @@ export function WorkspaceShell(props: {
                 historyItems={historyItems}
                 historyHref={historyHref}
                 activeHistoryId={activeHistoryId}
+                historyItemLimit={historyItemLimit}
                 historyLoading={historyLoading}
                 historyEmptyText={historyEmptyText}
                 onNavigate={() => setMobileOpen(false)}
