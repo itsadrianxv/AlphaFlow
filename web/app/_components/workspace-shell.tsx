@@ -68,6 +68,12 @@ const sidebarNavItems: Array<{
     icon: OverviewIcon,
   },
   {
+    key: "agentRuntime",
+    href: "/agent-runtime",
+    label: "Pi Agent",
+    icon: AgentRuntimeIcon,
+  },
+  {
     key: "screening",
     href: "/screening",
     label: "筛选",
@@ -84,12 +90,6 @@ const sidebarNavItems: Array<{
     href: "/company-research",
     label: "公司判断",
     icon: CompanyResearchIcon,
-  },
-  {
-    key: "agentRuntime",
-    href: "/agent-runtime",
-    label: "Pi Agent",
-    icon: AgentRuntimeIcon,
   },
   {
     key: "timing",

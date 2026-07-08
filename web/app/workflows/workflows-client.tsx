@@ -115,17 +115,24 @@ export function WorkflowsClient() {
   };
 
   const questionPanel = (
-    <SectionCard title="研究问题">
-      <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
-        本轮要回答什么？
-        <textarea
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="例如：AI 眼镜供应链里，哪些环节会最先兑现利润？"
-          className="app-textarea min-h-[220px]"
-        />
-      </label>
-    </SectionCard>
+    <>
+      <SectionCard title="研究问题">
+        <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
+          本轮要回答什么？
+          <textarea
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="例如：AI 眼镜供应链里，哪些环节会最先兑现利润？"
+            className="app-textarea min-h-[220px]"
+          />
+        </label>
+      </SectionCard>
+      <WorkflowVisualizationPanel
+        templateCode={INDUSTRY_RESEARCH_TEMPLATE_CODE}
+        title="行业研究 Agent 状态图"
+        description="发起前先查看完整 Agent 拓扑；运行后结果页会高亮当前节点。"
+      />
+    </>
   );
 
   const constraintsPanel = (
@@ -332,11 +339,6 @@ export function WorkflowsClient() {
         </>
       }
     >
-      <WorkflowVisualizationPanel
-        templateCode={INDUSTRY_RESEARCH_TEMPLATE_CODE}
-        title="行业研究 Agent 状态图"
-        description="发起前先查看完整 Agent 拓扑；运行后结果页会高亮当前节点。"
-      />
       <WorkflowStageSwitcher
         tabs={workflowsStageTabs}
         activeTabId={activeTabId}

@@ -95,11 +95,6 @@ vi.mock("~/app/_components/workspace-history", () => ({
   buildTimingReportHistoryItems: () => [],
 }));
 
-vi.mock("~/app/_components/market-context-section", () => ({
-  MarketContextSection: () =>
-    React.createElement("div", null, "market-context"),
-}));
-
 vi.mock("~/app/timing/timing-signal-card-list", () => ({
   TimingSignalCardList: () => React.createElement("div", null, "signal-cards"),
 }));

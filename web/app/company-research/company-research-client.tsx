@@ -52,6 +52,8 @@ const starterCases = [
 
 const stageCanvasClassName =
   "min-h-[calc(100vh-17rem)] xl:min-h-[calc(100vh-15rem)]";
+const targetCanvasClassName =
+  "min-h-[calc((100vh-17rem)*0.67)] xl:min-h-[calc((100vh-15rem)*0.67)]";
 
 export function CompanyResearchClient() {
   const router = useRouter();
@@ -159,7 +161,7 @@ export function CompanyResearchClient() {
   };
 
   const targetPanel = (
-    <Panel className={stageCanvasClassName} title="研究目标">
+    <Panel className={targetCanvasClassName} title="研究目标">
       <div className="grid gap-4">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
           <input
@@ -179,7 +181,7 @@ export function CompanyResearchClient() {
           value={keyQuestion}
           onChange={(event) => setKeyQuestion(event.target.value)}
           placeholder="最想优先确认的问题，例如：过去几个季度里，真正驱动利润率上行的业务环节有哪些？"
-          className="app-textarea min-h-[180px]"
+          className="app-textarea min-h-[120px]"
         />
       </div>
     </Panel>

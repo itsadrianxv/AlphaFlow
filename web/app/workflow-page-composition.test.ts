@@ -114,7 +114,7 @@ describe("workflow page composition", () => {
     expect(companyResearchHistorySource).not.toContain("headerActions");
   });
 
-  it("keeps the shared market context entrypoint on overview and timing only", () => {
+  it("keeps the shared macro analysis entrypoint on overview only", () => {
     const homePageSource = readSource("./page.tsx");
     const screeningSource = readSource(
       "./screening/screening-studio-client.tsx",
@@ -130,7 +130,7 @@ describe("workflow page composition", () => {
     expect(screeningSource).not.toContain("MarketContextSection");
     expect(workflowsSource).not.toContain("MarketContextSection");
     expect(companyResearchSource).not.toContain("MarketContextSection");
-    expect(timingSource).toContain("MarketContextSection");
+    expect(timingSource).not.toContain("MarketContextSection");
   });
 
   it("uses a dedicated document-style industry research detail component", () => {

@@ -58,6 +58,12 @@ describe("WorkspaceShell", () => {
     expect(markup.match(/data-sidebar-icon=/g)?.length).toBe(8);
     expect(markup).toContain('data-sidebar-icon="agentRuntime"');
     expect(markup).toContain('data-sidebar-icon="watchlists"');
+    expect(markup.indexOf('data-sidebar-icon="home"')).toBeLessThan(
+      markup.indexOf('data-sidebar-icon="agentRuntime"'),
+    );
+    expect(markup.indexOf('data-sidebar-icon="agentRuntime"')).toBeLessThan(
+      markup.indexOf('data-sidebar-icon="screening"'),
+    );
     expect(markup).not.toContain('data-sidebar-icon="history"');
     expect(markup).toContain("Question");
     expect(markup).toContain('aria-label="Open navigation menu"');
