@@ -33,7 +33,6 @@ type SavedCompanyRecord = {
   reason: string | null;
   tags: string[];
   metadataJson: unknown;
-  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -47,7 +46,6 @@ type SavedIndustryRecord = {
   tags: string[];
   relatedCompaniesJson: unknown;
   metadataJson: unknown;
-  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -258,7 +256,6 @@ function buildCompany(record: SavedCompanyRecord) {
     reason: record.reason,
     tags: record.tags,
     metadata: asRecord(record.metadataJson),
-    archivedAt: toIso(record.archivedAt),
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   });
@@ -273,7 +270,6 @@ function buildIndustry(record: SavedIndustryRecord) {
     tags: record.tags,
     relatedCompanies: asCompanyRefs(record.relatedCompaniesJson),
     metadata: asRecord(record.metadataJson),
-    archivedAt: toIso(record.archivedAt),
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   });
@@ -338,15 +334,12 @@ async function requireTarget(
   db: ResearchTargetDbClient,
   userId: string,
   targetRef: ResearchTargetRef,
-  options?: { allowArchived?: boolean },
 ) {
-  const allowArchived = options?.allowArchived ?? false;
-
   if (targetRef.type === "company") {
     const company = await db.savedCompany.findFirst({
       where: { id: targetRef.id, userId },
     });
-    if (!company || (!allowArchived && company.archivedAt)) {
+    if (!company) {
       throw new TRPCError({ code: "NOT_FOUND", message: "收藏公司不存在" });
     }
     return company;
@@ -356,7 +349,7 @@ async function requireTarget(
     const industry = await db.savedIndustry.findFirst({
       where: { id: targetRef.id, userId },
     });
-    if (!industry || (!allowArchived && industry.archivedAt)) {
+    if (!industry) {
       throw new TRPCError({ code: "NOT_FOUND", message: "收藏行业不存在" });
     }
     return industry;
@@ -468,14 +461,13 @@ export const researchTargetRouter = createTRPCRouter({
           "workflow_run",
         ],
       );
-      const includeArchived = input?.includeArchived ?? false;
       const query = input?.query;
       const limit = input?.limit ?? 50;
       const items = [];
 
       if (types.has("company")) {
         const records = await db.savedCompany.findMany({
-          where: includeArchived ? { userId } : { userId, archivedAt: null },
+          where: { userId },
           orderBy: { updatedAt: "desc" },
           take: limit,
         });
@@ -492,7 +484,6 @@ export const researchTargetRouter = createTRPCRouter({
                 label: `${record.companyName} (${record.stockCode})`,
                 description: record.reason,
                 tags: record.tags,
-                archived: Boolean(record.archivedAt),
                 updatedAt: record.updatedAt.toISOString(),
               }),
             );
@@ -502,7 +493,7 @@ export const researchTargetRouter = createTRPCRouter({
 
       if (types.has("industry")) {
         const records = await db.savedIndustry.findMany({
-          where: includeArchived ? { userId } : { userId, archivedAt: null },
+          where: { userId },
           orderBy: { updatedAt: "desc" },
           take: limit,
         });
@@ -516,7 +507,6 @@ export const researchTargetRouter = createTRPCRouter({
                 label: record.name,
                 description: record.source,
                 tags: record.tags,
-                archived: Boolean(record.archivedAt),
                 updatedAt: record.updatedAt.toISOString(),
               }),
             );
@@ -538,7 +528,6 @@ export const researchTargetRouter = createTRPCRouter({
                 label: record.name,
                 description: record.description,
                 tags: [],
-                archived: false,
                 updatedAt: toIso(record.updatedAt),
               }),
             );
@@ -560,7 +549,6 @@ export const researchTargetRouter = createTRPCRouter({
                 label: record.name,
                 description: record.description,
                 tags: [],
-                archived: false,
                 updatedAt: toIso(record.updatedAt),
               }),
             );
@@ -582,7 +570,6 @@ export const researchTargetRouter = createTRPCRouter({
                 label: record.query,
                 description: record.status,
                 tags: [],
-                archived: false,
                 updatedAt: toIso(record.updatedAt ?? record.createdAt),
               }),
             );
@@ -620,12 +607,10 @@ export const researchTargetRouter = createTRPCRouter({
     .input(updateSavedCompanyInputSchema)
     .mutation(async ({ ctx, input }) => {
       const db = withResearchTargetDb(ctx.db);
-      await requireTarget(
-        db,
-        ctx.session.user.id,
-        { type: "company", id: input.id },
-        { allowArchived: true },
-      );
+      await requireTarget(db, ctx.session.user.id, {
+        type: "company",
+        id: input.id,
+      });
       const updated = await db.savedCompany.update({
         where: { id: input.id },
         data: {
@@ -635,23 +620,6 @@ export const researchTargetRouter = createTRPCRouter({
           ...(input.tags ? { tags: normalizeStringList(input.tags) } : {}),
           ...(input.metadata ? { metadataJson: input.metadata } : {}),
         },
-      });
-      return buildCompany(updated);
-    }),
-
-  archiveCompany: protectedProcedure
-    .input(researchTargetRefSchema.pick({ id: true }))
-    .mutation(async ({ ctx, input }) => {
-      const db = withResearchTargetDb(ctx.db);
-      await requireTarget(
-        db,
-        ctx.session.user.id,
-        { type: "company", id: input.id },
-        { allowArchived: true },
-      );
-      const updated = await db.savedCompany.update({
-        where: { id: input.id },
-        data: { archivedAt: new Date() },
       });
       return buildCompany(updated);
     }),
@@ -687,12 +655,10 @@ export const researchTargetRouter = createTRPCRouter({
     .input(updateSavedIndustryInputSchema)
     .mutation(async ({ ctx, input }) => {
       const db = withResearchTargetDb(ctx.db);
-      await requireTarget(
-        db,
-        ctx.session.user.id,
-        { type: "industry", id: input.id },
-        { allowArchived: true },
-      );
+      await requireTarget(db, ctx.session.user.id, {
+        type: "industry",
+        id: input.id,
+      });
       const updated = await db.savedIndustry.update({
         where: { id: input.id },
         data: {
@@ -705,23 +671,6 @@ export const researchTargetRouter = createTRPCRouter({
             : {}),
           ...(input.metadata ? { metadataJson: input.metadata } : {}),
         },
-      });
-      return buildIndustry(updated);
-    }),
-
-  archiveIndustry: protectedProcedure
-    .input(researchTargetRefSchema.pick({ id: true }))
-    .mutation(async ({ ctx, input }) => {
-      const db = withResearchTargetDb(ctx.db);
-      await requireTarget(
-        db,
-        ctx.session.user.id,
-        { type: "industry", id: input.id },
-        { allowArchived: true },
-      );
-      const updated = await db.savedIndustry.update({
-        where: { id: input.id },
-        data: { archivedAt: new Date() },
       });
       return buildIndustry(updated);
     }),
@@ -801,9 +750,7 @@ export const researchTargetRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const db = withResearchTargetDb(ctx.db);
       if (input.targetRef) {
-        await requireTarget(db, ctx.session.user.id, input.targetRef, {
-          allowArchived: true,
-        });
+        await requireTarget(db, ctx.session.user.id, input.targetRef);
       }
       const records = await db.researchNote.findMany({
         where: {
@@ -872,9 +819,7 @@ export const researchTargetRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const db = withResearchTargetDb(ctx.db);
       if (input.targetRef) {
-        await requireTarget(db, ctx.session.user.id, input.targetRef, {
-          allowArchived: true,
-        });
+        await requireTarget(db, ctx.session.user.id, input.targetRef);
       }
       const records = await db.financialSnapshot.findMany({
         where: {
@@ -900,15 +845,10 @@ export const researchTargetRouter = createTRPCRouter({
       if (!snapshot) {
         throw new TRPCError({ code: "NOT_FOUND", message: "财务快照不存在" });
       }
-      await requireTarget(
-        db,
-        ctx.session.user.id,
-        {
-          type: snapshot.targetType as ResearchTargetType,
-          id: snapshot.targetId,
-        },
-        { allowArchived: true },
-      );
+      await requireTarget(db, ctx.session.user.id, {
+        type: snapshot.targetType as ResearchTargetType,
+        id: snapshot.targetId,
+      });
       const markdown = buildComparisonMarkdown(snapshot);
       const created = await db.researchArtifact.create({
         data: {
@@ -935,9 +875,7 @@ export const researchTargetRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const db = withResearchTargetDb(ctx.db);
       if (input.targetRef) {
-        await requireTarget(db, ctx.session.user.id, input.targetRef, {
-          allowArchived: true,
-        });
+        await requireTarget(db, ctx.session.user.id, input.targetRef);
       }
       const records = await db.researchArtifact.findMany({
         where: {

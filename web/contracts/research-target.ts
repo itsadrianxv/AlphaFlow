@@ -21,7 +21,6 @@ export const savedCompanySchema = z.object({
   reason: z.string().nullable(),
   tags: z.array(z.string()),
   metadata: z.record(z.unknown()),
-  archivedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -39,7 +38,6 @@ export const savedIndustrySchema = z.object({
     }),
   ),
   metadata: z.record(z.unknown()),
-  archivedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -49,7 +47,6 @@ export const researchTargetSummarySchema = z.object({
   label: z.string().min(1),
   description: z.string().nullable(),
   tags: z.array(z.string()),
-  archived: z.boolean().default(false),
   updatedAt: z.string().nullable(),
 });
 
@@ -134,7 +131,6 @@ export const updateSavedIndustryInputSchema = createSavedIndustryInputSchema
 export const listResearchTargetsInputSchema = z
   .object({
     types: z.array(researchTargetTypeSchema).max(5).optional(),
-    includeArchived: z.boolean().default(false),
     limit: z.number().int().min(1).max(100).default(50),
     query: z.string().trim().optional(),
   })

@@ -473,8 +473,6 @@ function TargetContentList(props: {
     artifact: ResearchArtifact,
     content: string,
   ) => Promise<void>;
-  onArchive: (target: TargetSummary) => void;
-  archivePendingTargetKey?: string | null;
 }) {
   const {
     targets,
@@ -488,8 +486,6 @@ function TargetContentList(props: {
     artifactSaving,
     onSaveNote,
     onSaveArtifact,
-    onArchive,
-    archivePendingTargetKey = null,
   } = props;
 
   if (targets.length === 0) {
@@ -519,7 +515,6 @@ function TargetContentList(props: {
         const showSnapshots = snapshotsLoading || targetSnapshots.length > 0;
         const showArtifacts = artifactsLoading || targetArtifacts.length > 0;
         const targetKey = serializeRef(target.ref);
-        const archivePending = archivePendingTargetKey === targetKey;
 
         return (
           <Panel
@@ -543,21 +538,6 @@ function TargetContentList(props: {
                       去择时
                     </Link>
                   </>
-                ) : null}
-                {target.ref.type === "company" ||
-                target.ref.type === "industry" ? (
-                  !target.archived ? (
-                    <button
-                      type="button"
-                      className="app-button"
-                      onClick={() => onArchive(target)}
-                      disabled={archivePending}
-                    >
-                      {archivePending ? "归档中..." : "归档"}
-                    </button>
-                  ) : (
-                    <StatusPill label="已归档" tone="warning" />
-                  )
                 ) : null}
               </div>
             }
@@ -684,13 +664,9 @@ export function ResearchTargetsClient() {
   const [industryTags, setIndustryTags] = useState("");
   const [watchlistName, setWatchlistName] = useState("");
   const [watchlistDescription, setWatchlistDescription] = useState("");
-  const [archivingTargetKey, setArchivingTargetKey] = useState<string | null>(
-    null,
-  );
 
   const targetsQuery = api.researchTarget.listTargets.useQuery({
     types: ["company", "industry", "watchlist"],
-    includeArchived: true,
     limit: 100,
   });
   const targets = useMemo(() => targetsQuery.data ?? [], [targetsQuery.data]);
@@ -822,29 +798,6 @@ export function ResearchTargetsClient() {
       ]);
     },
   });
-  const archiveCompanyMutation = api.researchTarget.archiveCompany.useMutation({
-    onSuccess: async () => {
-      await Promise.all([
-        utils.researchTarget.listCompanies.invalidate(),
-        utils.researchTarget.listTargets.invalidate(),
-      ]);
-    },
-    onSettled: () => {
-      setArchivingTargetKey(null);
-    },
-  });
-  const archiveIndustryMutation =
-    api.researchTarget.archiveIndustry.useMutation({
-      onSuccess: async () => {
-        await Promise.all([
-          utils.researchTarget.listIndustries.invalidate(),
-          utils.researchTarget.listTargets.invalidate(),
-        ]);
-      },
-      onSettled: () => {
-        setArchivingTargetKey(null);
-      },
-    });
   const updateNoteMutation = api.researchTarget.updateNote.useMutation({
     onSuccess: async () => {
       await utils.researchTarget.listNotes.invalidate();
@@ -968,19 +921,6 @@ export function ResearchTargetsClient() {
               markdown: content,
             });
           }}
-          onArchive={(target) => {
-            setArchivingTargetKey(serializeRef(target.ref));
-
-            if (target.ref.type === "company") {
-              archiveCompanyMutation.mutate({ id: target.ref.id });
-              return;
-            }
-
-            if (target.ref.type === "industry") {
-              archiveIndustryMutation.mutate({ id: target.ref.id });
-            }
-          }}
-          archivePendingTargetKey={archivingTargetKey}
         />
       </div>
     </WorkspaceShell>
