@@ -12,6 +12,7 @@ import React, {
 
 import {
   CloseIcon,
+  AgentRuntimeIcon,
   CompanyResearchIcon,
   MenuIcon,
   OverviewIcon,
@@ -37,6 +38,7 @@ export type WorkspaceSection =
   | "home"
   | "screening"
   | "workflows"
+  | "agentRuntime"
   | "timing"
   | "watchlists"
   | "companyResearch"
@@ -82,6 +84,12 @@ const sidebarNavItems: Array<{
     href: "/company-research",
     label: "公司判断",
     icon: CompanyResearchIcon,
+  },
+  {
+    key: "agentRuntime",
+    href: "/agent-runtime",
+    label: "Pi Agent",
+    icon: AgentRuntimeIcon,
   },
   {
     key: "timing",

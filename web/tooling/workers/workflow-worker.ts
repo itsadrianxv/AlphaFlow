@@ -20,6 +20,8 @@ import { db } from "~/server/db";
 import { TimingActionPolicy } from "~/server/domain/timing/services/timing-action-policy";
 import { TimingConfidencePolicy } from "~/server/domain/timing/services/timing-confidence-policy";
 import { TimingReviewPolicy } from "~/server/domain/timing/services/timing-review-policy";
+import { AgentRuntimeClient } from "~/server/infrastructure/agent-runtime/agent-runtime-client";
+import { PrismaAgentRuntimeRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-runtime-repository";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
@@ -45,6 +47,7 @@ import {
   ODRCompanyResearchLangGraph,
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
 import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
+import { PiAgentRuntimeLangGraph } from "~/server/infrastructure/workflow/langgraph/pi-agent-runtime-graph";
 import { TimingReviewLoopLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-review-loop-graph";
 import { TimingSignalPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-signal-graph";
 import { WatchlistTimingCardsPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/watchlist-timing-cards-graph";
@@ -53,6 +56,8 @@ import { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/pr
 import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
 
 const workflowRepository = new PrismaWorkflowRunRepository(db);
+const agentRuntimeRepository = new PrismaAgentRuntimeRepository(db);
+const agentRuntimeClient = new AgentRuntimeClient();
 const deepSeekClient = new DeepSeekClient();
 const pythonDataClient = new PythonIntelligenceDataClient();
 const capabilityGatewayClient = new PythonCapabilityGatewayClient();
@@ -178,6 +183,10 @@ const executionService = new WorkflowExecutionService({
       feedbackService: timingFeedbackService,
       reminderRepository,
       reviewPolicy: new TimingReviewPolicy(),
+    }),
+    new PiAgentRuntimeLangGraph({
+      agentRuntimeClient,
+      agentRuntimeRepository,
     }),
   ],
 });

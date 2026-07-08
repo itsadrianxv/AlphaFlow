@@ -55,6 +55,7 @@ export const WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE =
   "watchlist_timing_pipeline_v1";
 export const SCREENING_TO_TIMING_TEMPLATE_CODE = "screening_to_timing_v1";
 export const TIMING_REVIEW_LOOP_TEMPLATE_CODE = "timing_review_loop_v1";
+export const PI_AGENT_RUN_TEMPLATE_CODE = "pi_agent_run_v1";
 
 export const INDUSTRY_RESEARCH_NODE_KEYS = [
   "agent0_clarify_scope",
@@ -174,6 +175,12 @@ export const TIMING_REVIEW_LOOP_NODE_KEYS = [
   "schedule_next_review",
 ] as const;
 
+export const PI_AGENT_RUN_NODE_KEYS = [
+  "prepare_agent_task",
+  "execute_agent_runtime",
+  "persist_agent_result",
+] as const;
+
 export type IndustryResearchNodeKey =
   (typeof INDUSTRY_RESEARCH_NODE_KEYS)[number];
 export type CompanyResearchNodeKey =
@@ -193,6 +200,7 @@ export type ScreeningToTimingNodeKey =
   (typeof SCREENING_TO_TIMING_NODE_KEYS)[number];
 export type TimingReviewLoopNodeKey =
   (typeof TIMING_REVIEW_LOOP_NODE_KEYS)[number];
+export type PiAgentRunNodeKey = (typeof PI_AGENT_RUN_NODE_KEYS)[number];
 export type WorkflowNodeKey =
   | IndustryResearchNodeKey
   | CompanyResearchNodeKey
@@ -202,6 +210,7 @@ export type WorkflowNodeKey =
   | WatchlistTimingPipelineNodeKey
   | ScreeningToTimingNodeKey
   | TimingReviewLoopNodeKey
+  | PiAgentRunNodeKey
   | string;
 
 export type IndustryResearchStructuredModel =
@@ -255,7 +264,8 @@ export type WorkflowTemplateCode =
   | typeof WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE
   | typeof WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE
   | typeof SCREENING_TO_TIMING_TEMPLATE_CODE
-  | typeof TIMING_REVIEW_LOOP_TEMPLATE_CODE;
+  | typeof TIMING_REVIEW_LOOP_TEMPLATE_CODE
+  | typeof PI_AGENT_RUN_TEMPLATE_CODE;
 
 export type WorkflowEventStreamType =
   | "RUN_STARTED"
@@ -603,6 +613,13 @@ export type TimingReviewLoopInput = {
   limit?: number;
 };
 
+export type PiAgentRunInput = {
+  skillId: string;
+  prompt: string;
+  title?: string;
+  context?: Record<string, unknown>;
+};
+
 export type TimingPipelineTarget = {
   stockCode: string;
   stockName?: string;
@@ -801,6 +818,30 @@ export type TimingReviewLoopGraphState = WorkflowGraphState & {
   persistedReviews: TimingReviewRecord[];
   feedbackSuggestions: TimingPresetAdjustmentSuggestionRecord[];
   consumedReminderIds: string[];
+};
+
+export type PiAgentRuntimeEvent = {
+  runId: string;
+  sequence: number;
+  type: string;
+  timestamp: string;
+  message?: string;
+  payload?: Record<string, unknown>;
+};
+
+export type PiAgentRunGraphState = WorkflowGraphState & {
+  currentNodeKey?: PiAgentRunNodeKey;
+  lastCompletedNodeKey?: PiAgentRunNodeKey;
+  agentInput: PiAgentRunInput;
+  preparedTask?: {
+    skillId: string;
+    prompt: string;
+    title: string;
+  };
+  runtimeEvents: PiAgentRuntimeEvent[];
+  finalOutput?: Record<string, unknown>;
+  artifactIds: string[];
+  toolCallCount: number;
 };
 
 export function getWorkflowNodeKeysFromGraphConfig(

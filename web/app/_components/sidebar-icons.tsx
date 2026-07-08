@@ -65,6 +65,19 @@ export function CompanyResearchIcon(props: IconProps) {
   );
 }
 
+export function AgentRuntimeIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M6 8.5 12 5l6 3.5v7L12 19l-6-3.5z" />
+      <path d="M12 12 6.5 8.75" />
+      <path d="M12 12v6.5" />
+      <path d="M12 12l5.5-3.25" />
+      <path d="M8.5 14.5 6 16" />
+      <path d="M15.5 14.5 18 16" />
+    </BaseIcon>
+  );
+}
+
 export function TimingIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>

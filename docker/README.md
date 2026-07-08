@@ -8,6 +8,7 @@
 - `workflow-worker`: 工作流后台执行器
 - `python-service`: FastAPI 金融数据与情报网关
 - `kronos-service`: Kronos 预测服务
+- `agent-runtime`: Pi Agent Harness sidecar
 - `redis`: 运行时缓存与队列
 - `postgres`: PostgreSQL 数据库
 
@@ -35,6 +36,7 @@ cp docker/.env.example docker/.env
 - `ZHIPU_API_KEY`
 - `TUSHARE_TOKEN`
 - `REFCHECKER_*`
+- `AGENT_RUNTIME_MODEL_*`
 
 ## 启动
 
@@ -47,6 +49,7 @@ docker compose --env-file docker/.env -f docker/docker-compose.yml up -d --build
 - Web: `http://localhost:3000`
 - Python API Docs: `http://localhost:8000/docs`
 - Kronos API: `http://localhost:8010`
+- Agent Runtime: `http://localhost:8020/health`
 - PostgreSQL: `localhost:5432`
 
 ## 常用命令
@@ -56,6 +59,7 @@ docker compose --env-file docker/.env -f docker/docker-compose.yml ps
 docker compose --env-file docker/.env -f docker/docker-compose.yml logs -f
 docker compose --env-file docker/.env -f docker/docker-compose.yml logs -f web
 docker compose --env-file docker/.env -f docker/docker-compose.yml logs -f workflow-worker
+docker compose --env-file docker/.env -f docker/docker-compose.yml logs -f agent-runtime
 docker compose --env-file docker/.env -f docker/docker-compose.yml down
 docker compose --env-file docker/.env -f docker/docker-compose.yml down -v
 ```

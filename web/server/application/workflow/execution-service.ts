@@ -19,6 +19,8 @@ import type {
   WorkflowGraphState,
   WorkflowNodeKey,
 } from "~/server/domain/workflow/types";
+import { AgentRuntimeClient } from "~/server/infrastructure/agent-runtime/agent-runtime-client";
+import { PrismaAgentRuntimeRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-runtime-repository";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
@@ -34,6 +36,7 @@ import {
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
 import { WorkflowGraphRegistry } from "~/server/infrastructure/workflow/langgraph/graph-registry";
 import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
+import { PiAgentRuntimeLangGraph } from "~/server/infrastructure/workflow/langgraph/pi-agent-runtime-graph";
 import { ScreeningInsightPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph";
 import type { WorkflowGraphRunner } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
 import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
@@ -125,6 +128,7 @@ export function createWorkflowExecutionService(
     researchToolRegistry,
   });
   const reminderRepository = new PrismaResearchReminderRepository(prisma);
+  const agentRuntimeRepository = new PrismaAgentRuntimeRepository(prisma);
   const reminderSchedulingService = new ReminderSchedulingService({
     reminderRepository,
   });
@@ -152,6 +156,10 @@ export function createWorkflowExecutionService(
         synthesisService,
         confidenceAnalysisService,
         reminderSchedulingService,
+      }),
+      new PiAgentRuntimeLangGraph({
+        agentRuntimeClient: new AgentRuntimeClient(),
+        agentRuntimeRepository,
       }),
     ],
   });

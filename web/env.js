@@ -60,6 +60,12 @@ export const env = createEnv({
       .int()
       .positive()
       .default(120_000),
+    AGENT_RUNTIME_URL: z.string().url().default("http://127.0.0.1:8020"),
+    AGENT_RUNTIME_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(300_000),
     KRONOS_FORECAST_ENABLED: z.coerce.boolean().default(false),
     KRONOS_DEFAULT_PREDICTION_LENGTH: z.coerce
       .number()
@@ -141,6 +147,12 @@ export const env = createEnv({
     KRONOS_SERVICE_TIMEOUT_MS: readPositiveNumberEnv(
       process.env.KRONOS_SERVICE_TIMEOUT_MS,
       120_000,
+    ),
+    AGENT_RUNTIME_URL:
+      process.env.AGENT_RUNTIME_URL ?? "http://127.0.0.1:8020",
+    AGENT_RUNTIME_TIMEOUT_MS: readPositiveNumberEnv(
+      process.env.AGENT_RUNTIME_TIMEOUT_MS,
+      300_000,
     ),
     KRONOS_FORECAST_ENABLED:
       process.env.KRONOS_FORECAST_ENABLED === "true" ||

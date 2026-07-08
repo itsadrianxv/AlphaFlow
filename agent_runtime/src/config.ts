@@ -1,0 +1,28 @@
+import type { AgentRuntimeConfig } from "./types";
+
+function readNumber(name: string, fallback: number) {
+  const raw = process.env[name];
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function readConfig(): AgentRuntimeConfig {
+  return {
+    host: process.env.AGENT_RUNTIME_HOST ?? "0.0.0.0",
+    port: readNumber("AGENT_RUNTIME_PORT", 8020),
+    pythonServiceUrl:
+      process.env.PYTHON_SERVICE_URL ?? "http://python-service:8000",
+    pythonServiceTimeoutMs: readNumber("PYTHON_SERVICE_TIMEOUT_MS", 60_000),
+    runTtlMs: readNumber("AGENT_RUNTIME_RUN_TTL_MS", 30 * 60_000),
+    maxToolCallsPerRun: readNumber("AGENT_RUNTIME_MAX_TOOL_CALLS", 12),
+    toolTimeoutMs: readNumber("AGENT_RUNTIME_TOOL_TIMEOUT_MS", 60_000),
+    modelProvider: process.env.AGENT_RUNTIME_MODEL_PROVIDER ?? "deepseek",
+    modelId: process.env.AGENT_RUNTIME_MODEL_ID ?? "deepseek-v4-flash",
+    modelTimeoutMs: readNumber("AGENT_RUNTIME_MODEL_TIMEOUT_MS", 120_000),
+    modelMaxRetries: readNumber("AGENT_RUNTIME_MODEL_MAX_RETRIES", 1),
+  };
+}

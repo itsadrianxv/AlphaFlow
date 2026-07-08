@@ -45,6 +45,7 @@ describe("WorkspaceShell", () => {
     expect(markup).toContain('href="/screening"');
     expect(markup).toContain('href="/workflows"');
     expect(markup).toContain('href="/company-research"');
+    expect(markup).toContain('href="/agent-runtime"');
     expect(markup).toContain('href="/timing"');
     expect(markup).toContain('href="/spaces"');
     expect(markup).toContain('href="/watchlists"');
@@ -54,7 +55,8 @@ describe("WorkspaceShell", () => {
     expect(markup).toContain("grid min-w-0 gap-1");
     expect(markup).toContain("block w-full min-w-0 overflow-hidden");
     expect(markup).toContain("block w-full truncate");
-    expect(markup.match(/data-sidebar-icon=/g)?.length).toBe(7);
+    expect(markup.match(/data-sidebar-icon=/g)?.length).toBe(8);
+    expect(markup).toContain('data-sidebar-icon="agentRuntime"');
     expect(markup).toContain('data-sidebar-icon="watchlists"');
     expect(markup).not.toContain('data-sidebar-icon="history"');
     expect(markup).toContain("Question");
@@ -77,7 +79,7 @@ describe("WorkspaceShell", () => {
     );
 
     expect(homeMarkup).not.toContain("/history");
-    expect(homeMarkup.match(/data-sidebar-icon=/g)?.length).toBe(7);
+    expect(homeMarkup.match(/data-sidebar-icon=/g)?.length).toBe(8);
 
     const watchlistsMarkup = renderToStaticMarkup(
       React.createElement(
