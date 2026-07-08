@@ -77,8 +77,8 @@ export function ScreeningHistoryClient() {
       historyHref="/screening/history"
       activeHistoryId={selectedWorkspaceId ?? undefined}
       historyLoading={workspacesQuery.isLoading}
-      historyEmptyText="还没有保存的工作台"
-      title="已保存工作台库"
+      historyEmptyText="还没有工作台"
+      title="工作台库"
       actions={
         <Link href="/screening" className="app-button app-button-primary">
           返回工作台
@@ -114,8 +114,8 @@ export function ScreeningHistoryClient() {
         <SectionCard title="工作台列表" className="xl:col-span-1">
           {workspaces.length === 0 ? (
             <EmptyState
-              title="还没有保存过工作台"
-              description="在 /screening 里完成选择后，手动点击“保存工作台”就会出现在这里。"
+              title="还没有工作台"
+              description="进入筛选页后会自动创建工作台，后续配置会自动保存到这里。"
             />
           ) : (
             <div className="grid gap-3">

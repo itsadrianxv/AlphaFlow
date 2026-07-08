@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
 import { StockSearchPicker } from "~/app/_components/stock-search-picker";
 import {
@@ -73,6 +73,10 @@ const stageCanvasClassName =
 const stockSearchCanvasClassName =
   "min-h-[calc(66.667vh-11.333rem)] xl:min-h-[calc(66.667vh-10rem)]";
 
+function buildDefaultWorkspaceName() {
+  return `筛选工作台 ${formatDateTime(new Date().toISOString())}`;
+}
+
 function emptyFilterRule(): FilterRuleDraft {
   return {
     clientId: crypto.randomUUID(),
@@ -116,13 +120,21 @@ export function ScreeningStudioClient() {
   const draftNameFromUrl = searchParams.get("draftName");
   const draftDescriptionFromUrl = searchParams.get("draftDescription");
   const utils = api.useUtils();
+  const autoCreateAttemptedRef = useRef(false);
+  const lastAutoSavedKeyRef = useRef<string | null>(null);
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
     workspaceIdFromUrl,
   );
-  const [draftMode, setDraftMode] = useState(workspaceIdFromUrl === null);
-  const [workspaceName, setWorkspaceName] = useState("");
-  const [workspaceDescription, setWorkspaceDescription] = useState("");
+  const [workspaceHydrated, setWorkspaceHydrated] = useState(
+    workspaceIdFromUrl === null,
+  );
+  const [workspaceName, setWorkspaceName] = useState(
+    () => draftNameFromUrl?.trim() || buildDefaultWorkspaceName(),
+  );
+  const [workspaceDescription, setWorkspaceDescription] = useState(
+    () => draftDescriptionFromUrl?.trim() ?? "",
+  );
   const [selectedStocks, setSelectedStocks] = useState<SelectedStock[]>([]);
   const [selectedIndicatorIds, setSelectedIndicatorIds] = useState<string[]>(
     [],
@@ -182,7 +194,7 @@ export function ScreeningStudioClient() {
   const workspaceDetailQuery = api.screening.getWorkspace.useQuery(
     { id: selectedWorkspaceId ?? "" },
     {
-      enabled: selectedWorkspaceId !== null && !draftMode,
+      enabled: selectedWorkspaceId !== null,
       refetchOnWindowFocus: false,
     },
   );
@@ -190,7 +202,7 @@ export function ScreeningStudioClient() {
     { id: watchListIdFromUrl ?? "" },
     {
       enabled:
-        draftMode &&
+        !workspaceIdFromUrl &&
         Boolean(watchListIdFromUrl) &&
         seedStockCodesFromUrl.length === 0,
       refetchOnWindowFocus: false,
@@ -329,20 +341,19 @@ export function ScreeningStudioClient() {
 
   const createWorkspaceMutation = api.screening.createWorkspace.useMutation({
     onSuccess: async (workspace) => {
-      setDraftMode(false);
       setSelectedWorkspaceId(workspace.id);
-      setNotice({ tone: "success", text: `工作台“${workspace.name}”已保存` });
+      setWorkspaceHydrated(true);
+      setNotice({
+        tone: "success",
+        text: `工作台“${workspace.name}”已自动创建`,
+      });
       await utils.screening.listWorkspaces.invalidate();
     },
     onError: (error) => setNotice({ tone: "error", text: error.message }),
   });
   const updateWorkspaceMutation = api.screening.updateWorkspace.useMutation({
-    onSuccess: async (workspace) => {
-      setNotice({ tone: "success", text: `工作台“${workspace.name}”已更新` });
-      await Promise.all([
-        utils.screening.listWorkspaces.invalidate(),
-        utils.screening.getWorkspace.invalidate({ id: workspace.id }),
-      ]);
+    onSuccess: async () => {
+      await utils.screening.listWorkspaces.invalidate();
     },
     onError: (error) => setNotice({ tone: "error", text: error.message }),
   });
@@ -429,56 +440,35 @@ export function ScreeningStudioClient() {
     setFormulaValidation(null);
   }
 
-  function resetWorkspaceDraft() {
-    setDraftMode(true);
-    setSelectedWorkspaceId(null);
-    setWorkspaceName("");
-    setWorkspaceDescription("");
-    setSelectedStocks([]);
-    setSelectedIndicatorIds([]);
-    setSelectedFormulaIds([]);
-    setTimeConfig(defaultTimeConfig);
-    setFilterRules([]);
-    setSortState(null);
-    setResultSnapshot(null);
-    setSnapshotTargetRef(null);
-    setSelectedSnapshotStockCodes([]);
-    setLastFetchedAt(undefined);
-    setStockFilterQuery("");
-    setMissingValueMode("keep");
-    setColumnQuickFilterDraft(null);
-  }
-
   useEffect(() => {
     if (workspaceIdFromUrl) {
-      setDraftMode(false);
+      setWorkspaceHydrated(false);
       setSelectedWorkspaceId(workspaceIdFromUrl);
     }
   }, [workspaceIdFromUrl]);
 
   useEffect(() => {
-    if (!draftMode) {
+    if (workspaceIdFromUrl || selectedWorkspaceId) {
       return;
     }
 
-    if (draftNameFromUrl && !workspaceName) {
+    if (draftNameFromUrl) {
       setWorkspaceName(draftNameFromUrl);
     }
 
-    if (draftDescriptionFromUrl && !workspaceDescription) {
+    if (draftDescriptionFromUrl) {
       setWorkspaceDescription(draftDescriptionFromUrl);
     }
   }, [
     draftDescriptionFromUrl,
-    draftMode,
     draftNameFromUrl,
-    workspaceDescription,
-    workspaceName,
+    selectedWorkspaceId,
+    workspaceIdFromUrl,
   ]);
 
   useEffect(() => {
     if (
-      !draftMode ||
+      workspaceIdFromUrl ||
       seedStockCodesFromUrl.length === 0 ||
       selectedStocks.length > 0
     ) {
@@ -492,10 +482,14 @@ export function ScreeningStudioClient() {
         market: "",
       })),
     );
-  }, [draftMode, seedStockCodesFromUrl, selectedStocks.length]);
+  }, [seedStockCodesFromUrl, selectedStocks.length, workspaceIdFromUrl]);
 
   useEffect(() => {
-    if (!draftMode || selectedStocks.length > 0 || !watchListSeedQuery.data) {
+    if (
+      workspaceIdFromUrl ||
+      selectedStocks.length > 0 ||
+      !watchListSeedQuery.data
+    ) {
       return;
     }
 
@@ -506,19 +500,7 @@ export function ScreeningStudioClient() {
         market: "",
       })),
     );
-  }, [draftMode, selectedStocks.length, watchListSeedQuery.data]);
-
-  useEffect(() => {
-    if (workspaceOptions.length === 0 || selectedWorkspaceId || draftMode) {
-      return;
-    }
-
-    const firstWorkspace = workspaceOptions[0];
-    if (firstWorkspace) {
-      setSelectedWorkspaceId(firstWorkspace.id);
-      setDraftMode(false);
-    }
-  }, [draftMode, selectedWorkspaceId, workspaceOptions]);
+  }, [selectedStocks.length, watchListSeedQuery.data, workspaceIdFromUrl]);
 
   useEffect(() => {
     if (!workspaceDetailQuery.data) {
@@ -526,6 +508,10 @@ export function ScreeningStudioClient() {
     }
 
     const detail = workspaceDetailQuery.data;
+    if (workspaceHydrated && detail.id === selectedWorkspaceId) {
+      return;
+    }
+
     setWorkspaceName(detail.name);
     setWorkspaceDescription(detail.description ?? "");
     setSelectedStocks(toSelectedStocks(detail));
@@ -541,7 +527,8 @@ export function ScreeningStudioClient() {
     setSortState(detail.state.sortState ?? null);
     setResultSnapshot(detail.state.resultSnapshot ?? null);
     setLastFetchedAt(detail.state.lastFetchedAt);
-  }, [workspaceDetailQuery.data]);
+    setWorkspaceHydrated(true);
+  }, [selectedWorkspaceId, workspaceDetailQuery.data, workspaceHydrated]);
 
   useEffect(() => {
     setSelectedFormulaIds((current) =>
@@ -757,8 +744,8 @@ export function ScreeningStudioClient() {
     });
   }
 
-  async function handleSaveWorkspace() {
-    const payload = {
+  const workspacePayload = useMemo(
+    () => ({
       name: workspaceName,
       description: workspaceDescription || undefined,
       stockCodes: selectedStocks.map((stock) => stock.stockCode),
@@ -772,18 +759,81 @@ export function ScreeningStudioClient() {
       columnState,
       resultSnapshot: resultSnapshot ?? undefined,
       lastFetchedAt,
-    };
+    }),
+    [
+      appliedFilterRules,
+      columnState,
+      lastFetchedAt,
+      resultSnapshot,
+      selectedFormulaIds,
+      selectedIndicatorIds,
+      selectedStocks,
+      sortState,
+      timeConfig,
+      workspaceDescription,
+      workspaceName,
+    ],
+  );
+  const createWorkspace = createWorkspaceMutation.mutateAsync;
+  const updateWorkspace = updateWorkspaceMutation.mutateAsync;
+  const workspaceAutoSaveKey = useMemo(
+    () => JSON.stringify({ id: selectedWorkspaceId, ...workspacePayload }),
+    [selectedWorkspaceId, workspacePayload],
+  );
 
-    if (draftMode || !selectedWorkspaceId) {
-      await createWorkspaceMutation.mutateAsync(payload);
+  useEffect(() => {
+    if (
+      workspaceIdFromUrl ||
+      selectedWorkspaceId ||
+      autoCreateAttemptedRef.current ||
+      createWorkspaceMutation.isPending
+    ) {
       return;
     }
 
-    await updateWorkspaceMutation.mutateAsync({
-      id: selectedWorkspaceId,
-      ...payload,
-    });
-  }
+    autoCreateAttemptedRef.current = true;
+    lastAutoSavedKeyRef.current = workspaceAutoSaveKey;
+    void createWorkspace(workspacePayload);
+  }, [
+    createWorkspace,
+    createWorkspaceMutation.isPending,
+    selectedWorkspaceId,
+    workspaceAutoSaveKey,
+    workspaceIdFromUrl,
+    workspacePayload,
+  ]);
+
+  useEffect(() => {
+    if (
+      !selectedWorkspaceId ||
+      !workspaceHydrated ||
+      createWorkspaceMutation.isPending
+    ) {
+      return;
+    }
+    if (lastAutoSavedKeyRef.current === workspaceAutoSaveKey) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      lastAutoSavedKeyRef.current = workspaceAutoSaveKey;
+      void updateWorkspace({
+        id: selectedWorkspaceId,
+        ...workspacePayload,
+      }).catch(() => {
+        lastAutoSavedKeyRef.current = null;
+      });
+    }, 800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    createWorkspaceMutation.isPending,
+    selectedWorkspaceId,
+    updateWorkspace,
+    workspaceAutoSaveKey,
+    workspaceHydrated,
+    workspacePayload,
+  ]);
 
   async function handleFetchDataset() {
     if (selectedStocks.length === 0) {
@@ -938,7 +988,7 @@ export function ScreeningStudioClient() {
     results: (
       <SectionCard
         title="结果表"
-        description="查看可见结果、告警和最终输出，再决定是否保存工作台。"
+        description="查看可见结果、告警和最终输出，当前配置会自动保存。"
       >
         <div className="text-sm leading-6 text-[var(--app-text-muted)]">
           当前可见 {visibleRows.length} 条结果。
@@ -962,47 +1012,27 @@ export function ScreeningStudioClient() {
       historyHref="/screening/history"
       activeHistoryId={selectedWorkspaceId ?? undefined}
       historyLoading={workspacesQuery.isLoading}
-      historyEmptyText="还没有保存的工作台"
+      historyEmptyText="还没有工作台"
       actions={
-        <>
-          <select
-            value={draftMode ? "" : (selectedWorkspaceId ?? "")}
-            onChange={(event) => {
-              const nextId = event.target.value;
-              if (!nextId) {
-                return;
-              }
-              setDraftMode(false);
-              setSelectedWorkspaceId(nextId);
-            }}
-            className="app-input !w-[260px] max-w-full shrink-0"
-          >
-            <option value="">选择已保存工作台</option>
-            {workspaceOptions.map((workspace: WorkspaceSummary) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={resetWorkspaceDraft}
-            className="app-button shrink-0"
-          >
-            新建工作台
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleSaveWorkspace()}
-            className="app-button app-button-primary shrink-0"
-            disabled={
-              createWorkspaceMutation.isPending ||
-              updateWorkspaceMutation.isPending
+        <select
+          value={selectedWorkspaceId ?? ""}
+          onChange={(event) => {
+            const nextId = event.target.value;
+            if (!nextId) {
+              return;
             }
-          >
-            保存工作台
-          </button>
-        </>
+            setWorkspaceHydrated(false);
+            setSelectedWorkspaceId(nextId);
+          }}
+          className="app-input !w-[260px] max-w-full shrink-0"
+        >
+          <option value="">选择工作台</option>
+          {workspaceOptions.map((workspace: WorkspaceSummary) => (
+            <option key={workspace.id} value={workspace.id}>
+              {workspace.name}
+            </option>
+          ))}
+        </select>
       }
     >
       {notice ? (
@@ -1319,18 +1349,6 @@ export function ScreeningStudioClient() {
           }
         >
           <div className="grid gap-3">
-            <input
-              value={workspaceName}
-              onChange={(event) => setWorkspaceName(event.target.value)}
-              placeholder="工作台名称"
-              className="app-input"
-            />
-            <input
-              value={workspaceDescription}
-              onChange={(event) => setWorkspaceDescription(event.target.value)}
-              placeholder="描述"
-              className="app-input"
-            />
             <div className="grid gap-3 md:grid-cols-2">
               <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
                 报告类型
