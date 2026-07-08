@@ -3,6 +3,7 @@ import type { WorkflowCommandService } from "~/server/application/workflow/comma
 export type StartAgentRuntimeRunCommand = {
   userId: string;
   skillId: string;
+  skillIds: string[];
   prompt: string;
   title?: string;
   conversationId?: string;

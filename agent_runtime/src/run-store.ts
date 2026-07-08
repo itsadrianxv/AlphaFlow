@@ -31,9 +31,11 @@ export class AgentRuntimeRunStore {
       id: request.runId,
       status: "queued",
       skillId: request.skillId,
+      skillIds: request.skillIds,
       title: request.title?.trim() || request.prompt.trim().slice(0, 80),
       input: {
         prompt: request.prompt,
+        skillIds: request.skillIds,
         context: request.context,
       },
       createdAt: now,
@@ -44,6 +46,7 @@ export class AgentRuntimeRunStore {
     this.runs.set(run.id, run);
     this.appendEvent(run.id, "run.created", {
       skillId: request.skillId,
+      skillIds: request.skillIds,
       title: run.title,
     });
     return run;
@@ -213,6 +216,7 @@ export class AgentRuntimeRunStore {
       id: run.id,
       status: run.status,
       skillId: run.skillId,
+      skillIds: run.skillIds,
       title: run.title,
       input: run.input,
       finalOutput: run.finalOutput,

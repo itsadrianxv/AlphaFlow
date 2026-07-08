@@ -115,6 +115,7 @@ export type StartTimingReviewLoopCommand = {
 export type StartPiAgentRunCommand = {
   userId: string;
   skillId: string;
+  skillIds: string[];
   prompt: string;
   title?: string;
   conversationId?: string;
@@ -360,6 +361,7 @@ export class WorkflowCommandService {
       templateVersion: command.templateVersion,
       input: {
         skillId: command.skillId,
+        skillIds: command.skillIds,
         prompt: command.prompt,
         title,
         conversationId: command.conversationId,
@@ -369,7 +371,7 @@ export class WorkflowCommandService {
       },
       idempotencyKey:
         command.idempotencyKey ??
-        `pi-agent:${command.userId}:${command.skillId}:${title}`,
+        `pi-agent:${command.userId}:${command.skillIds.join(",")}:${title}`,
     });
   }
 

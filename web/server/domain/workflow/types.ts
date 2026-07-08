@@ -615,6 +615,7 @@ export type TimingReviewLoopInput = {
 
 export type PiAgentRunInput = {
   skillId: string;
+  skillIds?: string[];
   prompt: string;
   title?: string;
   conversationId?: string;
@@ -838,6 +839,7 @@ export type PiAgentRunGraphState = WorkflowGraphState & {
   agentInput: PiAgentRunInput;
   preparedTask?: {
     skillId: string;
+    skillIds: string[];
     prompt: string;
     title: string;
     conversationId?: string;

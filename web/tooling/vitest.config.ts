@@ -18,6 +18,8 @@ export default defineConfig({
       "server/**/*.test.ts",
       "server/**/*.spec.ts",
       "server/**/*.property.test.ts",
+      "tests/**/*.test.ts",
+      "tests/**/*.spec.ts",
       "trpc/**/*.test.ts",
       "trpc/**/*.spec.ts",
       "trpc/**/*.property.test.ts",

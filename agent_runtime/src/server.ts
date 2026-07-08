@@ -22,7 +22,16 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
 
   const runId = value.runId;
   const skillId = value.skillId;
+  const rawSkillIds = Array.isArray(value.skillIds) ? value.skillIds : [];
   const prompt = value.prompt;
+  const skillIds = [
+    ...new Set(
+      [...rawSkillIds, skillId]
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
 
   if (
     typeof runId !== "string" ||
@@ -30,7 +39,8 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
     typeof prompt !== "string" ||
     !runId.trim() ||
     !skillId.trim() ||
-    !prompt.trim()
+    !prompt.trim() ||
+    skillIds.length > 3
   ) {
     return null;
   }
@@ -47,6 +57,7 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
         ? value.assistantMessageId
         : undefined,
     skillId,
+    skillIds: skillIds.length > 0 ? skillIds : [skillId],
     prompt,
     title: typeof value.title === "string" ? value.title : undefined,
     context: isRecord(value.context) ? value.context : undefined,

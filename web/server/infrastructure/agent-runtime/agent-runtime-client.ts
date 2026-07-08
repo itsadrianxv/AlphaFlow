@@ -26,9 +26,11 @@ const agentRuntimeRunSchema = z.object({
   id: z.string(),
   status: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]),
   skillId: z.string(),
+  skillIds: z.array(z.string()).optional(),
   title: z.string(),
   input: z.object({
     prompt: z.string(),
+    skillIds: z.array(z.string()).optional(),
     context: z.record(z.unknown()).optional(),
   }),
   finalOutput: z.record(z.unknown()).optional(),
@@ -56,6 +58,7 @@ export type StartAgentRuntimeRunInput = {
   userMessageId?: string;
   assistantMessageId?: string;
   skillId: string;
+  skillIds: string[];
   prompt: string;
   title?: string;
   context?: Record<string, unknown>;

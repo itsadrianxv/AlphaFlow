@@ -4,6 +4,10 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { AgentConversationService } from "~/server/application/agent-runtime/agent-conversation-service";
 import { AgentRuntimeCommandService } from "~/server/application/agent-runtime/agent-runtime-command-service";
 import { AgentRuntimeQueryService } from "~/server/application/agent-runtime/agent-runtime-query-service";
+import {
+  MAX_SELECTED_SKILLS_MESSAGE,
+  normalizeSelectedSkillIds,
+} from "~/server/application/agent-runtime/skill-selection";
 import { WorkflowCommandService } from "~/server/application/workflow/command-service";
 import { isWorkflowDomainError } from "~/server/domain/workflow/errors";
 import { AgentRuntimeClient } from "~/server/infrastructure/agent-runtime/agent-runtime-client";
@@ -23,6 +27,17 @@ function mapError(error: unknown): TRPCError {
     });
   }
 
+  if (
+    error instanceof Error &&
+    (error.message === "请选择 skill" ||
+      error.message === MAX_SELECTED_SKILLS_MESSAGE)
+  ) {
+    return new TRPCError({
+      code: "BAD_REQUEST",
+      message: error.message,
+    });
+  }
+
   if (error instanceof Error) {
     return new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
@@ -36,16 +51,24 @@ function mapError(error: unknown): TRPCError {
   });
 }
 
-const startRunInput = z.object({
-  skillId: z.string().trim().min(1),
-  prompt: z.string().trim().min(1),
-  title: z.string().trim().min(1).max(120).optional(),
-  conversationId: z.string().cuid().optional(),
-  userMessageId: z.string().cuid().optional(),
-  assistantMessageId: z.string().cuid().optional(),
-  context: z.record(z.unknown()).optional(),
-  idempotencyKey: z.string().min(8).max(128).optional(),
-});
+const startRunInput = z
+  .object({
+    skillId: z.string().trim().min(1).optional(),
+    skillIds: z
+      .array(z.string().trim().min(1))
+      .max(3, MAX_SELECTED_SKILLS_MESSAGE)
+      .optional(),
+    prompt: z.string().trim().min(1),
+    title: z.string().trim().min(1).max(120).optional(),
+    conversationId: z.string().cuid().optional(),
+    userMessageId: z.string().cuid().optional(),
+    assistantMessageId: z.string().cuid().optional(),
+    context: z.record(z.unknown()).optional(),
+    idempotencyKey: z.string().min(8).max(128).optional(),
+  })
+  .refine((value) => value.skillId || (value.skillIds?.length ?? 0) > 0, {
+    message: "请选择 skill",
+  });
 
 const listRunsInput = z.object({
   limit: z.number().int().min(1).max(50).default(20),
@@ -67,14 +90,39 @@ const conversationIdInput = z.object({
   conversationId: z.string().cuid(),
 });
 
-const sendMessageInput = z.object({
-  conversationId: z.string().cuid().optional(),
-  skillId: z.string().trim().min(1),
-  prompt: z.string().trim().min(1),
-  title: z.string().trim().min(1).max(120).optional(),
-  context: z.record(z.unknown()).optional(),
-  idempotencyKey: z.string().min(8).max(128).optional(),
-});
+const sendMessageInput = z
+  .object({
+    conversationId: z.string().cuid().optional(),
+    skillId: z.string().trim().min(1).optional(),
+    skillIds: z
+      .array(z.string().trim().min(1))
+      .max(3, MAX_SELECTED_SKILLS_MESSAGE)
+      .optional(),
+    prompt: z.string().trim().min(1),
+    title: z.string().trim().min(1).max(120).optional(),
+    context: z.record(z.unknown()).optional(),
+    idempotencyKey: z.string().min(8).max(128).optional(),
+  })
+  .refine((value) => value.skillId || (value.skillIds?.length ?? 0) > 0, {
+    message: "请选择 skill",
+  });
+
+function assertSkillsExist(
+  selectedSkillIds: string[],
+  skills: Awaited<ReturnType<AgentRuntimeClient["listSkills"]>>,
+) {
+  const availableSkillIds = new Set(skills.items.map((item) => item.id));
+  const missingSkillId = selectedSkillIds.find(
+    (skillId) => !availableSkillIds.has(skillId),
+  );
+
+  if (missingSkillId) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: `Skill 不存在: ${missingSkillId}`,
+    });
+  }
+}
 
 export const agentRuntimeRouter = createTRPCRouter({
   listSkills: protectedProcedure.query(async ({ ctx }) => {
@@ -137,15 +185,13 @@ export const agentRuntimeRouter = createTRPCRouter({
     .input(sendMessageInput)
     .mutation(async ({ ctx, input }) => {
       try {
+        const selectedSkills = normalizeSelectedSkillIds({
+          skillId: input.skillId,
+          skillIds: input.skillIds,
+        });
         const agentRuntimeClient = new AgentRuntimeClient();
         const skills = await agentRuntimeClient.listSkills();
-        const skill = skills.items.find((item) => item.id === input.skillId);
-        if (!skill) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Skill 不存在: ${input.skillId}`,
-          });
-        }
+        assertSkillsExist(selectedSkills.skillIds, skills);
 
         const workflowRepository = new PrismaWorkflowRunRepository(ctx.db);
         const conversationRepository = new PrismaAgentConversationRepository(
@@ -162,7 +208,8 @@ export const agentRuntimeRouter = createTRPCRouter({
         return await service.sendMessage({
           userId: ctx.session.user.id,
           conversationId: input.conversationId,
-          skillId: input.skillId,
+          skillId: selectedSkills.skillId,
+          skillIds: selectedSkills.skillIds,
           prompt: input.prompt,
           title: input.title,
           context: input.context,
@@ -186,15 +233,13 @@ export const agentRuntimeRouter = createTRPCRouter({
     .input(startRunInput)
     .mutation(async ({ ctx, input }) => {
       try {
+        const selectedSkills = normalizeSelectedSkillIds({
+          skillId: input.skillId,
+          skillIds: input.skillIds,
+        });
         const agentRuntimeClient = new AgentRuntimeClient();
         const skills = await agentRuntimeClient.listSkills();
-        const skill = skills.items.find((item) => item.id === input.skillId);
-        if (!skill) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Skill 不存在: ${input.skillId}`,
-          });
-        }
+        assertSkillsExist(selectedSkills.skillIds, skills);
 
         const workflowRepository = new PrismaWorkflowRunRepository(ctx.db);
         const workflowCommandService = new WorkflowCommandService(
@@ -206,7 +251,8 @@ export const agentRuntimeRouter = createTRPCRouter({
 
         return await commandService.startRun({
           userId: ctx.session.user.id,
-          skillId: input.skillId,
+          skillId: selectedSkills.skillId,
+          skillIds: selectedSkills.skillIds,
           prompt: input.prompt,
           title: input.title,
           conversationId: input.conversationId,

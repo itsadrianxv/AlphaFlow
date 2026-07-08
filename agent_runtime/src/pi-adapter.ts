@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+﻿import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -85,6 +85,47 @@ function resolveSystemPrompt() {
   ].join("\n");
 }
 
+function resolveSkillIds(request: StartRunRequest) {
+  return request.skillIds && request.skillIds.length > 0
+    ? request.skillIds
+    : [request.skillId];
+}
+
+function buildMergedSkill(skills: Skill[]): Skill {
+  if (skills.length === 1 && skills[0]) {
+    return skills[0];
+  }
+
+  const primary = skills[0];
+  if (!primary) {
+    throw new Error("缺少主 skill");
+  }
+
+  const content = [
+    "# 合并 Skill 执行说明",
+    "",
+    "你需要按用户选择顺序综合使用下列 skill。若不同 skill 的要求冲突，优先遵循排在前面的 skill，并在结论中保持一致口径。",
+    "",
+    ...skills.flatMap((skill, index) => [
+      `## Skill ${index + 1}: ${skill.name}`,
+      "",
+      `description: ${skill.description}`,
+      `referencesRoot: ${path.dirname(skill.filePath)}`,
+      "",
+      "```text",
+      skill.content,
+      "```",
+      "",
+    ]),
+  ].join("\n");
+
+  return {
+    ...primary,
+    description: skills.map((skill) => skill.description).join(" / "),
+    content,
+  };
+}
+
 function mapHarnessEvent(
   store: AgentRuntimeRunStore,
   request: StartRunRequest,
@@ -146,6 +187,7 @@ function mapHarnessEvent(
       toolCallId: event.toolCallId,
       toolName: event.toolName,
       skillId: request.skillId,
+      skillIds: resolveSkillIds(request),
       inputSummary: summarizeValue(event.input, 1000),
     });
     return;
@@ -156,6 +198,7 @@ function mapHarnessEvent(
       toolCallId: event.toolCallId,
       toolName: event.toolName,
       skillId: request.skillId,
+      skillIds: resolveSkillIds(request),
       inputSummary: summarizeValue(event.input, 1000),
       outputSummary: summarizeValue(
         {
@@ -280,15 +323,29 @@ export class PiAdapter {
   }
 
   async start(request: StartRunRequest) {
-    const skill = this.skillRegistry.get(request.skillId);
-    if (!skill) {
+    const skillIds = resolveSkillIds(request);
+    const skills = skillIds
+      .map((skillId) => this.skillRegistry.get(skillId))
+      .filter((skill): skill is Skill => Boolean(skill));
+    const missingSkillId = skillIds.find(
+      (skillId) => !skills.some((skill) => skill.name === skillId),
+    );
+
+    if (missingSkillId) {
       this.store.markFailed(
         request.runId,
         "SKILL_NOT_FOUND",
-        `Skill 不存在: ${request.skillId}`,
+        `Skill 不存在: ${missingSkillId}`,
       );
       return;
     }
+
+    if (!skills[0]) {
+      this.store.markFailed(request.runId, "SKILL_NOT_FOUND", "缺少主 skill");
+      return;
+    }
+
+    const runtimeSkill = buildMergedSkill(skills);
 
     const abortController = new AbortController();
     this.store.attachAbortController(request.runId, abortController);
@@ -299,7 +356,12 @@ export class PiAdapter {
 
     const env = new RestrictedExecutionEnv({
       cwd: tempRoot,
-      readRoots: [path.dirname(skill.filePath), tempRoot],
+      readRoots: [
+        ...new Set([
+          ...skills.map((skill) => path.dirname(skill.filePath)),
+          tempRoot,
+        ]),
+      ],
       writeRoots: [tempRoot],
     });
     const session = await this.resolveSession(request, tempRoot);
@@ -327,7 +389,7 @@ export class PiAdapter {
         maxRetries: this.config.modelMaxRetries,
       },
       resources: {
-        skills: [skill],
+        skills: [runtimeSkill],
       },
       tools: createInternalTools({
         pythonGatewayClient: this.pythonGatewayClient,
@@ -363,7 +425,7 @@ export class PiAdapter {
         ? `\n\n附加上下文：\n${JSON.stringify(request.context, null, 2)}`
         : "";
       const assistantMessage = await harness.skill(
-        request.skillId,
+        runtimeSkill.name,
         `${request.prompt}${context}`,
       );
       if (request.sessionId) {
@@ -373,6 +435,7 @@ export class PiAdapter {
       const finalOutput = {
         text,
         skillId: request.skillId,
+        skillIds,
         generatedAt: new Date().toISOString(),
         context: asJsonObject(request.context),
       };

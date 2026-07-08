@@ -184,11 +184,16 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
     state: PiAgentRunGraphState,
     hooks?: WorkflowGraphExecutionHooks,
   ) {
+    const skillIds =
+      state.agentInput.skillIds && state.agentInput.skillIds.length > 0
+        ? state.agentInput.skillIds
+        : [state.agentInput.skillId];
     const title =
       state.agentInput.title?.trim() ||
       state.agentInput.prompt.trim().slice(0, 80);
     const preparedTask = {
       skillId: state.agentInput.skillId,
+      skillIds,
       prompt: state.agentInput.prompt,
       title,
       conversationId: state.agentInput.conversationId,
@@ -203,6 +208,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
     await hooks?.onNodeProgress?.("prepare_agent_task", {
       message: "Pi agent task prepared",
       skillId: preparedTask.skillId,
+      skillIds: preparedTask.skillIds,
       title,
     });
 
@@ -228,6 +234,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
       userMessageId: task.userMessageId,
       assistantMessageId: task.assistantMessageId,
       skillId: task.skillId,
+      skillIds: task.skillIds,
       prompt: task.prompt,
       title: task.title,
       context: state.agentInput.context,
@@ -339,6 +346,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
         metadata: {
           runId: state.runId,
           skillId: task.skillId,
+          skillIds: task.skillIds,
           generatedAt:
             runtimeRun.finalOutput &&
             typeof runtimeRun.finalOutput.generatedAt === "string"

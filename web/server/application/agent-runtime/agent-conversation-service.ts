@@ -16,6 +16,7 @@ export class AgentConversationService {
     conversationId?: string;
     prompt: string;
     skillId: string;
+    skillIds: string[];
     title?: string;
     context?: Record<string, unknown>;
     idempotencyKey?: string;
@@ -48,6 +49,7 @@ export class AgentConversationService {
     const result = await this.workflowCommandService.startPiAgentRun({
       userId: params.userId,
       skillId: params.skillId,
+      skillIds: params.skillIds,
       prompt: params.prompt,
       title: params.title,
       conversationId: turn.conversation.id,

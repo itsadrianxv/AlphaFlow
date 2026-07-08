@@ -44,6 +44,7 @@ export type StartRunRequest = {
   userMessageId?: string;
   assistantMessageId?: string;
   skillId: string;
+  skillIds?: string[];
   prompt: string;
   title?: string;
   context?: Record<string, unknown>;
@@ -60,9 +61,11 @@ export type AgentRunSnapshot = {
   id: string;
   status: AgentRunStatus;
   skillId: string;
+  skillIds?: string[];
   title: string;
   input: {
     prompt: string;
+    skillIds?: string[];
     context?: Record<string, unknown>;
   };
   finalOutput?: Record<string, unknown>;

@@ -549,6 +549,11 @@ export class PrismaWorkflowRunRepository {
       required: ["skillId", "prompt"],
       properties: {
         skillId: { type: "string" },
+        skillIds: {
+          type: "array",
+          items: { type: "string" },
+          maxItems: 3,
+        },
         prompt: { type: "string" },
         title: { type: "string" },
         context: { type: "object" },

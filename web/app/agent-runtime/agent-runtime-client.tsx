@@ -13,6 +13,8 @@ type Conversation = NonNullable<
   RouterOutputs["agentRuntime"]["getConversation"]
 >;
 type Message = Conversation["messages"][number];
+type AgentRuntimeSkill =
+  RouterOutputs["agentRuntime"]["listSkills"]["items"][number];
 type WorkflowStreamEvent = {
   runId: string;
   sequence: number;
@@ -169,11 +171,12 @@ export function AgentRuntimeClientPage() {
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get("conversationId") ?? "";
   const utils = api.useUtils();
-  const [skillId, setSkillId] = useState("");
+  const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [prompt, setPrompt] = useState("");
   const [liveMessages, setLiveMessages] = useState<Record<string, string>>({});
   const [activeRunId, setActiveRunId] = useState("");
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
+  const [skillSelectionError, setSkillSelectionError] = useState("");
   const [lastTargetRef, setLastTargetRef] = useState<ResearchTargetRef | null>(
     null,
   );
@@ -214,10 +217,10 @@ export function AgentRuntimeClientPage() {
 
   useEffect(() => {
     const firstSkill = skillsQuery.data?.items[0]?.id;
-    if (!skillId && firstSkill) {
-      setSkillId(firstSkill);
+    if (selectedSkillIds.length === 0 && firstSkill) {
+      setSelectedSkillIds([firstSkill]);
     }
-  }, [skillId, skillsQuery.data?.items]);
+  }, [selectedSkillIds.length, skillsQuery.data?.items]);
 
   const selectedConversation = conversationQuery.data;
   const runningRunId = latestRunningRunId(selectedConversation);
@@ -295,9 +298,14 @@ export function AgentRuntimeClientPage() {
     () => buildHistoryItems(conversationsQuery.data?.items ?? []),
     [conversationsQuery.data?.items],
   );
-  const selectedSkill = useMemo(
-    () => skillsQuery.data?.items.find((skill) => skill.id === skillId),
-    [skillId, skillsQuery.data?.items],
+  const selectedSkills = useMemo(
+    () =>
+      selectedSkillIds
+        .map((skillId) =>
+          skillsQuery.data?.items.find((skill) => skill.id === skillId),
+        )
+        .filter((skill): skill is AgentRuntimeSkill => Boolean(skill)),
+    [selectedSkillIds, skillsQuery.data?.items],
   );
 
   useEffect(() => {
@@ -359,19 +367,206 @@ export function AgentRuntimeClientPage() {
   });
 
   const activeGenerationRunId = runningRunId ?? activeRunId;
-  const canSend = Boolean(skillId && prompt.trim() && !activeGenerationRunId);
+  const canSend = Boolean(
+    selectedSkillIds.length > 0 && prompt.trim() && !activeGenerationRunId,
+  );
+
+  const toggleSkill = (skillId: string) => {
+    setSkillSelectionError("");
+    setSelectedSkillIds((current) => {
+      if (current.includes(skillId)) {
+        return current.filter((item) => item !== skillId);
+      }
+
+      if (current.length >= 3) {
+        setSkillSelectionError("最多选择 3 个 skill");
+        return current;
+      }
+
+      return [...current, skillId];
+    });
+  };
+
+  const removeSkill = (skillId: string) => {
+    setSkillSelectionError("");
+    setSelectedSkillIds((current) =>
+      current.filter((item) => item !== skillId),
+    );
+  };
 
   const handleSend = async () => {
     if (!canSend) {
       return;
     }
+    const primarySkillId = selectedSkillIds[0];
+    if (!primarySkillId) {
+      return;
+    }
     await sendMutation.mutateAsync({
       conversationId: selectedConversationId || undefined,
-      skillId,
+      skillId: primarySkillId,
+      skillIds: selectedSkillIds,
       prompt,
       title: prompt.trim().slice(0, 80),
     });
   };
+
+  const renderComposer = (variant: "centered" | "fixed") => (
+    <div
+      className={
+        variant === "fixed"
+          ? "pi-agent-composer fixed right-0 bottom-0 left-0 z-30 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4"
+          : "w-full py-4"
+      }
+    >
+      <div className="mx-auto w-full max-w-[820px] px-1 sm:px-4">
+        <div className="mb-3 flex justify-end">
+          {activeGenerationRunId ? (
+            <StatusPill tone="info" label="正在生成" />
+          ) : null}
+        </div>
+        <div className="relative rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] transition-[border-color,box-shadow,background-color] focus-within:border-[var(--app-accent-strong)] focus-within:bg-[var(--app-bg-elevated)] focus-within:shadow-[0_0_0_3px_rgba(59,158,255,0.16)]">
+          <textarea
+            className="min-h-[104px] w-full resize-none rounded-[22px] border-0 bg-transparent pt-4 pr-16 pb-16 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            placeholder="输入下一条消息"
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                event.preventDefault();
+                void handleSend();
+              }
+            }}
+          />
+          <div
+            ref={skillMenuRef}
+            className="absolute bottom-3 left-3 flex max-w-[calc(100%-76px)] items-center gap-2"
+          >
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={skillMenuOpen}
+              title="选择 skill"
+              className="inline-flex h-10 shrink-0 items-center rounded-full border border-[var(--app-border-soft)] bg-[rgba(255,255,255,0.04)] px-3 text-xs font-medium text-[var(--app-text-subtle)] transition-colors hover:border-[rgba(255,255,255,0.28)] hover:bg-[rgba(255,255,255,0.08)]"
+              onClick={() => setSkillMenuOpen((current) => !current)}
+            >
+              选择 Skill
+            </button>
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+              {selectedSkills.map((skill) => (
+                <button
+                  key={skill.id}
+                  type="button"
+                  title={`移除 ${skill.name}`}
+                  className="inline-flex h-8 max-w-[180px] items-center rounded-[8px] border border-[var(--app-border-soft)] bg-[var(--app-bg-raised)] px-2.5 text-xs font-medium text-[var(--app-text-strong)] transition-colors hover:border-[var(--app-border-strong)]"
+                  onClick={() => removeSkill(skill.id)}
+                >
+                  <span className="truncate">{skill.name}</span>
+                </button>
+              ))}
+            </div>
+            <div
+              role="menu"
+              className={[
+                "absolute bottom-12 left-0 z-40 w-[min(560px,calc(100vw-40px))] origin-bottom-left rounded-[14px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-1 shadow-[var(--app-shadow-lg)] transition duration-160",
+                skillMenuOpen
+                  ? "scale-100 opacity-100"
+                  : "pointer-events-none scale-95 opacity-0",
+              ].join(" ")}
+            >
+              <div className="max-h-[320px] overflow-y-auto py-1">
+                {(skillsQuery.data?.items ?? []).map((skill) => {
+                  const active = selectedSkillIds.includes(skill.id);
+
+                  return (
+                    <button
+                      key={skill.id}
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={active}
+                      className={[
+                        "grid w-full gap-1 rounded-[10px] px-3 py-2.5 text-left text-sm transition-colors",
+                        active
+                          ? "bg-white text-black"
+                          : "text-[var(--app-text-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
+                      ].join(" ")}
+                      onClick={() => toggleSkill(skill.id)}
+                    >
+                      <span className="flex min-w-0 items-center justify-between gap-3">
+                        <span className="min-w-0 truncate font-medium">
+                          {skill.name}
+                        </span>
+                        {active ? (
+                          <span className="shrink-0 text-xs font-medium">
+                            已选
+                          </span>
+                        ) : null}
+                      </span>
+                      <span
+                        className={[
+                          "line-clamp-2 text-xs leading-5",
+                          active
+                            ? "text-black/68"
+                            : "text-[var(--app-text-subtle)]",
+                        ].join(" ")}
+                      >
+                        {skill.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {skillSelectionError ? (
+                <div className="border-t border-[var(--app-border-soft)] px-3 py-2 text-xs text-[var(--app-danger)]">
+                  {skillSelectionError}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          {activeGenerationRunId ? (
+            <button
+              type="button"
+              aria-label="停止生成"
+              title="停止生成"
+              className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(255,255,255,0.18)] bg-[var(--app-danger)] text-white transition-colors hover:bg-[#e6002e] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={cancelMutation.isPending}
+              onClick={() =>
+                cancelMutation.mutate({ runId: activeGenerationRunId })
+              }
+            >
+              <StopIcon className="h-5 w-5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              aria-label="发送消息"
+              title="发送"
+              className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white bg-white text-black transition-colors hover:bg-[rgba(255,255,255,0.86)] disabled:cursor-not-allowed disabled:border-[var(--app-border-soft)] disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
+              disabled={!canSend || sendMutation.isPending}
+              onClick={handleSend}
+            >
+              <SendIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+      </div>
+      {sendMutation.error ? (
+        <div className="mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
+          <InlineNotice
+            tone="danger"
+            description={sendMutation.error.message}
+          />
+        </div>
+      ) : null}
+      {skillsQuery.error ? (
+        <div className="mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
+          <InlineNotice tone="danger" description={skillsQuery.error.message} />
+        </div>
+      ) : null}
+    </div>
+  );
+  const showCenteredComposer =
+    !selectedConversationId && !activeGenerationRunId;
 
   return (
     <WorkspaceShell
@@ -385,8 +580,19 @@ export function AgentRuntimeClientPage() {
       contentWidth="wide"
       titleSize="compact"
     >
-      <div className="flex min-h-[calc(100vh-150px)] flex-col">
-        <div className="flex-1 pb-[260px]">
+      <div
+        className={[
+          "flex min-h-[calc(100vh-150px)] flex-col",
+          showCenteredComposer ? "justify-center" : undefined,
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <div
+          className={["flex-1", showCenteredComposer ? "hidden" : "pb-[260px]"]
+            .filter(Boolean)
+            .join(" ")}
+        >
           {selectedConversation ? (
             <div className="mx-auto grid w-full max-w-[820px] gap-6 px-1 sm:px-4">
               {selectedConversation.messages.map((message) => (
@@ -407,133 +613,7 @@ export function AgentRuntimeClientPage() {
           ) : null}
         </div>
 
-        <div className="pi-agent-composer fixed right-0 bottom-0 left-0 z-30 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4">
-          <div className="mx-auto w-full max-w-[820px] px-1 sm:px-4">
-            <div className="mb-3 flex justify-end">
-              {activeGenerationRunId ? (
-                <StatusPill tone="info" label="正在生成" />
-              ) : null}
-            </div>
-            <div className="relative rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] transition-[border-color,box-shadow,background-color] focus-within:border-[var(--app-accent-strong)] focus-within:bg-[var(--app-bg-elevated)] focus-within:shadow-[0_0_0_3px_rgba(59,158,255,0.16)]">
-              <textarea
-                className="min-h-[104px] w-full resize-none rounded-[22px] border-0 bg-transparent pt-4 pr-16 pb-16 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                placeholder="输入下一条消息"
-                onKeyDown={(event) => {
-                  if (
-                    event.key === "Enter" &&
-                    (event.metaKey || event.ctrlKey)
-                  ) {
-                    event.preventDefault();
-                    void handleSend();
-                  }
-                }}
-              />
-              <div ref={skillMenuRef} className="absolute bottom-3 left-3">
-                <button
-                  type="button"
-                  aria-haspopup="menu"
-                  aria-expanded={skillMenuOpen}
-                  title="选择 skill"
-                  className="inline-flex h-10 max-w-[calc(100vw-156px)] items-center gap-2 rounded-full border border-[var(--app-border-soft)] bg-[rgba(255,255,255,0.04)] px-3 text-xs font-medium text-[var(--app-text-strong)] transition-colors hover:border-[rgba(255,255,255,0.28)] hover:bg-[rgba(255,255,255,0.08)]"
-                  onClick={() => setSkillMenuOpen((current) => !current)}
-                >
-                  <span className="text-[var(--app-text-subtle)]">
-                    选择 Skill
-                  </span>
-                  {selectedSkill ? (
-                    <span className="max-w-[180px] truncate">
-                      {selectedSkill.name}
-                    </span>
-                  ) : null}
-                </button>
-                <div
-                  role="menu"
-                  className={[
-                    "absolute bottom-12 left-0 z-40 w-[min(320px,calc(100vw-40px))] origin-bottom-left rounded-[18px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-1 shadow-[var(--app-shadow-lg)] transition duration-160",
-                    skillMenuOpen
-                      ? "scale-100 opacity-100"
-                      : "pointer-events-none scale-95 opacity-0",
-                  ].join(" ")}
-                >
-                  <div className="max-h-[260px] overflow-y-auto py-1">
-                    {(skillsQuery.data?.items ?? []).map((skill) => {
-                      const active = skill.id === skillId;
-
-                      return (
-                        <button
-                          key={skill.id}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={active}
-                          className={[
-                            "flex w-full items-center justify-between gap-3 rounded-[14px] px-3 py-2.5 text-left text-sm transition-colors",
-                            active
-                              ? "bg-white text-black"
-                              : "text-[var(--app-text-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
-                          ].join(" ")}
-                          onClick={() => {
-                            setSkillId(skill.id);
-                            setSkillMenuOpen(false);
-                          }}
-                        >
-                          <span className="min-w-0 truncate">{skill.name}</span>
-                          {active ? (
-                            <span className="shrink-0 text-xs font-medium">
-                              当前
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-              {activeGenerationRunId ? (
-                <button
-                  type="button"
-                  aria-label="停止生成"
-                  title="停止生成"
-                  className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(255,255,255,0.18)] bg-[var(--app-danger)] text-white transition-colors hover:bg-[#e6002e] disabled:cursor-not-allowed disabled:opacity-60"
-                  disabled={cancelMutation.isPending}
-                  onClick={() =>
-                    cancelMutation.mutate({ runId: activeGenerationRunId })
-                  }
-                >
-                  <StopIcon className="h-5 w-5" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  aria-label="发送消息"
-                  title="发送"
-                  className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white bg-white text-black transition-colors hover:bg-[rgba(255,255,255,0.86)] disabled:cursor-not-allowed disabled:border-[var(--app-border-soft)] disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
-                  disabled={!canSend || sendMutation.isPending}
-                  onClick={handleSend}
-                >
-                  <SendIcon className="h-5 w-5" />
-                </button>
-              )}
-            </div>
-          </div>
-          {sendMutation.error ? (
-            <div className="mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
-              <InlineNotice
-                tone="danger"
-                description={sendMutation.error.message}
-              />
-            </div>
-          ) : null}
-          {skillsQuery.error ? (
-            <div className="mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
-              <InlineNotice
-                tone="danger"
-                description={skillsQuery.error.message}
-              />
-            </div>
-          ) : null}
-        </div>
+        {renderComposer(showCenteredComposer ? "centered" : "fixed")}
       </div>
     </WorkspaceShell>
   );
