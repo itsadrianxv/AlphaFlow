@@ -320,17 +320,9 @@ export function AgentRuntimeClientPage() {
       contentWidth="wide"
       titleSize="compact"
     >
-      <div className="flex min-h-[calc(100vh-150px)] flex-col rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-panel)]">
-        <div className="flex items-center justify-between gap-3 border-b border-[var(--app-border-soft)] px-5 py-3">
-          <div>
-            <div className="text-sm font-medium text-[var(--app-text-strong)]">
-              {selectedConversation?.title ?? "新对话"}
-            </div>
-            <div className="mt-1 text-xs text-[var(--app-text-subtle)]">
-              每条消息可以选择不同 skill，Pi session 会保留上下文。
-            </div>
-          </div>
-          {runningRunId ? (
+      <div className="flex min-h-[calc(100vh-150px)] flex-col">
+        {runningRunId ? (
+          <div className="mb-3 flex justify-end">
             <button
               type="button"
               className="app-button app-button-danger"
@@ -339,10 +331,10 @@ export function AgentRuntimeClientPage() {
             >
               停止
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
-        <div className="flex-1 overflow-y-auto px-5 py-5">
+        <div className="flex-1 overflow-y-auto pb-5">
           {selectedConversation ? (
             <div className="grid gap-4">
               {selectedConversation.messages.map((message) => (
@@ -361,7 +353,7 @@ export function AgentRuntimeClientPage() {
           )}
         </div>
 
-        <div className="border-t border-[var(--app-border-soft)] p-4">
+        <div className="sticky bottom-0 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4">
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <select
               value={skillId}
