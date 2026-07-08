@@ -319,6 +319,71 @@ function buildArtifact(record: ResearchArtifactRecord) {
   });
 }
 
+function formatComparisonValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  if (typeof value === "number") {
+    return new Intl.NumberFormat("zh-CN", {
+      maximumFractionDigits: 4,
+    }).format(value);
+  }
+
+  return String(value).replaceAll("|", "\\|");
+}
+
+function buildComparisonMetricTable(snapshot: FinancialSnapshotRecord) {
+  const raw = asRecord(snapshot.rawSnapshotJson);
+  const metricMeta = Array.isArray(raw.indicatorMeta) ? raw.indicatorMeta : [];
+  const latestRows = Array.isArray(raw.latestSnapshotRows)
+    ? raw.latestSnapshotRows
+    : [];
+  const metrics = metricMeta
+    .flatMap((item) => {
+      const record = asRecord(item);
+      if (typeof record.id !== "string" || typeof record.name !== "string") {
+        return [];
+      }
+      return [{ id: record.id, name: record.name }];
+    })
+    .slice(0, 8);
+
+  if (metrics.length === 0 || latestRows.length === 0) {
+    return "暂无可比较的结构化指标值。";
+  }
+
+  const header = ["公司", ...metrics.map((metric) => metric.name)];
+  const divider = header.map(() => "---");
+  const body = latestRows.slice(0, 20).flatMap((item) => {
+    const row = asRecord(item);
+    if (
+      typeof row.stockCode !== "string" ||
+      typeof row.stockName !== "string"
+    ) {
+      return [];
+    }
+
+    const metricValues = asRecord(row.metrics);
+    return [
+      [
+        `${row.stockName}(${row.stockCode})`,
+        ...metrics.map((metric) => {
+          const valueRecord = asRecord(metricValues[metric.id]);
+          const value = formatComparisonValue(valueRecord.value);
+          return typeof valueRecord.period === "string"
+            ? `${value} / ${valueRecord.period}`
+            : value;
+        }),
+      ],
+    ];
+  });
+
+  return [header, divider, ...body]
+    .map((columns) => `| ${columns.join(" | ")} |`)
+    .join("\n");
+}
+
 function matchesQuery(
   values: Array<string | null | undefined>,
   query?: string,
@@ -418,6 +483,9 @@ function buildComparisonMarkdown(snapshot: FinancialSnapshotRecord) {
     "",
     "## 指标范围",
     metricLines || "- 暂无指标",
+    "",
+    "## 指标对比",
+    buildComparisonMetricTable(snapshot),
     "",
     "## 初步结论",
     `本报告基于 ${rows.length} 条最新快照行生成。建议优先比较盈利质量、成长性、现金流和估值类指标的相对位置。`,

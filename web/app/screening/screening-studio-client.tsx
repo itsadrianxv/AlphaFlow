@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
@@ -113,6 +113,7 @@ function parseDelimitedCsv(value: string | null) {
 }
 
 export function ScreeningStudioClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const workspaceIdFromUrl = searchParams.get("workspaceId");
   const seedStockCodesFromUrl = parseDelimitedCsv(
@@ -390,9 +391,11 @@ export function ScreeningStudioClient() {
     });
   const generateComparisonArtifactMutation =
     api.researchTarget.generateComparisonArtifact.useMutation({
-      onSuccess: async () => {
+      onSuccess: async (artifact) => {
         setNotice({ tone: "success", text: "比较报告已生成" });
         await utils.researchTarget.listArtifacts.invalidate();
+        const target = `${artifact.targetRef.type}:${artifact.targetRef.id}`;
+        router.push(`/research-targets?target=${encodeURIComponent(target)}`);
       },
       onError: (error) => setNotice({ tone: "error", text: error.message }),
     });
