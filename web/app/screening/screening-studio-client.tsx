@@ -3,7 +3,6 @@
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { MarketContextSection } from "~/app/_components/market-context-section";
 import { StockSearchPicker } from "~/app/_components/stock-search-picker";
 import {
   EmptyState,
@@ -895,11 +894,6 @@ export function ScreeningStudioClient() {
           description={notice.text}
         />
       ) : null}
-
-      <MarketContextSection
-        section="screening"
-        currentStockCodes={selectedStocks.map((stock) => stock.stockCode)}
-      />
 
       <WorkflowStageSwitcher
         tabs={screeningStageTabs}

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { MarketContextSection } from "~/app/_components/market-context-section";
 import {
   InlineNotice,
   Panel,
@@ -160,10 +159,7 @@ export function CompanyResearchClient() {
   };
 
   const targetPanel = (
-    <Panel
-      className={stageCanvasClassName}
-      title="研究目标"
-    >
+    <Panel className={stageCanvasClassName} title="研究目标">
       <div className="grid gap-4">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
           <input
@@ -377,10 +373,6 @@ export function CompanyResearchClient() {
         </>
       }
     >
-      <MarketContextSection
-        section="companyResearch"
-        currentStockCodes={stockCode.trim() ? [stockCode.trim()] : []}
-      />
       <WorkflowStageSwitcher
         tabs={companyResearchStageTabs}
         activeTabId={activeTabId}

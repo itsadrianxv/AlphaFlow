@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { MarketContextSection } from "~/app/_components/market-context-section";
 import {
   InlineNotice,
   SectionCard,
@@ -333,7 +332,6 @@ export function WorkflowsClient() {
         </>
       }
     >
-      <MarketContextSection section="workflows" />
       <WorkflowVisualizationPanel
         templateCode={INDUSTRY_RESEARCH_TEMPLATE_CODE}
         title="行业研究 Agent 状态图"

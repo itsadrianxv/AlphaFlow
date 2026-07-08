@@ -114,7 +114,8 @@ describe("workflow page composition", () => {
     expect(companyResearchHistorySource).not.toContain("headerActions");
   });
 
-  it("injects the shared market context entrypoint into every core workflow page", () => {
+  it("keeps the shared market context entrypoint on overview and timing only", () => {
+    const homePageSource = readSource("./page.tsx");
     const screeningSource = readSource(
       "./screening/screening-studio-client.tsx",
     );
@@ -124,9 +125,11 @@ describe("workflow page composition", () => {
     );
     const timingSource = readSource("./timing/timing-client.tsx");
 
-    expect(screeningSource).toContain("MarketContextSection");
-    expect(workflowsSource).toContain("MarketContextSection");
-    expect(companyResearchSource).toContain("MarketContextSection");
+    expect(homePageSource).toContain("MarketContextSection");
+    expect(homePageSource).toContain('section="home"');
+    expect(screeningSource).not.toContain("MarketContextSection");
+    expect(workflowsSource).not.toContain("MarketContextSection");
+    expect(companyResearchSource).not.toContain("MarketContextSection");
     expect(timingSource).toContain("MarketContextSection");
   });
 

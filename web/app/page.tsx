@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MarketContextSection } from "~/app/_components/market-context-section";
 import { statusTone } from "~/app/_components/status-tone";
 import {
   ActionStrip,
@@ -201,6 +202,8 @@ export default async function Home() {
           }
         />
 
+        <MarketContextSection section="home" />
+
         {loadError ? (
           <SectionCard surface="inset" density="compact">
             <div className="text-sm leading-6 text-[var(--app-danger)]">
@@ -209,9 +212,7 @@ export default async function Home() {
           </SectionCard>
         ) : null}
 
-        <SectionCard
-          title="主流程"
-        >
+        <SectionCard title="主流程">
           <div className="grid gap-4 lg:grid-cols-4">
             {primaryWorkflowStages.map((stage, index) => {
               const isScreening = stage.id === "screening";
@@ -341,9 +342,7 @@ export default async function Home() {
             {!signedIn ? (
               <EmptyState title="登录后查看最新结论" />
             ) : latestRecommendations.length === 0 ? (
-              <EmptyState
-                title="还没有新的组合建议"
-              />
+              <EmptyState title="还没有新的组合建议" />
             ) : (
               <div className="grid gap-4">
                 {latestRecommendations.map((item) => (

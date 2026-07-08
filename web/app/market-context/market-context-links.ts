@@ -1,6 +1,7 @@
 import type { MarketContextSnapshot } from "~/contracts/market-context";
 
 export type MarketContextSectionTarget =
+  | "home"
   | "workflows"
   | "companyResearch"
   | "screening"
@@ -20,6 +21,7 @@ export function buildMarketContextHref(params: BuildMarketContextHrefParams) {
   const [firstCandidate] = params.theme.candidateStocks;
 
   switch (params.section) {
+    case "home":
     case "workflows": {
       const search = new URLSearchParams({
         query: buildWorkflowsQuestion(params.theme.theme),

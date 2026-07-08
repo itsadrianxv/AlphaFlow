@@ -38,6 +38,7 @@ const flowLabelMap = {
 } as const;
 
 const actionLabelMap: Record<MarketContextSectionTarget, string> = {
+  home: "发起行业研究",
   workflows: "发起行业研究",
   companyResearch: "打开公司研究",
   screening: "导入种子池",
@@ -59,7 +60,7 @@ export function MarketContextSection(props: {
   if (snapshotQuery.isLoading) {
     return (
       <SectionCard
-        title="市场上下文"
+        title="宏观分析"
         description="正在读取宏观慢变量、资金方向和热门主题。"
       >
         <div className="text-sm leading-6 text-[var(--app-text-muted)]">
@@ -71,20 +72,20 @@ export function MarketContextSection(props: {
 
   if (snapshotQuery.isError || !snapshotQuery.data) {
     return (
-      <SectionCard
-        title="市场上下文"
-        description="当前未能获取完整市场上下文。"
-      >
+      <SectionCard title="宏观分析" description="当前未能获取完整宏观分析。">
         <InlineNotice
           tone="warning"
-          description={snapshotQuery.error?.message ?? "市场上下文暂不可用。"}
+          description={snapshotQuery.error?.message ?? "宏观分析暂不可用。"}
         />
       </SectionCard>
     );
   }
 
   const snapshot = snapshotQuery.data;
-  const sectionHint = snapshot.downstreamHints[section];
+  const sectionHint =
+    section === "home"
+      ? snapshot.downstreamHints.workflows
+      : snapshot.downstreamHints[section];
   const hotThemes = snapshot.hotThemes.slice(0, 3);
   const matchedThemes = findMatchingHotThemes(hotThemes, currentStockCodes);
   const statusLabel =
@@ -95,7 +96,7 @@ export function MarketContextSection(props: {
         : "上下文待补齐";
 
   return (
-    <SectionCard title="市场上下文" description={sectionHint.summary}>
+    <SectionCard title="宏观分析" description={sectionHint.summary}>
       <div className="grid gap-4">
         <div className="flex flex-wrap gap-2">
           <StatusPill
