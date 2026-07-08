@@ -25,11 +25,18 @@ from app.contracts.timing import (
     TimingSignalData,
     TimingSignalResponse,
 )
+from app.data_providers import get_default_data_provider
+from app.data_providers.contracts import DataProvider, DailyBar, MarketSnapshotRow, StockProfile
+from app.data_providers.errors import (
+    DataProviderConfigurationError,
+    DataProviderError,
+    DataUnavailableError,
+    InvalidSymbolError,
+    UnsupportedDatasetError,
+)
 from app.gateway.common import GatewayError, build_meta, execute_cached, gateway_cache
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
-from app.providers.timing.base import TimingSignalDataProvider
-from app.providers.timing.tushare_provider import TushareTimingProvider
 from app.services.timing_indicators import timing_indicators_service
 
 SIGNAL_BENCHMARK_CODES = ["510300", "510500", "159915"]
@@ -44,11 +51,13 @@ MARKET_PROXY_CODES = [
 class TimingGateway:
     def __init__(
         self,
-        signal_data_provider: TimingSignalDataProvider | None = None,
-        market_context_provider: TushareTimingProvider | None = None,
+        data_provider: DataProvider | None = None,
+        signal_data_provider: DataProvider | None = None,
+        market_context_provider: DataProvider | None = None,
     ) -> None:
-        self._signal_data_provider = signal_data_provider or TushareTimingProvider()
-        self._market_context_provider = market_context_provider or TushareTimingProvider()
+        provider = data_provider or get_default_data_provider()
+        self._signal_data_provider = signal_data_provider or provider
+        self._market_context_provider = market_context_provider or provider
         self._retry_policy = RetryPolicy()
         self._cache = gateway_cache
 
@@ -149,7 +158,7 @@ class TimingGateway:
         cache_hits: list[bool] = []
         stale_hits: list[bool] = []
         as_of_values: list[str] = []
-        stock_snapshots = self._signal_data_provider.get_stock_snapshots(stock_codes)
+        stock_snapshots = self._get_stock_snapshots(self._signal_data_provider, stock_codes)
         benchmark_histories = self._load_signal_benchmark_histories(
             as_of_date=as_of_date,
             lookback_days=lookback_days,
@@ -244,7 +253,7 @@ class TimingGateway:
         timeframe: str,
         adjust: str,
     ) -> TimingBarsData:
-        stock = self._signal_data_provider.get_stock_snapshot(stock_code)
+        stock = self._get_stock_snapshot(self._signal_data_provider, stock_code)
         resolved_start = (
             self._resolve_start_date(
                 start=start,
@@ -255,7 +264,8 @@ class TimingGateway:
             else self._resolve_start_date(start=start, end=end, lookback_days=0)
         )
         try:
-            history = self._signal_data_provider.get_stock_bars(
+            history = self._get_stock_bars(
+                self._signal_data_provider,
                 stock_code=stock_code,
                 start_date=resolved_start,
                 end_date=end,
@@ -264,7 +274,8 @@ class TimingGateway:
         except GatewayError as error:
             if error.code != "bars_not_found" or start is not None:
                 raise
-            history = self._signal_data_provider.get_stock_bars(
+            history = self._get_stock_bars(
+                self._signal_data_provider,
                 stock_code=stock_code,
                 start_date=None,
                 end_date=end,
@@ -345,8 +356,9 @@ class TimingGateway:
         stock: dict[str, str] | None = None,
         benchmark_histories: dict[str, pd.DataFrame] | None = None,
     ) -> TimingSignalData:
-        stock_snapshot = stock or self._signal_data_provider.get_stock_snapshot(stock_code)
-        history = self._signal_data_provider.get_stock_bars(
+        stock_snapshot = stock or self._get_stock_snapshot(self._signal_data_provider, stock_code)
+        history = self._get_stock_bars(
+            self._signal_data_provider,
             stock_code=stock_code,
             start_date=self._resolve_start_date(
                 start=None,
@@ -384,19 +396,20 @@ class TimingGateway:
         *,
         as_of_date: str | None,
     ) -> MarketContextSnapshotData:
-        universe = self._market_context_provider.get_stock_universe(
+        universe = self._get_market_snapshot(
+            self._market_context_provider,
             as_of_date=as_of_date,
         )
 
         change_values = [
-            float(item.get("changePercent") or 0)
+            float(item.changePercent or 0)
             for item in universe
-            if item.get("changePercent") is not None
+            if item.changePercent is not None
         ]
         turnover_values = [
-            float(item.get("turnoverRate") or 0)
+            float(item.turnoverRate or 0)
             for item in universe
-            if item.get("turnoverRate") is not None
+            if item.turnoverRate is not None
         ]
 
         index_frames: dict[str, pd.DataFrame] = {}
@@ -404,8 +417,9 @@ class TimingGateway:
         resolved_as_of = self._resolve_universe_as_of(universe) or as_of_date
 
         for code, fallback_name in MARKET_PROXY_CODES:
-            stock = self._market_context_provider.get_stock_snapshot(code)
-            history = self._market_context_provider.get_stock_bars(
+            stock = self._get_stock_snapshot(self._market_context_provider, code)
+            history = self._get_stock_bars(
+                self._market_context_provider,
                 stock_code=code,
                 start_date=self._resolve_start_date(
                     start=None,
@@ -655,12 +669,149 @@ class TimingGateway:
             return "bearish"
         return "neutral"
 
-    def _resolve_universe_as_of(self, universe: list[dict]) -> str | None:
+    def _resolve_universe_as_of(self, universe: list[MarketSnapshotRow]) -> str | None:
         for item in universe:
-            value = item.get("tradeDate") or item.get("dataDate")
-            if value:
-                return str(value)
+            if item.tradeDate:
+                return item.tradeDate
         return None
+
+    def _get_stock_snapshot(self, provider: DataProvider, stock_code: str) -> dict[str, str]:
+        try:
+            return self._stock_profile_to_snapshot(provider.get_stock_profile(stock_code))
+        except DataProviderError as exc:
+            raise self._to_gateway_error(exc) from exc
+
+    def _get_stock_snapshots(
+        self,
+        provider: DataProvider,
+        stock_codes: list[str],
+    ) -> dict[str, dict[str, str]]:
+        snapshots: dict[str, dict[str, str]] = {}
+        for stock_code in stock_codes:
+            try:
+                snapshot = self._get_stock_snapshot(provider, stock_code)
+            except GatewayError:
+                continue
+            snapshots[stock_code] = snapshot
+        return snapshots
+
+    def _get_stock_bars(
+        self,
+        provider: DataProvider,
+        *,
+        stock_code: str,
+        start_date: str | None,
+        end_date: str | None,
+        adjust: str,
+    ) -> pd.DataFrame:
+        try:
+            bars = provider.get_daily_bars(
+                stock_code=stock_code,
+                start_date=start_date,
+                end_date=end_date,
+                adjust=adjust,
+            )
+        except DataProviderError as exc:
+            raise self._to_gateway_error(exc, dataset="bars") from exc
+        if not bars:
+            raise GatewayError(
+                code="bars_not_found",
+                message=f"Daily bars not found for {stock_code}",
+                status_code=404,
+                provider=provider.provider_name,
+            )
+        return self._daily_bars_to_timing_frame(bars)
+
+    def _get_benchmark_bars(
+        self,
+        provider: DataProvider,
+        *,
+        benchmark_code: str,
+        start_date: str | None,
+        end_date: str | None,
+    ) -> pd.DataFrame:
+        return self._get_stock_bars(
+            provider,
+            stock_code=benchmark_code,
+            start_date=start_date,
+            end_date=end_date,
+            adjust="qfq",
+        )
+
+    def _get_market_snapshot(
+        self,
+        provider: DataProvider,
+        *,
+        as_of_date: str | None,
+    ) -> list[MarketSnapshotRow]:
+        try:
+            return provider.get_market_snapshot(as_of_date=as_of_date)
+        except DataProviderError as exc:
+            raise self._to_gateway_error(exc) from exc
+
+    def _stock_profile_to_snapshot(self, profile: StockProfile) -> dict[str, str]:
+        return {
+            "code": profile.stockCode,
+            "name": profile.stockName,
+            "industry": profile.industry,
+            "stockName": profile.stockName,
+        }
+
+    def _daily_bars_to_timing_frame(self, bars: list[DailyBar]) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "日期": [bar.tradeDate for bar in bars],
+                "股票代码": [bar.stockCode for bar in bars],
+                "开盘": [bar.open for bar in bars],
+                "收盘": [bar.close for bar in bars],
+                "最高": [bar.high for bar in bars],
+                "最低": [bar.low for bar in bars],
+                "成交量": [bar.volume for bar in bars],
+                "成交额": [bar.amount for bar in bars],
+                "换手率": [bar.turnoverRate for bar in bars],
+            }
+        ).reset_index(drop=True)
+
+    def _to_gateway_error(
+        self,
+        error: DataProviderError,
+        *,
+        dataset: str | None = None,
+    ) -> GatewayError:
+        if isinstance(error, UnsupportedDatasetError):
+            return GatewayError(
+                code="invalid_adjust",
+                message=str(error),
+                status_code=400,
+                provider=error.provider,
+            )
+        if isinstance(error, InvalidSymbolError):
+            return GatewayError(
+                code="stock_not_found",
+                message=str(error),
+                status_code=404,
+                provider=error.provider,
+            )
+        if isinstance(error, DataUnavailableError):
+            return GatewayError(
+                code="bars_not_found" if dataset == "bars" else "data_unavailable",
+                message=str(error),
+                status_code=404 if dataset == "bars" else 503,
+                provider=error.provider,
+            )
+        if isinstance(error, DataProviderConfigurationError):
+            return GatewayError(
+                code="provider_configuration_error",
+                message=str(error),
+                status_code=503,
+                provider=error.provider,
+            )
+        return GatewayError(
+            code=error.code,
+            message=str(error),
+            status_code=503,
+            provider=error.provider,
+        )
 
     def _resolve_start_date(
         self,
@@ -710,7 +861,8 @@ class TimingGateway:
         )
         for benchmark_code in SIGNAL_BENCHMARK_CODES:
             benchmark_histories[benchmark_code] = (
-                self._signal_data_provider.get_benchmark_bars(
+                self._get_benchmark_bars(
+                    self._signal_data_provider,
                     benchmark_code=benchmark_code,
                     start_date=start_date,
                     end_date=as_of_date,

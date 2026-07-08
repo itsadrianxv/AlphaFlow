@@ -2,9 +2,9 @@ import { WorkflowEventType, WorkflowNodeRunStatus } from "@prisma/client";
 import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
 import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
 import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
+import { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
-import { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
 import { InsightQualityService } from "~/server/domain/intelligence/services/insight-quality-service";
@@ -20,6 +20,7 @@ import type {
   WorkflowNodeKey,
 } from "~/server/domain/workflow/types";
 import { AgentRuntimeClient } from "~/server/infrastructure/agent-runtime/agent-runtime-client";
+import { PrismaAgentConversationRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-conversation-repository";
 import { PrismaAgentRuntimeRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-runtime-repository";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
@@ -129,6 +130,9 @@ export function createWorkflowExecutionService(
   });
   const reminderRepository = new PrismaResearchReminderRepository(prisma);
   const agentRuntimeRepository = new PrismaAgentRuntimeRepository(prisma);
+  const agentConversationRepository = new PrismaAgentConversationRepository(
+    prisma,
+  );
   const reminderSchedulingService = new ReminderSchedulingService({
     reminderRepository,
   });
@@ -160,6 +164,7 @@ export function createWorkflowExecutionService(
       new PiAgentRuntimeLangGraph({
         agentRuntimeClient: new AgentRuntimeClient(),
         agentRuntimeRepository,
+        agentConversationRepository,
       }),
     ],
   });

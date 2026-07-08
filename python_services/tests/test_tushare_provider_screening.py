@@ -5,8 +5,9 @@ from dataclasses import dataclass
 import pandas as pd
 import pytest
 
-from app.providers.screening.tushare_provider import TushareScreeningProvider
-import app.providers.screening.tushare_provider as tushare_module
+import app.data_providers.tushare_provider as tushare_module
+from app.data_providers import TushareProvider
+from app.data_providers.errors import DataProviderConfigurationError
 
 
 @dataclass
@@ -22,8 +23,10 @@ class FakeProClient:
         return self.stock_basic_frame.copy()
 
     def daily_basic(self, **kwargs):
-        trade_date = kwargs["trade_date"]
-        return self.daily_basic_frames.get(trade_date, pd.DataFrame()).copy()
+        trade_date = kwargs.get("trade_date")
+        if trade_date is not None:
+            return self.daily_basic_frames.get(trade_date, pd.DataFrame()).copy()
+        return pd.DataFrame()
 
     def fina_indicator(self, **kwargs):
         return self.fina_indicator_frames[kwargs["ts_code"]].copy()
@@ -38,7 +41,7 @@ class FakeProClient:
         return self.cashflow_frames[kwargs["ts_code"]].copy()
 
 
-def test_tushare_provider_maps_universe_latest_metrics_and_history(monkeypatch):
+def test_tushare_provider_maps_universe_latest_and_series_metrics(monkeypatch):
     fake_client = FakeProClient(
         stock_basic_frame=pd.DataFrame(
             {
@@ -72,21 +75,8 @@ def test_tushare_provider_maps_universe_latest_metrics_and_history(monkeypatch):
                     "roe": [21.5, 19.0],
                     "eps": [50.3, 46.0],
                     "grossprofit_margin": [91.2, 90.5],
-                    "netprofit_margin": [52.1, 49.4],
-                    "roa": [17.8, 16.2],
-                    "roic": [25.4, 24.1],
-                    "bps": [189.5, 172.4],
                     "current_ratio": [4.6, 4.2],
-                    "quick_ratio": [3.8, 3.4],
-                    "cash_ratio": [2.1, 1.9],
-                    "q_sales_yoy": [15.0, 13.0],
-                    "q_netprofit_yoy": [18.0, 16.0],
-                    "dt_netprofit_yoy": [14.0, 11.0],
-                    "assets_turn": [0.62, 0.58],
-                    "ar_turn": [145.0, 138.0],
-                    "inv_turn": [0.17, 0.15],
                     "ocfps": [42.6, 39.5],
-                    "cfps": [38.4, 35.2],
                 }
             )
         },
@@ -122,32 +112,18 @@ def test_tushare_provider_maps_universe_latest_metrics_and_history(monkeypatch):
     monkeypatch.setenv("TUSHARE_TOKEN", "token-1")
     monkeypatch.setattr(tushare_module, "_create_tushare_client", lambda _token: fake_client)
     monkeypatch.setattr(
-        tushare_module.TushareScreeningProvider,
-        "_today_trade_dates",
-        lambda self: ["20260408", "20260407"],
+        tushare_module.TushareProvider,
+        "_candidate_trade_dates",
+        lambda self, as_of_date, *, lookback_days: ["20260408", "20260407"],
     )
 
-    provider = TushareScreeningProvider()
+    provider = TushareProvider()
 
-    assert provider.get_all_stock_codes() == ["600519", "300750", "430001"]
+    universe = provider.get_stock_universe()
+    assert [profile.stockCode for profile in universe] == ["600519", "300750", "430001"]
+    assert provider.get_stock_profile("430001").sector == "北交所"
 
-    batch = provider.get_stock_batch(["600519", "430001"])
-    assert batch[0]["name"] == "贵州茅台"
-    assert batch[0]["industry"] == "白酒"
-    assert batch[0]["sector"] == "主板"
-    assert batch[0]["pe"] == 25.0
-    assert batch[0]["marketCap"] == pytest.approx(21038.0)
-    assert batch[0]["floatMarketCap"] == pytest.approx(20500.0)
-    assert batch[0]["totalShares"] == 1_256_000_000.0
-    assert batch[0]["floatAShares"] == 1_225_000_000.0
-    assert batch[0]["roe"] == pytest.approx(0.215)
-    assert batch[0]["eps"] == 50.3
-    assert batch[0]["revenue"] == pytest.approx(1741.44)
-    assert batch[0]["netProfit"] == pytest.approx(862.28)
-    assert batch[0]["debtRatio"] == pytest.approx(0.25)
-    assert batch[1]["sector"] == "北交所"
-
-    latest = provider.query_latest_metrics(
+    latest = provider.get_latest_metrics(
         ["600519"],
         ["pe_ttm", "ps_ttm", "dv_ttm", "market_cap", "total_shares", "free_share"],
     )
@@ -162,7 +138,7 @@ def test_tushare_provider_maps_universe_latest_metrics_and_history(monkeypatch):
         }
     }
 
-    series = provider.query_series_metrics(
+    series = provider.get_metric_series(
         ["600519"],
         [
             "roe_report",
@@ -175,32 +151,21 @@ def test_tushare_provider_maps_universe_latest_metrics_and_history(monkeypatch):
         ],
         ["2023", "2024"],
     )
-    assert series["600519"]["roe_report"] == {"2023": pytest.approx(0.19), "2024": pytest.approx(0.215)}
-    assert series["600519"]["grossprofit_margin"] == {
-        "2023": pytest.approx(0.905),
-        "2024": pytest.approx(0.912),
+    by_metric = {
+        metric_id: {point.period: point.value for point in points}
+        for metric_id, points in series["600519"].items()
     }
-    assert series["600519"]["current_ratio"] == {
-        "2023": pytest.approx(4.2),
-        "2024": pytest.approx(4.6),
-    }
-    assert series["600519"]["ocfps"] == {"2023": pytest.approx(39.5), "2024": pytest.approx(42.6)}
-    assert series["600519"]["n_cashflow_act"] == {
-        "2023": pytest.approx(845.2),
-        "2024": pytest.approx(923.6),
-    }
-    assert series["600519"]["free_cashflow"] == {
-        "2023": pytest.approx(458.0),
-        "2024": pytest.approx(512.0),
-    }
-    assert series["600519"]["asset_liability_ratio"] == {
-        "2023": pytest.approx(0.25),
-        "2024": pytest.approx(0.25),
-    }
+    assert by_metric["roe_report"] == {"2023": pytest.approx(0.19), "2024": pytest.approx(0.215)}
+    assert by_metric["grossprofit_margin"] == {"2023": pytest.approx(0.905), "2024": pytest.approx(0.912)}
+    assert by_metric["current_ratio"] == {"2023": pytest.approx(4.2), "2024": pytest.approx(4.6)}
+    assert by_metric["ocfps"] == {"2023": pytest.approx(39.5), "2024": pytest.approx(42.6)}
+    assert by_metric["n_cashflow_act"] == {"2023": pytest.approx(845.2), "2024": pytest.approx(923.6)}
+    assert by_metric["free_cashflow"] == {"2023": pytest.approx(458.0), "2024": pytest.approx(512.0)}
+    assert by_metric["asset_liability_ratio"] == {"2023": pytest.approx(0.25), "2024": pytest.approx(0.25)}
 
 
 def test_tushare_provider_requires_token(monkeypatch):
     monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
 
-    with pytest.raises(RuntimeError, match="TUSHARE_TOKEN"):
-        TushareScreeningProvider().get_all_stock_codes()
+    with pytest.raises(DataProviderConfigurationError, match="TUSHARE_TOKEN"):
+        TushareProvider().get_stock_universe()

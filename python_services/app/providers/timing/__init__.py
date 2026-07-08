@@ -1,5 +1,3 @@
-"""Timing signal providers."""
+"""择时 provider 旧入口已迁移到 app.data_providers。"""
 
-from app.providers.timing.tushare_provider import TushareTimingProvider
-
-__all__ = ["TushareTimingProvider"]
+__all__: list[str] = []

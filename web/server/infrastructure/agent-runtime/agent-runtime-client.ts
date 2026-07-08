@@ -51,10 +51,19 @@ export type AgentRuntimeRun = z.infer<typeof agentRuntimeRunSchema>;
 
 export type StartAgentRuntimeRunInput = {
   runId: string;
+  sessionId?: string;
+  conversationId?: string;
+  userMessageId?: string;
+  assistantMessageId?: string;
   skillId: string;
   prompt: string;
   title?: string;
   context?: Record<string, unknown>;
+  sessionSeed?: Array<{
+    role: "user" | "assistant";
+    content: string;
+    skillId?: string;
+  }>;
 };
 
 function normalizeBaseUrl(rawBaseUrl: string) {
@@ -66,7 +75,8 @@ function toWorkflowError(error: unknown) {
     return error;
   }
 
-  const message = error instanceof Error ? error.message : "未知 agent-runtime 错误";
+  const message =
+    error instanceof Error ? error.message : "未知 agent-runtime 错误";
   return new WorkflowDomainError(
     WORKFLOW_ERROR_CODES.WORKFLOW_NODE_EXECUTION_FAILED,
     message,
@@ -109,7 +119,9 @@ export class AgentRuntimeClient {
   }
 
   async getRun(runId: string) {
-    return agentRuntimeRunSchema.parse(await this.requestJson(`/runs/${runId}`));
+    return agentRuntimeRunSchema.parse(
+      await this.requestJson(`/runs/${runId}`),
+    );
   }
 
   async cancelRun(runId: string) {

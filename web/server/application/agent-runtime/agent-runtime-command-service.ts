@@ -5,12 +5,17 @@ export type StartAgentRuntimeRunCommand = {
   skillId: string;
   prompt: string;
   title?: string;
+  conversationId?: string;
+  userMessageId?: string;
+  assistantMessageId?: string;
   context?: Record<string, unknown>;
   idempotencyKey?: string;
 };
 
 export class AgentRuntimeCommandService {
-  constructor(private readonly workflowCommandService: WorkflowCommandService) {}
+  constructor(
+    private readonly workflowCommandService: WorkflowCommandService,
+  ) {}
 
   async startRun(command: StartAgentRuntimeRunCommand) {
     return this.workflowCommandService.startPiAgentRun(command);

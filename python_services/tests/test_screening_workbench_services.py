@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from app.data_providers.contracts import FinancialMetricPoint, StockProfile
 from app.services.screening_formula_engine import SafeFormulaEngine
 from app.services.screening_query_service import ScreeningQueryService
 from app.services.screening_universe import ScreeningStockSearcher
@@ -74,43 +75,50 @@ def test_screening_query_service_chunks_statement_queries_by_budget():
             self.series_calls: list[tuple[list[str], list[str], list[str]]] = []
             self.latest_calls: list[tuple[list[str], list[str]]] = []
 
-        def resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]:
-            return {
-                stock_code: {
-                    "stockName": f"股票{stock_code}",
-                    "market": "SH" if stock_code.startswith("6") else "SZ",
-                }
-                for stock_code in stock_codes
-            }
+        def get_stock_profile(self, stock_code: str) -> StockProfile:
+            return StockProfile(
+                stockCode=stock_code,
+                tsCode=f"{stock_code}.SH",
+                stockName=f"股票{stock_code}",
+                market="SH" if stock_code.startswith("6") else "SZ",
+                sector="主板",
+                industry="",
+            )
 
-        def query_series_metrics(
+        def get_metric_series(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
             periods: list[str],
-        ) -> dict[str, dict[str, dict[str, float | None]]]:
-            self.series_calls.append((stock_codes[:], indicator_ids[:], periods[:]))
+        ) -> dict[str, dict[str, list[FinancialMetricPoint]]]:
+            self.series_calls.append((stock_codes[:], metric_ids[:], periods[:]))
             return {
                 stock_code: {
-                    indicator_id: {
-                        period: float(index + period_index + len(stock_code))
+                    metric_id: [
+                        FinancialMetricPoint(
+                            stockCode=stock_code,
+                            metricId=metric_id,
+                            period=period,
+                            endDate=f"{period}-12-31",
+                            value=float(index + period_index + len(stock_code)),
+                        )
                         for period_index, period in enumerate(periods)
-                    }
-                    for index, indicator_id in enumerate(indicator_ids)
+                    ]
+                    for index, metric_id in enumerate(metric_ids)
                 }
                 for stock_code in stock_codes
             }
 
-        def query_latest_metrics(
+        def get_latest_metrics(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
         ) -> dict[str, dict[str, float | None]]:
-            self.latest_calls.append((stock_codes[:], indicator_ids[:]))
+            self.latest_calls.append((stock_codes[:], metric_ids[:]))
             return {
                 stock_code: {
-                    indicator_id: float(index + len(stock_code))
-                    for index, indicator_id in enumerate(indicator_ids)
+                    metric_id: float(index + len(stock_code))
+                    for index, metric_id in enumerate(metric_ids)
                 }
                 for stock_code in stock_codes
             }
@@ -158,30 +166,44 @@ def test_screening_query_service_combines_latest_only_and_formula_values():
     class FakeProvider:
         provider_name = "tushare"
 
-        def resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]:
-            return {
-                stock_code: {"stockName": stock_code, "market": "SH"}
-                for stock_code in stock_codes
-            }
+        def get_stock_profile(self, stock_code: str) -> StockProfile:
+            return StockProfile(
+                stockCode=stock_code,
+                tsCode=f"{stock_code}.SH",
+                stockName=stock_code,
+                market="SH",
+                sector="主板",
+                industry="",
+            )
 
-        def query_series_metrics(
+        def get_metric_series(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
             periods: list[str],
-        ) -> dict[str, dict[str, dict[str, float | None]]]:
-            assert indicator_ids == ["revenue"]
+        ) -> dict[str, dict[str, list[FinancialMetricPoint]]]:
+            assert metric_ids == ["revenue"]
             assert periods == ["2024"]
             return {
-                stock_codes[0]: {"revenue": {"2024": 100.0}},
+                stock_codes[0]: {
+                    "revenue": [
+                        FinancialMetricPoint(
+                            stockCode=stock_codes[0],
+                            metricId="revenue",
+                            period="2024",
+                            endDate="2024-12-31",
+                            value=100.0,
+                        )
+                    ]
+                },
             }
 
-        def query_latest_metrics(
+        def get_latest_metrics(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
         ) -> dict[str, dict[str, float | None]]:
-            assert indicator_ids == ["pe_ttm"]
+            assert metric_ids == ["pe_ttm"]
             return {
                 stock_codes[0]: {"pe_ttm": 20.0},
             }
@@ -227,24 +249,28 @@ def test_screening_query_service_rejects_invalid_latest_payload_shape():
     class FakeProvider:
         provider_name = "tushare"
 
-        def resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]:
-            return {
-                stock_code: {"stockName": stock_code, "market": "SH"}
-                for stock_code in stock_codes
-            }
+        def get_stock_profile(self, stock_code: str) -> StockProfile:
+            return StockProfile(
+                stockCode=stock_code,
+                tsCode=f"{stock_code}.SH",
+                stockName=stock_code,
+                market="SH",
+                sector="主板",
+                industry="",
+            )
 
-        def query_series_metrics(
+        def get_metric_series(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
             periods: list[str],
-        ) -> dict[str, dict[str, dict[str, float | None]]]:
+        ) -> dict[str, dict[str, list[FinancialMetricPoint]]]:
             return {}
 
-        def query_latest_metrics(
+        def get_latest_metrics(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
         ):
             return None
 

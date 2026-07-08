@@ -803,10 +803,28 @@ def _build_fast_partial_a_share_spot_frame(stock_codes: list[str]) -> pd.DataFra
     if not stock_codes:
         return pd.DataFrame()
 
+    code_name_map = _build_code_name_index()
+    try:
+        financial_by_code = _build_financial_index(
+            AkShareAdapter.get_latest_financial_snapshot_frame()
+        )
+    except Exception:  # noqa: BLE001
+        financial_by_code = {}
+
     def build_row(code: str) -> dict[str, Any]:
+        financial_row = financial_by_code.get(code)
         info = _get_individual_info(code)
-        stock_name = str(info.get("name") or "").strip() or code
-        industry = str(info.get("industry") or "").strip() or "未知"
+        stock_name = (
+            code_name_map.get(code)
+            or _pick_financial_text(financial_row, ("股票简称", "名称", "简称"))
+            or str(info.get("name") or "").strip()
+            or code
+        )
+        industry = (
+            _pick_financial_text(financial_row, ("所处行业", "行业"))
+            or str(info.get("industry") or "").strip()
+            or "未知"
+        )
 
         return {
             "\u4ee3\u7801": code,

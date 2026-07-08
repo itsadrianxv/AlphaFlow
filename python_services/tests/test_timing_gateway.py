@@ -2,62 +2,64 @@
 
 from __future__ import annotations
 
-import pandas as pd
 import pytest
 
+from app.data_providers.contracts import DailyBar, StockProfile
+from app.data_providers.errors import DataUnavailableError
 from app.gateway.common import GatewayError
 from app.gateway.timing_gateway import SIGNAL_BENCHMARK_CODES, TimingGateway
 
 
-def _sample_history(stock_code: str) -> pd.DataFrame:
+def _sample_bars(stock_code: str) -> list[DailyBar]:
+    import pandas as pd
+
     dates = pd.date_range("2025-01-02", periods=280, freq="B")
-    rows: list[dict[str, object]] = []
+    bars: list[DailyBar] = []
     for index, trade_date in enumerate(dates):
         close = 10 + index * 0.05
-        rows.append(
-            {
-                "日期": trade_date.strftime("%Y-%m-%d"),
-                "股票代码": stock_code,
-                "开盘": close - 0.02,
-                "收盘": close,
-                "最高": close + 0.08,
-                "最低": close - 0.08,
-                "成交量": 900_000 + index * 5_000,
-                "成交额": (900_000 + index * 5_000) * close,
-                "换手率": 1.1,
-            }
+        bars.append(
+            DailyBar(
+                stockCode=stock_code,
+                tradeDate=trade_date.strftime("%Y-%m-%d"),
+                open=close - 0.02,
+                close=close,
+                high=close + 0.08,
+                low=close - 0.08,
+                volume=900_000 + index * 5_000,
+                amount=(900_000 + index * 5_000) * close,
+                turnoverRate=1.1,
+            )
         )
-    return pd.DataFrame(rows)
+    return bars
 
 
 class FakeSignalProvider:
     provider_name = "tushare"
 
     def __init__(self) -> None:
-        self.snapshot_batch_calls: list[list[str]] = []
-        self.snapshot_calls: list[str] = []
-        self.stock_bar_calls: list[dict[str, str | None]] = []
-        self.benchmark_bar_calls: list[str] = []
+        self.profile_calls: list[str] = []
+        self.bar_calls: list[dict[str, str | None]] = []
+        self.benchmark_codes: list[str] = []
 
-    def get_stock_snapshots(self, stock_codes: list[str]):
-        self.snapshot_batch_calls.append(list(stock_codes))
-        return {
-            stock_code: {"code": stock_code, "name": f"Stock-{stock_code}"}
-            for stock_code in stock_codes
-        }
+    def get_stock_profile(self, stock_code: str) -> StockProfile:
+        self.profile_calls.append(stock_code)
+        return StockProfile(
+            stockCode=stock_code,
+            tsCode=f"{stock_code}.SH",
+            stockName=f"Stock-{stock_code}",
+            market="SH",
+            sector="主板",
+            industry="",
+        )
 
-    def get_stock_snapshot(self, stock_code: str):
-        self.snapshot_calls.append(stock_code)
-        return {"code": stock_code, "name": f"Stock-{stock_code}"}
-
-    def get_stock_bars(
+    def get_daily_bars(
         self,
         stock_code: str,
-        start_date: str | None,
-        end_date: str | None,
-        adjust: str,
-    ):
-        self.stock_bar_calls.append(
+        start_date: str | None = None,
+        end_date: str | None = None,
+        adjust: str = "qfq",
+    ) -> list[DailyBar]:
+        self.bar_calls.append(
             {
                 "stock_code": stock_code,
                 "start_date": start_date,
@@ -65,41 +67,18 @@ class FakeSignalProvider:
                 "adjust": adjust,
             }
         )
-        return _sample_history(stock_code)
-
-    def get_benchmark_bars(
-        self,
-        benchmark_code: str,
-        start_date: str | None,
-        end_date: str | None,
-    ):
-        del start_date, end_date
-        self.benchmark_bar_calls.append(benchmark_code)
-        return _sample_history(benchmark_code)
+        if stock_code in SIGNAL_BENCHMARK_CODES:
+            self.benchmark_codes.append(stock_code)
+        return _sample_bars(stock_code)
 
 
-class FakeMarketContextProvider:
-    provider_name = "tushare"
-
-    def get_stock_universe(self, as_of_date: str | None = None):
+class FakeMarketContextProvider(FakeSignalProvider):
+    def get_market_snapshot(self, as_of_date: str | None = None):
         del as_of_date
         return []
 
-    def get_stock_snapshot(self, stock_code: str):
-        return {"code": stock_code, "name": stock_code}
 
-    def get_stock_bars(
-        self,
-        stock_code: str,
-        start_date: str | None,
-        end_date: str | None,
-        adjust: str,
-    ):
-        del start_date, end_date, adjust
-        return _sample_history(stock_code)
-
-
-def test_get_signal_batch_reuses_batch_metadata_and_benchmark_histories() -> None:
+def test_get_signal_batch_reuses_benchmark_histories() -> None:
     signal_provider = FakeSignalProvider()
     gateway = TimingGateway(
         signal_data_provider=signal_provider,
@@ -114,23 +93,28 @@ def test_get_signal_batch_reuses_batch_metadata_and_benchmark_histories() -> Non
     )
 
     assert [item.stockCode for item in response.data.items] == ["600519", "000001"]
-    assert signal_provider.snapshot_batch_calls == [["600519", "000001"]]
-    assert signal_provider.snapshot_calls == []
-    assert signal_provider.stock_bar_calls == [
+    assert signal_provider.profile_calls[:2] == ["600519", "000001"]
+    assert signal_provider.bar_calls[:3] == [
         {
-            "stock_code": "600519",
+            "stock_code": "510300",
             "start_date": "20240907",
             "end_date": "2025-12-31",
             "adjust": "qfq",
         },
         {
-            "stock_code": "000001",
+            "stock_code": "510500",
+            "start_date": "20240907",
+            "end_date": "2025-12-31",
+            "adjust": "qfq",
+        },
+        {
+            "stock_code": "159915",
             "start_date": "20240907",
             "end_date": "2025-12-31",
             "adjust": "qfq",
         },
     ]
-    assert signal_provider.benchmark_bar_calls == list(SIGNAL_BENCHMARK_CODES)
+    assert signal_provider.benchmark_codes == list(SIGNAL_BENCHMARK_CODES)
 
 
 def test_get_signal_returns_bars_when_requested() -> None:
@@ -155,14 +139,14 @@ def test_get_signal_returns_bars_when_requested() -> None:
 
 def test_get_bars_without_explicit_start_retries_with_unbounded_start() -> None:
     class FlakySignalProvider(FakeSignalProvider):
-        def get_stock_bars(
+        def get_daily_bars(
             self,
             stock_code: str,
-            start_date: str | None,
-            end_date: str | None,
-            adjust: str,
-        ):
-            self.stock_bar_calls.append(
+            start_date: str | None = None,
+            end_date: str | None = None,
+            adjust: str = "qfq",
+        ) -> list[DailyBar]:
+            self.bar_calls.append(
                 {
                     "stock_code": stock_code,
                     "start_date": start_date,
@@ -171,13 +155,11 @@ def test_get_bars_without_explicit_start_retries_with_unbounded_start() -> None:
                 }
             )
             if start_date is not None:
-                raise GatewayError(
-                    code="bars_not_found",
-                    message=f"Daily bars not found for {stock_code}",
-                    status_code=404,
-                    provider="tushare",
+                raise DataUnavailableError(
+                    f"Daily bars not found for {stock_code}",
+                    provider=self.provider_name,
                 )
-            return _sample_history(stock_code)
+            return _sample_bars(stock_code)
 
     signal_provider = FlakySignalProvider()
     gateway = TimingGateway(
@@ -195,7 +177,7 @@ def test_get_bars_without_explicit_start_retries_with_unbounded_start() -> None:
     )
 
     assert len(response.data.bars) == 280
-    assert signal_provider.stock_bar_calls == [
+    assert signal_provider.bar_calls == [
         {
             "stock_code": "600519",
             "start_date": "20240907",
@@ -213,14 +195,14 @@ def test_get_bars_without_explicit_start_retries_with_unbounded_start() -> None:
 
 def test_get_bars_with_explicit_start_does_not_retry() -> None:
     class MissingBarsSignalProvider(FakeSignalProvider):
-        def get_stock_bars(
+        def get_daily_bars(
             self,
             stock_code: str,
-            start_date: str | None,
-            end_date: str | None,
-            adjust: str,
-        ):
-            self.stock_bar_calls.append(
+            start_date: str | None = None,
+            end_date: str | None = None,
+            adjust: str = "qfq",
+        ) -> list[DailyBar]:
+            self.bar_calls.append(
                 {
                     "stock_code": stock_code,
                     "start_date": start_date,
@@ -228,11 +210,9 @@ def test_get_bars_with_explicit_start_does_not_retry() -> None:
                     "adjust": adjust,
                 }
             )
-            raise GatewayError(
-                code="bars_not_found",
-                message=f"Daily bars not found for {stock_code}",
-                status_code=404,
-                provider="tushare",
+            raise DataUnavailableError(
+                f"Daily bars not found for {stock_code}",
+                provider=self.provider_name,
             )
 
     signal_provider = MissingBarsSignalProvider()
@@ -251,7 +231,7 @@ def test_get_bars_with_explicit_start_does_not_retry() -> None:
             adjust="qfq",
         )
 
-    assert signal_provider.stock_bar_calls == [
+    assert signal_provider.bar_calls == [
         {
             "stock_code": "600519",
             "start_date": "20250101",

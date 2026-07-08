@@ -148,11 +148,14 @@ services:
       AGENT_RUNTIME_MODEL_TIMEOUT_MS: ${AGENT_RUNTIME_MODEL_TIMEOUT_MS:-120000}
       AGENT_RUNTIME_MAX_TOOL_CALLS: ${AGENT_RUNTIME_MAX_TOOL_CALLS:-12}
       AGENT_RUNTIME_TOOL_TIMEOUT_MS: ${AGENT_RUNTIME_TOOL_TIMEOUT_MS:-60000}
+      AGENT_RUNTIME_SESSION_ROOT: ${AGENT_RUNTIME_SESSION_ROOT:-/data/agent-runtime/sessions}
+      AGENT_RUNTIME_COMPACTION_TOKEN_THRESHOLD: ${AGENT_RUNTIME_COMPACTION_TOKEN_THRESHOLD:-48000}
     ports:
       - "${AGENT_RUNTIME_PORT:-8020}:8020"
     volumes:
       - ../agent_runtime:/repo/agent_runtime
       - agent_runtime_node_modules:/repo/agent_runtime/node_modules
+      - agent_runtime_sessions:/data/agent-runtime/sessions
     command: ["npm", "run", "dev"]
     healthcheck:
       test:
@@ -284,5 +287,6 @@ volumes:
   web_node_modules:
   web_next:
   agent_runtime_node_modules:
+  agent_runtime_sessions:
 
 

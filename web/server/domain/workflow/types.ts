@@ -617,6 +617,9 @@ export type PiAgentRunInput = {
   skillId: string;
   prompt: string;
   title?: string;
+  conversationId?: string;
+  userMessageId?: string;
+  assistantMessageId?: string;
   context?: Record<string, unknown>;
 };
 
@@ -837,6 +840,9 @@ export type PiAgentRunGraphState = WorkflowGraphState & {
     skillId: string;
     prompt: string;
     title: string;
+    conversationId?: string;
+    userMessageId?: string;
+    assistantMessageId?: string;
   };
   runtimeEvents: PiAgentRuntimeEvent[];
   finalOutput?: Record<string, unknown>;

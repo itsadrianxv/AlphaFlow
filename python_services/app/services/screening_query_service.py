@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.data_providers.contracts import DataProvider, FinancialMetricPoint
 from app.services.screening_formula_engine import SafeFormulaEngine
-from app.providers.screening.base import ScreeningDataProvider
 
 
 class ScreeningQueryService:
     def __init__(
         self,
         *,
-        provider: ScreeningDataProvider,
+        provider: DataProvider,
         formula_engine: SafeFormulaEngine | None = None,
     ) -> None:
         self._provider = provider
@@ -41,7 +41,7 @@ class ScreeningQueryService:
         formulas: list[dict[str, object]],
         periods: list[str],
     ) -> dict[str, object]:
-        stock_meta = self._provider.resolve_stock_metadata(stock_codes)
+        stock_meta = self._resolve_stock_metadata(stock_codes)
 
         series_values: dict[str, dict[str, dict[str, float | None]]] = {
             stock_code: {} for stock_code in stock_codes
@@ -63,7 +63,7 @@ class ScreeningQueryService:
 
         if series_indicators:
             series_payload = self._require_dict_payload(
-                self._provider.query_series_metrics(
+                self._query_series_metrics(
                     stock_codes,
                     [indicator["id"] for indicator in series_indicators],
                     periods,
@@ -81,7 +81,7 @@ class ScreeningQueryService:
 
         if latest_indicators:
             latest_payload = self._require_dict_payload(
-                self._provider.query_latest_metrics(
+                self._provider.get_latest_metrics(
                     stock_codes,
                     [indicator["id"] for indicator in latest_indicators],
                 ),
@@ -206,3 +206,36 @@ class ScreeningQueryService:
             "dataStatus": "READY" if rows else "EMPTY",
             "provider": self._provider.provider_name,
         }
+
+    def _resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]:
+        metadata: dict[str, dict[str, str]] = {}
+        for stock_code in stock_codes:
+            try:
+                profile = self._provider.get_stock_profile(stock_code)
+            except Exception:  # noqa: BLE001
+                continue
+            metadata[profile.stockCode] = {
+                "stockName": profile.stockName,
+                "market": profile.market,
+                "industry": profile.industry,
+                "sector": profile.sector,
+            }
+        return metadata
+
+    def _query_series_metrics(
+        self,
+        stock_codes: list[str],
+        indicator_ids: list[str],
+        periods: list[str],
+    ) -> dict[str, dict[str, dict[str, float | None]]]:
+        raw_series = self._provider.get_metric_series(stock_codes, indicator_ids, periods)
+        results: dict[str, dict[str, dict[str, float | None]]] = {}
+        for stock_code, metric_bucket in raw_series.items():
+            results[stock_code] = {}
+            for metric_id, points in metric_bucket.items():
+                results[stock_code][metric_id] = {
+                    point.period: point.value
+                    for point in points
+                    if isinstance(point, FinancialMetricPoint)
+                }
+        return results

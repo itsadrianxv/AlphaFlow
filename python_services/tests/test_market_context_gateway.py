@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+from app.data_providers.contracts import HsgtFlowSnapshot, MacroSnapshot
 from app.contracts.intelligence import ThemeConceptsData, ThemeConceptsResponse, ThemeNewsData, ThemeNewsItem, ThemeNewsResponse
 from app.contracts.market import ThemeCandidate, ThemeCandidatesData, ThemeCandidatesResponse
 from app.contracts.meta import GatewayMeta
@@ -86,18 +87,18 @@ def test_market_context_gateway_builds_snapshot_from_macro_flow_and_hot_themes()
 
     gateway = MarketContextGateway(
         macro_provider=SimpleNamespace(
-            get_macro_snapshot=lambda: {
-                "asOf": "2026-04-18T00:00:00+00:00",
-                "gdpYoY": 5.4,
-                "m2YoY": 8.3,
-                "socialFinancingIncrement": 5200.0,
-                "manufacturingPmi": 50.8,
-            },
-            get_hsgt_flow_snapshot=lambda: {
-                "asOf": "2026-04-18T00:00:00+00:00",
-                "northboundNetAmount": 1762.62,
-                "southboundNetAmount": -664.0,
-            },
+            get_macro_snapshot=lambda: MacroSnapshot(
+                asOf="2026-04-18T00:00:00+00:00",
+                gdpYoY=5.4,
+                m2YoY=8.3,
+                socialFinancingIncrement=5200.0,
+                manufacturingPmi=50.8,
+            ),
+            get_hsgt_flow_snapshot=lambda: HsgtFlowSnapshot(
+                asOf="2026-04-18T00:00:00+00:00",
+                northboundNetAmount=1762.62,
+                southboundNetAmount=-664.0,
+            ),
         ),
         intelligence_data_gateway=SimpleNamespace(
             get_theme_news=lambda **kwargs: _theme_news(
@@ -139,11 +140,11 @@ def test_market_context_gateway_marks_partial_when_macro_snapshot_is_unavailable
     gateway = MarketContextGateway(
         macro_provider=SimpleNamespace(
             get_macro_snapshot=lambda: (_ for _ in ()).throw(RuntimeError("macro unavailable")),
-            get_hsgt_flow_snapshot=lambda: {
-                "asOf": "2026-04-18T00:00:00+00:00",
-                "northboundNetAmount": -300.0,
-                "southboundNetAmount": 100.0,
-            },
+            get_hsgt_flow_snapshot=lambda: HsgtFlowSnapshot(
+                asOf="2026-04-18T00:00:00+00:00",
+                northboundNetAmount=-300.0,
+                southboundNetAmount=100.0,
+            ),
         ),
         intelligence_data_gateway=SimpleNamespace(
             get_theme_news=lambda **kwargs: _theme_news(
@@ -172,18 +173,18 @@ def test_market_context_gateway_marks_partial_when_macro_snapshot_is_unavailable
 def test_market_context_gateway_returns_partial_without_recorded_hot_themes():
     gateway = MarketContextGateway(
         macro_provider=SimpleNamespace(
-            get_macro_snapshot=lambda: {
-                "asOf": "2026-04-18T00:00:00+00:00",
-                "gdpYoY": 5.4,
-                "m2YoY": 8.3,
-                "socialFinancingIncrement": 5200.0,
-                "manufacturingPmi": 50.8,
-            },
-            get_hsgt_flow_snapshot=lambda: {
-                "asOf": "2026-04-18T00:00:00+00:00",
-                "northboundNetAmount": 1762.62,
-                "southboundNetAmount": -664.0,
-            },
+            get_macro_snapshot=lambda: MacroSnapshot(
+                asOf="2026-04-18T00:00:00+00:00",
+                gdpYoY=5.4,
+                m2YoY=8.3,
+                socialFinancingIncrement=5200.0,
+                manufacturingPmi=50.8,
+            ),
+            get_hsgt_flow_snapshot=lambda: HsgtFlowSnapshot(
+                asOf="2026-04-18T00:00:00+00:00",
+                northboundNetAmount=1762.62,
+                southboundNetAmount=-664.0,
+            ),
         ),
         intelligence_data_gateway=SimpleNamespace(
             get_theme_news=lambda **kwargs: (_ for _ in ()).throw(
