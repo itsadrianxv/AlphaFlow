@@ -72,6 +72,8 @@ const stageCanvasClassName =
   "min-h-[calc(100vh-17rem)] xl:min-h-[calc(100vh-15rem)]";
 const stockSearchCanvasClassName =
   "min-h-[calc(66.667vh-11.333rem)] xl:min-h-[calc(66.667vh-10rem)]";
+const formulaMetricDragType = "application/x-screening-metric";
+const formulaOperatorButtons = ["+", "-", "*", "/"] as const;
 
 function buildDefaultWorkspaceName() {
   return `筛选工作台 ${formatDateTime(new Date().toISOString())}`;
@@ -167,9 +169,6 @@ export function ScreeningStudioClient() {
   const [formulaName, setFormulaName] = useState("");
   const [formulaDescription, setFormulaDescription] = useState("");
   const [formulaExpression, setFormulaExpression] = useState("");
-  const [formulaInsertQuery, setFormulaInsertQuery] = useState("");
-  const [formulaTargetIndicatorQuery, setFormulaTargetIndicatorQuery] =
-    useState("");
   const [formulaTargetIndicators, setFormulaTargetIndicators] = useState<
     string[]
   >([]);
@@ -216,23 +215,6 @@ export function ScreeningStudioClient() {
       }),
     [catalogItems, catalogSearchQuery],
   );
-  const formulaInsertOptions = useMemo(
-    () =>
-      buildFormulaMetricOptions({
-        items: catalogItems,
-        query: formulaInsertQuery,
-      }),
-    [catalogItems, formulaInsertQuery],
-  );
-  const formulaTargetIndicatorOptions = useMemo(
-    () =>
-      buildFormulaMetricOptions({
-        items: catalogItems,
-        query: formulaTargetIndicatorQuery,
-      }),
-    [catalogItems, formulaTargetIndicatorQuery],
-  );
-
   const groupedCatalog = useMemo(
     () =>
       groupCatalogItems({
@@ -722,21 +704,84 @@ export function ScreeningStudioClient() {
 
   function insertMetricIntoFormula(name: string) {
     setFormulaExpression((current) =>
-      current.length === 0 ? `[${name}]` : `${current}[${name}]`,
+      current.trim().length === 0 ? `[${name}]` : `${current} [${name}]`,
     );
   }
 
-  function toggleFormulaTargetIndicator(metricId: string) {
-    setFormulaTargetIndicators((current) => {
-      if (current.includes(metricId)) {
-        return current.filter((item) => item !== metricId);
-      }
-      if (current.length >= 5) {
-        setNotice({ tone: "error", text: "目标指标最多只能选择 5 个" });
-        return current;
-      }
-      return [...current, metricId];
+  function insertFormulaOperator(
+    operator: (typeof formulaOperatorButtons)[number],
+  ) {
+    setFormulaExpression((current) => {
+      const trimmed = current.trimEnd();
+      return trimmed.length === 0 ? operator : `${trimmed} ${operator} `;
     });
+  }
+
+  function handleFormulaMetricDragStart(
+    event: React.DragEvent<HTMLElement>,
+    name: string,
+  ) {
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData(formulaMetricDragType, name);
+    event.dataTransfer.setData("text/plain", `[${name}]`);
+  }
+
+  function handleFormulaDrop(event: React.DragEvent<HTMLTextAreaElement>) {
+    const metricName = event.dataTransfer.getData(formulaMetricDragType);
+
+    if (!metricName) {
+      return;
+    }
+
+    event.preventDefault();
+    insertMetricIntoFormula(metricName);
+  }
+
+  function handleFormulaKeyDown(
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      formulaOperatorButtons.includes(
+        event.key as (typeof formulaOperatorButtons)[number],
+      )
+    ) {
+      event.preventDefault();
+      setFormulaValidation("请使用下方按钮插入加减乘除符号");
+    }
+  }
+
+  function inferFormulaTargetIndicators(expression: string) {
+    const catalogIdByAlias = new Map<string, string>();
+
+    for (const item of catalogItems) {
+      catalogIdByAlias.set(item.id, item.id);
+      catalogIdByAlias.set(item.name, item.id);
+    }
+
+    const nextTargets: string[] = [];
+    const metricReferencePattern = /var\[(\d+)\]|\[([^[\]]+)\]/g;
+
+    for (const match of expression.matchAll(metricReferencePattern)) {
+      const targetIndex =
+        match[1] === undefined ? Number.NaN : Number(match[1]);
+      const alias = match[2]?.trim();
+      const indicatorId = Number.isNaN(targetIndex)
+        ? alias
+          ? catalogIdByAlias.get(alias)
+          : undefined
+        : formulaTargetIndicators[targetIndex];
+
+      if (!indicatorId || nextTargets.includes(indicatorId)) {
+        continue;
+      }
+
+      nextTargets.push(indicatorId);
+    }
+
+    return nextTargets.slice(0, 5);
   }
 
   const workspacePayload = useMemo(
@@ -894,24 +939,36 @@ export function ScreeningStudioClient() {
   }
 
   async function handleValidateFormula() {
-    if (!formulaExpression.trim() || formulaTargetIndicators.length === 0) {
-      setFormulaValidation("请填写公式表达式并选择目标指标");
+    const targetIndicators = inferFormulaTargetIndicators(formulaExpression);
+
+    if (!formulaExpression.trim() || targetIndicators.length === 0) {
+      setFormulaValidation("请拖入至少 1 个官方指标后再校验公式");
       return;
     }
+
+    setFormulaTargetIndicators(targetIndicators);
     await validateFormulaMutation.mutateAsync({
       expression: formulaExpression,
-      targetIndicators: formulaTargetIndicators,
+      targetIndicators,
     });
   }
 
   async function handleSaveFormula() {
+    const targetIndicators = inferFormulaTargetIndicators(formulaExpression);
     const payload = {
       name: formulaName,
       expression: formulaExpression,
-      targetIndicators: formulaTargetIndicators,
+      targetIndicators,
       description: formulaDescription || undefined,
       categoryId: "custom",
     };
+
+    if (targetIndicators.length === 0) {
+      setFormulaValidation("请拖入至少 1 个官方指标后再保存公式");
+      return;
+    }
+
+    setFormulaTargetIndicators(targetIndicators);
 
     if (editingFormulaId) {
       await updateFormulaMutation.mutateAsync({
@@ -1095,27 +1152,36 @@ export function ScreeningStudioClient() {
                 <div className="text-xs font-medium text-[var(--app-text-soft)]">
                   {category.name}
                 </div>
-                <div className="mt-2 grid gap-2">
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 2xl:grid-cols-3">
                   {category.items.map((item) => (
-                    <label
+                    <div
                       key={item.id}
-                      className="flex items-start gap-2 text-sm text-[var(--app-text)]"
+                      className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-neutral-surface)] px-2.5 py-2 text-sm text-[var(--app-text)] transition-colors hover:border-[var(--app-border)] hover:bg-[var(--app-selection)]"
+                      title="拖到右侧公式编辑器可插入指标"
                     >
                       <input
                         type="checkbox"
                         checked={selectedIndicatorIds.includes(item.id)}
                         onChange={() => toggleIndicator(item.id)}
                         className="mt-1"
+                        aria-label={`选择指标 ${item.name}`}
                       />
-                      <span>
-                        <span>{item.name}</span>
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(event) =>
+                          handleFormulaMetricDragStart(event, item.name)
+                        }
+                        className="min-w-0 cursor-grab border-0 bg-transparent p-0 text-left text-[inherit] active:cursor-grabbing"
+                      >
+                        <span className="block truncate">{item.name}</span>
                         <span className="block text-xs text-[var(--app-text-subtle)]">
                           {item.periodScope === "series"
                             ? "多期间展开"
                             : "仅最新值"}
                         </span>
-                      </span>
-                    </label>
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1157,7 +1223,7 @@ export function ScreeningStudioClient() {
 
         <SectionCard
           title="公式编辑器"
-          description="输入 [指标名]，保存时会由后端转换为安全表达式。"
+          description="把左侧官方指标拖到表达式里，并使用按钮插入加减乘除。"
           className={
             activeTabId === "indicators"
               ? `xl:col-span-5 ${stageCanvasClassName}`
@@ -1185,66 +1251,36 @@ export function ScreeningStudioClient() {
             <textarea
               value={formulaExpression}
               onChange={(event) => setFormulaExpression(event.target.value)}
-              placeholder="示例：[营业收入] / [归母净利润]"
-              className="app-input min-h-[120px]"
+              onDrop={handleFormulaDrop}
+              onDragOver={(event) => event.preventDefault()}
+              onKeyDown={handleFormulaKeyDown}
+              placeholder="把左侧指标拖到这里"
+              className="app-input min-h-[140px] border-dashed"
             />
+            <div className="grid gap-2 rounded-[12px] border border-[var(--app-border-soft)] p-3">
+              <div className="text-xs text-[var(--app-text-subtle)]">
+                运算符
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {formulaOperatorButtons.map((operator) => (
+                  <button
+                    key={operator}
+                    type="button"
+                    onClick={() => insertFormulaOperator(operator)}
+                    className="app-button min-h-10 px-0 text-base"
+                    aria-label={`插入 ${operator}`}
+                  >
+                    {operator}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               value={formulaDescription}
               onChange={(event) => setFormulaDescription(event.target.value)}
               placeholder="说明"
               className="app-input"
             />
-            <div className="rounded-[12px] border border-[var(--app-border-soft)] p-3">
-              <div className="text-xs text-[var(--app-text-subtle)]">
-                点击插入指标名
-              </div>
-              <input
-                value={formulaInsertQuery}
-                onChange={(event) => setFormulaInsertQuery(event.target.value)}
-                placeholder="搜索可插入指标"
-                className="app-input mt-2"
-              />
-              <div className="mt-2 flex max-h-[120px] flex-wrap gap-2 overflow-auto">
-                {formulaInsertOptions.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => insertMetricIntoFormula(item.name)}
-                    className="rounded-full border border-[var(--app-border-soft)] px-3 py-1 text-xs text-[var(--app-text)]"
-                  >
-                    {item.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-[12px] border border-[var(--app-border-soft)] p-3">
-              <div className="text-xs text-[var(--app-text-subtle)]">
-                目标指标（最多 5 个）
-              </div>
-              <input
-                value={formulaTargetIndicatorQuery}
-                onChange={(event) =>
-                  setFormulaTargetIndicatorQuery(event.target.value)
-                }
-                placeholder="搜索目标指标"
-                className="app-input mt-2"
-              />
-              <div className="mt-2 grid max-h-[140px] gap-2 overflow-auto">
-                {formulaTargetIndicatorOptions.map((item) => (
-                  <label
-                    key={item.id}
-                    className="flex items-center gap-2 text-sm text-[var(--app-text)]"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={formulaTargetIndicators.includes(item.id)}
-                      onChange={() => toggleFormulaTargetIndicator(item.id)}
-                    />
-                    <span>{item.name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
             {formulaValidation ? (
               <InlineNotice tone="info" description={formulaValidation} />
             ) : null}
