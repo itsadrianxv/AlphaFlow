@@ -354,33 +354,22 @@ export function ScreeningStudioClient() {
     },
     onError: (error) => setNotice({ tone: "error", text: error.message }),
   });
-  const validateFormulaMutation = api.screening.validateFormula.useMutation({
-    onSuccess: (result) =>
-      setFormulaValidation(
-        result.valid
-          ? `校验通过：${result.normalizedExpression ?? formulaExpression}`
-          : (result.errors ?? []).join("；"),
-      ),
-    onError: (error) => setFormulaValidation(error.message),
-  });
   const createFormulaMutation = api.screening.createFormula.useMutation({
     onSuccess: async (formula) => {
       setSelectedFormulaIds((current) =>
         current.includes(formula.id) ? current : [...current, formula.id],
       );
-      setNotice({ tone: "success", text: `公式“${formula.name}”已保存` });
       await utils.screening.listFormulas.invalidate();
       resetFormulaEditor();
     },
-    onError: (error) => setNotice({ tone: "error", text: error.message }),
+    onError: (error) => setFormulaValidation(error.message),
   });
   const updateFormulaMutation = api.screening.updateFormula.useMutation({
-    onSuccess: async (formula) => {
-      setNotice({ tone: "success", text: `公式“${formula.name}”已更新` });
+    onSuccess: async () => {
       await utils.screening.listFormulas.invalidate();
       resetFormulaEditor();
     },
-    onError: (error) => setNotice({ tone: "error", text: error.message }),
+    onError: (error) => setFormulaValidation(error.message),
   });
   const deleteFormulaMutation = api.screening.deleteFormula.useMutation({
     onSuccess: async () => {
@@ -938,21 +927,6 @@ export function ScreeningStudioClient() {
     });
   }
 
-  async function handleValidateFormula() {
-    const targetIndicators = inferFormulaTargetIndicators(formulaExpression);
-
-    if (!formulaExpression.trim() || targetIndicators.length === 0) {
-      setFormulaValidation("请拖入至少 1 个官方指标后再校验公式");
-      return;
-    }
-
-    setFormulaTargetIndicators(targetIndicators);
-    await validateFormulaMutation.mutateAsync({
-      expression: formulaExpression,
-      targetIndicators,
-    });
-  }
-
   async function handleSaveFormula() {
     const targetIndicators = inferFormulaTargetIndicators(formulaExpression);
     const payload = {
@@ -969,6 +943,7 @@ export function ScreeningStudioClient() {
     }
 
     setFormulaTargetIndicators(targetIndicators);
+    setFormulaValidation(null);
 
     if (editingFormulaId) {
       await updateFormulaMutation.mutateAsync({
@@ -1282,22 +1257,19 @@ export function ScreeningStudioClient() {
               className="app-input"
             />
             {formulaValidation ? (
-              <InlineNotice tone="info" description={formulaValidation} />
+              <InlineNotice tone="danger" description={formulaValidation} />
             ) : null}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => void handleValidateFormula()}
-                className="app-button"
-              >
-                校验公式
-              </button>
-              <button
-                type="button"
                 onClick={() => void handleSaveFormula()}
                 className="app-button app-button-primary"
+                disabled={
+                  createFormulaMutation.isPending ||
+                  updateFormulaMutation.isPending
+                }
               >
-                保存公式
+                {editingFormulaId ? "更新公式" : "保存公式"}
               </button>
             </div>
             {formulas.length > 0 ? (
