@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { MarkdownContent } from "~/app/_components/markdown-content";
-import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
 import {
   EmptyState,
   InlineNotice,
@@ -75,7 +74,8 @@ function latestRunningRunId(conversation?: Conversation) {
 function ChatMessage(props: {
   message: Message;
   liveText?: string;
-  targetRef?: ResearchTargetRef | null;
+  lastTargetRef?: ResearchTargetRef | null;
+  onLastTargetRefChange?: (targetRef: ResearchTargetRef | null) => void;
 }) {
   const { message, liveText } = props;
   const isUser = message.role === "USER";
@@ -101,7 +101,9 @@ function ChatMessage(props: {
       <div className="min-w-0 max-w-full text-[var(--app-text-strong)]">
         {content ? (
           <HighlightToNote
-            targetRef={props.targetRef}
+            lastTargetRef={props.lastTargetRef}
+            floatingToolbar
+            onLastTargetRefChange={props.onLastTargetRefChange}
             source={{
               kind: "pi_agent_message",
               messageId: message.id,
@@ -177,7 +179,9 @@ export function AgentRuntimeClientPage() {
   const [prompt, setPrompt] = useState("");
   const [liveMessages, setLiveMessages] = useState<Record<string, string>>({});
   const [activeRunId, setActiveRunId] = useState("");
-  const [targetRef, setTargetRef] = useState<ResearchTargetRef | null>(null);
+  const [lastTargetRef, setLastTargetRef] = useState<ResearchTargetRef | null>(
+    null,
+  );
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const migrationRequestedRef = useRef(false);
 
@@ -336,7 +340,6 @@ export function AgentRuntimeClientPage() {
       skillId,
       prompt,
       title: prompt.trim().slice(0, 80),
-      context: targetRef ? { targetRef } : undefined,
     });
   };
 
@@ -371,7 +374,8 @@ export function AgentRuntimeClientPage() {
                   key={message.id}
                   message={message}
                   liveText={liveMessages[message.id]}
-                  targetRef={targetRef}
+                  lastTargetRef={lastTargetRef}
+                  onLastTargetRefChange={setLastTargetRef}
                 />
               ))}
               <div ref={messagesEndRef} />
@@ -389,33 +393,14 @@ export function AgentRuntimeClientPage() {
 
         <div className="pi-agent-composer fixed right-0 bottom-0 left-0 z-30 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4">
           <div className="mx-auto w-full max-w-[820px] px-1 sm:px-4">
-            <div className="mb-3 flex flex-wrap items-center gap-3">
-              <select
-                value={skillId}
-                onChange={(event) => setSkillId(event.target.value)}
-                className="max-w-[280px] rounded-[18px]"
-              >
-                {(skillsQuery.data?.items ?? []).map((skill) => (
-                  <option key={skill.id} value={skill.id}>
-                    {skill.name}
-                  </option>
-                ))}
-              </select>
+            <div className="mb-3 flex justify-end">
               {activeGenerationRunId ? (
                 <StatusPill tone="info" label="正在生成" />
               ) : null}
             </div>
-            <div className="mb-3">
-              <ResearchTargetPicker
-                value={targetRef}
-                onChange={setTargetRef}
-                allowedTypes={["company", "industry", "watchlist", "space"]}
-                compact
-              />
-            </div>
             <div className="relative rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] transition-[border-color,box-shadow,background-color] focus-within:border-[var(--app-accent-strong)] focus-within:bg-[var(--app-bg-elevated)] focus-within:shadow-[0_0_0_3px_rgba(59,158,255,0.16)]">
               <textarea
-                className="min-h-[82px] w-full resize-none rounded-[22px] border-0 bg-transparent py-4 pr-16 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
+                className="min-h-[104px] w-full resize-none rounded-[22px] border-0 bg-transparent pt-4 pr-16 pb-16 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
                 placeholder="输入下一条消息"
@@ -429,6 +414,27 @@ export function AgentRuntimeClientPage() {
                   }
                 }}
               />
+              <label
+                className="absolute bottom-3 left-3 inline-flex h-10 max-w-[calc(100%-76px)] items-center rounded-full border border-[var(--app-border-soft)] bg-[rgba(255,255,255,0.04)] text-[var(--app-text-muted)] transition-colors hover:border-[rgba(255,255,255,0.28)] hover:bg-[rgba(255,255,255,0.08)]"
+                title="选择 skill"
+              >
+                <span className="pointer-events-none px-3 text-xs font-medium text-[var(--app-text-subtle)]">
+                  选择 Skill
+                </span>
+                <select
+                  aria-label="选择 skill"
+                  value={skillId}
+                  onChange={(event) => setSkillId(event.target.value)}
+                  className="h-10 min-w-[130px] max-w-[220px] border-0 bg-transparent py-0 pr-9 pl-0 text-xs text-[var(--app-text-strong)] outline-none"
+                  title="选择 skill"
+                >
+                  {(skillsQuery.data?.items ?? []).map((skill) => (
+                    <option key={skill.id} value={skill.id}>
+                      {skill.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
               {activeGenerationRunId ? (
                 <button
                   type="button"
