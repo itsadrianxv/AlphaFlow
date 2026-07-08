@@ -10,6 +10,7 @@ import os
 from typing import Any, Generic, TypeVar
 
 from app.data_providers import get_default_data_provider
+from app.data_providers.errors import DataProviderError
 from app.services.firecrawl_capability_client import FirecrawlCapabilityClient
 from app.services.screening_periods import resolve_periods
 from app.services.screening_query_service import ScreeningQueryService
@@ -104,6 +105,71 @@ class ExternalCapabilityGateway:
                 capability="screening",
                 operation="query_dataset",
                 code="tushare_query_failed",
+                message=str(exc),
+                failure_phase=_classify_screening_failure(str(exc)),
+                diagnostics=diagnostics,
+                retryable=False,
+                status_code=503,
+            ) from exc
+
+    def query_market_data(
+        self,
+        request_id: str,
+        operation: str,
+        payload: dict[str, Any],
+    ) -> CapabilityResult[dict[str, Any]]:
+        provider_name = "tushare"
+        diagnostics = {
+            "provider": provider_name,
+            "hasToken": bool(os.getenv("TUSHARE_TOKEN", "").strip()),
+            "sdkAvailable": find_spec("tushare") is not None,
+            "requestFingerprint": _fingerprint(payload),
+            "operation": operation,
+        }
+        try:
+            provider = get_default_data_provider()
+            provider_name = provider.provider_name
+            diagnostics["provider"] = provider_name
+            if not hasattr(provider, "query_market_tool"):
+                raise CapabilityError(
+                    provider=provider_name,
+                    capability="market",
+                    operation=operation,
+                    code="unsupported_market_provider",
+                    message=f"Provider {provider_name} does not support market tool queries",
+                    failure_phase="runtime_environment",
+                    diagnostics=diagnostics,
+                    retryable=False,
+                    status_code=501,
+                )
+            data = provider.query_market_tool(operation, payload)
+            return CapabilityResult(
+                provider=provider_name,
+                capability="market",
+                operation=operation,
+                data=data,
+                diagnostics=diagnostics,
+            )
+        except CapabilityError:
+            raise
+        except DataProviderError as exc:
+            raise CapabilityError(
+                provider=exc.provider or provider_name,
+                capability="market",
+                operation=operation,
+                code=exc.code,
+                message=str(exc),
+                failure_phase=_classify_data_provider_failure(exc),
+                diagnostics=diagnostics,
+                retryable=exc.retryable,
+                status_code=503 if exc.retryable else 400,
+            ) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise CapabilityError(
+                provider=provider_name,
+                capability="market",
+                operation=operation,
+                code="tushare_market_query_failed",
                 message=str(exc),
                 failure_phase=_classify_screening_failure(str(exc)),
                 diagnostics=diagnostics,
@@ -240,5 +306,13 @@ def _classify_screening_failure(message: str) -> str:
     if "tushare_token" in normalized or "token" in normalized:
         return "configuration"
     if "sdk" in normalized or "tushare" in normalized:
+        return "runtime_environment"
+    return "request"
+
+
+def _classify_data_provider_failure(error: DataProviderError) -> str:
+    if error.code == "provider_configuration_error":
+        return "configuration"
+    if error.code == "unsupported_dataset":
         return "runtime_environment"
     return "request"

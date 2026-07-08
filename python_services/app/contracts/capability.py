@@ -58,3 +58,113 @@ class WebFetchCapabilityRequest(BaseModel):
 class ConceptMatchCapabilityRequest(BaseModel):
     theme: str = Field(..., min_length=1)
     limit: int = Field(default=5, ge=1, le=20)
+
+
+class StockSearchCapabilityRequest(BaseModel):
+    keyword: str = Field(..., min_length=1)
+    limit: int = Field(default=10, ge=1, le=100)
+    listStatus: str = Field(default="L")
+    exchange: str | None = None
+
+
+class StockProfileCapabilityRequest(BaseModel):
+    stockCode: str = Field(..., min_length=1)
+    includeCompany: bool = True
+
+
+class StockBarsCapabilityRequest(BaseModel):
+    stockCode: str = Field(..., min_length=1)
+    startDate: str | None = None
+    endDate: str | None = None
+    freq: str = Field(default="daily")
+    adjust: str = Field(default="qfq")
+
+
+class StockDailyBasicCapabilityRequest(BaseModel):
+    stockCode: str | None = None
+    tradeDate: str | None = None
+    startDate: str | None = None
+    endDate: str | None = None
+
+
+class IndexMarketCapabilityRequest(BaseModel):
+    indexCode: str = Field(..., min_length=1)
+    startDate: str | None = None
+    endDate: str | None = None
+    includeBasic: bool = True
+    includeValuation: bool = True
+
+
+class IndexConstituentsCapabilityRequest(BaseModel):
+    indexCode: str = Field(..., min_length=1)
+    tradeDate: str | None = None
+    startDate: str | None = None
+    endDate: str | None = None
+    includeNames: bool = True
+
+
+class MoneyflowCapabilityRequest(BaseModel):
+    stockCode: str | None = None
+    tradeDate: str | None = None
+    startDate: str | None = None
+    endDate: str | None = None
+    include: list[str] = Field(default_factory=lambda: ["moneyflow"])
+
+
+class MarketEventsCapabilityRequest(BaseModel):
+    tradeDate: str = Field(..., min_length=8)
+    stockCode: str | None = None
+    include: list[str] = Field(default_factory=lambda: ["topList", "topInst", "blockTrade", "limit"])
+
+
+class ShareholderEventsCapabilityRequest(BaseModel):
+    stockCode: str = Field(..., min_length=1)
+    startDate: str | None = None
+    endDate: str | None = None
+    include: list[str] = Field(
+        default_factory=lambda: ["holderNumber", "holderTrade", "pledge", "shareFloat", "repurchase"]
+    )
+
+
+class FinancialStatementsCapabilityRequest(BaseModel):
+    stockCode: str = Field(..., min_length=1)
+    startDate: str | None = None
+    endDate: str | None = None
+    period: str | None = None
+    statement: str = Field(default="all")
+    reportType: str = Field(default="1")
+
+
+class FinancialIndicatorsCapabilityRequest(BaseModel):
+    stockCode: str = Field(..., min_length=1)
+    startDate: str | None = None
+    endDate: str | None = None
+    period: str | None = None
+    include: list[str] = Field(default_factory=lambda: ["indicator", "mainBusiness", "audit"])
+
+
+class EarningsEventsCapabilityRequest(BaseModel):
+    stockCode: str = Field(..., min_length=1)
+    startDate: str | None = None
+    endDate: str | None = None
+    include: list[str] = Field(default_factory=lambda: ["forecast", "express", "disclosureDate", "dividend"])
+
+
+class FundMarketCapabilityRequest(BaseModel):
+    fundCode: str = Field(..., min_length=1)
+    startDate: str | None = None
+    endDate: str | None = None
+    include: list[str] = Field(default_factory=lambda: ["basic", "nav", "daily", "portfolio"])
+
+
+class ConvertibleBondMarketCapabilityRequest(BaseModel):
+    bondCode: str = Field(..., min_length=1)
+    startDate: str | None = None
+    endDate: str | None = None
+    include: list[str] = Field(default_factory=lambda: ["basic", "issue", "daily"])
+
+
+class MacroRatesCapabilityRequest(BaseModel):
+    startDate: str | None = None
+    endDate: str | None = None
+    include: list[str] = Field(default_factory=lambda: ["shibor", "lpr", "libor", "hibor"])
