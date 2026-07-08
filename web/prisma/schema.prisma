@@ -78,6 +78,7 @@ model User {
     timingPresetAdjustmentSuggestions TimingPresetAdjustmentSuggestion[]
     workflowRuns                      WorkflowRun[]
     researchSpaces                    ResearchSpace[]
+    agentConversations                AgentConversation[]
 }
 
 model VerificationToken {
@@ -500,6 +501,24 @@ enum WorkflowRunStatus {
     CANCELLED
 }
 
+enum AgentConversationStatus {
+    ACTIVE
+    ARCHIVED
+}
+
+enum AgentConversationMessageRole {
+    USER
+    ASSISTANT
+}
+
+enum AgentConversationMessageStatus {
+    PENDING
+    STREAMING
+    SUCCEEDED
+    FAILED
+    CANCELLED
+}
+
 enum WorkflowNodeRunStatus {
     PENDING
     RUNNING
@@ -568,6 +587,8 @@ model WorkflowRun {
     spaceLinks              ResearchSpaceRunLink[]
     agentToolCalls          AgentToolCall[]
     agentArtifacts          AgentArtifact[]
+    agentConversationMessages AgentConversationMessage[]
+    legacyAgentConversation AgentConversation? @relation("LegacyAgentConversationRun")
 
     @@index([templateId])
     @@index([userId, createdAt])
@@ -678,4 +699,46 @@ model AgentArtifact {
 
     @@index([workflowRunId, createdAt])
     @@index([kind, createdAt])
+}
+
+model AgentConversation {
+    id                  String                  @id @default(cuid())
+    userId              String
+    title               String
+    status              AgentConversationStatus @default(ACTIVE)
+    piSessionId         String                  @unique
+    legacyWorkflowRunId String?                 @unique
+    lastMessageAt       DateTime                @default(now())
+    createdAt           DateTime                @default(now())
+    updatedAt           DateTime                @updatedAt
+
+    user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+    legacyWorkflowRun WorkflowRun?                @relation("LegacyAgentConversationRun", fields: [legacyWorkflowRunId], references: [id], onDelete: SetNull)
+    messages          AgentConversationMessage[]
+
+    @@index([userId, lastMessageAt])
+    @@index([userId, status])
+}
+
+model AgentConversationMessage {
+    id             String                         @id @default(cuid())
+    conversationId String
+    role           AgentConversationMessageRole
+    content        String
+    skillId        String?
+    status         AgentConversationMessageStatus @default(SUCCEEDED)
+    workflowRunId  String?
+    sequence       Int
+    metadata       Json?
+    errorCode      String?
+    errorMessage   String?
+    createdAt      DateTime                       @default(now())
+    updatedAt      DateTime                       @updatedAt
+
+    conversation AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    workflowRun  WorkflowRun?      @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+
+    @@unique([conversationId, sequence])
+    @@index([conversationId, createdAt])
+    @@index([workflowRunId])
 }

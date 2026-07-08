@@ -112,6 +112,9 @@ export type StartPiAgentRunCommand = {
   skillId: string;
   prompt: string;
   title?: string;
+  conversationId?: string;
+  userMessageId?: string;
+  assistantMessageId?: string;
   context?: Record<string, unknown>;
   templateVersion?: number;
   idempotencyKey?: string;
@@ -349,6 +352,9 @@ export class WorkflowCommandService {
         skillId: command.skillId,
         prompt: command.prompt,
         title,
+        conversationId: command.conversationId,
+        userMessageId: command.userMessageId,
+        assistantMessageId: command.assistantMessageId,
         context: command.context,
       },
       idempotencyKey:

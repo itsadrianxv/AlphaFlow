@@ -37,10 +37,33 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
 
   return {
     runId,
+    sessionId: typeof value.sessionId === "string" ? value.sessionId : undefined,
+    conversationId:
+      typeof value.conversationId === "string" ? value.conversationId : undefined,
+    userMessageId:
+      typeof value.userMessageId === "string" ? value.userMessageId : undefined,
+    assistantMessageId:
+      typeof value.assistantMessageId === "string"
+        ? value.assistantMessageId
+        : undefined,
     skillId,
     prompt,
     title: typeof value.title === "string" ? value.title : undefined,
     context: isRecord(value.context) ? value.context : undefined,
+    sessionSeed: Array.isArray(value.sessionSeed)
+      ? value.sessionSeed
+          .filter(
+            (item) =>
+              isRecord(item) &&
+              (item.role === "user" || item.role === "assistant") &&
+              typeof item.content === "string",
+          )
+          .map((item) => ({
+            role: item.role as "user" | "assistant",
+            content: item.content as string,
+            skillId: typeof item.skillId === "string" ? item.skillId : undefined,
+          }))
+      : undefined,
   };
 }
 

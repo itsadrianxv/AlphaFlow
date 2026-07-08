@@ -21,6 +21,7 @@ import { TimingActionPolicy } from "~/server/domain/timing/services/timing-actio
 import { TimingConfidencePolicy } from "~/server/domain/timing/services/timing-confidence-policy";
 import { TimingReviewPolicy } from "~/server/domain/timing/services/timing-review-policy";
 import { AgentRuntimeClient } from "~/server/infrastructure/agent-runtime/agent-runtime-client";
+import { PrismaAgentConversationRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-conversation-repository";
 import { PrismaAgentRuntimeRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-runtime-repository";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
@@ -57,6 +58,7 @@ import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redi
 
 const workflowRepository = new PrismaWorkflowRunRepository(db);
 const agentRuntimeRepository = new PrismaAgentRuntimeRepository(db);
+const agentConversationRepository = new PrismaAgentConversationRepository(db);
 const agentRuntimeClient = new AgentRuntimeClient();
 const deepSeekClient = new DeepSeekClient();
 const pythonDataClient = new PythonIntelligenceDataClient();
@@ -187,6 +189,7 @@ const executionService = new WorkflowExecutionService({
     new PiAgentRuntimeLangGraph({
       agentRuntimeClient,
       agentRuntimeRepository,
+      agentConversationRepository,
     }),
   ],
 });

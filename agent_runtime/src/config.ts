@@ -14,6 +14,12 @@ export function readConfig(): AgentRuntimeConfig {
   return {
     host: process.env.AGENT_RUNTIME_HOST ?? "0.0.0.0",
     port: readNumber("AGENT_RUNTIME_PORT", 8020),
+    sessionRoot:
+      process.env.AGENT_RUNTIME_SESSION_ROOT ?? "temp/agent-runtime-sessions",
+    compactionTokenThreshold: readNumber(
+      "AGENT_RUNTIME_COMPACTION_TOKEN_THRESHOLD",
+      48_000,
+    ),
     pythonServiceUrl:
       process.env.PYTHON_SERVICE_URL ?? "http://python-service:8000",
     pythonServiceTimeoutMs: readNumber("PYTHON_SERVICE_TIMEOUT_MS", 60_000),
