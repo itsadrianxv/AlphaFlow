@@ -9,7 +9,7 @@ import json
 import os
 from typing import Any, Generic, TypeVar
 
-from app.providers.screening.factory import get_strict_screening_provider
+from app.data_providers import get_default_data_provider
 from app.services.firecrawl_capability_client import FirecrawlCapabilityClient
 from app.services.screening_periods import resolve_periods
 from app.services.screening_query_service import ScreeningQueryService
@@ -81,7 +81,7 @@ class ExternalCapabilityGateway:
             "requestFingerprint": _fingerprint(payload),
         }
         try:
-            provider = get_strict_screening_provider()
+            provider = get_default_data_provider()
             provider_name = provider.provider_name
             diagnostics["provider"] = provider_name
             service = ScreeningQueryService(provider=provider)

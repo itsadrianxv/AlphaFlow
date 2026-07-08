@@ -7,7 +7,7 @@ from functools import lru_cache
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.providers.screening.factory import get_strict_screening_provider
+from app.data_providers import get_default_data_provider
 from app.services.screening_catalog import load_indicator_catalog
 from app.services.screening_formula_engine import SafeFormulaEngine
 from app.services.screening_periods import resolve_periods
@@ -31,18 +31,16 @@ class ScreeningQueryRequest(BaseModel):
 
 @lru_cache(maxsize=1)
 def get_stock_searcher() -> ScreeningStockSearcher:
-    provider = get_strict_screening_provider()
+    provider = get_default_data_provider()
 
     def load_universe():
-        stock_codes = provider.get_all_stock_codes()
-        metadata = provider.resolve_stock_metadata(stock_codes)
         return [
             {
-                "stockCode": stock_code,
-                "stockName": metadata.get(stock_code, {}).get("stockName", stock_code),
-                "market": metadata.get(stock_code, {}).get("market", ""),
+                "stockCode": profile.stockCode,
+                "stockName": profile.stockName,
+                "market": profile.market,
             }
-            for stock_code in stock_codes
+            for profile in provider.get_stock_universe()
         ]
 
     return ScreeningStockSearcher(universe_loader=load_universe)
@@ -87,7 +85,7 @@ def validate_formula(request: FormulaValidationRequest):
 @router.post("/query")
 def query_dataset(request: ScreeningQueryRequest):
     try:
-        provider = get_strict_screening_provider()
+        provider = get_default_data_provider()
         service = ScreeningQueryService(provider=provider)
         periods = resolve_periods(request.timeConfig)
         return service.query_dataset(

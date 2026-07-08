@@ -6,6 +6,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 import pytest
 
+from app.data_providers.contracts import StockProfile
 from app.main import app
 
 client = TestClient(app)
@@ -153,29 +154,33 @@ def test_screening_query_capability_reports_actual_provider_for_invalid_payload(
     class BrokenProvider:
         provider_name = "akshare"
 
-        def resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]:
-            return {
-                stock_code: {"stockName": stock_code, "market": "SH"}
-                for stock_code in stock_codes
-            }
+        def get_stock_profile(self, stock_code: str) -> StockProfile:
+            return StockProfile(
+                stockCode=stock_code,
+                tsCode=f"{stock_code}.SH",
+                stockName=stock_code,
+                market="SH",
+                sector="主板",
+                industry="",
+            )
 
-        def query_latest_metrics(
+        def get_latest_metrics(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
         ):
             return None
 
-        def query_series_metrics(
+        def get_metric_series(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
             periods: list[str],
-        ) -> dict[str, dict[str, dict[str, float | None]]]:
+        ) -> dict[str, dict[str, list]]:
             return {}
 
     monkeypatch.setattr(
-        "app.gateway.external_capability_gateway.get_strict_screening_provider",
+        "app.gateway.external_capability_gateway.get_default_data_provider",
         lambda: BrokenProvider(),
     )
 
@@ -215,29 +220,33 @@ def test_screening_query_capability_uses_strict_screening_provider(monkeypatch):
     class StrictProvider:
         provider_name = "tushare"
 
-        def resolve_stock_metadata(self, stock_codes: list[str]) -> dict[str, dict[str, str]]:
-            return {
-                stock_code: {"stockName": stock_code, "market": "SH"}
-                for stock_code in stock_codes
-            }
+        def get_stock_profile(self, stock_code: str) -> StockProfile:
+            return StockProfile(
+                stockCode=stock_code,
+                tsCode=f"{stock_code}.SH",
+                stockName=stock_code,
+                market="SH",
+                sector="主板",
+                industry="",
+            )
 
-        def query_latest_metrics(
+        def get_latest_metrics(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
         ) -> dict[str, dict[str, float | None]]:
             return {stock_code: {} for stock_code in stock_codes}
 
-        def query_series_metrics(
+        def get_metric_series(
             self,
             stock_codes: list[str],
-            indicator_ids: list[str],
+            metric_ids: list[str],
             periods: list[str],
-        ) -> dict[str, dict[str, dict[str, float | None]]]:
+        ) -> dict[str, dict[str, list]]:
             return {stock_code: {} for stock_code in stock_codes}
 
     monkeypatch.setattr(
-        "app.gateway.external_capability_gateway.get_strict_screening_provider",
+        "app.gateway.external_capability_gateway.get_default_data_provider",
         lambda: StrictProvider(),
     )
 

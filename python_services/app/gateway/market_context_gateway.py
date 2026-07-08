@@ -15,13 +15,14 @@ from app.contracts.market_context import (
     MarketRegimeSummary,
     SectionHint,
 )
+from app.data_providers import get_default_data_provider
+from app.data_providers.contracts import DataProvider, HsgtFlowSnapshot, MacroSnapshot
 from app.gateway.common import build_meta, execute_cached, gateway_cache, iso_now
 from app.gateway.intelligence_gateway import IntelligenceGateway, intelligence_gateway
 from app.gateway.market_gateway import MarketGateway, market_gateway
 from app.infrastructure.metrics.recorder import MetricsRecorder, metrics_recorder
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
-from app.providers.market_context.tushare_provider import TushareMarketContextProvider
 
 
 def _average(values: list[float]) -> float | None:
@@ -35,12 +36,12 @@ class MarketContextGateway:
 
     def __init__(
         self,
-        macro_provider: TushareMarketContextProvider | None = None,
+        macro_provider: DataProvider | None = None,
         intelligence_data_gateway: IntelligenceGateway | None = None,
         market_data_gateway: MarketGateway | None = None,
         recorder: MetricsRecorder | None = None,
     ) -> None:
-        self._macro_provider = macro_provider or TushareMarketContextProvider()
+        self._macro_provider = macro_provider or get_default_data_provider()
         self._intelligence_gateway = intelligence_data_gateway or intelligence_gateway
         self._market_gateway = market_data_gateway or market_gateway
         self._recorder = recorder or metrics_recorder
@@ -91,7 +92,7 @@ class MarketContextGateway:
         macro_snapshot = None
         try:
             macro_snapshot = self._macro_provider.get_macro_snapshot()
-            as_of_candidates.append(str(macro_snapshot.get("asOf") or ""))
+            as_of_candidates.append(str(macro_snapshot.asOf or ""))
         except Exception as exc:  # noqa: BLE001
             availability.regime = MarketContextAvailabilityEntry(
                 available=False,
@@ -101,7 +102,7 @@ class MarketContextGateway:
         flow_snapshot = None
         try:
             flow_snapshot = self._macro_provider.get_hsgt_flow_snapshot()
-            as_of_candidates.append(str(flow_snapshot.get("asOf") or ""))
+            as_of_candidates.append(str(flow_snapshot.asOf or ""))
         except Exception as exc:  # noqa: BLE001
             availability.flow = MarketContextAvailabilityEntry(
                 available=False,
@@ -199,7 +200,7 @@ class MarketContextGateway:
             topNews=news_items,
         )
 
-    def _build_regime_summary(self, macro_snapshot: dict | None) -> MarketRegimeSummary:
+    def _build_regime_summary(self, macro_snapshot: MacroSnapshot | None) -> MarketRegimeSummary:
         if not macro_snapshot:
             return MarketRegimeSummary(
                 overallTone="unknown",
@@ -210,10 +211,10 @@ class MarketContextGateway:
                 drivers=[],
             )
 
-        gdp_yoy = macro_snapshot.get("gdpYoY")
-        m2_yoy = macro_snapshot.get("m2YoY")
-        sf_month = macro_snapshot.get("socialFinancingIncrement")
-        pmi = macro_snapshot.get("manufacturingPmi")
+        gdp_yoy = macro_snapshot.gdpYoY
+        m2_yoy = macro_snapshot.m2YoY
+        sf_month = macro_snapshot.socialFinancingIncrement
+        pmi = macro_snapshot.manufacturingPmi
 
         growth_tone = "unknown"
         if pmi is not None or gdp_yoy is not None:
@@ -264,7 +265,7 @@ class MarketContextGateway:
             drivers=drivers,
         )
 
-    def _build_flow_summary(self, flow_snapshot: dict | None) -> MarketFlowSummary:
+    def _build_flow_summary(self, flow_snapshot: HsgtFlowSnapshot | None) -> MarketFlowSummary:
         if not flow_snapshot:
             return MarketFlowSummary(
                 northboundNetAmount=None,
@@ -272,7 +273,7 @@ class MarketContextGateway:
                 summary="北向资金数据暂不可用。",
             )
 
-        northbound = flow_snapshot.get("northboundNetAmount")
+        northbound = flow_snapshot.northboundNetAmount
         if northbound is None:
             direction = "unknown"
         elif northbound > 0:
