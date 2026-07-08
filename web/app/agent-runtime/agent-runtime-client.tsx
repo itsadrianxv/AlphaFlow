@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "~/app/_components/markdown-content";
 import {
-  cn,
   EmptyState,
   InlineNotice,
   StatusPill,
@@ -75,50 +74,42 @@ function ChatMessage(props: { message: Message; liveText?: string }) {
   const isUser = message.role === "USER";
   const content = messageText(message, liveText);
 
-  return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
-      <div
-        className={cn(
-          "max-w-[min(760px,92%)] rounded-[10px] border px-4 py-3",
-          isUser
-            ? "border-[var(--app-accent)] bg-[var(--app-accent)] text-white"
-            : "border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] text-[var(--app-text-strong)]",
-        )}
-      >
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-xs font-medium">
-            {isUser ? "你" : "Pi Agent"}
-          </span>
-          {message.skillId ? (
-            <span
-              className={cn(
-                "text-xs",
-                isUser ? "text-white/80" : "text-[var(--app-text-subtle)]",
-              )}
-            >
-              {message.skillId}
-            </span>
-          ) : null}
-          {!isUser && message.status !== "SUCCEEDED" ? (
-            <StatusPill
-              tone={statusTone[message.status]}
-              label={statusLabel[message.status]}
-            />
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[min(620px,78%)] rounded-[18px] bg-[var(--app-panel-strong)] px-4 py-3 text-[var(--app-text-strong)]">
+          <div className="whitespace-pre-wrap text-sm leading-6">{content}</div>
+          {message.errorMessage ? (
+            <div className="mt-3 text-sm text-[var(--app-danger)]">
+              {message.errorMessage}
+            </div>
           ) : null}
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-start">
+      <div className="min-w-0 max-w-full text-[var(--app-text-strong)]">
         {content ? (
-          isUser ? (
-            <div className="whitespace-pre-wrap text-sm leading-6">
-              {content}
-            </div>
-          ) : (
-            <MarkdownContent content={content} />
-          )
+          <MarkdownContent
+            content={content}
+            className="max-w-none [&>*+*]:mt-4"
+          />
         ) : (
           <div className="text-sm text-[var(--app-text-subtle)]">
             正在准备回复
           </div>
         )}
+        {message.status !== "SUCCEEDED" ? (
+          <div className="mt-3">
+            <StatusPill
+              tone={statusTone[message.status]}
+              label={statusLabel[message.status]}
+            />
+          </div>
+        ) : null}
         {message.errorMessage ? (
           <div className="mt-3 text-sm text-[var(--app-danger)]">
             {message.errorMessage}
@@ -336,7 +327,7 @@ export function AgentRuntimeClientPage() {
 
         <div className="flex-1 overflow-y-auto pb-5">
           {selectedConversation ? (
-            <div className="grid gap-4">
+            <div className="mx-auto grid w-full max-w-[820px] gap-6 px-1 sm:px-4">
               {selectedConversation.messages.map((message) => (
                 <ChatMessage
                   key={message.id}
@@ -347,51 +338,62 @@ export function AgentRuntimeClientPage() {
               <div ref={messagesEndRef} />
             </div>
           ) : selectedConversationId && conversationQuery.isLoading ? (
-            <div className="text-sm text-[var(--app-text-muted)]">加载中</div>
+            <div className="mx-auto w-full max-w-[820px] px-1 text-sm text-[var(--app-text-muted)] sm:px-4">
+              加载中
+            </div>
           ) : (
-            <EmptyState title="开始一次 Pi Agent 对话" />
+            <div className="mx-auto w-full max-w-[820px] px-1 sm:px-4">
+              <EmptyState title="开始一次 Pi Agent 对话" />
+            </div>
           )}
         </div>
 
         <div className="sticky bottom-0 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4">
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <select
-              value={skillId}
-              onChange={(event) => setSkillId(event.target.value)}
-              className="max-w-[280px]"
-            >
-              {(skillsQuery.data?.items ?? []).map((skill) => (
-                <option key={skill.id} value={skill.id}>
-                  {skill.name}
-                </option>
-              ))}
-            </select>
-            {runningRunId ? <StatusPill tone="info" label="正在生成" /> : null}
-          </div>
-          <div className="flex gap-3">
-            <textarea
-              className="app-textarea min-h-[72px] flex-1 resize-none"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="输入下一条消息"
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault();
-                  void handleSend();
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="app-button app-button-primary self-end"
-              disabled={!canSend || sendMutation.isPending}
-              onClick={handleSend}
-            >
-              {sendMutation.isPending ? "发送中" : "发送"}
-            </button>
+          <div className="mx-auto w-full max-w-[820px] px-1 sm:px-4">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <select
+                value={skillId}
+                onChange={(event) => setSkillId(event.target.value)}
+                className="max-w-[280px]"
+              >
+                {(skillsQuery.data?.items ?? []).map((skill) => (
+                  <option key={skill.id} value={skill.id}>
+                    {skill.name}
+                  </option>
+                ))}
+              </select>
+              {runningRunId ? (
+                <StatusPill tone="info" label="正在生成" />
+              ) : null}
+            </div>
+            <div className="flex gap-3">
+              <textarea
+                className="app-textarea min-h-[72px] flex-1 resize-none"
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                placeholder="输入下一条消息"
+                onKeyDown={(event) => {
+                  if (
+                    event.key === "Enter" &&
+                    (event.metaKey || event.ctrlKey)
+                  ) {
+                    event.preventDefault();
+                    void handleSend();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="app-button app-button-primary self-end"
+                disabled={!canSend || sendMutation.isPending}
+                onClick={handleSend}
+              >
+                {sendMutation.isPending ? "发送中" : "发送"}
+              </button>
+            </div>
           </div>
           {sendMutation.error ? (
-            <div className="mt-3">
+            <div className="mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
               <InlineNotice
                 tone="danger"
                 description={sendMutation.error.message}
@@ -399,7 +401,7 @@ export function AgentRuntimeClientPage() {
             </div>
           ) : null}
           {skillsQuery.error ? (
-            <div className="mt-3">
+            <div className="mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
               <InlineNotice
                 tone="danger"
                 description={skillsQuery.error.message}
