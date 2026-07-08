@@ -39,6 +39,8 @@ import { api, type RouterOutputs } from "~/trpc/react";
 type FormulaItem = RouterOutputs["screening"]["listFormulas"][number];
 type WorkspaceSummary = RouterOutputs["screening"]["listWorkspaces"][number];
 type WorkspaceDetail = RouterOutputs["screening"]["getWorkspace"];
+const emptyFormulas: FormulaItem[] = [];
+
 type SelectedStock = {
   stockCode: string;
   stockName: string;
@@ -239,7 +241,7 @@ export function ScreeningStudioClient() {
       catalogQuery.isLoading,
     ],
   );
-  const formulas = formulasQuery.data ?? [];
+  const formulas = formulasQuery.data ?? emptyFormulas;
   const workspaceOptions = workspacesQuery.data ?? [];
   const workspaceHistoryItems = useMemo(
     () => buildScreeningWorkspaceHistoryItems(workspaceOptions),
@@ -500,11 +502,13 @@ export function ScreeningStudioClient() {
   }, [selectedWorkspaceId, workspaceDetailQuery.data, workspaceHydrated]);
 
   useEffect(() => {
-    setSelectedFormulaIds((current) =>
-      current.filter((formulaId) =>
+    setSelectedFormulaIds((current) => {
+      const next = current.filter((formulaId) =>
         formulas.some((formula: FormulaItem) => formula.id === formulaId),
-      ),
-    );
+      );
+
+      return next.length === current.length ? current : next;
+    });
   }, [formulas]);
 
   function toggleStock(stock: SelectedStock) {
