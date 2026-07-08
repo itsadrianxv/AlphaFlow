@@ -108,8 +108,8 @@ export function SpacesHeaderActions(props: { onOpenCreate: () => void }) {
       >
         创建 Research Space
       </button>
-      <Link href="/watchlists" className="app-button">
-        打开自选股列表
+      <Link href="/research-targets" className="app-button">
+        打开投研收藏
       </Link>
     </>
   );
@@ -141,10 +141,7 @@ export function ResearchSpacesListSection(props: {
       {isLoading ? (
         <EmptyState title="正在加载研究空间" />
       ) : spaces.length === 0 ? (
-        <EmptyState
-          title="还没有 Research Space"
-          actions={createAction}
-        />
+        <EmptyState title="还没有 Research Space" actions={createAction} />
       ) : (
         <div className="grid gap-4">
           {spaces.map((space) => (

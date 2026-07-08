@@ -99,16 +99,10 @@ const sidebarNavItems: Array<{
     icon: TimingIcon,
   },
   {
-    key: "watchlists",
-    href: "/watchlists",
-    label: "自选股",
-    icon: WatchlistsIcon,
-  },
-  {
     key: "researchTargets",
     href: "/research-targets",
     label: "投研收藏",
-    icon: ResearchSpacesIcon,
+    icon: WatchlistsIcon,
   },
   {
     key: "spaces",
@@ -535,8 +529,8 @@ export function WorkspaceShell(props: {
     <>
       {actions}
       {showWatchlistsAction ? (
-        <Link href="/watchlists" className="app-button shrink-0">
-          自选股列表
+        <Link href="/research-targets" className="app-button shrink-0">
+          投研收藏
         </Link>
       ) : null}
     </>

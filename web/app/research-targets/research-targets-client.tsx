@@ -8,6 +8,7 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { WatchlistsPanel } from "~/app/watchlists/watchlists-client";
 import { api } from "~/trpc/react";
 
 function splitTags(value: string) {
@@ -123,8 +124,16 @@ export function ResearchTargetsClient() {
       contentWidth="wide"
       titleSize="compact"
       actions={null}
+      showWatchlistsAction={false}
     >
-      <div className="grid gap-6 xl:grid-cols-2">
+      <section className="grid gap-4">
+        <h2 className="text-lg font-medium text-[var(--app-text-strong)]">
+          自选股
+        </h2>
+        <WatchlistsPanel />
+      </section>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
         <Panel title="收藏公司">
           <div className="grid gap-3">
             <div className="grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">

@@ -129,7 +129,7 @@ export function WatchlistDetailClient({
 
   return (
     <WorkspaceShell
-      section="watchlists"
+      section="researchTargets"
       eyebrow="Watchlist Detail"
       title={detailQuery.data?.name ?? "自选股列表"}
       description={
@@ -139,8 +139,8 @@ export function WatchlistDetailClient({
       showWatchlistsAction={false}
       actions={
         <>
-          <Link href="/watchlists" className="app-button">
-            返回列表总览
+          <Link href="/research-targets" className="app-button">
+            返回投研收藏
           </Link>
           <Link href="/spaces" className="app-button">
             打开研究空间

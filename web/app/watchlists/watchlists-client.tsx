@@ -14,6 +14,24 @@ import { api, type RouterOutputs } from "~/trpc/react";
 type WatchlistSummary = RouterOutputs["watchlist"]["list"][number];
 
 export function WatchlistsClient() {
+  return (
+    <WorkspaceShell
+      section="researchTargets"
+      eyebrow="Watchlists"
+      title="自选股列表"
+      showWatchlistsAction={false}
+      actions={
+        <Link href="/research-targets" className="app-button">
+          返回投研收藏
+        </Link>
+      }
+    >
+      <WatchlistsPanel />
+    </WorkspaceShell>
+  );
+}
+
+export function WatchlistsPanel() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
@@ -34,17 +52,7 @@ export function WatchlistsClient() {
   });
 
   return (
-    <WorkspaceShell
-      section="watchlists"
-      eyebrow="Watchlists"
-      title="自选股列表"
-      showWatchlistsAction={false}
-      actions={
-        <Link href="/spaces" className="app-button">
-          返回研究空间
-        </Link>
-      }
-    >
+    <>
       {notice ? <InlineNotice tone="success" description={notice} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -126,6 +134,6 @@ export function WatchlistsClient() {
           </div>
         </SectionCard>
       </div>
-    </WorkspaceShell>
+    </>
   );
 }
