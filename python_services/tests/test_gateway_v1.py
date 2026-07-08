@@ -1,4 +1,4 @@
-"""Tests for standardized v1 gateway endpoints and stale cache fallback."""
+﻿"""Tests for standardized v1 gateway endpoints and stale cache fallback."""
 
 from __future__ import annotations
 
@@ -20,21 +20,21 @@ def setup_function() -> None:
 
 def test_get_v1_market_stock_codes_success() -> None:
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_all_stock_codes",
+        "app.providers.tushare.client.TushareProviderClient.get_all_stock_codes",
         return_value=["600519", "000001"],
     ):
         response = client.get("/api/v1/market/stocks/codes")
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["meta"]["provider"] == "akshare"
+    assert payload["meta"]["provider"] == "tushare"
     assert payload["data"]["codes"] == ["600519", "000001"]
     assert payload["data"]["total"] == 2
 
 
 def test_get_v1_market_industries_success() -> None:
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_available_industries",
+        "app.providers.tushare.client.TushareProviderClient.get_available_industries",
         return_value=["白酒", "银行"],
     ):
         response = client.get("/api/v1/market/stocks/industries")
@@ -47,7 +47,7 @@ def test_get_v1_market_industries_success() -> None:
 
 def test_get_v1_indicator_history_success() -> None:
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_indicator_history",
+        "app.providers.tushare.client.TushareProviderClient.get_indicator_history",
         return_value=[
             {"date": "2023-12-31", "value": 1000.0, "isEstimated": False},
             {"date": "2024-12-31", "value": 1200.0, "isEstimated": False},
@@ -67,7 +67,7 @@ def test_get_v1_indicator_history_success() -> None:
 
 def test_get_v1_market_stock_success() -> None:
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_snapshot",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_snapshot",
         return_value={
             "code": "600519",
             "name": "贵州茅台",
@@ -85,7 +85,7 @@ def test_get_v1_market_stock_success() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["meta"]["provider"] == "akshare"
+    assert payload["meta"]["provider"] == "tushare"
     assert payload["meta"]["cacheHit"] is False
     assert payload["data"]["stockCode"] == "600519"
     assert payload["data"]["exchange"] == "SSE"
@@ -95,7 +95,7 @@ def test_get_v1_market_stock_success() -> None:
 
 def test_get_v1_market_batch_reports_partial_errors() -> None:
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_batch",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_batch",
         return_value=[
             {
                 "code": "600519",
@@ -124,13 +124,13 @@ def test_get_v1_market_batch_reports_partial_errors() -> None:
 
 def test_get_v1_theme_news_success() -> None:
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_theme_news",
+        "app.providers.tushare.client.TushareProviderClient.get_theme_news",
         return_value=[
             {
                 "id": "ai-1",
                 "title": "AI 算力需求提升",
                 "summary": "产业链景气度持续改善。",
-                "source": "akshare",
+                "source": "tushare:news",
                 "publishedAt": "2026-03-08T08:00:00+00:00",
                 "sentiment": "positive",
                 "relevanceScore": 0.92,
@@ -148,7 +148,7 @@ def test_get_v1_theme_news_success() -> None:
 
 def test_get_v1_stock_research_pack_success() -> None:
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_research_pack",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_research_pack",
         return_value={
             "stockCode": "600519",
             "companyName": "贵州茅台",
@@ -158,7 +158,7 @@ def test_get_v1_stock_research_pack_success() -> None:
                 {
                     "id": "pack-1",
                     "title": "财务快照",
-                    "sourceName": "akshare:stock_snapshot",
+                    "sourceName": "tushare:financial_snapshot",
                     "snippet": "结构化财务指标摘要",
                     "extractedFact": "总市值: 20000.00亿元",
                     "sourceType": "financial",
@@ -178,7 +178,7 @@ def test_get_v1_stock_research_pack_success() -> None:
 def test_market_gateway_uses_stale_cache_when_provider_fails() -> None:
     cache_key = build_cache_key(
         dataset="stock_snapshot",
-        provider="akshare",
+        provider="tushare",
         params={"stockCode": "600519"},
     )
     gateway_cache.set(
@@ -204,14 +204,14 @@ def test_market_gateway_uses_stale_cache_when_provider_fails() -> None:
             "netProfit": None,
             "debtRatio": None,
             "asOf": "2026-03-08",
-            "provider": "akshare",
+            "provider": "tushare",
         },
         policy=CachePolicy(fresh_ttl_seconds=0, stale_ttl_seconds=120),
         as_of="2026-03-08T08:00:00+00:00",
     )
 
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_snapshot",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_snapshot",
         side_effect=Exception("provider down"),
     ):
         response = client.get("/api/v1/market/stocks/600519")
@@ -224,3 +224,4 @@ def test_market_gateway_uses_stale_cache_when_provider_fails() -> None:
     assert any(
         warning["code"] == "stale_cache" for warning in payload["meta"]["warnings"]
     )
+

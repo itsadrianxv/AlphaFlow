@@ -1,4 +1,4 @@
-"""Tests for gateway jobs, layered cache integration, and admin job routes."""
+﻿"""Tests for gateway jobs, layered cache integration, and admin job routes."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ class FakeRedisClient:
 
 
 class FakeUniverseProvider:
-    provider_name = "akshare"
+    provider_name = "tushare"
 
     def get_stock_universe(self) -> list[dict]:
         return [
@@ -116,7 +116,7 @@ class FakeIntelligenceGateway:
 
 
 class FakeConceptProvider:
-    provider_name = "akshare"
+    provider_name = "tushare"
 
     def get_concept_catalog(self) -> list[dict]:
         return [
@@ -166,7 +166,7 @@ def test_refresh_universe_job_warms_snapshot_cache() -> None:
 
     cache_key = build_cache_key(
         dataset="stock_snapshot",
-        provider="akshare",
+        provider="tushare",
         params={"stockCode": "600519"},
     )
     entry = gateway_cache.get(cache_key)
@@ -312,13 +312,13 @@ def test_refresh_concepts_endpoint_returns_queued_and_triggers_background_task()
 
 def test_admin_metrics_endpoint_returns_gateway_snapshot() -> None:
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_theme_news",
+        "app.providers.tushare.client.TushareProviderClient.get_theme_news",
         return_value=[
             {
                 "id": "ai-1",
                 "title": "AI 算力需求提升",
                 "summary": "产业链景气度持续改善。",
-                "source": "akshare",
+                "source": "tushare:news",
                 "publishedAt": "2026-03-08T08:00:00+00:00",
                 "sentiment": "positive",
                 "relevanceScore": 0.92,
@@ -339,3 +339,4 @@ def test_admin_metrics_endpoint_returns_gateway_snapshot() -> None:
         item["labels"].get("theme") == "AI"
         for item in payload["counters"]["theme_request_count"]
     )
+

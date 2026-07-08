@@ -24,13 +24,13 @@ from app.gateway.common import build_meta, execute_cached, gateway_cache
 from app.infrastructure.metrics.recorder import metrics_recorder
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
-from app.providers.akshare.client import AkShareProviderClient
-from app.providers.akshare.mappers import to_market_stock, to_theme_candidate
+from app.providers.mappers import to_market_stock, to_theme_candidate
+from app.providers.tushare.client import TushareProviderClient
 
 
 class MarketGateway:
-    def __init__(self, provider_client: AkShareProviderClient | None = None) -> None:
-        self._provider_client = provider_client or AkShareProviderClient()
+    def __init__(self, provider_client: TushareProviderClient | None = None) -> None:
+        self._provider_client = provider_client or TushareProviderClient()
         self._retry_policy = RetryPolicy()
         self._theme_retry_policy = RetryPolicy(max_attempts=1)
         self._cache = gateway_cache

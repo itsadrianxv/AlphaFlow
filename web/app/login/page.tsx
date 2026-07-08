@@ -36,7 +36,7 @@ const capabilityCards = [
   },
   {
     label: "数据源",
-    value: "FastAPI + AkShare",
+    value: "FastAPI + TuShare",
     detail: "金融数据独立服务化，便于扩展和治理。",
   },
   {

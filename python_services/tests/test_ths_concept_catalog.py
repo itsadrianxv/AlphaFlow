@@ -6,7 +6,6 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from app.services.akshare_adapter import AkShareAdapter
 from app.services.ths_concept_catalog import (
     clear_ths_concept_catalog_cache,
     load_ths_concept_catalog_frame,
@@ -16,10 +15,8 @@ from scripts.refresh_concept_catalog import refresh_concept_catalog
 
 @pytest.fixture(autouse=True)
 def clear_catalog_cache():
-    AkShareAdapter.clear_caches()
     clear_ths_concept_catalog_cache()
     yield
-    AkShareAdapter.clear_caches()
     clear_ths_concept_catalog_cache()
 
 
@@ -83,35 +80,27 @@ def test_load_ths_concept_catalog_frame_raises_for_duplicate_names(tmp_path: Pat
         load_ths_concept_catalog_frame(catalog_path)
 
 
-def test_akshare_adapter_get_concept_catalog_frame_uses_local_snapshot(tmp_path: Path):
+def test_load_ths_concept_catalog_frame_uses_local_snapshot(tmp_path: Path):
     catalog_path = tmp_path / "ths_concept_catalog.csv"
     catalog_path.write_text("name,code\nAI,309121\n", encoding="utf-8")
 
-    with (
-        patch.dict(
-            os.environ,
-            {"INTELLIGENCE_CONCEPT_CATALOG_FILE": str(catalog_path)},
-            clear=False,
-        ),
-        patch(
-            "app.services.akshare_adapter.ak.stock_board_concept_name_ths",
-            side_effect=AssertionError("live THS should not be called"),
-        ),
+    with patch.dict(
+        os.environ,
+        {"INTELLIGENCE_CONCEPT_CATALOG_FILE": str(catalog_path)},
+        clear=False,
     ):
-        frame = AkShareAdapter.get_concept_catalog_frame()
+        frame = load_ths_concept_catalog_frame()
 
     assert frame.to_dict("records") == [{"name": "AI", "code": "309121"}]
 
 
-@patch("scripts.refresh_concept_catalog.AkShareAdapter.get_live_concept_catalog_frame")
-def test_refresh_concept_catalog_writes_standard_snapshot(mock_live_catalog, tmp_path: Path):
-    mock_live_catalog.return_value = pd.DataFrame(
-        {
-            "name": ["AI", "AI", "人形机器人"],
-            "code": ["309121", "309121", "309119"],
-            "ignored": ["x", "y", "z"],
-        }
-    )
+@patch("scripts.refresh_concept_catalog.TushareProviderClient.get_concept_catalog")
+def test_refresh_concept_catalog_writes_standard_snapshot(mock_catalog, tmp_path: Path):
+    mock_catalog.return_value = [
+        {"conceptName": "AI", "conceptCode": "309121"},
+        {"conceptName": "AI", "conceptCode": "309121"},
+        {"conceptName": "人形机器人", "conceptCode": "309119"},
+    ]
     output_path = tmp_path / "ths_concept_catalog.csv"
 
     written_path = refresh_concept_catalog(str(output_path))

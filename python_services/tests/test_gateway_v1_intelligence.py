@@ -1,4 +1,4 @@
-from unittest.mock import patch
+﻿from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -35,7 +35,7 @@ def test_get_v1_stock_evidence_batch_success():
         }
 
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_evidence",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_evidence",
         side_effect=fake_get_stock_evidence,
     ):
         response = client.post(
@@ -82,7 +82,7 @@ def test_get_v1_stock_evidence_batch_fetches_stocks_concurrently():
         }
 
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_evidence",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_evidence",
         side_effect=fake_get_stock_evidence,
     ):
         response = client.post(
@@ -97,49 +97,25 @@ def test_get_v1_stock_evidence_batch_fetches_stocks_concurrently():
     assert max_active_calls >= 2
 
 
-def test_intelligence_gateway_prefers_mock_fallback_over_stale_cache_when_provider_fails():
-    cache_key = build_cache_key(
-        dataset="theme_news",
-        provider="akshare",
-        params={"theme": "AI", "days": 7, "limit": 20},
-    )
-    gateway_cache.set(
-        key=cache_key,
-        value=[
-            {
-                "id": "stale-1",
-                "title": "Stale cached headline",
-                "summary": "Stale cached summary",
-                "source": "cache",
-                "publishedAt": "2026-03-01T08:00:00+00:00",
-                "sentiment": "neutral",
-                "relevanceScore": 0.4,
-                "relatedStocks": [],
-            }
-        ],
-        policy=_stale_policy(),
-        as_of="2026-03-01T08:00:00+00:00",
-    )
-
-    with patch(
-        "app.services.intelligence_data_adapter._fetch_theme_news_from_akshare",
-        side_effect=Exception("provider down"),
-    ):
-        response = client.get("/api/v1/intelligence/themes/AI/news")
+def test_intelligence_gateway_returns_disabled_news_warning():
+    response = client.get("/api/v1/intelligence/themes/AI/news")
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["meta"]["cacheHit"] is False
     assert payload["meta"]["isStale"] is False
     assert payload["data"]["theme"] == "AI"
-    assert payload["data"]["newsItems"][0]["source"] == "intelligence-fallback"
-    assert payload["data"]["newsItems"][0]["id"] != "stale-1"
+    assert payload["data"]["newsItems"] == []
+    assert any(
+        warning["code"] == "news_provider_disabled"
+        for warning in payload["meta"]["warnings"]
+    )
 
 
 def test_v1_theme_concepts_returns_stale_cache_when_provider_fails():
     cache_key = build_cache_key(
         dataset="theme_concepts",
-        provider="akshare",
+        provider="tushare",
         params={"theme": "AI", "limit": 5},
     )
     gateway_cache.set(
@@ -163,7 +139,7 @@ def test_v1_theme_concepts_returns_stale_cache_when_provider_fails():
     )
 
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_theme_concepts",
+        "app.providers.tushare.client.TushareProviderClient.get_theme_concepts",
         side_effect=Exception("provider down"),
     ):
         response = client.get("/api/v1/intelligence/themes/AI/concepts")
@@ -179,7 +155,7 @@ def test_v1_theme_concepts_returns_stale_cache_when_provider_fails():
 def test_v1_theme_candidates_returns_stale_cache_when_provider_fails():
     cache_key = build_cache_key(
         dataset="theme_candidates",
-        provider="akshare",
+        provider="tushare",
         params={"theme": "AI", "limit": 6},
     )
     gateway_cache.set(
@@ -198,7 +174,7 @@ def test_v1_theme_candidates_returns_stale_cache_when_provider_fails():
     )
 
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_theme_candidates",
+        "app.providers.tushare.client.TushareProviderClient.get_theme_candidates",
         side_effect=Exception("provider down"),
     ):
         response = client.get("/api/v1/market/themes/AI/candidates")
@@ -212,7 +188,7 @@ def test_v1_theme_candidates_returns_stale_cache_when_provider_fails():
 
 def test_v1_stock_evidence_exposes_partial_data_quality():
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_evidence",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_evidence",
         return_value={
             "stockCode": "603019",
             "companyName": "中科曙光",
@@ -236,7 +212,7 @@ def test_v1_stock_evidence_exposes_partial_data_quality():
 
 def test_v1_stock_research_pack_exposes_partial_data_quality():
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_research_pack",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_research_pack",
         return_value={
             "stockCode": "603019",
             "companyName": "中科曙光",
@@ -259,7 +235,7 @@ def test_v1_stock_research_pack_exposes_partial_data_quality():
 def test_v1_stock_evidence_returns_stale_cache_when_provider_fails():
     cache_key = build_cache_key(
         dataset="company_evidence",
-        provider="akshare",
+        provider="tushare",
         params={"stockCode": "603019", "concept": "AI"},
     )
     gateway_cache.set(
@@ -281,7 +257,7 @@ def test_v1_stock_evidence_returns_stale_cache_when_provider_fails():
     )
 
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_evidence",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_evidence",
         side_effect=Exception("provider down"),
     ):
         response = client.get("/api/v1/intelligence/stocks/603019/evidence?concept=AI")
@@ -296,7 +272,7 @@ def test_v1_stock_evidence_returns_stale_cache_when_provider_fails():
 def test_v1_stock_research_pack_returns_stale_cache_when_provider_fails():
     cache_key = build_cache_key(
         dataset="company_research_pack",
-        provider="akshare",
+        provider="tushare",
         params={"stockCode": "603019", "concept": "AI"},
     )
     gateway_cache.set(
@@ -316,7 +292,7 @@ def test_v1_stock_research_pack_returns_stale_cache_when_provider_fails():
     )
 
     with patch(
-        "app.providers.akshare.client.AkShareProviderClient.get_stock_research_pack",
+        "app.providers.tushare.client.TushareProviderClient.get_stock_research_pack",
         side_effect=Exception("provider down"),
     ):
         response = client.get("/api/v1/intelligence/stocks/603019/research-pack?concept=AI")
@@ -326,3 +302,4 @@ def test_v1_stock_research_pack_returns_stale_cache_when_provider_fails():
     assert payload["meta"]["cacheHit"] is True
     assert payload["meta"]["isStale"] is True
     assert payload["data"]["researchPack"]["financialHighlights"] == ["cached highlight"]
+

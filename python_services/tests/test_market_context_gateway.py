@@ -1,4 +1,4 @@
-from types import SimpleNamespace
+﻿from types import SimpleNamespace
 
 from app.data_providers.contracts import HsgtFlowSnapshot, MacroSnapshot
 from app.contracts.intelligence import ThemeConceptsData, ThemeConceptsResponse, ThemeNewsData, ThemeNewsItem, ThemeNewsResponse
@@ -11,7 +11,7 @@ from app.infrastructure.metrics.recorder import MetricsRecorder
 def _meta():
     return GatewayMeta(
         requestId="req-1",
-        provider="akshare",
+        provider="tushare",
         cacheHit=False,
         isStale=False,
         latencyMs=0,
@@ -30,7 +30,7 @@ def _theme_news(theme: str, title: str, sentiment: str, score: float):
                     id=f"{theme}-news-1",
                     title=title,
                     summary=f"{theme} summary",
-                    source="akshare",
+                    source="tushare:news",
                     publishedAt="2026-04-18T00:00:00+00:00",
                     sentiment=sentiment,
                     relevanceScore=score,
@@ -210,3 +210,4 @@ def test_market_context_gateway_returns_partial_without_recorded_hot_themes():
     assert response.data.availability.flow.available is True
     assert response.data.availability.hotThemes.available is False
     assert response.data.availability.hotThemes.warning == "no hot themes available"
+

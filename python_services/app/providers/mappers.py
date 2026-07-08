@@ -1,4 +1,4 @@
-"""Mapping helpers from provider payloads to standardized contracts."""
+"""Provider-neutral mapping helpers for standardized gateway contracts."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ def infer_exchange(stock_code: str) -> str:
         return "SSE"
     if stock_code.startswith(("00", "30", "15", "16", "18", "159")):
         return "SZSE"
-    if stock_code.startswith(("4", "8")):
+    if stock_code.startswith(("4", "8", "920")):
         return "BSE"
     return "UNKNOWN"
 
@@ -123,9 +123,7 @@ def to_company_evidence(raw: dict) -> CompanyEvidence:
     )
 
 
-def to_company_research_pack_reference(
-    raw: dict,
-) -> CompanyResearchPackReferenceItem:
+def to_company_research_pack_reference(raw: dict) -> CompanyResearchPackReferenceItem:
     return CompanyResearchPackReferenceItem(
         id=str(raw.get("id") or "").strip(),
         title=str(raw.get("title") or "").strip(),

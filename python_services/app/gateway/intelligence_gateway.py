@@ -23,18 +23,18 @@ from app.gateway.common import GatewayError, build_meta, execute_cached, gateway
 from app.infrastructure.metrics.recorder import metrics_recorder
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
-from app.providers.akshare.client import AkShareProviderClient
-from app.providers.akshare.mappers import (
+from app.providers.mappers import (
     to_company_evidence,
     to_company_research_pack,
     to_concept_match_item,
     to_theme_news_item,
 )
+from app.providers.tushare.client import TushareProviderClient
 
 
 class IntelligenceGateway:
-    def __init__(self, provider_client: AkShareProviderClient | None = None) -> None:
-        self._provider_client = provider_client or AkShareProviderClient()
+    def __init__(self, provider_client: TushareProviderClient | None = None) -> None:
+        self._provider_client = provider_client or TushareProviderClient()
         self._retry_policy = RetryPolicy(max_attempts=1)
         self._cache = gateway_cache
 
@@ -74,7 +74,13 @@ class IntelligenceGateway:
                 started_at=started_at,
                 cache_hit=result.cache_hit,
                 is_stale=result.is_stale,
-                warnings=result.warnings,
+                warnings=[
+                    *result.warnings,
+                    GatewayWarning(
+                        code="news_provider_disabled",
+                        message="TuShare news requires separate permission and is disabled by default.",
+                    ),
+                ],
                 as_of=result.as_of,
             ),
             data=ThemeNewsData(theme=theme, newsItems=result.data),

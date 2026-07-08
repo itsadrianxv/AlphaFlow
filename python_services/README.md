@@ -1,6 +1,6 @@
 ﻿# Stock Screening Python Service
 
-Python FastAPI 微服务，向主应用提供 TuShare、AkShare 与情报工作流所需的数据接口。
+Python FastAPI 微服务，向主应用提供 TuShare 与情报工作流所需的数据接口。
 
 默认推荐通过 `docker/docker-compose.yml` 运行本服务，保证与 Web / Worker 使用一致的 Python 3.11 容器环境；本地 `.venv` 更适合做单独调试和测试。
 
@@ -8,9 +8,9 @@ Python FastAPI 微服务，向主应用提供 TuShare、AkShare 与情报工作�
 
 - 股票基础数据：代码列表、批量行情、历史指标、行业列表
 - Screening v1 链路：通过 TuShare provider 查询选股工作台数据
-- Workflow 情报数据：主题资讯、候选股、公司证据（含批量）
+- Workflow 情报数据：候选股、概念匹配、公司证据（含批量）
 - 主题词 -> A 股概念映射：白名单/黑名单 + 智谱 Web Search + 本地自动匹配
-- 智能降级：AkShare 请求失败时优先读缓存，再走兜底数据
+- 智能降级：上游请求失败时优先读缓存，再走 stale fallback
 - 统一网关缓存：`L1 内存缓存 + L2 Redis 缓存 + stale fallback`
 - 管理任务：`refresh-universe`、`refresh-concepts`、`prewarm-hot-themes`
 - 基础可观测性：provider latency / error、cache hit、stale fallback、batch success 等指标
@@ -39,15 +39,13 @@ python_services/
       metrics/
         recorder.py
     providers/
-      screening/
-        factory.py
-        tushare_provider.py
+      tushare/
+        client.py
     jobs/
       refresh_universe.py
       refresh_concepts.py
       prewarm_hot_themes.py
     services/
-      akshare_adapter.py
       intelligence_data_adapter.py
       zhipu_search_client.py
       theme_concept_rules_registry.py
@@ -114,10 +112,9 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## 环境变量
 
-Screening provider：
+Market provider：
 
 - `TUSHARE_TOKEN`：TuShare 数据接口 Token
-- `SCREENING_ENABLE_AKSHARE_FALLBACK`：是否开启 AkShare 兜底（默认 `false`）
 
 缓存与降级：
 

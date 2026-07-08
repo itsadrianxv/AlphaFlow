@@ -6,13 +6,13 @@ from app.gateway.common import gateway_cache, set_cached_value
 from app.infrastructure.metrics.recorder import metrics_recorder
 from app.jobs.common import build_job_summary, chunked, iso_now
 from app.policies.cache_policy import get_cache_policy
-from app.providers.akshare.client import AkShareProviderClient
-from app.providers.akshare.mappers import to_market_stock
+from app.providers.mappers import to_market_stock
+from app.providers.tushare.client import TushareProviderClient
 
 
 class RefreshUniverseJob:
-    def __init__(self, provider_client: AkShareProviderClient | None = None) -> None:
-        self._provider_client = provider_client or AkShareProviderClient()
+    def __init__(self, provider_client: TushareProviderClient | None = None) -> None:
+        self._provider_client = provider_client or TushareProviderClient()
 
     def run(
         self,

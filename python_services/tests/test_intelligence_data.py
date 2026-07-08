@@ -15,7 +15,7 @@ def test_get_theme_news_success():
             "id": "news-1",
             "title": "AI板块景气快照",
             "summary": "板块涨跌幅2.1%",
-            "source": "akshare",
+            "source": "tushare:news",
             "publishedAt": "2026-01-01T00:00:00+00:00",
             "sentiment": "positive",
             "relevanceScore": 0.82,
@@ -159,3 +159,4 @@ def test_get_company_evidence_batch_invalid_stock_code():
 
     assert response.status_code == 400
     assert "存在无效股票代码" in response.json()["detail"]
+

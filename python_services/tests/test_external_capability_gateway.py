@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import patch
@@ -152,7 +152,7 @@ def test_screening_query_capability_reports_actual_provider_for_invalid_payload(
     )
 
     class BrokenProvider:
-        provider_name = "akshare"
+        provider_name = "tushare"
 
         def get_stock_profile(self, stock_code: str) -> StockProfile:
             return StockProfile(
@@ -207,10 +207,10 @@ def test_screening_query_capability_reports_actual_provider_for_invalid_payload(
             },
         )
 
-    assert exc_info.value.provider == "akshare"
+    assert exc_info.value.provider == "tushare"
     assert (
         exc_info.value.message
-        == "Screening provider akshare returned invalid latest metrics payload: expected dict, got NoneType"
+        == "Screening provider tushare returned invalid latest metrics payload: expected dict, got NoneType"
     )
 
 
@@ -411,3 +411,4 @@ def test_search_web_maps_tavily_errors_to_tavily_provider():
     assert exc_info.value.provider == "tavily"
     assert exc_info.value.code == "tavily_search_failed"
     assert exc_info.value.diagnostics["endpoint"] == "https://api.tavily.com"
+

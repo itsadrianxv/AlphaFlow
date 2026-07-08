@@ -7,14 +7,14 @@ import logging
 from app.gateway.common import gateway_cache, set_cached_value
 from app.jobs.common import build_job_summary, chunked, iso_now
 from app.policies.cache_policy import get_cache_policy
-from app.providers.akshare.client import AkShareProviderClient
+from app.providers.tushare.client import TushareProviderClient
 
 LOGGER = logging.getLogger(__name__)
 
 
 class RefreshConceptsJob:
-    def __init__(self, provider_client: AkShareProviderClient | None = None) -> None:
-        self._provider_client = provider_client or AkShareProviderClient()
+    def __init__(self, provider_client: TushareProviderClient | None = None) -> None:
+        self._provider_client = provider_client or TushareProviderClient()
 
     def run(self, limit: int | None = None, batch_size: int = 20):
         started_at = iso_now()

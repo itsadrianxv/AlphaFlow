@@ -60,6 +60,10 @@ RAW_DATASET_FIELDS: dict[str, str] = {
     "index_weight": "index_code,con_code,trade_date,weight",
     "index_classify": "index_code,industry_name,level,industry_code,is_pub,parent_code,src",
     "index_member_all": "l1_code,l1_name,l2_code,l2_name,l3_code,l3_name,ts_code,name,in_date,out_date,is_new",
+    "ths_index": "ts_code,name,count,exchange,list_date,type",
+    "ths_member": "ts_code,code,name,weight,in_date,out_date,is_new",
+    "ths_daily": "ts_code,trade_date,close,open,high,low,pre_close,avg_price,change,pct_change,vol,turnover_rate,total_mv,float_mv",
+    "ths_hot": "trade_date,ts_code,ts_name,rank,pct_change,current_price,concept,rank_reason,hot,rank_time,market,type",
     "moneyflow": "ts_code,trade_date,buy_sm_vol,buy_sm_amount,sell_sm_vol,sell_sm_amount,buy_md_vol,buy_md_amount,sell_md_vol,sell_md_amount,buy_lg_vol,buy_lg_amount,sell_lg_vol,sell_lg_amount,buy_elg_vol,buy_elg_amount,sell_elg_vol,sell_elg_amount,net_mf_vol,net_mf_amount",
     "margin": "trade_date,exchange_id,rzye,rzmre,rzche,rqye,rqmcl,rqyl,rqchl,rzrqye",
     "margin_detail": "trade_date,ts_code,rzye,rqye,rzmre,rqyl,rzche,rqmcl,rqchl,rzrqye",
@@ -613,7 +617,7 @@ class TushareProvider:
                 params["report_type"] = request.get("reportType")
             return params
 
-        if dataset in {"index_basic", "index_daily", "index_dailybasic", "index_weight"}:
+        if dataset in {"index_basic", "index_daily", "index_dailybasic", "index_weight", "ths_daily"}:
             index_code = request.get("indexCode")
             params["ts_code" if dataset != "index_weight" else "index_code"] = index_code
             if trade_date:
@@ -622,6 +626,31 @@ class TushareProvider:
                 params["start_date"] = start_date
             if end_date:
                 params["end_date"] = end_date
+            return params
+
+        if dataset == "ths_index":
+            if request.get("indexCode"):
+                params["ts_code"] = request.get("indexCode")
+            if request.get("exchange"):
+                params["exchange"] = request.get("exchange")
+            if request.get("marketType"):
+                params["type"] = request.get("marketType")
+            return params
+
+        if dataset == "ths_member":
+            if request.get("indexCode"):
+                params["ts_code"] = request.get("indexCode")
+            if request.get("stockCode"):
+                params["code"] = request.get("stockCode")
+            return params
+
+        if dataset == "ths_hot":
+            if trade_date:
+                params["trade_date"] = trade_date
+            if request.get("market"):
+                params["market"] = request.get("market")
+            if request.get("marketType"):
+                params["type"] = request.get("marketType")
             return params
 
         if dataset in {"index_classify", "index_member_all"}:

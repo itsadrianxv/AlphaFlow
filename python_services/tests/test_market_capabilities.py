@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from dataclasses import dataclass, field
 
@@ -128,7 +128,7 @@ def test_market_tool_filters_financial_statement(monkeypatch):
 
 def test_market_gateway_maps_unsupported_provider_to_capability_error(monkeypatch):
     class UnsupportedProvider:
-        provider_name = "akshare"
+        provider_name = "tushare"
 
     monkeypatch.setattr(
         "app.gateway.external_capability_gateway.get_default_data_provider",
@@ -143,3 +143,4 @@ def test_market_gateway_maps_unsupported_provider_to_capability_error(monkeypatc
         assert getattr(exc, "status_code") == 501
     else:
         raise AssertionError("expected unsupported provider error")
+

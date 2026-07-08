@@ -12,7 +12,7 @@ from app.infrastructure.logging.request_id import RequestIdMiddleware, create_re
 
 app = FastAPI(
     title="Stock Screening Data Service",
-    description="Financial data API powered by AkShare intelligence flows and pluggable stock screening providers",
+    description="Financial data API powered by TuShare market and intelligence providers",
     version="0.1.0",
 )
 
