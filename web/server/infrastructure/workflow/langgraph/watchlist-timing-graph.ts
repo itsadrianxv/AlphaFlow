@@ -288,7 +288,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
                   kronosWarnings: [
                     ...new Set([
                       ...(card.reasoning.kronosWarnings ?? []),
-                      "Kronos forecast unavailable; auxiliary weight treated as 0.",
+                      "Kronos 预测暂不可用，辅助权重按 0 处理。",
                     ]),
                   ],
                 },

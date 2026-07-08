@@ -126,7 +126,7 @@ export class TimingSignalPipelineLangGraph extends BaseWorkflowLangGraph<
         if (!deps.kronosForecastWorkflowService) {
           return {
             cards: state.cards,
-            errors: ["kronos:Kronos forecast service is not configured."],
+            errors: ["kronos:Kronos 预测服务未配置。"],
           };
         }
 

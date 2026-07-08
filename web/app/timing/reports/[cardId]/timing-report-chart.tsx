@@ -3,6 +3,7 @@
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, { useEffect, useRef, useState } from "react";
 import { StatusPill } from "~/app/_components/ui";
+import { formatKronosModelLabel } from "~/app/timing/timing-labels";
 import type {
   TimingBar,
   TimingChartLevels,
@@ -301,7 +302,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             stack: "kronos-band",
           },
           {
-            name: "Kronos 预测 high",
+            name: "Kronos 预测高点",
             type: "line",
             data: allDates.map((date) => {
               const point = input.forecast?.points.find(
@@ -318,7 +319,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             stack: "kronos-band",
           },
           {
-            name: "Kronos 预测 close",
+            name: "Kronos 预测收盘",
             type: "line",
             data: allDates.map((date) => {
               const point = input.forecast?.points.find(
@@ -631,7 +632,7 @@ export function TimingReportChart(props: {
         <StatusPill
           label={
             forecast
-              ? `Kronos 预测 ${forecast.modelName} / ${forecast.predictionLength}日`
+              ? `Kronos 预测 · ${formatKronosModelLabel(forecast.modelName)} · ${forecast.predictionLength}日`
               : "Kronos 预测不可用"
           }
           tone={forecast ? "info" : "warning"}

@@ -50,7 +50,7 @@ export class KronosForecastClient {
         errors: params.items.map((item) => ({
           stockCode: item.stockCode,
           code: "kronos_disabled",
-          message: "Kronos forecast is disabled.",
+          message: "Kronos 预测已禁用。",
         })),
       };
     }

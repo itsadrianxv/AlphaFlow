@@ -13,6 +13,19 @@ import type {
 } from "~/server/domain/timing/types";
 import { TechnicalSignalSet } from "~/server/domain/timing/value-objects/technical-signal-set";
 
+const actionLabelMap = {
+  WATCH: "观望",
+  PROBE: "试仓",
+  ADD: "加仓",
+  HOLD: "持有",
+  TRIM: "减仓",
+  EXIT: "卖出",
+} as const;
+
+function formatActionLabel(action: keyof typeof actionLabelMap) {
+  return actionLabelMap[action] ?? action;
+}
+
 function uniqueFlags(flags: string[]): TimingRiskFlag[] {
   return [...new Set(flags)].filter((flag): flag is TimingRiskFlag =>
     [
@@ -143,7 +156,7 @@ export class TimingAnalysisService {
         sourceId: params.sourceId,
         actionBias,
         confidence: assessment.confidence,
-        summary: `${assessment.stockName} 当前偏向 ${actionBias}，核心依据是 ${assessment.signalContext.summary}`,
+        summary: `${assessment.stockName} 当前偏向 ${formatActionLabel(actionBias)}，核心依据是 ${assessment.signalContext.summary}`,
         triggerNotes: assessment.triggerNotes,
         invalidationNotes: assessment.invalidationNotes,
         riskFlags: assessment.riskFlags,
@@ -251,10 +264,10 @@ export class TimingAnalysisService {
           : `正负因子拉扯，最强优势是 ${topPositive}，主要拖累是 ${topNegative}。`;
     const summary =
       direction === "bullish"
-        ? `Composite ${compositeScore.toFixed(1)}，多子引擎整体偏多。`
+        ? `综合择时评分 ${compositeScore.toFixed(1)}，多个择时模型整体偏多。`
         : direction === "bearish"
-          ? `Composite ${compositeScore.toFixed(1)}，多子引擎整体偏空。`
-          : `Composite ${compositeScore.toFixed(1)}，当前多空分歧较大。`;
+          ? `综合择时评分 ${compositeScore.toFixed(1)}，多个择时模型整体偏空。`
+          : `综合择时评分 ${compositeScore.toFixed(1)}，当前多空分歧较大。`;
 
     return {
       stockCode: snapshot.stockCode,

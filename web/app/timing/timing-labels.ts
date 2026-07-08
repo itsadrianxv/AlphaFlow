@@ -13,18 +13,18 @@ import type {
 } from "~/server/domain/timing/types";
 
 const timingActionLabelMap: Record<TimingAction, string> = {
-  WATCH: "观察",
+  WATCH: "观望",
   PROBE: "试仓",
   ADD: "加仓",
   HOLD: "持有",
   TRIM: "减仓",
-  EXIT: "退出",
+  EXIT: "卖出",
 };
 
 const timingDirectionLabelMap: Record<TimingDirection, string> = {
-  bullish: "看多",
+  bullish: "偏多",
   neutral: "中性",
-  bearish: "看空",
+  bearish: "偏空",
 };
 
 const timingSignalKeyLabelMap: Record<TimingSignalEngineKey, string> = {
@@ -119,6 +119,37 @@ const timingVolatilityTrendLabelMap: Record<
 
 function formatNumber(value: number, digits = 2) {
   return value.toFixed(digits).replace(/\.00$/, "");
+}
+
+export function formatKronosModelLabel(modelName: string) {
+  const shortName = modelName.split("/").at(-1) ?? modelName;
+  return shortName.endsWith("模型") ? shortName : `${shortName} 模型`;
+}
+
+export function formatTimingNarrative(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .replace(/\bWATCH\b/g, "观望")
+    .replace(/\bHOLD\b/g, "持有")
+    .replace(/\bEXIT\b/g, "卖出")
+    .replace(/\bbullish\b/g, "偏多")
+    .replace(/\bneutral\b/g, "中性")
+    .replace(/\bbearish\b/g, "偏空")
+    .replace(/\bComposite\b/g, "综合择时评分")
+    .replace(/多子引擎/g, "多个择时模型")
+    .replace(/六大证据引擎/g, "六大择时模型")
+    .replace(
+      /Kronos forecast unavailable; auxiliary weight treated as 0\./g,
+      "Kronos 预测暂不可用，辅助权重按 0 处理。",
+    )
+    .replace(/Kronos forecast:\s*/g, "Kronos 预测：")
+    .replace(/Kronos forecast is\s*/g, "Kronos 预测为")
+    .replace(/expected return/g, "预期收益")
+    .replace(/max drawdown/g, "最大回撤")
+    .replace(/confidence/g, "置信度");
 }
 
 export function formatTimingActionLabel(value: TimingAction | string) {

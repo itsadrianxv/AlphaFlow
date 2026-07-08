@@ -13,6 +13,7 @@ import {
   formatTimingMarketTransitionLabel,
   formatTimingMetricLabel,
   formatTimingMetricValue,
+  formatTimingNarrative,
   formatTimingReviewHorizonLabel,
   formatTimingReviewVerdictLabel,
   formatTimingRiskFlagLabel,
@@ -174,10 +175,10 @@ function SummaryTab(props: { report: TimingReportPayload }) {
               <StatusPill label={`报告日期 ${asOfDate}`} />
             </div>
             <p className="max-w-4xl text-base leading-7 text-[var(--app-text)]">
-              {report.card.summary}
+              {formatTimingNarrative(report.card.summary)}
             </p>
             <p className="max-w-4xl text-sm leading-7 text-[var(--app-text-muted)]">
-              {report.card.reasoning.actionRationale}
+              {formatTimingNarrative(report.card.reasoning.actionRationale)}
             </p>
           </div>
           <div className="grid gap-3 rounded-[14px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4">
@@ -206,7 +207,7 @@ function SummaryTab(props: { report: TimingReportPayload }) {
               </div>
             </div>
             <p className="text-sm leading-6 text-[var(--app-text-muted)]">
-              {signalContext.summary}
+              {formatTimingNarrative(signalContext.summary)}
             </p>
           </div>
         </div>
@@ -236,7 +237,7 @@ function EvidenceTab(props: { report: TimingReportPayload }) {
         />
       </Panel>
 
-      <Panel title="六大证据引擎">
+      <Panel title="六大择时模型">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {evidenceOrder.map((key) => {
             const evidence = report.evidence[key];
@@ -262,7 +263,7 @@ function EvidenceTab(props: { report: TimingReportPayload }) {
                   />
                 </div>
                 <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
-                  {evidence.detail}
+                  {formatTimingNarrative(evidence.detail)}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <StatusPill
@@ -325,7 +326,7 @@ function ExecutionTab(props: { report: TimingReportPayload }) {
                   key={item}
                   className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] px-3 py-2"
                 >
-                  {item}
+                  {formatTimingNarrative(item)}
                 </li>
               ))}
             </ul>
@@ -342,7 +343,7 @@ function ExecutionTab(props: { report: TimingReportPayload }) {
                   key={item}
                   className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] px-3 py-2"
                 >
-                  {item}
+                  {formatTimingNarrative(item)}
                 </li>
               ))}
             </ul>

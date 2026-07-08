@@ -9,8 +9,17 @@ import type {
 import type { KronosForecastClient } from "~/server/infrastructure/timing/kronos-forecast-client";
 import type { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
 
-const KRONOS_MISSING_WARNING =
-  "Kronos forecast unavailable; auxiliary weight treated as 0.";
+const KRONOS_MISSING_WARNING = "Kronos 预测暂不可用，辅助权重按 0 处理。";
+
+const directionLabelMap = {
+  bullish: "偏多",
+  neutral: "中性",
+  bearish: "偏空",
+} as const;
+
+function formatDirectionLabel(direction: keyof typeof directionLabelMap) {
+  return directionLabelMap[direction] ?? direction;
+}
 
 function hashBars(bars: TimingBar[]) {
   const stablePayload = bars.map((bar) => ({
@@ -112,7 +121,7 @@ export class KronosForecastWorkflowService {
               ...card.reasoning,
               kronosForecast: forecast.summary,
               kronosWarnings: forecast.warnings,
-              actionRationale: `${card.reasoning.actionRationale} Kronos forecast: ${forecast.summary.direction}, expected return ${forecast.summary.expectedReturnPct.toFixed(2)}%, max drawdown ${forecast.summary.maxDrawdownPct.toFixed(2)}%.`,
+              actionRationale: `${card.reasoning.actionRationale} Kronos 预测：${formatDirectionLabel(forecast.summary.direction)}，预期收益 ${forecast.summary.expectedReturnPct.toFixed(2)}%，最大回撤 ${forecast.summary.maxDrawdownPct.toFixed(2)}%。`,
             },
           };
         }),

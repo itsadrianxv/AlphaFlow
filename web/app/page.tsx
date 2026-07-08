@@ -9,6 +9,7 @@ import {
   WorkspaceShell,
 } from "~/app/_components/ui";
 import { primaryWorkflowStages } from "~/app/_components/workflow-stage-config";
+import { formatTimingNarrative } from "~/app/timing/timing-labels";
 import { getTemplateLabel } from "~/app/workflows/research-view-models";
 import { buildRunDetailHref } from "~/app/workflows/run-detail-href";
 import { auth } from "~/server/auth";
@@ -44,12 +45,12 @@ function formatPct(value?: number | null): string {
 }
 
 const actionLabelMap: Record<string, string> = {
-  WATCH: "观察",
+  WATCH: "观望",
   PROBE: "试仓",
   ADD: "加仓",
   HOLD: "持有",
   TRIM: "减仓",
-  EXIT: "退出",
+  EXIT: "卖出",
 };
 
 export default async function Home() {
@@ -121,7 +122,7 @@ export default async function Home() {
   const priorityDescription = !signedIn
     ? "登录后可以串起筛选、研究、公司判断和组合建议，在同一条流程里完成今天的决策。"
     : priorityRecommendation
-      ? `${priorityRecommendation.reasoning.actionRationale} 当前建议区间 ${formatPct(
+      ? `${formatTimingNarrative(priorityRecommendation.reasoning.actionRationale)} 当前建议区间 ${formatPct(
           priorityRecommendation.suggestedMinPct,
         )} 至 ${formatPct(priorityRecommendation.suggestedMaxPct)}。`
       : priorityResearch
@@ -361,7 +362,7 @@ export default async function Home() {
                       {item.stockName} · {item.stockCode}
                     </div>
                     <div className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
-                      {item.reasoning.actionRationale}
+                      {formatTimingNarrative(item.reasoning.actionRationale)}
                     </div>
                     <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
                       <span>

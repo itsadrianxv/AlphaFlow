@@ -16,6 +16,7 @@ import {
 } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { buildTimingReportHistoryItems } from "~/app/_components/workspace-history";
+import { formatTimingNarrative } from "~/app/timing/timing-labels";
 import { TimingSignalCardList } from "~/app/timing/timing-signal-card-list";
 import { timingStageTabs } from "~/app/timing/timing-stage-tabs";
 import {
@@ -75,12 +76,12 @@ const actionToneMap: Record<
 };
 
 const actionLabelMap: Record<string, string> = {
-  WATCH: "观察",
+  WATCH: "观望",
   PROBE: "试仓",
   ADD: "加仓",
   HOLD: "持有",
   TRIM: "减仓",
-  EXIT: "退出",
+  EXIT: "卖出",
 };
 
 const marketRegimeToneMap: Record<
@@ -1729,7 +1730,9 @@ export function TimingClient() {
                         {recommendation.stockName} · {recommendation.stockCode}
                       </div>
                       <p className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
-                        {recommendation.reasoning.actionRationale}
+                        {formatTimingNarrative(
+                          recommendation.reasoning.actionRationale,
+                        )}
                       </p>
                     </article>
                   ))}
@@ -1819,7 +1822,9 @@ export function TimingClient() {
                           />
                         </div>
                         <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
-                          {recommendation.reasoning.actionRationale}
+                          {formatTimingNarrative(
+                            recommendation.reasoning.actionRationale,
+                          )}
                         </p>
                       </div>
                       <div className="text-right text-xs text-[var(--app-text-soft)]">

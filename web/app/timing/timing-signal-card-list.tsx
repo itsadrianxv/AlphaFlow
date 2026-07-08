@@ -4,6 +4,10 @@ import Link from "next/link";
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React from "react";
 import { StatusPill } from "~/app/_components/ui";
+import {
+  formatTimingNarrative,
+  formatTimingRiskFlagLabel,
+} from "~/app/timing/timing-labels";
 
 type SignalIndicators = {
   rsi?: { value: number };
@@ -40,12 +44,12 @@ const actionToneMap: Record<
 };
 
 const actionLabelMap: Record<string, string> = {
-  WATCH: "观察",
+  WATCH: "观望",
   PROBE: "试仓",
   ADD: "加仓",
   HOLD: "持有",
   TRIM: "减仓",
-  EXIT: "退出",
+  EXIT: "卖出",
 };
 
 const sourceLabelMap: Record<string, string> = {
@@ -102,7 +106,7 @@ export function TimingSignalCardList(props: {
                   />
                 </div>
                 <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--app-text-muted)]">
-                  {card.summary}
+                  {formatTimingNarrative(card.summary)}
                 </p>
               </div>
               <div className="flex min-w-[180px] flex-col items-end gap-2 text-right text-xs text-[var(--app-text-soft)]">
@@ -153,7 +157,11 @@ export function TimingSignalCardList(props: {
             {card.riskFlags && card.riskFlags.length > 0 ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {card.riskFlags.map((flag) => (
-                  <StatusPill key={flag} label={flag} tone="warning" />
+                  <StatusPill
+                    key={flag}
+                    label={formatTimingRiskFlagLabel(flag)}
+                    tone="warning"
+                  />
                 ))}
               </div>
             ) : null}

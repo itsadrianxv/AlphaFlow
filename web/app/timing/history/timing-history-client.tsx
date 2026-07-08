@@ -11,6 +11,10 @@ import {
 } from "~/app/_components/ui";
 import { buildTimingReportHistoryItems } from "~/app/_components/workspace-history";
 import { TimingReportView } from "~/app/timing/reports/[cardId]/timing-report-view";
+import {
+  formatTimingActionLabel,
+  formatTimingNarrative,
+} from "~/app/timing/timing-labels";
 import { api } from "~/trpc/react";
 
 function formatDate(value?: Date | null) {
@@ -167,13 +171,16 @@ export function TimingHistoryClient() {
                         label={sourceTypeLabel(card.sourceType)}
                         tone="info"
                       />
-                      <StatusPill label={card.actionBias} tone="neutral" />
+                      <StatusPill
+                        label={formatTimingActionLabel(card.actionBias)}
+                        tone="neutral"
+                      />
                     </div>
                     <p className="mt-3 text-sm font-medium leading-6 text-[var(--app-text)]">
                       {card.stockName} · {card.stockCode}
                     </p>
                     <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--app-text-muted)]">
-                      {card.summary}
+                      {formatTimingNarrative(card.summary)}
                     </p>
                     <div className="mt-3 flex items-center justify-between gap-3 text-xs text-[var(--app-text-soft)]">
                       <span>{formatDate(card.createdAt)}</span>
@@ -211,7 +218,9 @@ export function TimingHistoryClient() {
                       tone="info"
                     />
                     <StatusPill
-                      label={reportQuery.data.card.actionBias}
+                      label={formatTimingActionLabel(
+                        reportQuery.data.card.actionBias,
+                      )}
                       tone="neutral"
                     />
                   </div>
@@ -220,7 +229,7 @@ export function TimingHistoryClient() {
                     {reportQuery.data.card.stockCode}
                   </h2>
                   <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--app-text-muted)]">
-                    {reportQuery.data.card.summary}
+                    {formatTimingNarrative(reportQuery.data.card.summary)}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

@@ -27,6 +27,18 @@ function unique<T>(values: T[]) {
   return [...new Set(values)];
 }
 
+const KRONOS_MISSING_WARNING = "Kronos 预测暂不可用，辅助权重按 0 处理。";
+
+const directionLabelMap = {
+  bullish: "偏多",
+  neutral: "中性",
+  bearish: "偏空",
+} as const;
+
+function formatDirectionLabel(direction: keyof typeof directionLabelMap) {
+  return directionLabelMap[direction] ?? direction;
+}
+
 function kronosConfidenceAdjustment(
   forecast: TimingKronosForecastSummary | undefined,
 ) {
@@ -77,14 +89,14 @@ function buildKronosRationale(
   forecast: TimingKronosForecastSummary | undefined,
 ) {
   if (!forecast) {
-    return "Kronos forecast unavailable; auxiliary weight treated as 0.";
+    return KRONOS_MISSING_WARNING;
   }
 
-  return `Kronos forecast is ${forecast.direction}: expected return ${round(
+  return `Kronos 预测为${formatDirectionLabel(forecast.direction)}：预期收益 ${round(
     forecast.expectedReturnPct,
-  )}%, max drawdown ${round(forecast.maxDrawdownPct)}%, confidence ${round(
+  )}%，最大回撤 ${round(forecast.maxDrawdownPct)}%，置信度 ${round(
     forecast.confidence * 100,
-  )}%.`;
+  )}%。`;
 }
 
 type Candidate = {
@@ -297,7 +309,7 @@ export class WatchlistPortfolioManagerService {
             : [
                 ...new Set([
                   ...(candidate.card.reasoning.kronosWarnings ?? []),
-                  "Kronos forecast unavailable; auxiliary weight treated as 0.",
+                  KRONOS_MISSING_WARNING,
                 ]),
               ],
         },
