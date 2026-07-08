@@ -468,8 +468,12 @@ function UnifiedCreatePanel(props: {
   );
 }
 
-function TargetContentPanel(props: {
-  selectedTarget: TargetSummary | null;
+function sameTargetRef(left: ResearchTargetRef, right: ResearchTargetRef) {
+  return left.type === right.type && left.id === right.id;
+}
+
+function TargetContentList(props: {
+  targets: TargetSummary[];
   notes: ResearchNote[];
   notesLoading: boolean;
   snapshots: RouterOutputs["researchTarget"]["listFinancialSnapshots"];
@@ -483,11 +487,11 @@ function TargetContentPanel(props: {
     artifact: ResearchArtifact,
     content: string,
   ) => Promise<void>;
-  onArchive?: () => void;
+  onArchive: (target: TargetSummary) => void;
   archivePending?: boolean;
 }) {
   const {
-    selectedTarget,
+    targets,
     notes,
     notesLoading,
     snapshots,
@@ -502,12 +506,12 @@ function TargetContentPanel(props: {
     archivePending = false,
   } = props;
 
-  if (!selectedTarget) {
+  if (targets.length === 0) {
     return (
       <Panel title="对象内容">
         <EmptyState
-          title="还没有选中投研对象"
-          description="先从左侧选择收藏公司、收藏行业或自选股，再查看它的笔记、财务快照和研究报告。"
+          title="当前分类还没有投研对象"
+          description="可以点击右上角“新建”，先创建收藏行业、收藏公司或自选股列表。"
         />
       </Panel>
     );
@@ -515,148 +519,166 @@ function TargetContentPanel(props: {
 
   return (
     <div className="grid gap-6">
-      <Panel
-        title={selectedTarget.label}
-        description={selectedTarget.description || "暂无说明"}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {selectedTarget.ref.type === "watchlist" ? (
-              <>
-                <Link
-                  href={`/watchlists/${selectedTarget.ref.id}`}
-                  className="app-button app-button-primary"
-                >
-                  打开列表
-                </Link>
-                <Link
-                  href={`/timing?watchListId=${selectedTarget.ref.id}`}
-                  className="app-button"
-                >
-                  去择时
-                </Link>
-              </>
-            ) : null}
-            {onArchive && !selectedTarget.archived ? (
-              <button
-                type="button"
-                className="app-button"
-                onClick={onArchive}
-                disabled={archivePending}
-              >
-                {archivePending ? "归档中..." : "归档"}
-              </button>
-            ) : null}
-            {selectedTarget.archived ? (
-              <StatusPill label="已归档" tone="warning" />
-            ) : null}
-          </div>
-        }
-      >
-        <div className="flex flex-wrap gap-2">
-          <StatusPill
-            label={targetTypeLabel(selectedTarget.ref.type)}
-            tone="info"
-          />
-          <StatusPill
-            label={`更新于 ${formatDate(selectedTarget.updatedAt)}`}
-            tone="neutral"
-          />
-          {selectedTarget.tags.map((tag) => (
-            <StatusPill key={tag} label={tag} tone="neutral" />
-          ))}
-        </div>
-      </Panel>
+      {targets.map((target) => {
+        const targetNotes = notes.filter((note) =>
+          sameTargetRef(note.targetRef, target.ref),
+        );
+        const targetSnapshots = snapshots.filter((snapshot) =>
+          sameTargetRef(snapshot.targetRef, target.ref),
+        );
+        const targetArtifacts = artifacts.filter((artifact) =>
+          sameTargetRef(artifact.targetRef, target.ref),
+        );
+        const showNotes = notesLoading || targetNotes.length > 0;
+        const showSnapshots = snapshotsLoading || targetSnapshots.length > 0;
+        const showArtifacts = artifactsLoading || targetArtifacts.length > 0;
 
-      <Panel title="最近笔记">
-        <div className="grid gap-3">
-          {notesLoading ? (
-            <EmptyState title="正在加载笔记" />
-          ) : notes.length === 0 ? (
-            <EmptyState title="还没有笔记" />
-          ) : (
-            notes.map((note) => (
-              <article
-                key={note.id}
-                className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel)] p-4"
-              >
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {note.title ? (
-                    <StatusPill label={note.title} tone="info" />
-                  ) : null}
-                  <StatusPill
-                    label={formatDate(note.updatedAt)}
-                    tone="neutral"
-                  />
-                </div>
-                <EditableMarkdownBlock
-                  content={note.contentMarkdown}
-                  saving={noteSaving}
-                  onSave={(content) => onSaveNote(note, content)}
+        return (
+          <Panel
+            key={serializeRef(target.ref)}
+            title={target.label}
+            description={target.description || "暂无说明"}
+            actions={
+              <div className="flex flex-wrap gap-2">
+                {target.ref.type === "watchlist" ? (
+                  <>
+                    <Link
+                      href={`/watchlists/${target.ref.id}`}
+                      className="app-button app-button-primary"
+                    >
+                      打开列表
+                    </Link>
+                    <Link
+                      href={`/timing?watchListId=${target.ref.id}`}
+                      className="app-button"
+                    >
+                      去择时
+                    </Link>
+                  </>
+                ) : null}
+                {target.ref.type === "company" ||
+                target.ref.type === "industry" ? (
+                  !target.archived ? (
+                    <button
+                      type="button"
+                      className="app-button"
+                      onClick={() => onArchive(target)}
+                      disabled={archivePending}
+                    >
+                      {archivePending ? "归档中..." : "归档"}
+                    </button>
+                  ) : (
+                    <StatusPill label="已归档" tone="warning" />
+                  )
+                ) : null}
+              </div>
+            }
+          >
+            <div className="grid gap-4">
+              <div className="flex flex-wrap gap-2">
+                <StatusPill
+                  label={targetTypeLabel(target.ref.type)}
+                  tone="info"
                 />
-              </article>
-            ))
-          )}
-        </div>
-      </Panel>
-
-      <Panel title="财务快照">
-        <div className="grid gap-3">
-          {snapshotsLoading ? (
-            <EmptyState title="正在加载财务快照" />
-          ) : snapshots.length === 0 ? (
-            <EmptyState title="还没有财务快照" />
-          ) : (
-            snapshots.map((snapshot) => (
-              <article
-                key={snapshot.id}
-                className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel)] p-4"
-              >
-                <p className="text-sm text-[var(--app-text-strong)]">
-                  {snapshot.companyRefs
-                    .map((item) => `${item.stockName}(${item.stockCode})`)
-                    .join("、") || "未记录公司"}
-                </p>
-                <p className="mt-2 text-xs text-[var(--app-text-soft)]">
-                  保存于 {formatDate(snapshot.createdAt)}
-                </p>
-              </article>
-            ))
-          )}
-        </div>
-      </Panel>
-
-      <Panel title="研究报告">
-        <div className="grid gap-3">
-          {artifactsLoading ? (
-            <EmptyState title="正在加载研究报告" />
-          ) : artifacts.length === 0 ? (
-            <EmptyState title="还没有研究报告" />
-          ) : (
-            artifacts.map((artifact) => (
-              <article
-                key={artifact.id}
-                className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel)] p-4"
-              >
-                <div className="mb-3 flex flex-wrap gap-2">
-                  <StatusPill label={artifact.title} tone="info" />
-                  <StatusPill
-                    label={`${artifact.artifactType} · ${formatDate(
-                      artifact.updatedAt,
-                    )}`}
-                    tone="neutral"
-                  />
-                </div>
-                <EditableMarkdownBlock
-                  content={artifactMarkdown(artifact)}
-                  compact={false}
-                  saving={artifactSaving}
-                  onSave={(content) => onSaveArtifact(artifact, content)}
+                <StatusPill
+                  label={`更新于 ${formatDate(target.updatedAt)}`}
+                  tone="neutral"
                 />
-              </article>
-            ))
-          )}
-        </div>
-      </Panel>
+                {target.tags.map((tag) => (
+                  <StatusPill key={tag} label={tag} tone="neutral" />
+                ))}
+              </div>
+
+              {showNotes ? (
+                <Panel title="最近笔记">
+                  {notesLoading ? (
+                    <EmptyState title="正在加载笔记" />
+                  ) : (
+                    <div className="grid gap-4">
+                      {targetNotes.map((note) => (
+                        <div key={note.id} className="grid gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            {note.title ? (
+                              <StatusPill label={note.title} tone="info" />
+                            ) : null}
+                            <StatusPill
+                              label={formatDate(note.updatedAt)}
+                              tone="neutral"
+                            />
+                          </div>
+                          <EditableMarkdownBlock
+                            content={note.contentMarkdown}
+                            saving={noteSaving}
+                            onSave={(content) => onSaveNote(note, content)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
+              ) : null}
+
+              {showSnapshots ? (
+                <Panel title="财务快照">
+                  {snapshotsLoading ? (
+                    <EmptyState title="正在加载财务快照" />
+                  ) : (
+                    <div className="grid gap-3">
+                      {targetSnapshots.map((snapshot) => (
+                        <div key={snapshot.id}>
+                          <p className="text-sm text-[var(--app-text-strong)]">
+                            {snapshot.companyRefs
+                              .map(
+                                (item) =>
+                                  `${item.stockName}(${item.stockCode})`,
+                              )
+                              .join("、") || "未记录公司"}
+                          </p>
+                          <p className="mt-2 text-xs text-[var(--app-text-soft)]">
+                            保存于 {formatDate(snapshot.createdAt)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
+              ) : null}
+
+              {showArtifacts ? (
+                <Panel title="研究报告">
+                  {artifactsLoading ? (
+                    <EmptyState title="正在加载研究报告" />
+                  ) : (
+                    <div className="grid gap-4">
+                      {targetArtifacts.map((artifact) => (
+                        <div key={artifact.id} className="grid gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            <StatusPill label={artifact.title} tone="info" />
+                            <StatusPill
+                              label={`${artifact.artifactType} · ${formatDate(
+                                artifact.updatedAt,
+                              )}`}
+                              tone="neutral"
+                            />
+                          </div>
+                          <EditableMarkdownBlock
+                            content={artifactMarkdown(artifact)}
+                            compact={false}
+                            saving={artifactSaving}
+                            onSave={(content) =>
+                              onSaveArtifact(artifact, content)
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Panel>
+              ) : null}
+            </div>
+          </Panel>
+        );
+      })}
     </div>
   );
 }
@@ -710,14 +732,13 @@ export function ResearchTargetsClient() {
   const visibleTargets = targets.filter(
     (target) => target.ref.type === activeTargetType,
   );
-  const selectedTarget =
+  const activeHistoryTarget =
     visibleTargets.find(
       (target) => serializeRef(target.ref) === requestedKey,
-    ) ??
-    visibleTargets[0] ??
-    null;
-  const selectedTargetRef = selectedTarget?.ref ?? null;
-  const selectedKey = selectedTarget ? serializeRef(selectedTarget.ref) : "";
+    ) ?? null;
+  const selectedKey = activeHistoryTarget
+    ? serializeRef(activeHistoryTarget.ref)
+    : "";
   const historyItems = visibleTargets.map((target) => ({
     id: serializeRef(target.ref),
     title: `[${targetTypeLabel(target.ref.type)}] ${target.label}`,
@@ -747,27 +768,24 @@ export function ResearchTargetsClient() {
 
   const notesQuery = api.researchTarget.listNotes.useQuery(
     {
-      targetRef: selectedTargetRef ?? undefined,
-      limit: 12,
+      limit: 100,
       offset: 0,
     },
-    { enabled: Boolean(selectedTargetRef) },
+    { enabled: visibleTargets.length > 0 },
   );
   const snapshotsQuery = api.researchTarget.listFinancialSnapshots.useQuery(
     {
-      targetRef: selectedTargetRef ?? undefined,
-      limit: 8,
+      limit: 100,
       offset: 0,
     },
-    { enabled: Boolean(selectedTargetRef) },
+    { enabled: visibleTargets.length > 0 },
   );
   const artifactsQuery = api.researchTarget.listArtifacts.useQuery(
     {
-      targetRef: selectedTargetRef ?? undefined,
-      limit: 8,
+      limit: 100,
       offset: 0,
     },
-    { enabled: Boolean(selectedTargetRef) },
+    { enabled: visibleTargets.length > 0 },
   );
 
   const createCompanyMutation = api.researchTarget.createCompany.useMutation({
@@ -940,8 +958,8 @@ export function ResearchTargetsClient() {
           />
         ) : null}
 
-        <TargetContentPanel
-          selectedTarget={selectedTarget}
+        <TargetContentList
+          targets={visibleTargets}
           notes={notesQuery.data ?? []}
           notesLoading={notesQuery.isLoading}
           snapshots={snapshotsQuery.data ?? []}
@@ -962,19 +980,16 @@ export function ResearchTargetsClient() {
               markdown: content,
             });
           }}
-          onArchive={
-            selectedTarget?.ref.type === "company"
-              ? () =>
-                  archiveCompanyMutation.mutate({
-                    id: selectedTarget.ref.id,
-                  })
-              : selectedTarget?.ref.type === "industry"
-                ? () =>
-                    archiveIndustryMutation.mutate({
-                      id: selectedTarget.ref.id,
-                    })
-                : undefined
-          }
+          onArchive={(target) => {
+            if (target.ref.type === "company") {
+              archiveCompanyMutation.mutate({ id: target.ref.id });
+              return;
+            }
+
+            if (target.ref.type === "industry") {
+              archiveIndustryMutation.mutate({ id: target.ref.id });
+            }
+          }}
           archivePending={
             archiveCompanyMutation.isPending ||
             archiveIndustryMutation.isPending
