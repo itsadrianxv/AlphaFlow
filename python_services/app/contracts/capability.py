@@ -154,7 +154,7 @@ class FundMarketCapabilityRequest(BaseModel):
     fundCode: str = Field(..., min_length=1)
     startDate: str | None = None
     endDate: str | None = None
-    include: list[str] = Field(default_factory=lambda: ["basic", "nav", "daily", "portfolio"])
+    include: list[str] = Field(default_factory=lambda: ["basic", "nav"])
 
 
 class ConvertibleBondMarketCapabilityRequest(BaseModel):

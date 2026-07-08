@@ -19,6 +19,21 @@ from app.services.theme_concept_rules_registry import ThemeConceptRulesRegistry
 _ETF_PREFIXES = ("15", "16", "18", "50", "51", "52", "56", "58", "159")
 _RULES_REGISTRY = ThemeConceptRulesRegistry()
 _GENERIC_THEME_KEYS = {"ai", "人工智能", "aigc"}
+_SW_INDUSTRY_SOURCE = "SW2021"
+_SW_THEME_INDUSTRY_HINTS: dict[str, list[str]] = {
+    "ai": ["计算机", "软件开发", "IT服务", "电子", "通信"],
+    "人工智能": ["计算机", "软件开发", "IT服务", "电子", "通信"],
+    "aigc": ["计算机", "软件开发", "IT服务", "传媒", "电子"],
+    "机器人": ["机器人", "自动化设备", "机械设备", "通用设备"],
+    "人形机器人": ["机器人", "自动化设备", "机械设备", "通用设备"],
+    "半导体": ["半导体", "电子", "半导体设备", "半导体材料"],
+    "芯片": ["半导体", "电子", "数字芯片设计", "模拟芯片设计"],
+    "新能源": ["电力设备", "光伏设备", "电池", "新能源动力系统"],
+    "光伏": ["光伏设备", "电力设备"],
+    "储能": ["电池", "电力设备", "电网设备"],
+    "汽车": ["汽车", "乘用车", "汽车零部件", "汽车电子电气系统"],
+    "低空经济": ["航空装备", "国防军工", "航天装备", "机械设备"],
+}
 
 
 class TushareProviderClient:
@@ -324,22 +339,23 @@ class TushareProviderClient:
         if cached is not None and now - cached[0] <= 86_400:
             return list(cached[1])
 
-        frame = self._raw_frame("ths_index")
+        frame = self._raw_frame("index_classify", src=_SW_INDUSTRY_SOURCE)
         items: list[dict[str, Any]] = []
         for _, row in frame.iterrows():
-            concept_name = _pick_text(row, ["name", "industry_name", "概念名称", "板块名称"])
-            concept_code = _pick_text(row, ["ts_code", "code", "index_code", "板块代码"])
+            concept_name = _pick_text(row, ["industry_name", "name", "概念名称", "板块名称"])
+            concept_code = _pick_text(row, ["index_code", "ts_code", "code", "板块代码"])
             if not concept_name or not concept_code:
                 continue
             items.append(
                 {
                     "conceptName": concept_name,
                     "conceptCode": concept_code,
+                    "conceptLevel": _pick_text(row, ["level"]) or _infer_sw_level(concept_code),
                     "leadingStock": None,
                     "changePercent": None,
                     "upCount": None,
                     "downCount": None,
-                    "source": "tushare:ths_index",
+                    "source": f"tushare:index_classify:{_SW_INDUSTRY_SOURCE}",
                 }
             )
         self._concept_catalog_cache = (now, items)
@@ -353,12 +369,17 @@ class TushareProviderClient:
         resolved_code = concept_code or self._resolve_concept_code(concept_name)
         if not resolved_code:
             return []
-        frame = self._raw_frame("ths_member", ts_code=resolved_code)
+        industry_item = self._resolve_industry_item(concept_name, resolved_code)
+        params = _industry_member_params(
+            resolved_code,
+            industry_item.get("conceptLevel") if industry_item else None,
+        )
+        frame = self._raw_frame("index_member_all", is_new="Y", **params)
         snapshot_map = self._load_snapshot_map(allow_empty=True)
         items: list[dict[str, Any]] = []
         for _, row in frame.iterrows():
             stock_code = _normalize_stock_code(
-                _pick_text(row, ["code", "con_code", "ts_code", "股票代码"])
+                _pick_text(row, ["ts_code", "code", "con_code", "股票代码"])
             )
             if not stock_code:
                 continue
@@ -367,7 +388,7 @@ class TushareProviderClient:
                 {
                     "conceptName": concept_name,
                     "stockCode": stock_code,
-                    "stockName": _pick_text(row, ["name", "stock_name", "股票名称"])
+                    "stockName": _pick_text(row, ["name", "stock_name", "con_name", "股票名称"])
                     or snapshot.get("name")
                     or stock_code,
                     "latestPrice": snapshot.get("close"),
@@ -530,12 +551,16 @@ class TushareProviderClient:
                 for item in catalog
                 if any(_normalize_text(wanted) in _normalize_text(item.get("conceptName")) for wanted in whitelist)
             ]
+            if not selected:
+                selected = self._select_sw_hint_concepts(theme, catalog)
         else:
             selected = [
                 self._enrich_concept_match(item, theme, _concept_match_confidence(theme, item), "auto")
                 for item in catalog
             ]
             selected = [item for item in selected if item["confidence"] >= 0.55]
+            if not selected:
+                selected = self._select_sw_hint_concepts(theme, catalog)
 
         if blacklist:
             selected = [
@@ -544,6 +569,28 @@ class TushareProviderClient:
                 if _normalize_text(item.get("conceptName")) not in blacklist
             ]
         return sorted(selected, key=lambda item: item["confidence"], reverse=True)[:normalized_limit]
+
+    def _select_sw_hint_concepts(
+        self,
+        theme: str,
+        catalog: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        theme_terms = [_normalize_text(theme)]
+        rules = _RULES_REGISTRY.get_rules(theme)
+        theme_terms.extend(_normalize_text(item) for item in rules.get("aliases", []))
+        hints: list[str] = []
+        for term in theme_terms:
+            hints.extend(_SW_THEME_INDUSTRY_HINTS.get(term, []))
+        normalized_hints = [_normalize_text(item) for item in hints if _normalize_text(item)]
+        if not normalized_hints:
+            return []
+        matches: list[dict[str, Any]] = []
+        for item in catalog:
+            concept_key = _normalize_text(item.get("conceptName"))
+            if not any(hint in concept_key or concept_key in hint for hint in normalized_hints):
+                continue
+            matches.append(self._enrich_concept_match(item, theme, 0.68, "sw_hint"))
+        return matches
 
     def _enrich_concept_match(
         self,
@@ -557,9 +604,9 @@ class TushareProviderClient:
         result["reason"] = (
             f"规则白名单匹配主题“{theme}”"
             if source == "whitelist"
-            else f"TuShare THS 概念“{item.get('conceptName')}”与主题“{theme}”文本相关"
+            else f"TuShare 申万行业“{item.get('conceptName')}”与主题“{theme}”文本相关"
         )
-        result["source"] = "tushare:ths_index"
+        result["source"] = item.get("source") or f"tushare:index_classify:{_SW_INDUSTRY_SOURCE}"
         return result
 
     def _build_candidates_from_snapshot(self, theme: str, limit: int) -> dict[str, dict[str, Any]]:
@@ -604,14 +651,33 @@ class TushareProviderClient:
                 return str(item.get("conceptCode") or "")
         return ""
 
+    def _resolve_industry_item(
+        self,
+        concept_name: str,
+        concept_code: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_name = _normalize_text(concept_name)
+        normalized_code = str(concept_code or "").strip()
+        for item in self.get_concept_catalog():
+            current_code = str(item.get("conceptCode") or "").strip()
+            current_name = _normalize_text(item.get("conceptName"))
+            if normalized_code and current_code == normalized_code:
+                return item
+            if normalized_name and (current_name == normalized_name or normalized_name in current_name):
+                return item
+        return {}
+
     def _get_etf_snapshot(self, stock_code: str) -> dict[str, Any] | None:
         ts_code = _resolve_fund_ts_code(stock_code)
         frame = self._safe_raw_frame("fund_basic", ts_code=ts_code, market="E")
         if frame.empty:
             return None
         row = frame.iloc[0]
-        daily = self._safe_raw_frame("fund_daily", ts_code=ts_code)
-        latest = daily.sort_values("trade_date").iloc[-1] if not daily.empty else pd.Series()
+        nav = self._safe_raw_frame("fund_nav", ts_code=ts_code)
+        latest = nav.sort_values("nav_date" if "nav_date" in nav.columns else "end_date").iloc[-1] if not nav.empty else pd.Series()
+        previous = nav.sort_values("nav_date" if "nav_date" in nav.columns else "end_date").iloc[-2] if len(nav.index) >= 2 else pd.Series()
+        latest_nav = _safe_float(latest.get("unit_nav")) or _safe_float(latest.get("adj_nav"))
+        previous_nav = _safe_float(previous.get("unit_nav")) or _safe_float(previous.get("adj_nav"))
         return {
             "code": stock_code,
             "name": _pick_text(row, ["name", "ts_code"]) or stock_code,
@@ -620,12 +686,14 @@ class TushareProviderClient:
             "marketCap": None,
             "floatMarketCap": None,
             "turnoverRate": None,
-            "changePercent": _safe_float(latest.get("pct_chg")),
+            "changePercent": _pct_change(latest_nav, previous_nav),
             "pe": None,
             "pb": None,
-            "dataDate": _format_ymd(latest.get("trade_date")) if not latest.empty else datetime.now(UTC).date().isoformat(),
+            "close": latest_nav,
+            "dataDate": _format_ymd(latest.get("nav_date") or latest.get("end_date")) if not latest.empty else datetime.now(UTC).date().isoformat(),
             "securityType": "etf",
             "market": "CN-ETF",
+            "warnings": ["fund_daily_unavailable_using_fund_nav_proxy"],
         }
 
     def _safe_raw_frame(self, dataset: str, **params: str) -> pd.DataFrame:
@@ -698,6 +766,28 @@ def _format_ymd(value: Any) -> str:
     if len(text) == 8 and text.isdigit():
         return f"{text[:4]}-{text[4:6]}-{text[6:8]}"
     return text
+
+
+def _infer_sw_level(index_code: Any) -> str:
+    code = str(index_code or "").strip()
+    if code.startswith("85"):
+        return "L3"
+    return ""
+
+
+def _industry_member_params(index_code: str, level: Any) -> dict[str, str]:
+    normalized_level = str(level or "").strip().upper()
+    if normalized_level == "L1":
+        return {"l1_code": index_code}
+    if normalized_level == "L2":
+        return {"l2_code": index_code}
+    return {"l3_code": index_code}
+
+
+def _pct_change(latest: float | None, previous: float | None) -> float | None:
+    if latest is None or previous in {None, 0}:
+        return None
+    return round((latest / previous - 1) * 100, 4)
 
 
 def _normalize_text(value: Any) -> str:

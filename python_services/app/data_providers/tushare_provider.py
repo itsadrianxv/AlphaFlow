@@ -89,7 +89,7 @@ RAW_DATASET_FIELDS: dict[str, str] = {
     "disclosure_date": "ts_code,ann_date,end_date,pre_date,actual_date,modify_date",
     "dividend": "ts_code,end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date",
     "fund_basic": "ts_code,name,management,custodian,fund_type,found_date,due_date,list_date,issue_date,delist_date,issue_amount,m_fee,c_fee,duration_year,p_value,min_amount,exp_return,benchmark,status,invest_type,type,trustee,purc_startdate,redm_startdate,market",
-    "fund_nav": "ts_code,ann_date,end_date,unit_nav,accum_nav,accum_div,net_asset,total_netasset,adj_nav",
+    "fund_nav": "ts_code,ann_date,end_date,nav_date,unit_nav,accum_nav,accum_div,net_asset,total_netasset,adj_nav",
     "fund_daily": "ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount",
     "fund_portfolio": "ts_code,ann_date,end_date,symbol,mkv,amount,stk_mkv_ratio,stk_float_ratio",
     "cb_basic": "ts_code,bond_full_name,bond_short_name,stk_code,stk_short_name,maturity,par,issue_price,issue_size,remain_size,value_date,maturity_date,rate_type,coupon_rate,add_rate,pay_per_year,list_date,delist_date,exchange,conv_start_date,conv_end_date,conv_price",
@@ -433,6 +433,14 @@ class TushareProvider:
         warnings: list[str] = []
         normalized_request = self._normalize_market_tool_request(operation, payload)
         selected_specs = self._filter_market_specs(operation, specs, payload)
+        selected_specs, skipped_apis = self._skip_apis_unavailable_for_2000_credits(
+            operation,
+            selected_specs,
+        )
+        warnings.extend(
+            f"{dataset} skipped: TuShare 2000-credit mode uses lower-permission substitutes"
+            for dataset in skipped_apis
+        )
         result: dict[str, Any] = {
             "provider": self.provider_name,
             "api": [dataset for dataset, _key in selected_specs],
@@ -443,6 +451,8 @@ class TushareProvider:
                 "cacheHit": False,
                 "rowCount": 0,
                 "elapsedMs": 0,
+                "skippedApis": skipped_apis,
+                "failedApis": [],
             },
         }
 
@@ -454,7 +464,11 @@ class TushareProvider:
             fields = RAW_DATASET_FIELDS.get(dataset)
             if fields:
                 params["fields"] = fields
-            frame = self.get_raw_frame(dataset, **{key: str(value) for key, value in params.items() if value not in {None, ""}})
+            try:
+                frame = self.get_raw_frame(dataset, **{key: str(value) for key, value in params.items() if value not in {None, ""}})
+            except DataProviderError:
+                result["diagnostics"]["failedApis"].append(dataset)
+                raise
             rows = self._frame_to_records(frame)
             if not rows:
                 warnings.append(f"{dataset} returned empty result")
@@ -562,6 +576,22 @@ class TushareProvider:
             for dataset, key in specs
             if key in include_set or dataset in include_set or aliases.get(key) in include_set
         ] or specs
+
+    def _skip_apis_unavailable_for_2000_credits(
+        self,
+        operation: str,
+        specs: list[tuple[str, str]],
+    ) -> tuple[list[tuple[str, str]], list[str]]:
+        if operation != "fund_market":
+            return specs, []
+        skipped_datasets = {"fund_daily", "fund_portfolio"}
+        filtered_specs = [
+            (dataset, key)
+            for dataset, key in specs
+            if dataset not in skipped_datasets
+        ]
+        skipped = [dataset for dataset, _key in specs if dataset in skipped_datasets]
+        return filtered_specs, skipped
 
     def _market_include_aliases(self, operation: str) -> dict[str, str]:
         if operation == "moneyflow":

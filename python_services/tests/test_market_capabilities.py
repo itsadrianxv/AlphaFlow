@@ -60,6 +60,34 @@ class FakeMarketClient:
         self.calls.append(("cashflow", kwargs))
         return pd.DataFrame({"ts_code": ["600519.SH"], "end_date": ["20251231"], "n_cashflow_act": [50.0]})
 
+    def fund_basic(self, **kwargs):
+        self.calls.append(("fund_basic", kwargs))
+        return pd.DataFrame(
+            {
+                "ts_code": ["510300.SH"],
+                "name": ["沪深300ETF"],
+                "market": ["E"],
+                "fund_type": ["股票型"],
+            }
+        )
+
+    def fund_nav(self, **kwargs):
+        self.calls.append(("fund_nav", kwargs))
+        return pd.DataFrame(
+            {
+                "ts_code": ["510300.SH"],
+                "nav_date": ["20260707"],
+                "unit_nav": [4.0],
+                "accum_nav": [4.0],
+            }
+        )
+
+    def fund_daily(self, **kwargs):
+        raise AssertionError("fund_daily should be skipped in 2000-credit mode")
+
+    def fund_portfolio(self, **kwargs):
+        raise AssertionError("fund_portfolio should be skipped in 2000-credit mode")
+
 
 def test_market_capability_route_returns_standard_envelope(monkeypatch):
     fake_client = FakeMarketClient()
@@ -124,6 +152,26 @@ def test_market_tool_filters_financial_statement(monkeypatch):
     assert called_datasets == ["stock_basic", "income"]
     assert result["api"] == ["income"]
     assert result["rows"]["income"][0]["total_revenue"] == 100.0
+
+
+def test_fund_market_skips_high_permission_apis_in_2000_credit_mode(monkeypatch):
+    fake_client = FakeMarketClient()
+    monkeypatch.setenv("TUSHARE_TOKEN", "token-1")
+    monkeypatch.setattr(tushare_module, "_create_tushare_client", lambda _token: fake_client)
+
+    result = TushareProvider().query_market_tool(
+        "fund_market",
+        {
+            "fundCode": "510300.SH",
+            "include": ["basic", "nav", "daily", "portfolio"],
+        },
+    )
+
+    called_datasets = [name for name, _kwargs in fake_client.calls]
+    assert called_datasets == ["fund_basic", "fund_nav"]
+    assert result["api"] == ["fund_basic", "fund_nav"]
+    assert result["diagnostics"]["skippedApis"] == ["fund_daily", "fund_portfolio"]
+    assert any("fund_daily skipped" in warning for warning in result["warnings"])
 
 
 def test_market_gateway_maps_unsupported_provider_to_capability_error(monkeypatch):
