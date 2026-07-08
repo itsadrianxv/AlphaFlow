@@ -120,7 +120,6 @@ export function ScreeningStudioClient() {
   const draftNameFromUrl = searchParams.get("draftName");
   const draftDescriptionFromUrl = searchParams.get("draftDescription");
   const utils = api.useUtils();
-  const autoCreateAttemptedRef = useRef(false);
   const lastAutoSavedKeyRef = useRef<string | null>(null);
   const [notice, setNotice] = useState<NoticeState | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
@@ -343,10 +342,6 @@ export function ScreeningStudioClient() {
     onSuccess: async (workspace) => {
       setSelectedWorkspaceId(workspace.id);
       setWorkspaceHydrated(true);
-      setNotice({
-        tone: "success",
-        text: `工作台“${workspace.name}”已自动创建`,
-      });
       await utils.screening.listWorkspaces.invalidate();
     },
     onError: (error) => setNotice({ tone: "error", text: error.message }),
@@ -783,28 +778,6 @@ export function ScreeningStudioClient() {
 
   useEffect(() => {
     if (
-      workspaceIdFromUrl ||
-      selectedWorkspaceId ||
-      autoCreateAttemptedRef.current ||
-      createWorkspaceMutation.isPending
-    ) {
-      return;
-    }
-
-    autoCreateAttemptedRef.current = true;
-    lastAutoSavedKeyRef.current = workspaceAutoSaveKey;
-    void createWorkspace(workspacePayload);
-  }, [
-    createWorkspace,
-    createWorkspaceMutation.isPending,
-    selectedWorkspaceId,
-    workspaceAutoSaveKey,
-    workspaceIdFromUrl,
-    workspacePayload,
-  ]);
-
-  useEffect(() => {
-    if (
       !selectedWorkspaceId ||
       !workspaceHydrated ||
       createWorkspaceMutation.isPending
@@ -843,6 +816,14 @@ export function ScreeningStudioClient() {
     if (selectedIndicatorIds.length === 0 && selectedFormulaIds.length === 0) {
       setNotice({ tone: "error", text: "请至少选择一个指标或公式" });
       return;
+    }
+
+    if (!selectedWorkspaceId) {
+      const workspace = await createWorkspace(workspacePayload);
+      lastAutoSavedKeyRef.current = JSON.stringify({
+        id: workspace.id,
+        ...workspacePayload,
+      });
     }
 
     await queryDatasetMutation.mutateAsync({
@@ -1438,9 +1419,15 @@ export function ScreeningStudioClient() {
                 type="button"
                 onClick={() => void handleFetchDataset()}
                 className="app-button app-button-primary"
-                disabled={queryDatasetMutation.isPending}
+                disabled={
+                  createWorkspaceMutation.isPending ||
+                  queryDatasetMutation.isPending
+                }
               >
-                {queryDatasetMutation.isPending ? "获取中..." : "获取"}
+                {createWorkspaceMutation.isPending ||
+                queryDatasetMutation.isPending
+                  ? "获取中..."
+                  : "获取"}
               </button>
               <StatusPill
                 label={`股票 ${selectedStocks.length}/20`}
