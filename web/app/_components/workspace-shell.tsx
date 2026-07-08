@@ -112,20 +112,11 @@ const sidebarNavItems: Array<{
   },
 ];
 
-function AppMark() {
-  return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] font-[family-name:var(--font-heading)] text-[11px] font-semibold text-[var(--app-text-strong)]">
-      AF
-    </div>
-  );
-}
-
 function SidebarBrand(props: { onNavigate?: () => void }) {
   const { onNavigate } = props;
 
   return (
-    <Link href="/" className="flex items-center gap-3" onClick={onNavigate}>
-      <AppMark />
+    <Link href="/" className="flex min-w-0 items-center" onClick={onNavigate}>
       <div className="min-w-0 truncate text-sm font-medium text-[var(--app-text-strong)]">
         AlphaFlow
       </div>
@@ -329,6 +320,7 @@ function SidebarRail(props: {
     onNavigate,
     onToggleSidebar,
   } = props;
+  const showAgentNewConversation = section === "agentRuntime" && !collapsed;
   const shouldShowHistory =
     !collapsed &&
     (historyLoading ||
@@ -351,15 +343,26 @@ function SidebarRail(props: {
             collapsed ? "justify-center" : "justify-between gap-3",
           )}
         >
-          <div
-            aria-hidden={collapsed}
-            data-collapsed={collapsed ? "true" : "false"}
-            className={cn(
-              "app-sidebar-brand-panel",
-              collapsed ? "pointer-events-none max-w-0 flex-none" : "",
-            )}
-          >
-            <SidebarBrand onNavigate={onNavigate} />
+          <div className="flex min-w-0 items-center gap-2">
+            <div
+              aria-hidden={collapsed}
+              data-collapsed={collapsed ? "true" : "false"}
+              className={cn(
+                "app-sidebar-brand-panel",
+                collapsed ? "pointer-events-none max-w-0 flex-none" : "",
+              )}
+            >
+              <SidebarBrand onNavigate={onNavigate} />
+            </div>
+            {showAgentNewConversation ? (
+              <Link
+                href="/agent-runtime"
+                onClick={onNavigate}
+                className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-[var(--app-border-soft)] px-3 text-xs font-medium text-[var(--app-text-muted)] transition-colors hover:border-[rgba(255,255,255,0.28)] hover:bg-[var(--app-panel-strong)] hover:text-[var(--app-text-strong)]"
+              >
+                新对话
+              </Link>
+            ) : null}
           </div>
           <button
             type="button"
@@ -525,6 +528,9 @@ export function WorkspaceShell(props: {
       desktopCollapsed ? "true" : "false",
     );
   }, [desktopCollapsed, desktopStateReady]);
+  const shouldShowPageHeader = Boolean(
+    eyebrow || title || description || actions || showWatchlistsAction,
+  );
   const headerActions = (
     <>
       {actions}
@@ -630,13 +636,15 @@ export function WorkspaceShell(props: {
             contentWidth === "wide" ? "max-w-[1560px]" : "max-w-[1280px]",
           )}
         >
-          <PageHeader
-            eyebrow={eyebrow}
-            title={title}
-            description={description}
-            actions={headerActions}
-            titleSize={titleSize}
-          />
+          {shouldShowPageHeader ? (
+            <PageHeader
+              eyebrow={eyebrow}
+              title={title}
+              description={description}
+              actions={headerActions}
+              titleSize={titleSize}
+            />
+          ) : null}
 
           {workflowTabs.length > 0 ? (
             <section className="grid gap-3 lg:grid-cols-4 xl:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">

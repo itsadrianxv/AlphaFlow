@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HighlightToNote } from "~/app/_components/highlight-to-note";
@@ -346,22 +345,12 @@ export function AgentRuntimeClientPage() {
   return (
     <WorkspaceShell
       section="agentRuntime"
-      title="Pi Agent"
       historyItems={historyItems}
       historyHref="/agent-runtime"
       historyLoading={conversationsQuery.isLoading}
       historyEmptyText="还没有 Pi Agent 对话"
       activeHistoryId={selectedConversationId}
-      actions={
-        <>
-          <Link href="/agent-runtime" className="app-button">
-            新对话
-          </Link>
-          <Link href="/workflows" className="app-button">
-            运行记录
-          </Link>
-        </>
-      }
+      showWatchlistsAction={false}
       contentWidth="wide"
       titleSize="compact"
     >
