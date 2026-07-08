@@ -53,20 +53,6 @@ function splitTags(value: string) {
     .filter(Boolean);
 }
 
-function formatDate(value?: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
 function targetTypeLabel(type: ResearchTargetType | string) {
   switch (type) {
     case "company":
@@ -488,7 +474,7 @@ function TargetContentList(props: {
     content: string,
   ) => Promise<void>;
   onArchive: (target: TargetSummary) => void;
-  archivePending?: boolean;
+  archivePendingTargetKey?: string | null;
 }) {
   const {
     targets,
@@ -503,7 +489,7 @@ function TargetContentList(props: {
     onSaveNote,
     onSaveArtifact,
     onArchive,
-    archivePending = false,
+    archivePendingTargetKey = null,
   } = props;
 
   if (targets.length === 0) {
@@ -532,10 +518,12 @@ function TargetContentList(props: {
         const showNotes = notesLoading || targetNotes.length > 0;
         const showSnapshots = snapshotsLoading || targetSnapshots.length > 0;
         const showArtifacts = artifactsLoading || targetArtifacts.length > 0;
+        const targetKey = serializeRef(target.ref);
+        const archivePending = archivePendingTargetKey === targetKey;
 
         return (
           <Panel
-            key={serializeRef(target.ref)}
+            key={targetKey}
             title={target.label}
             description={target.description || "暂无说明"}
             actions={
@@ -575,37 +563,30 @@ function TargetContentList(props: {
             }
           >
             <div className="grid gap-4">
-              <div className="flex flex-wrap gap-2">
-                <StatusPill
-                  label={targetTypeLabel(target.ref.type)}
-                  tone="info"
-                />
-                <StatusPill
-                  label={`更新于 ${formatDate(target.updatedAt)}`}
-                  tone="neutral"
-                />
-                {target.tags.map((tag) => (
-                  <StatusPill key={tag} label={tag} tone="neutral" />
-                ))}
-              </div>
+              {target.tags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {target.tags.map((tag) => (
+                    <StatusPill key={tag} label={tag} tone="neutral" />
+                  ))}
+                </div>
+              ) : null}
 
               {showNotes ? (
-                <Panel title="最近笔记">
+                <section className="grid gap-3 border-t border-[var(--app-border-soft)] pt-4">
+                  <h3 className="font-[family-name:var(--font-heading)] text-sm text-[var(--app-text-strong)]">
+                    最近笔记
+                  </h3>
                   {notesLoading ? (
                     <EmptyState title="正在加载笔记" />
                   ) : (
                     <div className="grid gap-4">
                       {targetNotes.map((note) => (
                         <div key={note.id} className="grid gap-2">
-                          <div className="flex flex-wrap gap-2">
-                            {note.title ? (
-                              <StatusPill label={note.title} tone="info" />
-                            ) : null}
-                            <StatusPill
-                              label={formatDate(note.updatedAt)}
-                              tone="neutral"
-                            />
-                          </div>
+                          {note.title ? (
+                            <p className="text-sm text-[var(--app-text-muted)]">
+                              {note.title}
+                            </p>
+                          ) : null}
                           <EditableMarkdownBlock
                             content={note.contentMarkdown}
                             saving={noteSaving}
@@ -615,11 +596,14 @@ function TargetContentList(props: {
                       ))}
                     </div>
                   )}
-                </Panel>
+                </section>
               ) : null}
 
               {showSnapshots ? (
-                <Panel title="财务快照">
+                <section className="grid gap-3 border-t border-[var(--app-border-soft)] pt-4">
+                  <h3 className="font-[family-name:var(--font-heading)] text-sm text-[var(--app-text-strong)]">
+                    财务快照
+                  </h3>
                   {snapshotsLoading ? (
                     <EmptyState title="正在加载财务快照" />
                   ) : (
@@ -634,33 +618,27 @@ function TargetContentList(props: {
                               )
                               .join("、") || "未记录公司"}
                           </p>
-                          <p className="mt-2 text-xs text-[var(--app-text-soft)]">
-                            保存于 {formatDate(snapshot.createdAt)}
-                          </p>
                         </div>
                       ))}
                     </div>
                   )}
-                </Panel>
+                </section>
               ) : null}
 
               {showArtifacts ? (
-                <Panel title="研究报告">
+                <section className="grid gap-3 border-t border-[var(--app-border-soft)] pt-4">
+                  <h3 className="font-[family-name:var(--font-heading)] text-sm text-[var(--app-text-strong)]">
+                    研究报告
+                  </h3>
                   {artifactsLoading ? (
                     <EmptyState title="正在加载研究报告" />
                   ) : (
                     <div className="grid gap-4">
                       {targetArtifacts.map((artifact) => (
                         <div key={artifact.id} className="grid gap-2">
-                          <div className="flex flex-wrap gap-2">
-                            <StatusPill label={artifact.title} tone="info" />
-                            <StatusPill
-                              label={`${artifact.artifactType} · ${formatDate(
-                                artifact.updatedAt,
-                              )}`}
-                              tone="neutral"
-                            />
-                          </div>
+                          <p className="text-sm text-[var(--app-text-muted)]">
+                            {artifact.title}
+                          </p>
                           <EditableMarkdownBlock
                             content={artifactMarkdown(artifact)}
                             compact={false}
@@ -673,7 +651,7 @@ function TargetContentList(props: {
                       ))}
                     </div>
                   )}
-                </Panel>
+                </section>
               ) : null}
             </div>
           </Panel>
@@ -706,9 +684,13 @@ export function ResearchTargetsClient() {
   const [industryTags, setIndustryTags] = useState("");
   const [watchlistName, setWatchlistName] = useState("");
   const [watchlistDescription, setWatchlistDescription] = useState("");
+  const [archivingTargetKey, setArchivingTargetKey] = useState<string | null>(
+    null,
+  );
 
   const targetsQuery = api.researchTarget.listTargets.useQuery({
     types: ["company", "industry", "watchlist"],
+    includeArchived: true,
     limit: 100,
   });
   const targets = useMemo(() => targetsQuery.data ?? [], [targetsQuery.data]);
@@ -847,6 +829,9 @@ export function ResearchTargetsClient() {
         utils.researchTarget.listTargets.invalidate(),
       ]);
     },
+    onSettled: () => {
+      setArchivingTargetKey(null);
+    },
   });
   const archiveIndustryMutation =
     api.researchTarget.archiveIndustry.useMutation({
@@ -855,6 +840,9 @@ export function ResearchTargetsClient() {
           utils.researchTarget.listIndustries.invalidate(),
           utils.researchTarget.listTargets.invalidate(),
         ]);
+      },
+      onSettled: () => {
+        setArchivingTargetKey(null);
       },
     });
   const updateNoteMutation = api.researchTarget.updateNote.useMutation({
@@ -981,6 +969,8 @@ export function ResearchTargetsClient() {
             });
           }}
           onArchive={(target) => {
+            setArchivingTargetKey(serializeRef(target.ref));
+
             if (target.ref.type === "company") {
               archiveCompanyMutation.mutate({ id: target.ref.id });
               return;
@@ -990,10 +980,7 @@ export function ResearchTargetsClient() {
               archiveIndustryMutation.mutate({ id: target.ref.id });
             }
           }}
-          archivePending={
-            archiveCompanyMutation.isPending ||
-            archiveIndustryMutation.isPending
-          }
+          archivePendingTargetKey={archivingTargetKey}
         />
       </div>
     </WorkspaceShell>
