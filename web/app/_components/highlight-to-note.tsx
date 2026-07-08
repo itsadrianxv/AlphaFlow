@@ -20,6 +20,33 @@ type ToolbarPosition = {
   left: number;
 };
 
+type FloatingPickerMode = "company" | "industry" | "workflow_run";
+
+const floatingPickerConfig: Record<
+  FloatingPickerMode,
+  {
+    buttonLabel: string;
+    pickerLabel: string;
+    allowedTypes: ResearchTargetRef["type"][];
+  }
+> = {
+  company: {
+    buttonLabel: "保存到公司收藏",
+    pickerLabel: "选择公司收藏",
+    allowedTypes: ["company"],
+  },
+  industry: {
+    buttonLabel: "保存到行业收藏",
+    pickerLabel: "选择行业收藏",
+    allowedTypes: ["industry"],
+  },
+  workflow_run: {
+    buttonLabel: "保存到运行实例",
+    pickerLabel: "选择运行实例",
+    allowedTypes: ["workflow_run"],
+  },
+};
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -28,19 +55,23 @@ export function HighlightToNote(props: HighlightToNoteProps) {
   const [selectedText, setSelectedText] = useState("");
   const [toolbarPosition, setToolbarPosition] =
     useState<ToolbarPosition | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<FloatingPickerMode | null>(null);
   const [targetRef, setTargetRef] = useState<ResearchTargetRef | null>(
     props.lastTargetRef ?? props.targetRef ?? null,
   );
   const [lastNoteId, setLastNoteId] = useState("");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const utils = api.useUtils();
+  const targetsQuery = api.researchTarget.listTargets.useQuery(
+    { limit: 100 },
+    { enabled: props.floatingToolbar && Boolean(selectedText) },
+  );
   const createNoteMutation = api.researchTarget.createNote.useMutation({
     onSuccess: async (note) => {
       setLastNoteId(note.id);
       setSelectedText("");
       setToolbarPosition(null);
-      setPickerOpen(false);
+      setPickerMode(null);
       await utils.researchTarget.listNotes.invalidate();
     },
   });
@@ -80,12 +111,12 @@ export function HighlightToNote(props: HighlightToNoteProps) {
 
       const rect = range?.getBoundingClientRect();
       setSelectedText(text.slice(0, 4000));
-      setPickerOpen(false);
+      setPickerMode(null);
       if (props.floatingToolbar && rect) {
-        const maxLeft = Math.max(10, window.innerWidth - 370);
+        const maxLeft = Math.max(10, window.innerWidth - 430);
         setToolbarPosition({
           top: clamp(rect.top - 52, 10, window.innerHeight - 168),
-          left: clamp(rect.left + rect.width / 2 - 114, 10, maxLeft),
+          left: clamp(rect.left + rect.width / 2 - 160, 10, maxLeft),
         });
       }
       return;
@@ -94,11 +125,21 @@ export function HighlightToNote(props: HighlightToNoteProps) {
     if (props.floatingToolbar) {
       setSelectedText("");
       setToolbarPosition(null);
-      setPickerOpen(false);
+      setPickerMode(null);
     }
   }
 
   const activeTargetRef = targetRef ?? props.lastTargetRef ?? null;
+  const activeTargetLabel = activeTargetRef
+    ? targetsQuery.data?.find(
+        (target) =>
+          target.ref.type === activeTargetRef.type &&
+          target.ref.id === activeTargetRef.id,
+      )?.label
+    : null;
+  const activePickerConfig = pickerMode
+    ? floatingPickerConfig[pickerMode]
+    : null;
 
   if (props.floatingToolbar) {
     return (
@@ -110,27 +151,49 @@ export function HighlightToNote(props: HighlightToNoteProps) {
       >
         {props.children}
         {selectedText && toolbarPosition ? (
+          // biome-ignore lint/a11y/noStaticElementInteractions: 这里只阻断浮层内部点击冒泡，交互控件由内部按钮和选择器提供。
           <div
             className="fixed z-50"
+            onMouseDown={(event) => event.stopPropagation()}
+            onMouseUp={(event) => event.stopPropagation()}
             style={{
               top: toolbarPosition.top,
               left: toolbarPosition.left,
             }}
           >
-            <div className="flex items-center gap-2 rounded-full border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-1 shadow-[var(--app-shadow-lg)]">
-              <button
-                type="button"
-                className="inline-flex h-9 items-center justify-center rounded-full px-3 text-xs font-medium text-[var(--app-text-strong)] transition-colors hover:bg-[rgba(255,255,255,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  if (!pickerOpen && activeTargetRef) {
-                    setTargetRef(activeTargetRef);
-                  }
-                  setPickerOpen((current) => !current);
-                }}
-              >
-                选择对象
-              </button>
+            <div className="flex flex-wrap items-center gap-2 rounded-[22px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-1 shadow-[var(--app-shadow-lg)]">
+              {(Object.keys(floatingPickerConfig) as FloatingPickerMode[]).map(
+                (mode) => {
+                  const config = floatingPickerConfig[mode];
+                  const active = pickerMode === mode;
+
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={[
+                        "inline-flex h-9 items-center justify-center rounded-full px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                        active
+                          ? "bg-white text-black"
+                          : "text-[var(--app-text-strong)] hover:bg-[rgba(255,255,255,0.08)]",
+                      ].join(" ")}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        setTargetRef((current) =>
+                          current && config.allowedTypes.includes(current.type)
+                            ? current
+                            : null,
+                        );
+                        setPickerMode((current) =>
+                          current === mode ? null : mode,
+                        );
+                      }}
+                    >
+                      {config.buttonLabel}
+                    </button>
+                  );
+                },
+              )}
               <button
                 type="button"
                 className="inline-flex h-9 items-center justify-center rounded-full bg-white px-3 text-xs font-medium text-black transition-colors hover:bg-[rgba(255,255,255,0.86)] disabled:cursor-not-allowed disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
@@ -142,14 +205,18 @@ export function HighlightToNote(props: HighlightToNoteProps) {
                   }
                 }}
               >
-                上次对象
+                {activeTargetLabel
+                  ? `保存到${activeTargetLabel}`
+                  : "保存到上次对象"}
               </button>
             </div>
-            {pickerOpen ? (
-              <div className="mt-2 w-[min(360px,calc(100vw-20px))] rounded-[18px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-3 shadow-[var(--app-shadow-lg)]">
+            {activePickerConfig ? (
+              <div className="mt-2 w-[min(390px,calc(100vw-20px))] rounded-[18px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-3 shadow-[var(--app-shadow-lg)]">
                 <ResearchTargetPicker
                   value={targetRef}
                   onChange={(value) => setTargetRef(value)}
+                  allowedTypes={activePickerConfig.allowedTypes}
+                  label={activePickerConfig.pickerLabel}
                   compact
                 />
                 <div className="mt-3 flex items-center justify-end gap-2">
@@ -159,7 +226,7 @@ export function HighlightToNote(props: HighlightToNoteProps) {
                     onClick={() => {
                       setSelectedText("");
                       setToolbarPosition(null);
-                      setPickerOpen(false);
+                      setPickerMode(null);
                     }}
                   >
                     取消
