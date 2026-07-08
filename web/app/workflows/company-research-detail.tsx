@@ -26,6 +26,8 @@ import {
   isCompanyResearchResult,
   type ResearchDigest,
 } from "~/app/workflows/research-view-models";
+import { WorkflowAgentStep } from "~/app/workflows/workflow-agent-step";
+import type { WorkflowDiagramRunDetail } from "~/app/workflows/workflow-diagram-runtime";
 import type { ConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
@@ -34,6 +36,11 @@ import {
 } from "~/server/domain/workflow/types";
 
 const companyResearchDetailTabs: WorkflowStageTab[] = [
+  {
+    id: "agent",
+    label: "Agent 状态图",
+    summary: "先看 Agent 状态图、运行摘要和研究执行状态。",
+  },
   {
     id: "summary",
     label: "投资结论",
@@ -53,6 +60,19 @@ const companyResearchDetailTabs: WorkflowStageTab[] = [
     id: "references",
     label: "引用与来源",
     summary: "审查证据覆盖、来源类型和引用内容。",
+  },
+];
+
+const companyResearchPausedTabs: WorkflowStageTab[] = [
+  {
+    id: "agent",
+    label: "Agent 状态图",
+    summary: "先看 Agent 状态图、运行摘要和研究执行状态。",
+  },
+  {
+    id: "paused",
+    label: "已暂停",
+    summary: "查看阻塞项和下一步动作，确认如何继续。",
   },
 ];
 
@@ -982,6 +1002,7 @@ function ReferencesTab(props: {
 
 export function CompanyResearchDetailPanels(props: {
   model: CompanyResearchDetailModel;
+  run?: WorkflowDiagramRunDetail | null;
   activeTabId?: string;
   onTabChange?: (tabId: string) => void;
   expandedQuestionId?: string | null;
@@ -1001,6 +1022,7 @@ export function CompanyResearchDetailPanels(props: {
       activeTabId={activeTabId}
       onChange={props.onTabChange}
       panels={{
+        agent: <WorkflowAgentStep run={props.run ?? null} />,
         summary: <SummaryTab model={props.model} />,
         concepts: <ConceptsTab model={props.model} />,
         questions: (
@@ -1024,6 +1046,7 @@ export function CompanyResearchDetailPanels(props: {
 
 export function CompanyResearchDetailContent(props: {
   model: CompanyResearchDetailModel;
+  run?: WorkflowDiagramRunDetail | null;
 }) {
   const [activeTabId, setActiveTabId] = useState(
     companyResearchDetailTabs[0]?.id ?? "summary",
@@ -1048,6 +1071,7 @@ export function CompanyResearchDetailContent(props: {
     <div className="grid gap-6">
       <CompanyResearchDetailPanels
         model={props.model}
+        run={props.run}
         activeTabId={activeTabId}
         onTabChange={setActiveTabId}
         expandedQuestionId={stableExpandedQuestionId}
@@ -1065,32 +1089,48 @@ export function CompanyResearchDetailContent(props: {
 
 export function CompanyResearchPausedFallbackPanel(props: {
   model: CompanyResearchPausedFallbackModel;
+  run?: WorkflowDiagramRunDetail | null;
+  initialTabId?: string;
 }) {
+  const [activeTabId, setActiveTabId] = useState(
+    props.initialTabId ?? companyResearchPausedTabs[0]?.id ?? "agent",
+  );
+
   return (
     <div className="grid gap-6">
-      <Panel
-        title="已暂停"
-        description="当前还没有完整的结构化公司研究结果，先处理暂停原因再继续。"
-      >
-        <div className="grid gap-4 xl:grid-cols-2">
-          <KeyPointList
-            title="当前阻塞项"
-            items={props.model.blockers.map((item) => (
-              <MarkdownContent key={item} content={item} compact />
-            ))}
-            emptyText="暂无阻塞项。"
-            tone="warning"
-          />
-          <KeyPointList
-            title="建议动作"
-            items={props.model.nextActions.map((item) => (
-              <MarkdownContent key={item} content={item} compact />
-            ))}
-            emptyText="暂无建议动作。"
-            tone="info"
-          />
-        </div>
-      </Panel>
+      <WorkflowStageSwitcher
+        tabs={companyResearchPausedTabs}
+        activeTabId={activeTabId}
+        onChange={setActiveTabId}
+        panels={{
+          agent: <WorkflowAgentStep run={props.run ?? null} />,
+          paused: (
+            <Panel
+              title="已暂停"
+              description="当前还没有完整的结构化公司研究结果，先处理暂停原因再继续。"
+            >
+              <div className="grid gap-4 xl:grid-cols-2">
+                <KeyPointList
+                  title="当前阻塞项"
+                  items={props.model.blockers.map((item) => (
+                    <MarkdownContent key={item} content={item} compact />
+                  ))}
+                  emptyText="暂无阻塞项。"
+                  tone="warning"
+                />
+                <KeyPointList
+                  title="建议动作"
+                  items={props.model.nextActions.map((item) => (
+                    <MarkdownContent key={item} content={item} compact />
+                  ))}
+                  emptyText="暂无建议动作。"
+                  tone="info"
+                />
+              </div>
+            </Panel>
+          ),
+        }}
+      />
     </div>
   );
 }

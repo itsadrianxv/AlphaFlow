@@ -337,6 +337,7 @@ describe("company-research-detail", () => {
     const markup = renderToStaticMarkup(
       React.createElement(CompanyResearchPausedFallbackPanel, {
         model,
+        initialTabId: "paused",
       }),
     );
 

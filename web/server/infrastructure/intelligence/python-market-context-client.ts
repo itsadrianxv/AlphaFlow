@@ -162,7 +162,7 @@ export class PythonMarketContextClient {
   }
 }
 
-function formatMarketContextRequestError(error: unknown) {
+function formatMarketContextRequestError(error: unknown): string {
   if (error instanceof ZodError) {
     return error.issues
       .map((issue) => `${issue.path.join(".")}: ${issue.message}`)

@@ -444,9 +444,15 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
 
           {showCompanyDetailExperience ? (
             companyDetailModel.kind === "detail" ? (
-              <CompanyResearchDetailContent model={companyDetailModel} />
+              <CompanyResearchDetailContent
+                model={companyDetailModel}
+                run={run}
+              />
             ) : (
-              <CompanyResearchPausedFallbackPanel model={companyDetailModel} />
+              <CompanyResearchPausedFallbackPanel
+                model={companyDetailModel}
+                run={run}
+              />
             )
           ) : (
             <>

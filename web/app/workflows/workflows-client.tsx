@@ -12,6 +12,7 @@ import {
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-history";
 import { buildIndustryResearchStartInput } from "~/app/workflows/industry-research-form";
+import { WorkflowVisualizationPanel } from "~/app/workflows/workflow-visualization-panel";
 import { workflowsStageTabs } from "~/app/workflows/workflows-stage-tabs";
 import { INDUSTRY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { api } from "~/trpc/react";
@@ -115,9 +116,7 @@ export function WorkflowsClient() {
   };
 
   const questionPanel = (
-    <SectionCard
-      title="研究问题"
-    >
+    <SectionCard title="研究问题">
       <label className="grid gap-2 text-sm text-[var(--app-text-muted)]">
         本轮要回答什么？
         <textarea
@@ -335,6 +334,11 @@ export function WorkflowsClient() {
       }
     >
       <MarketContextSection section="workflows" />
+      <WorkflowVisualizationPanel
+        templateCode={INDUSTRY_RESEARCH_TEMPLATE_CODE}
+        title="行业研究 Agent 状态图"
+        description="发起前先查看完整 Agent 拓扑；运行后结果页会高亮当前节点。"
+      />
       <WorkflowStageSwitcher
         tabs={workflowsStageTabs}
         activeTabId={activeTabId}
