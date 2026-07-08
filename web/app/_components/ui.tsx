@@ -148,7 +148,7 @@ const densityClassMap: Record<Density, string> = {
 function AppMark() {
   return (
     <div className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel-strong)] font-[family-name:var(--font-heading)] text-[11px] tracking-[0.12em] text-[var(--app-text-strong)] shadow-[var(--app-shadow-sm)]">
-      SSB
+      AF
     </div>
   );
 }
@@ -230,10 +230,7 @@ export function LegacyWorkspaceShell(props: {
                 <AppMark />
                 <div>
                   <div className="font-[family-name:var(--font-heading)] text-sm font-medium text-[var(--app-text-strong)]">
-                    Stock Screening Boost
-                  </div>
-                  <div className="text-xs text-[var(--app-text-subtle)]">
-                    {"\u6295\u8d44\u51b3\u7b56\u5de5\u4f5c\u53f0"}
+                    AlphaFlow
                   </div>
                 </div>
               </Link>
@@ -413,10 +410,7 @@ export function LegacyWorkspaceShell(props: {
               <AppMark />
               <div>
                 <div className="text-[11px] uppercase tracking-[0.2em] text-[var(--app-text-subtle)]">
-                  Stock Screening Boost
-                </div>
-                <div className="mt-2 text-xl leading-none text-[var(--app-text-strong)]">
-                  投资决策工作流
+                  AlphaFlow
                 </div>
               </div>
               </Link>
@@ -539,10 +533,7 @@ export function LegacyWorkspaceShell(props: {
                 <AppMark />
                 <div>
                   <div className="text-sm font-medium text-[var(--app-text-strong)]">
-                    股票筛选增强
-                  </div>
-                  <div className="text-xs text-[var(--app-text-subtle)]">
-                    投资决策工作台
+                    AlphaFlow
                   </div>
                 </div>
               </Link>

@@ -190,6 +190,7 @@ describe("WorkspaceShell", () => {
       ),
     );
 
+    expect(markup).toContain("AlphaFlow");
     expect(markup).not.toContain("SSB");
     expect(markup).not.toContain("Stock Screening Boost");
     expect(markup).not.toContain("投资决策工作台");

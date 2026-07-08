@@ -111,6 +111,27 @@ const sidebarNavItems: Array<{
   },
 ];
 
+function AppMark() {
+  return (
+    <div className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] font-[family-name:var(--font-heading)] text-[11px] font-semibold text-[var(--app-text-strong)]">
+      AF
+    </div>
+  );
+}
+
+function SidebarBrand(props: { onNavigate?: () => void }) {
+  const { onNavigate } = props;
+
+  return (
+    <Link href="/" className="flex items-center gap-3" onClick={onNavigate}>
+      <AppMark />
+      <div className="min-w-0 truncate text-sm font-medium text-[var(--app-text-strong)]">
+        AlphaFlow
+      </div>
+    </Link>
+  );
+}
+
 function SidebarLink(props: {
   href: string;
   label: string;
@@ -326,9 +347,19 @@ function SidebarRail(props: {
         <div
           className={cn(
             "flex items-center",
-            collapsed ? "justify-center" : "justify-end",
+            collapsed ? "justify-center" : "justify-between gap-3",
           )}
         >
+          <div
+            aria-hidden={collapsed}
+            data-collapsed={collapsed ? "true" : "false"}
+            className={cn(
+              "app-sidebar-brand-panel",
+              collapsed ? "pointer-events-none max-w-0 flex-none" : "",
+            )}
+          >
+            <SidebarBrand onNavigate={onNavigate} />
+          </div>
           <button
             type="button"
             aria-label="Toggle sidebar"
@@ -552,6 +583,7 @@ export function WorkspaceShell(props: {
             >
               <MenuIcon className="h-[18px] w-[18px]" />
             </button>
+            <SidebarBrand />
           </div>
         </div>
 
@@ -564,7 +596,8 @@ export function WorkspaceShell(props: {
               onClick={() => setMobileOpen(false)}
             />
             <aside className="relative z-10 flex h-full w-[280px] max-w-[82vw] flex-col border-r border-[var(--app-border-soft)] bg-[var(--app-sidebar-bg)] px-4 py-4 shadow-[var(--app-shadow-lg)]">
-              <div className="mb-6 flex justify-end">
+              <div className="mb-6 flex items-center justify-between gap-3">
+                <SidebarBrand onNavigate={() => setMobileOpen(false)} />
                 <button
                   type="button"
                   aria-label="Close navigation menu"

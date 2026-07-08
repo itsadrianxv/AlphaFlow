@@ -89,14 +89,11 @@ export default async function LoginPage(props: {
           <div className="flex items-center justify-between gap-4">
             <Link href="/" className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] text-[11px] font-semibold tracking-[0.08em] text-[var(--app-text-strong)]">
-                SSB
+                AF
               </div>
               <div>
                 <div className="text-sm font-medium text-[var(--app-text-strong)]">
-                  股票筛选增强
-                </div>
-                <div className="text-xs text-[var(--app-text-subtle)]">
-                  投资决策工作台
+                  AlphaFlow
                 </div>
               </div>
             </Link>

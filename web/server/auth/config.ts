@@ -39,7 +39,7 @@ declare module "next-auth" {
  */
 const localCredentialsUsername = env.AUTH_CREDENTIALS_USERNAME ?? "admin";
 const localCredentialsPassword = env.AUTH_CREDENTIALS_PASSWORD ?? "admin123456";
-const localCredentialsEmail = "local-user@stock-screening-boost.local";
+const localCredentialsEmail = "local-user@alphaflow.local";
 
 const authSecrets = collectAuthSecrets({
   authSecret: env.AUTH_SECRET,
