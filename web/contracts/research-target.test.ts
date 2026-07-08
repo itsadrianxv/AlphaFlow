@@ -3,6 +3,7 @@ import {
   createFinancialSnapshotInputSchema,
   createResearchNoteInputSchema,
   researchTargetRefSchema,
+  updateResearchArtifactInputSchema,
 } from "~/contracts/research-target";
 
 const sampleWorkspaceResult = {
@@ -86,5 +87,21 @@ describe("research-target contracts", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("requires concrete markdown when updating a research artifact", () => {
+    expect(
+      updateResearchArtifactInputSchema.safeParse({
+        id: "artifact-1",
+        markdown: "## 结论\n\n继续跟踪盈利质量。",
+      }).success,
+    ).toBe(true);
+
+    expect(
+      updateResearchArtifactInputSchema.safeParse({
+        id: "artifact-1",
+        markdown: "",
+      }).success,
+    ).toBe(false);
   });
 });

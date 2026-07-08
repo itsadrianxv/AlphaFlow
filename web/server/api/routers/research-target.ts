@@ -17,6 +17,7 @@ import {
   researchTargetSummarySchema,
   savedCompanySchema,
   savedIndustrySchema,
+  updateResearchArtifactInputSchema,
   updateResearchNoteInputSchema,
   updateSavedCompanyInputSchema,
   updateSavedIndustryInputSchema,
@@ -146,6 +147,10 @@ type ResearchTargetDbClient = {
   };
   researchArtifact: {
     create(args: {
+      data: Record<string, unknown>;
+    }): Promise<ResearchArtifactRecord>;
+    update(args: {
+      where: { id: string };
       data: Record<string, unknown>;
     }): Promise<ResearchArtifactRecord>;
     findFirst(args: {
@@ -946,5 +951,31 @@ export const researchTargetRouter = createTRPCRouter({
         skip: input.offset,
       });
       return records.map(buildArtifact);
+    }),
+
+  updateArtifact: protectedProcedure
+    .input(updateResearchArtifactInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const db = withResearchTargetDb(ctx.db);
+      const existing = await db.researchArtifact.findFirst({
+        where: { id: input.id, userId: ctx.session.user.id },
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "研究报告不存在" });
+      }
+
+      const payload = asRecord(existing.payloadJson);
+      const updated = await db.researchArtifact.update({
+        where: { id: input.id },
+        data: {
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          contentType: "text/markdown",
+          payloadJson: {
+            ...payload,
+            markdown: input.markdown,
+          },
+        },
+      });
+      return buildArtifact(updated);
     }),
 });

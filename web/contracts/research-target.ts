@@ -193,6 +193,12 @@ export const generateComparisonArtifactInputSchema = z.object({
   title: z.string().trim().min(1).optional(),
 });
 
+export const updateResearchArtifactInputSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().trim().min(1).optional(),
+  markdown: z.string().trim().min(1),
+});
+
 export type ResearchTargetType = z.infer<typeof researchTargetTypeSchema>;
 export type ResearchTargetRef = z.infer<typeof researchTargetRefSchema>;
 export type SavedCompanyDto = z.infer<typeof savedCompanySchema>;
