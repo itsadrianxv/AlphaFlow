@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
 import {
   InlineNotice,
   Panel,
@@ -13,7 +12,6 @@ import {
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-history";
 import { companyResearchStageTabs } from "~/app/company-research/company-research-stage-tabs";
-import type { ResearchTargetRef } from "~/contracts/research-target";
 import { COMPANY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { api } from "~/trpc/react";
 
@@ -73,7 +71,6 @@ export function CompanyResearchClient() {
   const [forbiddenEvidenceTypes, setForbiddenEvidenceTypes] = useState("");
   const [preferredSources, setPreferredSources] = useState("");
   const [freshnessWindowDays, setFreshnessWindowDays] = useState("180");
-  const [targetRef, setTargetRef] = useState<ResearchTargetRef | null>(null);
   const [activeTabId, setActiveTabId] = useState(
     companyResearchStageTabs[0]?.id ?? "target",
   );
@@ -139,7 +136,6 @@ export function CompanyResearchClient() {
 
     await startMutation.mutateAsync({
       companyName: companyName.trim(),
-      targetRef: targetRef ?? undefined,
       stockCode: stockCode.trim() || undefined,
       officialWebsite: normalizeUrlInput(officialWebsite),
       focusConcepts: parseLines(focusConcepts),
@@ -167,12 +163,6 @@ export function CompanyResearchClient() {
   const targetPanel = (
     <Panel className={targetCanvasClassName} title="研究目标">
       <div className="grid gap-4">
-        <ResearchTargetPicker
-          label="归档目标"
-          value={targetRef}
-          onChange={setTargetRef}
-          allowedTypes={["company", "industry", "watchlist", "space"]}
-        />
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
           <input
             value={companyName}

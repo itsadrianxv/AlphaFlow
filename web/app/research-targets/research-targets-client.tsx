@@ -11,6 +11,8 @@ import {
   StatusPill,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import type {
   ResearchTargetRef,
   ResearchTargetType,
@@ -22,9 +24,27 @@ type ResearchNote = RouterOutputs["researchTarget"]["listNotes"][number];
 type ResearchArtifact =
   RouterOutputs["researchTarget"]["listArtifacts"][number];
 
-const selectableTargetTypes = ["company", "industry", "watchlist"] as const;
+const selectableTargetTypes = ["industry", "company", "watchlist"] as const;
 type SelectableTargetType = (typeof selectableTargetTypes)[number];
 type CreateMode = SelectableTargetType;
+
+const researchTargetViewTabs: WorkflowStageTab[] = [
+  {
+    id: "industry",
+    label: "收藏行业",
+    summary: "",
+  },
+  {
+    id: "company",
+    label: "收藏公司",
+    summary: "",
+  },
+  {
+    id: "watchlist",
+    label: "自选股",
+    summary: "",
+  },
+];
 
 function splitTags(value: string) {
   return value
@@ -64,7 +84,9 @@ function serializeRef(ref: ResearchTargetRef) {
   return `${ref.type}:${ref.id}`;
 }
 
-function parseSerializedRef(value: string | null): ResearchTargetRef | null {
+function parseSerializedRef(
+  value: string | null,
+): (ResearchTargetRef & { type: SelectableTargetType }) | null {
   if (!value) {
     return null;
   }
@@ -74,6 +96,10 @@ function parseSerializedRef(value: string | null): ResearchTargetRef | null {
     return null;
   }
   return { type, id };
+}
+
+function parseTargetType(value: string | null): SelectableTargetType | null {
+  return value && isSelectableTargetType(value) ? value : null;
 }
 
 function isSelectableTargetType(value: string): value is SelectableTargetType {
@@ -640,7 +666,14 @@ export function ResearchTargetsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
-  const [createMode, setCreateMode] = useState<CreateMode>("company");
+  const [activeTargetType, setActiveTargetType] =
+    useState<SelectableTargetType>(
+      () =>
+        parseSerializedRef(searchParams.get("target"))?.type ??
+        parseTargetType(searchParams.get("type")) ??
+        "industry",
+    );
+  const [createMode, setCreateMode] = useState<CreateMode>(activeTargetType);
   const [stockCode, setStockCode] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [companyReason, setCompanyReason] = useState("");
@@ -658,20 +691,59 @@ export function ResearchTargetsClient() {
   });
   const targets = useMemo(() => targetsQuery.data ?? [], [targetsQuery.data]);
   const requestedTargetRef = parseSerializedRef(searchParams.get("target"));
+  const requestedType = parseTargetType(searchParams.get("type"));
   const requestedKey = requestedTargetRef
     ? serializeRef(requestedTargetRef)
     : null;
+
+  useEffect(() => {
+    if (requestedTargetRef) {
+      setActiveTargetType(requestedTargetRef.type);
+      return;
+    }
+
+    if (requestedType) {
+      setActiveTargetType(requestedType);
+    }
+  }, [requestedTargetRef, requestedType]);
+
+  const visibleTargets = targets.filter(
+    (target) => target.ref.type === activeTargetType,
+  );
   const selectedTarget =
-    targets.find((target) => serializeRef(target.ref) === requestedKey) ??
-    targets[0] ??
+    visibleTargets.find(
+      (target) => serializeRef(target.ref) === requestedKey,
+    ) ??
+    visibleTargets[0] ??
     null;
   const selectedTargetRef = selectedTarget?.ref ?? null;
   const selectedKey = selectedTarget ? serializeRef(selectedTarget.ref) : "";
-  const historyItems = targets.map((target) => ({
+  const historyItems = visibleTargets.map((target) => ({
     id: serializeRef(target.ref),
     title: `[${targetTypeLabel(target.ref.type)}] ${target.label}`,
     href: `/research-targets?target=${encodeURIComponent(serializeRef(target.ref))}`,
   }));
+
+  function handleTargetTypeChange(tabId: string) {
+    if (!isSelectableTargetType(tabId)) {
+      return;
+    }
+
+    setActiveTargetType(tabId);
+    setCreateMode(tabId);
+    const firstTarget = targets.find((target) => target.ref.type === tabId);
+
+    if (firstTarget) {
+      router.push(
+        `/research-targets?target=${encodeURIComponent(
+          serializeRef(firstTarget.ref),
+        )}`,
+      );
+      return;
+    }
+
+    router.push(`/research-targets?type=${tabId}`);
+  }
 
   const notesQuery = api.researchTarget.listNotes.useQuery(
     {
@@ -793,14 +865,28 @@ export function ResearchTargetsClient() {
         <button
           type="button"
           className="app-button app-button-primary"
-          onClick={() => setCreateOpen((current) => !current)}
+          onClick={() => {
+            setCreateMode(activeTargetType);
+            setCreateOpen((current) => !current);
+          }}
         >
           新建
         </button>
       }
       showWatchlistsAction={false}
     >
-      <div className="grid gap-6">
+      <WorkflowStageSwitcher
+        tabs={researchTargetViewTabs}
+        activeTabId={activeTargetType}
+        onChange={handleTargetTypeChange}
+        panels={{
+          industry: null,
+          company: null,
+          watchlist: null,
+        }}
+      />
+
+      <div className="mt-6 grid gap-6">
         {createOpen ? (
           <UnifiedCreatePanel
             mode={createMode}
