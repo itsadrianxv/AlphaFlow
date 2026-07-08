@@ -154,6 +154,7 @@ services:
       - "${AGENT_RUNTIME_PORT:-8020}:8020"
     volumes:
       - ../agent_runtime:/repo/agent_runtime
+      - ../web:/repo/web:ro
       - agent_runtime_node_modules:/repo/agent_runtime/node_modules
       - agent_runtime_sessions:/data/agent-runtime/sessions
     command: ["npm", "run", "dev"]
@@ -229,7 +230,7 @@ services:
       [
         "sh",
         "-c",
-        "npm run validate:runtime && npm run db:push -- --accept-data-loss && npm run dev",
+        "npx prisma generate && npm run validate:runtime && npm run db:push -- --accept-data-loss && npm run dev",
       ]
 
   workflow-worker:
@@ -278,7 +279,7 @@ services:
       - web_node_modules:/repo/web/node_modules
       - web_next:/repo/web/.next
     command:
-      ["sh", "-c", "npm run validate:runtime && npm run worker:workflow"]
+      ["sh", "-c", "npx prisma generate && npm run validate:runtime && npm run worker:workflow"]
 volumes:
   postgres_data:
   redis_data:

@@ -1,15 +1,26 @@
-import {
-  AgentConversationMessageRole,
-  AgentConversationMessageStatus,
-  AgentConversationStatus,
-  type Prisma,
-  type PrismaClient,
-  WorkflowRunStatus,
-} from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { PI_AGENT_RUN_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 
 const toJson = (value: unknown): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
+const AgentConversationStatus = {
+  ACTIVE: "ACTIVE",
+} as const;
+const AgentConversationMessageRole = {
+  USER: "USER",
+  ASSISTANT: "ASSISTANT",
+} as const;
+const AgentConversationMessageStatus = {
+  PENDING: "PENDING",
+  STREAMING: "STREAMING",
+  SUCCEEDED: "SUCCEEDED",
+  FAILED: "FAILED",
+  CANCELLED: "CANCELLED",
+} as const;
+const WorkflowRunStatus = {
+  FAILED: "FAILED",
+  CANCELLED: "CANCELLED",
+} as const;
 
 function readTextPayload(value: unknown) {
   if (!value || typeof value !== "object") {

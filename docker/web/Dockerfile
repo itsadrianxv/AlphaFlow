@@ -12,6 +12,7 @@ RUN set -eux; \
 COPY web/package.json web/package-lock.json ./
 COPY web/prisma ./prisma
 RUN npm ci
+COPY web ./
 
 ARG SKIP_ENV_VALIDATION=1
 ENV SKIP_ENV_VALIDATION=${SKIP_ENV_VALIDATION}
