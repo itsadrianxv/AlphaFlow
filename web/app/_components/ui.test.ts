@@ -190,7 +190,9 @@ describe("WorkspaceShell", () => {
       ),
     );
 
-    expect(markup).toContain("SSB");
+    expect(markup).not.toContain("SSB");
+    expect(markup).not.toContain("Stock Screening Boost");
+    expect(markup).not.toContain("投资决策工作台");
     expect(markup).not.toContain('aria-label="Primary workflow"');
     expect(markup).not.toContain("data-stage-active=");
     expect(markup).not.toContain("策略、会话与观察池");
