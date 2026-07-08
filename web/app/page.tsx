@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { MarketContextSection } from "~/app/_components/market-context-section";
 import { statusTone } from "~/app/_components/status-tone";
 import {
   ActionStrip,
@@ -201,8 +200,6 @@ export default async function Home() {
             </Link>
           }
         />
-
-        <MarketContextSection section="home" />
 
         {loadError ? (
           <SectionCard surface="inset" density="compact">

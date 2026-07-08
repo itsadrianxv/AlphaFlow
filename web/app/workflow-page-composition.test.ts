@@ -114,7 +114,7 @@ describe("workflow page composition", () => {
     expect(companyResearchHistorySource).not.toContain("headerActions");
   });
 
-  it("keeps the shared macro analysis entrypoint on overview only", () => {
+  it("does not render the shared macro analysis entrypoint on main pages", () => {
     const homePageSource = readSource("./page.tsx");
     const screeningSource = readSource(
       "./screening/screening-studio-client.tsx",
@@ -125,8 +125,7 @@ describe("workflow page composition", () => {
     );
     const timingSource = readSource("./timing/timing-client.tsx");
 
-    expect(homePageSource).toContain("MarketContextSection");
-    expect(homePageSource).toContain('section="home"');
+    expect(homePageSource).not.toContain("MarketContextSection");
     expect(screeningSource).not.toContain("MarketContextSection");
     expect(workflowsSource).not.toContain("MarketContextSection");
     expect(companyResearchSource).not.toContain("MarketContextSection");
