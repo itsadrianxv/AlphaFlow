@@ -167,6 +167,10 @@ export const formatResearchNoteInputSchema = z.object({
     .default("bullets"),
 });
 
+export const formatResearchArtifactInputSchema = z.object({
+  id: z.string().min(1),
+});
+
 export const createFinancialSnapshotInputSchema = z.object({
   targetRef: researchTargetRefSchema,
   companyRefs: z

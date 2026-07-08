@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createFinancialSnapshotInputSchema,
   createResearchNoteInputSchema,
+  formatResearchArtifactInputSchema,
   researchTargetRefSchema,
   updateResearchArtifactInputSchema,
 } from "~/contracts/research-target";
@@ -102,6 +103,16 @@ describe("research-target contracts", () => {
         id: "artifact-1",
         markdown: "",
       }).success,
+    ).toBe(false);
+  });
+
+  it("requires a concrete artifact id when formatting a research artifact", () => {
+    expect(
+      formatResearchArtifactInputSchema.safeParse({ id: "artifact-1" }).success,
+    ).toBe(true);
+
+    expect(
+      formatResearchArtifactInputSchema.safeParse({ id: "" }).success,
     ).toBe(false);
   });
 });

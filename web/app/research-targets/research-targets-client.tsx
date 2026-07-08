@@ -21,8 +21,19 @@ import { api, type RouterOutputs } from "~/trpc/react";
 
 type TargetSummary = RouterOutputs["researchTarget"]["listTargets"][number];
 type ResearchNote = RouterOutputs["researchTarget"]["listNotes"][number];
+type FinancialSnapshot =
+  RouterOutputs["researchTarget"]["listFinancialSnapshots"][number];
 type ResearchArtifact =
   RouterOutputs["researchTarget"]["listArtifacts"][number];
+type SnapshotMetricMeta = {
+  id: string;
+  name: string;
+};
+type SnapshotLatestRow = {
+  stockCode: string;
+  stockName: string;
+  metrics: Record<string, Record<string, unknown>>;
+};
 
 const selectableTargetTypes = ["industry", "company", "watchlist"] as const;
 type SelectableTargetType = (typeof selectableTargetTypes)[number];
@@ -109,13 +120,200 @@ function artifactMarkdown(artifact: ResearchArtifact) {
   return `\`\`\`json\n${JSON.stringify(artifact.payload, null, 2)}\n\`\`\``;
 }
 
+function formatSnapshotDate(value?: string | null) {
+  if (!value) {
+    return "未知时间";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatSnapshotValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  if (typeof value === "number") {
+    return new Intl.NumberFormat("zh-CN", {
+      maximumFractionDigits: 4,
+    }).format(value);
+  }
+
+  return String(value);
+}
+
+function getSnapshotPeriods(snapshot: FinancialSnapshot) {
+  const raw = asRecord(snapshot.rawSnapshot);
+  return Array.isArray(raw.periods)
+    ? raw.periods.filter((period): period is string => typeof period === "string")
+    : [];
+}
+
+function getSnapshotMetricMeta(snapshot: FinancialSnapshot): SnapshotMetricMeta[] {
+  const raw = asRecord(snapshot.rawSnapshot);
+  const items = Array.isArray(raw.indicatorMeta) ? raw.indicatorMeta : [];
+
+  return items.flatMap((item) => {
+    const record = asRecord(item);
+    if (typeof record.id !== "string" || typeof record.name !== "string") {
+      return [];
+    }
+
+    return [{ id: record.id, name: record.name }];
+  });
+}
+
+function getSnapshotLatestRows(snapshot: FinancialSnapshot): SnapshotLatestRow[] {
+  const raw = asRecord(snapshot.rawSnapshot);
+  const items = Array.isArray(raw.latestSnapshotRows)
+    ? raw.latestSnapshotRows
+    : [];
+
+  return items.flatMap((item) => {
+    const record = asRecord(item);
+    if (
+      typeof record.stockCode !== "string" ||
+      typeof record.stockName !== "string"
+    ) {
+      return [];
+    }
+
+    const metricsRecord = asRecord(record.metrics);
+    const metrics = Object.fromEntries(
+      Object.entries(metricsRecord).map(([key, value]) => [
+        key,
+        asRecord(value),
+      ]),
+    );
+
+    return [
+      {
+        stockCode: record.stockCode,
+        stockName: record.stockName,
+        metrics,
+      },
+    ];
+  });
+}
+
+function FinancialSnapshotBlock(props: { snapshot: FinancialSnapshot }) {
+  const { snapshot } = props;
+  const metricMeta = getSnapshotMetricMeta(snapshot);
+  const periods = getSnapshotPeriods(snapshot);
+  const rows = getSnapshotLatestRows(snapshot);
+  const visibleMetrics = metricMeta.slice(0, 8);
+  const visibleRows = rows.slice(0, 12);
+  const hiddenMetricCount = Math.max(metricMeta.length - visibleMetrics.length, 0);
+  const hiddenRowCount = Math.max(rows.length - visibleRows.length, 0);
+
+  return (
+    <div className="grid gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="grid gap-1">
+          <p className="text-sm font-medium text-[var(--app-text-strong)]">
+            {snapshot.companyRefs
+              .map((item) => `${item.stockName}(${item.stockCode})`)
+              .join("、") || "未记录公司"}
+          </p>
+          <p className="text-xs text-[var(--app-text-muted)]">
+            {formatSnapshotDate(snapshot.createdAt)} · {metricMeta.length} 个指标
+            {periods.length > 0 ? ` · ${periods.join("、")}` : ""}
+          </p>
+        </div>
+      </div>
+
+      {visibleMetrics.length === 0 || visibleRows.length === 0 ? (
+        <EmptyState title="此快照没有可展示的结构化指标" />
+      ) : (
+        <div className="overflow-x-auto rounded-[8px] border border-[var(--app-border-soft)]">
+          <table className="w-full min-w-[720px] border-collapse text-sm">
+            <thead className="bg-[var(--app-bg-inset)] text-left text-[var(--app-text-muted)]">
+              <tr>
+                <th className="border-b border-[var(--app-border-soft)] px-3 py-2 font-medium">
+                  公司
+                </th>
+                {visibleMetrics.map((metric) => (
+                  <th
+                    key={metric.id}
+                    className="border-b border-[var(--app-border-soft)] px-3 py-2 font-medium"
+                  >
+                    {metric.name}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map((row) => (
+                <tr key={row.stockCode}>
+                  <td className="border-b border-[var(--app-border-soft)] px-3 py-2 align-top text-[var(--app-text-strong)]">
+                    {row.stockName}
+                    <span className="ml-2 text-xs text-[var(--app-text-muted)]">
+                      {row.stockCode}
+                    </span>
+                  </td>
+                  {visibleMetrics.map((metric) => {
+                    const metricValue = row.metrics[metric.id] ?? {};
+                    const period =
+                      typeof metricValue.period === "string"
+                        ? metricValue.period
+                        : null;
+                    return (
+                      <td
+                        key={`${row.stockCode}-${metric.id}`}
+                        className="border-b border-[var(--app-border-soft)] px-3 py-2 align-top"
+                      >
+                        <span className="text-[var(--app-text-strong)]">
+                          {formatSnapshotValue(metricValue.value)}
+                        </span>
+                        {period ? (
+                          <span className="ml-2 text-xs text-[var(--app-text-muted)]">
+                            {period}
+                          </span>
+                        ) : null}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {hiddenMetricCount > 0 || hiddenRowCount > 0 ? (
+        <p className="text-xs text-[var(--app-text-muted)]">
+          已预览前 {visibleMetrics.length} 个指标、前 {visibleRows.length} 家公司；
+          仍保存 {hiddenMetricCount} 个指标、{hiddenRowCount} 家公司在原始快照中。
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function EditableMarkdownBlock(props: {
   content: string;
   compact?: boolean;
   saving?: boolean;
+  formatting?: boolean;
+  formatError?: string | null;
   onSave: (content: string) => Promise<void>;
+  onFormat?: () => Promise<void>;
 }) {
-  const { content, compact = true, saving = false, onSave } = props;
+  const {
+    content,
+    compact = true,
+    saving = false,
+    formatting = false,
+    formatError = null,
+    onSave,
+    onFormat,
+  } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(content);
   const [error, setError] = useState<string | null>(null);
@@ -194,13 +392,29 @@ function EditableMarkdownBlock(props: {
       >
         <MarkdownContent content={content} compact={compact} />
       </button>
-      <button
-        type="button"
-        className="app-button justify-self-start opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
-        onClick={() => setEditing(true)}
-      >
-        编辑
-      </button>
+      {formatError ? (
+        <InlineNotice tone="danger" description={formatError} />
+      ) : null}
+      <div className="flex flex-wrap gap-2 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+        <button
+          type="button"
+          className="app-button"
+          onClick={() => setEditing(true)}
+          disabled={formatting}
+        >
+          编辑
+        </button>
+        {onFormat ? (
+          <button
+            type="button"
+            className="app-button"
+            onClick={() => void onFormat()}
+            disabled={saving || formatting}
+          >
+            {formatting ? "调格式中..." : "AI调格式"}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -468,11 +682,15 @@ function TargetContentList(props: {
   artifactsLoading: boolean;
   noteSaving: boolean;
   artifactSaving: boolean;
+  formattingKeys: ReadonlySet<string>;
+  formatErrors: Record<string, string | undefined>;
   onSaveNote: (note: ResearchNote, content: string) => Promise<void>;
   onSaveArtifact: (
     artifact: ResearchArtifact,
     content: string,
   ) => Promise<void>;
+  onFormatNote: (note: ResearchNote) => Promise<void>;
+  onFormatArtifact: (artifact: ResearchArtifact) => Promise<void>;
 }) {
   const {
     targets,
@@ -484,8 +702,12 @@ function TargetContentList(props: {
     artifactsLoading,
     noteSaving,
     artifactSaving,
+    formattingKeys,
+    formatErrors,
     onSaveNote,
     onSaveArtifact,
+    onFormatNote,
+    onFormatArtifact,
   } = props;
 
   if (targets.length === 0) {
@@ -562,16 +784,28 @@ function TargetContentList(props: {
                     <div className="grid gap-4">
                       {targetNotes.map((note) => (
                         <div key={note.id} className="grid gap-2">
-                          {note.title ? (
-                            <p className="text-sm text-[var(--app-text-muted)]">
-                              {note.title}
-                            </p>
-                          ) : null}
-                          <EditableMarkdownBlock
-                            content={note.contentMarkdown}
-                            saving={noteSaving}
-                            onSave={(content) => onSaveNote(note, content)}
-                          />
+                          {(() => {
+                            const formatKey = `note:${note.id}`;
+                            return (
+                              <>
+                                {note.title ? (
+                                  <p className="text-sm text-[var(--app-text-muted)]">
+                                    {note.title}
+                                  </p>
+                                ) : null}
+                                <EditableMarkdownBlock
+                                  content={note.contentMarkdown}
+                                  saving={noteSaving}
+                                  formatting={formattingKeys.has(formatKey)}
+                                  formatError={formatErrors[formatKey] ?? null}
+                                  onSave={(content) =>
+                                    onSaveNote(note, content)
+                                  }
+                                  onFormat={() => onFormatNote(note)}
+                                />
+                              </>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>
@@ -589,16 +823,10 @@ function TargetContentList(props: {
                   ) : (
                     <div className="grid gap-3">
                       {targetSnapshots.map((snapshot) => (
-                        <div key={snapshot.id}>
-                          <p className="text-sm text-[var(--app-text-strong)]">
-                            {snapshot.companyRefs
-                              .map(
-                                (item) =>
-                                  `${item.stockName}(${item.stockCode})`,
-                              )
-                              .join("、") || "未记录公司"}
-                          </p>
-                        </div>
+                        <FinancialSnapshotBlock
+                          key={snapshot.id}
+                          snapshot={snapshot}
+                        />
                       ))}
                     </div>
                   )}
@@ -616,17 +844,27 @@ function TargetContentList(props: {
                     <div className="grid gap-4">
                       {targetArtifacts.map((artifact) => (
                         <div key={artifact.id} className="grid gap-2">
-                          <p className="text-sm text-[var(--app-text-muted)]">
-                            {artifact.title}
-                          </p>
-                          <EditableMarkdownBlock
-                            content={artifactMarkdown(artifact)}
-                            compact={false}
-                            saving={artifactSaving}
-                            onSave={(content) =>
-                              onSaveArtifact(artifact, content)
-                            }
-                          />
+                          {(() => {
+                            const formatKey = `artifact:${artifact.id}`;
+                            return (
+                              <>
+                                <p className="text-sm text-[var(--app-text-muted)]">
+                                  {artifact.title}
+                                </p>
+                                <EditableMarkdownBlock
+                                  content={artifactMarkdown(artifact)}
+                                  compact={false}
+                                  saving={artifactSaving}
+                                  formatting={formattingKeys.has(formatKey)}
+                                  formatError={formatErrors[formatKey] ?? null}
+                                  onSave={(content) =>
+                                    onSaveArtifact(artifact, content)
+                                  }
+                                  onFormat={() => onFormatArtifact(artifact)}
+                                />
+                              </>
+                            );
+                          })()}
                         </div>
                       ))}
                     </div>
@@ -664,6 +902,12 @@ export function ResearchTargetsClient() {
   const [industryTags, setIndustryTags] = useState("");
   const [watchlistName, setWatchlistName] = useState("");
   const [watchlistDescription, setWatchlistDescription] = useState("");
+  const [formattingKeys, setFormattingKeys] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [formatErrors, setFormatErrors] = useState<
+    Record<string, string | undefined>
+  >({});
 
   const targetsQuery = api.researchTarget.listTargets.useQuery({
     types: ["company", "industry", "watchlist"],
@@ -808,6 +1052,40 @@ export function ResearchTargetsClient() {
       await utils.researchTarget.listArtifacts.invalidate();
     },
   });
+  const formatNoteMutation = api.researchTarget.formatNote.useMutation({
+    onSuccess: async () => {
+      await utils.researchTarget.listNotes.invalidate();
+    },
+  });
+  const formatArtifactMutation = api.researchTarget.formatArtifact.useMutation({
+    onSuccess: async () => {
+      await utils.researchTarget.listArtifacts.invalidate();
+    },
+  });
+
+  async function runFormatAction(key: string, action: () => Promise<void>) {
+    setFormattingKeys((current) => new Set([...current, key]));
+    setFormatErrors((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+
+    try {
+      await action();
+    } catch (error) {
+      setFormatErrors((current) => ({
+        ...current,
+        [key]: error instanceof Error ? error.message : "AI 调格式失败。",
+      }));
+    } finally {
+      setFormattingKeys((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  }
 
   return (
     <WorkspaceShell
@@ -909,6 +1187,8 @@ export function ResearchTargetsClient() {
           artifactsLoading={artifactsQuery.isLoading}
           noteSaving={updateNoteMutation.isPending}
           artifactSaving={updateArtifactMutation.isPending}
+          formattingKeys={formattingKeys}
+          formatErrors={formatErrors}
           onSaveNote={async (note, content) => {
             await updateNoteMutation.mutateAsync({
               id: note.id,
@@ -919,6 +1199,19 @@ export function ResearchTargetsClient() {
             await updateArtifactMutation.mutateAsync({
               id: artifact.id,
               markdown: content,
+            });
+          }}
+          onFormatNote={async (note) => {
+            await runFormatAction(`note:${note.id}`, async () => {
+              await formatNoteMutation.mutateAsync({
+                id: note.id,
+                mode: "bullets",
+              });
+            });
+          }}
+          onFormatArtifact={async (artifact) => {
+            await runFormatAction(`artifact:${artifact.id}`, async () => {
+              await formatArtifactMutation.mutateAsync({ id: artifact.id });
             });
           }}
         />

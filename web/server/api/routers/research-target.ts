@@ -5,6 +5,7 @@ import {
   createSavedCompanyInputSchema,
   createSavedIndustryInputSchema,
   financialSnapshotSchema,
+  formatResearchArtifactInputSchema,
   formatResearchNoteInputSchema,
   generateComparisonArtifactInputSchema,
   listResearchTargetsInputSchema,
@@ -428,6 +429,24 @@ function buildComparisonMarkdown(snapshot: FinancialSnapshotRecord) {
   ].join("\n");
 }
 
+function buildMarkdownFormatPrompt(params: {
+  content: string;
+  contentLabel: string;
+  direction?: string;
+}) {
+  return [
+    `你是投研${params.contentLabel}整理助手。请把用户保存的原始内容整理成结构清晰的中文 Markdown。`,
+    params.direction ? `整理方向：${params.direction}` : null,
+    "硬性要求：只调整标题、层级、段落、列表、表格和加粗等 Markdown 结构。",
+    "不要新增事实、数字、判断、风险或结论；不要删除原文中的实质信息；不要改变原文的事实边界。",
+    "只输出整理后的 Markdown，不要解释你的修改。",
+    "",
+    params.content,
+  ]
+    .filter((item): item is string => typeof item === "string")
+    .join("\n");
+}
+
 function formatPrompt(mode: string, content: string) {
   const modeLabel: Record<string, string> = {
     bullets: "要点",
@@ -437,13 +456,11 @@ function formatPrompt(mode: string, content: string) {
     indicator: "跟踪指标",
   };
 
-  return [
-    "你是投研笔记整理助手。请把用户保存的原始内容整理成中文 markdown。",
-    `整理方向：${modeLabel[mode] ?? "要点"}`,
-    "要求：保留事实边界，不新增未给出的结论；输出简洁、可后续追踪。",
-    "",
+  return buildMarkdownFormatPrompt({
     content,
-  ].join("\n");
+    contentLabel: "笔记",
+    direction: modeLabel[mode] ?? "要点",
+  });
 }
 
 export const researchTargetRouter = createTRPCRouter({
@@ -911,6 +928,51 @@ export const researchTargetRouter = createTRPCRouter({
           payloadJson: {
             ...payload,
             markdown: input.markdown,
+          },
+        },
+      });
+      return buildArtifact(updated);
+    }),
+
+  formatArtifact: protectedProcedure
+    .input(formatResearchArtifactInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const db = withResearchTargetDb(ctx.db);
+      const existing = await db.researchArtifact.findFirst({
+        where: { id: input.id, userId: ctx.session.user.id },
+      });
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "研究报告不存在" });
+      }
+
+      const payload = asRecord(existing.payloadJson);
+      const currentMarkdown =
+        typeof payload.markdown === "string"
+          ? payload.markdown
+          : typeof existing.payloadJson === "string"
+            ? existing.payloadJson
+            : `\`\`\`json\n${JSON.stringify(existing.payloadJson, null, 2)}\n\`\`\``;
+      const fallback = `## 整理后的研究报告\n\n${currentMarkdown}`;
+      const formatted = await new DeepSeekClient().complete(
+        [
+          {
+            role: "user",
+            content: buildMarkdownFormatPrompt({
+              content: currentMarkdown,
+              contentLabel: "研究报告",
+            }),
+          },
+        ],
+        fallback,
+        { model: "deepseek-chat", maxOutputTokens: 1800 },
+      );
+      const updated = await db.researchArtifact.update({
+        where: { id: input.id },
+        data: {
+          contentType: "text/markdown",
+          payloadJson: {
+            ...payload,
+            markdown: formatted,
           },
         },
       });
