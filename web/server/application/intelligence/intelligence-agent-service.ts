@@ -93,6 +93,21 @@ function mapCandidateToIndustryResearch(
   };
 }
 
+function buildIndustryResearchSystemPrompt(system: string) {
+  const now = new Date();
+  const currentTime = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    dateStyle: "full",
+    timeStyle: "long",
+  }).format(now);
+
+  return [
+    `当前时间：${currentTime}（Asia/Shanghai，ISO: ${now.toISOString()}）。`,
+    "涉及时效性信息时，必须核对资料日期；缺少日期的资料应降低权重。",
+    system,
+  ].join("\n");
+}
+
 export class IntelligenceAgentService {
   private readonly deepSeekClient: DeepSeekClient;
   private readonly dataClient: PythonIntelligenceDataClient;
@@ -123,8 +138,9 @@ export class IntelligenceAgentService {
         [
           {
             role: "system",
-            content:
+            content: buildIndustryResearchSystemPrompt(
               "你是股票投研助手，请输出一段不超过 120 字的行业概览，避免空话，强调关键驱动因素。",
+            ),
           },
           {
             role: "user",
@@ -164,8 +180,9 @@ export class IntelligenceAgentService {
         [
           {
             role: "system",
-            content:
+            content: buildIndustryResearchSystemPrompt(
               "你是量化投研助理，请基于热度分数输出一句结论，控制在 50 字以内。",
+            ),
           },
           {
             role: "user",
@@ -255,8 +272,9 @@ export class IntelligenceAgentService {
         [
           {
             role: "system",
-            content:
+            content: buildIndustryResearchSystemPrompt(
               "你是产业研究员，请输出一句竞争格局总结（50 字以内），突出龙头优势与边际风险。",
+            ),
           },
           {
             role: "user",

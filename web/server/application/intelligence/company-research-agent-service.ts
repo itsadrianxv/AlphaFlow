@@ -917,6 +917,21 @@ function buildLegacySearchQueries(
   ]);
 }
 
+function buildCompanyResearchSystemPrompt(system: string) {
+  const now = new Date();
+  const currentTime = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    dateStyle: "full",
+    timeStyle: "long",
+  }).format(now);
+
+  return [
+    `当前时间：${currentTime}（Asia/Shanghai，ISO: ${now.toISOString()}）。`,
+    "涉及公告、财报、新闻和业务进展时，必须核对资料日期；缺少日期的资料应降低权重。",
+    system,
+  ].join("\n");
+}
+
 async function collectSearchEvidence(params: {
   client: PythonCapabilityGatewayClient;
   queries: string[];
@@ -995,8 +1010,9 @@ export class CompanyResearchAgentService {
       [
         {
           role: "system",
-          content:
+          content: buildCompanyResearchSystemPrompt(
             "You are a stock research assistant. Convert the user input into a structured company research brief. Output valid JSON and write all human-readable text in Simplified Chinese.",
+          ),
         },
         {
           role: "user",
@@ -1016,8 +1032,9 @@ export class CompanyResearchAgentService {
       [
         {
           role: "system",
-          content:
+          content: buildCompanyResearchSystemPrompt(
             "You are a company analyst. Output 3-5 concept insights in valid JSON. Use Simplified Chinese for free-text fields.",
+          ),
         },
         {
           role: "user",
@@ -1041,8 +1058,9 @@ export class CompanyResearchAgentService {
       [
         {
           role: "system",
-          content:
+          content: buildCompanyResearchSystemPrompt(
             "You are a fundamental research analyst. Design 4-6 deep due-diligence questions and output valid JSON. Use Simplified Chinese for all free-text fields.",
+          ),
         },
         {
           role: "user",
@@ -1575,8 +1593,9 @@ export class CompanyResearchAgentService {
       [
         {
           role: "system",
-          content:
+          content: buildCompanyResearchSystemPrompt(
             "You are a company-research analyst. Answer each question using only the provided evidence. Output valid JSON. Use Simplified Chinese. If evidence is insufficient, say so explicitly.",
+          ),
         },
         {
           role: "user",
@@ -1630,8 +1649,9 @@ export class CompanyResearchAgentService {
       [
         {
           role: "system",
-          content:
+          content: buildCompanyResearchSystemPrompt(
             "You are the investment-research lead. Produce a verdict in valid JSON. Use Simplified Chinese. The stance must stay within the provided enum values.",
+          ),
         },
         {
           role: "user",

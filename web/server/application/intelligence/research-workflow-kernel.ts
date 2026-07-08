@@ -266,10 +266,21 @@ function buildMessages(
   system: string,
   userPayload: unknown,
 ): DeepSeekMessage[] {
+  const now = new Date();
+  const currentTime = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    dateStyle: "full",
+    timeStyle: "long",
+  }).format(now);
+
   return [
     {
       role: "system",
-      content: system,
+      content: [
+        `当前时间：${currentTime}（Asia/Shanghai，ISO: ${now.toISOString()}）。`,
+        "涉及时效性信息时，必须核对资料日期；缺少日期的资料应降低权重。",
+        system,
+      ].join("\n"),
     },
     {
       role: "user",
