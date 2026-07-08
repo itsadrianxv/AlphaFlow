@@ -4,12 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { MarkdownContent } from "~/app/_components/markdown-content";
-import {
-  EmptyState,
-  InlineNotice,
-  StatusPill,
-  WorkspaceShell,
-} from "~/app/_components/ui";
+import { InlineNotice, StatusPill, WorkspaceShell } from "~/app/_components/ui";
 import type { WorkspaceHistoryItem } from "~/app/_components/workspace-shell";
 import type { ResearchTargetRef } from "~/contracts/research-target";
 import { api, type RouterOutputs } from "~/trpc/react";
@@ -178,9 +173,11 @@ export function AgentRuntimeClientPage() {
   const [prompt, setPrompt] = useState("");
   const [liveMessages, setLiveMessages] = useState<Record<string, string>>({});
   const [activeRunId, setActiveRunId] = useState("");
+  const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const [lastTargetRef, setLastTargetRef] = useState<ResearchTargetRef | null>(
     null,
   );
+  const skillMenuRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const migrationRequestedRef = useRef(false);
 
@@ -298,6 +295,40 @@ export function AgentRuntimeClientPage() {
     () => buildHistoryItems(conversationsQuery.data?.items ?? []),
     [conversationsQuery.data?.items],
   );
+  const selectedSkill = useMemo(
+    () => skillsQuery.data?.items.find((skill) => skill.id === skillId),
+    [skillId, skillsQuery.data?.items],
+  );
+
+  useEffect(() => {
+    if (!skillMenuOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (
+        event.target instanceof Node &&
+        skillMenuRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+      setSkillMenuOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSkillMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [skillMenuOpen]);
 
   const sendMutation = api.agentRuntime.sendMessage.useMutation({
     onSuccess: async (result) => {
@@ -373,11 +404,7 @@ export function AgentRuntimeClientPage() {
             <div className="mx-auto w-full max-w-[820px] px-1 text-sm text-[var(--app-text-muted)] sm:px-4">
               加载中
             </div>
-          ) : (
-            <div className="mx-auto w-full max-w-[820px] px-1 sm:px-4">
-              <EmptyState title="开始一次 Pi Agent 对话" />
-            </div>
-          )}
+          ) : null}
         </div>
 
         <div className="pi-agent-composer fixed right-0 bottom-0 left-0 z-30 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4">
@@ -403,27 +430,66 @@ export function AgentRuntimeClientPage() {
                   }
                 }}
               />
-              <label
-                className="absolute bottom-3 left-3 inline-flex h-10 max-w-[calc(100%-76px)] items-center rounded-full border border-[var(--app-border-soft)] bg-[rgba(255,255,255,0.04)] text-[var(--app-text-muted)] transition-colors hover:border-[rgba(255,255,255,0.28)] hover:bg-[rgba(255,255,255,0.08)]"
-                title="选择 skill"
-              >
-                <span className="pointer-events-none px-3 text-xs font-medium text-[var(--app-text-subtle)]">
-                  选择 Skill
-                </span>
-                <select
-                  aria-label="选择 skill"
-                  value={skillId}
-                  onChange={(event) => setSkillId(event.target.value)}
-                  className="h-10 min-w-[130px] max-w-[220px] border-0 bg-transparent py-0 pr-9 pl-0 text-xs text-[var(--app-text-strong)] outline-none"
+              <div ref={skillMenuRef} className="absolute bottom-3 left-3">
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={skillMenuOpen}
                   title="选择 skill"
+                  className="inline-flex h-10 max-w-[calc(100vw-156px)] items-center gap-2 rounded-full border border-[var(--app-border-soft)] bg-[rgba(255,255,255,0.04)] px-3 text-xs font-medium text-[var(--app-text-strong)] transition-colors hover:border-[rgba(255,255,255,0.28)] hover:bg-[rgba(255,255,255,0.08)]"
+                  onClick={() => setSkillMenuOpen((current) => !current)}
                 >
-                  {(skillsQuery.data?.items ?? []).map((skill) => (
-                    <option key={skill.id} value={skill.id}>
-                      {skill.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <span className="text-[var(--app-text-subtle)]">
+                    选择 Skill
+                  </span>
+                  {selectedSkill ? (
+                    <span className="max-w-[180px] truncate">
+                      {selectedSkill.name}
+                    </span>
+                  ) : null}
+                </button>
+                <div
+                  role="menu"
+                  className={[
+                    "absolute bottom-12 left-0 z-40 w-[min(320px,calc(100vw-40px))] origin-bottom-left rounded-[18px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-1 shadow-[var(--app-shadow-lg)] transition duration-160",
+                    skillMenuOpen
+                      ? "scale-100 opacity-100"
+                      : "pointer-events-none scale-95 opacity-0",
+                  ].join(" ")}
+                >
+                  <div className="max-h-[260px] overflow-y-auto py-1">
+                    {(skillsQuery.data?.items ?? []).map((skill) => {
+                      const active = skill.id === skillId;
+
+                      return (
+                        <button
+                          key={skill.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={active}
+                          className={[
+                            "flex w-full items-center justify-between gap-3 rounded-[14px] px-3 py-2.5 text-left text-sm transition-colors",
+                            active
+                              ? "bg-white text-black"
+                              : "text-[var(--app-text-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
+                          ].join(" ")}
+                          onClick={() => {
+                            setSkillId(skill.id);
+                            setSkillMenuOpen(false);
+                          }}
+                        >
+                          <span className="min-w-0 truncate">{skill.name}</span>
+                          {active ? (
+                            <span className="shrink-0 text-xs font-medium">
+                              当前
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
               {activeGenerationRunId ? (
                 <button
                   type="button"
