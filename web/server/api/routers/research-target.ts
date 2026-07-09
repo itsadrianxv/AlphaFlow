@@ -132,6 +132,7 @@ type ResearchTargetDbClient = {
     delete(args: { where: { id: string } }): Promise<ResearchNoteRecord>;
     findFirst(args: {
       where: Record<string, unknown>;
+      orderBy?: Record<string, unknown>;
     }): Promise<ResearchNoteRecord | null>;
     findMany(args: Record<string, unknown>): Promise<ResearchNoteRecord[]>;
   };
@@ -154,6 +155,7 @@ type ResearchTargetDbClient = {
     }): Promise<ResearchArtifactRecord>;
     findFirst(args: {
       where: Record<string, unknown>;
+      orderBy?: Record<string, unknown>;
     }): Promise<ResearchArtifactRecord | null>;
     findMany(args: Record<string, unknown>): Promise<ResearchArtifactRecord[]>;
   };
@@ -228,6 +230,15 @@ function asRecord(value: unknown) {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function appendMarkdown(existing: string, next: string) {
+  const current = existing.trim();
+  const incoming = next.trim();
+  if (!current) {
+    return incoming;
+  }
+  return `${current}\n\n${incoming}`;
 }
 
 function asCompanyRefs(value: unknown) {
@@ -774,6 +785,38 @@ export const researchTargetRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const db = withResearchTargetDb(ctx.db);
       await requireTarget(db, ctx.session.user.id, input.targetRef);
+      const existing = await db.researchNote.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          targetType: input.targetRef.type,
+          targetId: input.targetRef.id,
+          title: input.title ?? null,
+          kind: input.kind ?? null,
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (existing) {
+        const updated = await db.researchNote.update({
+          where: { id: existing.id },
+          data: {
+            contentMarkdown: appendMarkdown(
+              existing.contentMarkdown,
+              input.contentMarkdown,
+            ),
+            rawContent: appendMarkdown(
+              existing.rawContent ?? existing.contentMarkdown,
+              input.rawContent ?? input.contentMarkdown,
+            ),
+            sourceJson: input.source ?? existing.sourceJson,
+            tags: normalizeStringList([
+              ...existing.tags,
+              ...normalizeStringList(input.tags),
+            ]),
+          },
+        });
+        return buildNote(updated);
+      }
+
       const created = await db.researchNote.create({
         data: {
           userId: ctx.session.user.id,
@@ -935,19 +978,61 @@ export const researchTargetRouter = createTRPCRouter({
         id: snapshot.targetId,
       });
       const markdown = buildComparisonMarkdown(snapshot);
+      const artifactType = "financial_comparison_report";
+      const existing = await db.researchArtifact.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          targetType: snapshot.targetType,
+          targetId: snapshot.targetId,
+          artifactType,
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (existing) {
+        const payload = asRecord(existing.payloadJson);
+        const currentMarkdown =
+          typeof payload.markdown === "string" ? payload.markdown : "";
+        const currentSnapshotIds = Array.isArray(payload.snapshotIds)
+          ? payload.snapshotIds.filter(
+              (item): item is string => typeof item === "string",
+            )
+          : typeof payload.snapshotId === "string"
+            ? [payload.snapshotId]
+            : [];
+        const updated = await db.researchArtifact.update({
+          where: { id: existing.id },
+          data: {
+            contentType: "text/markdown",
+            payloadJson: {
+              ...payload,
+              markdown: appendMarkdown(currentMarkdown, markdown),
+              companyRefs: asCompanyRefs(snapshot.companyRefsJson),
+              snapshotId: snapshot.id,
+              snapshotIds: normalizeStringList([
+                ...currentSnapshotIds,
+                snapshot.id,
+              ]),
+            },
+            sourceJson: { kind: "financial_snapshot" },
+          },
+        });
+        return buildArtifact(updated);
+      }
+
       const created = await db.researchArtifact.create({
         data: {
           userId: ctx.session.user.id,
           targetType: snapshot.targetType,
           targetId: snapshot.targetId,
           financialSnapshotId: snapshot.id,
-          artifactType: "financial_comparison_report",
+          artifactType,
           title: input.title ?? "财务快照比较报告",
           contentType: "text/markdown",
           payloadJson: {
             markdown,
             companyRefs: asCompanyRefs(snapshot.companyRefsJson),
             snapshotId: snapshot.id,
+            snapshotIds: [snapshot.id],
           },
           sourceJson: { kind: "financial_snapshot" },
         },
