@@ -474,7 +474,6 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
         shellContext.historyQueryKind === "timing" ? undefined : runId
       }
       historyLoading={historyLoading}
-      eyebrow="研究运行详情"
       title="研究任务详情"
       description="以运行视角查看状态、进度、节点、时间线和结果摘要。对进行中的任务，页面会自动接收事件并刷新。"
       actions={

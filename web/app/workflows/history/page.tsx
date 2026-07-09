@@ -7,7 +7,6 @@ export default function WorkflowsHistoryPage() {
     <Suspense fallback={null}>
       <WorkflowHistoryClient
         section="workflows"
-        eyebrow="行业判断历史"
         title="行业判断历史"
         description="把历次行业主题研究集中到同一页浏览，便于回看问题表述、研究结论和仍在执行中的任务。"
         emptyTitle="还没有行业判断记录"

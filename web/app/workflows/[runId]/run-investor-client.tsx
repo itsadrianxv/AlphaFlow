@@ -267,7 +267,6 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
           : runId
       }
       historyLoading={historyLoading}
-      eyebrow="投资结论"
       title={getTitle(run?.template.code)}
       description={
         showIndustryConclusion

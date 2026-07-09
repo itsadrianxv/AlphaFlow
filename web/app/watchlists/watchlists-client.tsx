@@ -17,7 +17,6 @@ export function WatchlistsClient() {
   return (
     <WorkspaceShell
       section="researchTargets"
-      eyebrow="Watchlists"
       title="自选股列表"
       showWatchlistsAction={false}
       actions={

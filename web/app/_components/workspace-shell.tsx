@@ -413,13 +413,12 @@ function SidebarRail(props: {
 }
 
 function PageHeader(props: {
-  eyebrow?: string;
   title?: string;
   description?: string;
   actions?: ReactNode;
   titleSize?: "default" | "compact";
 }) {
-  const { eyebrow, title, description, actions, titleSize = "default" } = props;
+  const { title, description, actions, titleSize = "default" } = props;
   const titleClassName =
     titleSize === "compact"
       ? "app-display max-w-5xl text-[38px] leading-[0.98] text-[var(--app-text-strong)] sm:text-[46px] xl:text-[58px]"
@@ -427,13 +426,8 @@ function PageHeader(props: {
 
   return (
     <header className="app-page-header flex flex-col gap-5 border-b border-[var(--app-border-soft)] pb-6 lg:flex-row lg:items-start lg:justify-between">
-      {eyebrow || title || description ? (
+      {title || description ? (
         <div className="min-w-0">
-          {eyebrow ? (
-            <div className="mb-4 font-[family-name:var(--font-heading)] text-[11px] tracking-[0.18em] text-[var(--app-text-subtle)]">
-              {eyebrow}
-            </div>
-          ) : null}
           {title ? <h1 className={titleClassName}>{title}</h1> : null}
           {description ? (
             <p className="mt-4 max-w-4xl text-sm leading-7 text-[var(--app-text-muted)] sm:text-base">
@@ -454,7 +448,6 @@ function PageHeader(props: {
 export function WorkspaceShell(props: {
   section: WorkspaceSection;
   sectionView?: WorkspaceSectionView;
-  eyebrow?: string;
   title?: string;
   description?: string;
   actions?: ReactNode;
@@ -476,7 +469,6 @@ export function WorkspaceShell(props: {
   const {
     section,
     sectionView = "default",
-    eyebrow,
     title,
     description,
     actions,
@@ -528,7 +520,7 @@ export function WorkspaceShell(props: {
     );
   }, [desktopCollapsed, desktopStateReady]);
   const shouldShowPageHeader = Boolean(
-    eyebrow || title || description || actions || showWatchlistsAction,
+    title || description || actions || showWatchlistsAction,
   );
   const headerActions = (
     <>
@@ -639,7 +631,6 @@ export function WorkspaceShell(props: {
         >
           {shouldShowPageHeader ? (
             <PageHeader
-              eyebrow={eyebrow}
               title={title}
               description={description}
               actions={headerActions}

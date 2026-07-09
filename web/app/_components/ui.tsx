@@ -146,21 +146,15 @@ const densityClassMap: Record<Density, string> = {
 };
 
 export function PageHeader(props: {
-  eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
 }) {
-  const { eyebrow, title, description, actions } = props;
+  const { title, description, actions } = props;
 
   return (
     <header className="app-page-header flex flex-col gap-5 border-b border-[var(--app-border-soft)] pb-6 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0">
-        {eyebrow ? (
-          <div className="mb-4 font-[family-name:var(--font-heading)] text-[11px] tracking-[0.18em] text-[var(--app-text-subtle)]">
-            {eyebrow}
-          </div>
-        ) : null}
         <h1 className="app-display max-w-5xl text-[46px] leading-[0.96] text-[var(--app-text-strong)] sm:text-[58px] xl:text-[72px]">
           {title}
         </h1>
@@ -182,7 +176,6 @@ export function PageHeader(props: {
 export function LegacyWorkspaceShell(props: {
   section: WorkspaceSection;
   sectionView?: WorkspaceSectionView;
-  eyebrow?: string;
   title: string;
   description?: string;
   actions?: ReactNode;
@@ -193,7 +186,6 @@ export function LegacyWorkspaceShell(props: {
   const {
     section,
     sectionView = "default",
-    eyebrow,
     title,
     description,
     actions,
@@ -287,7 +279,6 @@ export function LegacyWorkspaceShell(props: {
           <section className="min-w-0 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
             <div className="mx-auto flex min-h-screen w-full max-w-[1260px] flex-col gap-8">
               <PageHeader
-                eyebrow={eyebrow}
                 title={title}
                 description={description}
                 actions={actions}
@@ -468,7 +459,6 @@ export function LegacyWorkspaceShell(props: {
         <section className="min-w-0 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
           <div className="mx-auto flex min-h-screen w-full max-w-[1440px] flex-col gap-8">
             <PageHeader
-              eyebrow={eyebrow}
               title={title}
               description={description}
               actions={actions}

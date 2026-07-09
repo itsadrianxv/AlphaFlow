@@ -104,7 +104,6 @@ export function TimingHistoryClient() {
       activeHistoryId={selectedCardId ?? undefined}
       historyLoading={cardsQuery.isLoading}
       historyEmptyText="还没有择时报告"
-      eyebrow="择时报告历史"
       title="择时报告历史"
       description="按时间回看每张单股择时报告，直接在历史页预览报告内容，再决定是否进入完整报告页。"
       actions={

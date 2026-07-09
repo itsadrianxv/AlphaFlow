@@ -82,7 +82,6 @@ function isLiveRun(status: string | undefined) {
 
 export function WorkflowHistoryClient(props: {
   section: WorkspaceSection;
-  eyebrow: string;
   title: string;
   description: string;
   emptyTitle: string;
@@ -95,7 +94,6 @@ export function WorkflowHistoryClient(props: {
 }) {
   const {
     section,
-    eyebrow,
     title,
     description,
     emptyTitle,
@@ -200,7 +198,6 @@ export function WorkflowHistoryClient(props: {
       activeHistoryId={selectedRunId ?? undefined}
       historyLoading={runsQuery.isLoading}
       historyEmptyText={emptyTitle}
-      eyebrow={eyebrow}
       title={title}
       description={description}
       actions={summaryActions.map((action) => (

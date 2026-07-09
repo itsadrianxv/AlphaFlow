@@ -358,7 +358,6 @@ export function CompanyResearchClient() {
       historyHref="/company-research/history"
       historyLoading={runsQuery.isLoading}
       historyEmptyText="还没有公司判断记录"
-      eyebrow="公司判断"
       title="公司判断"
     >
       <WorkflowStageSwitcher

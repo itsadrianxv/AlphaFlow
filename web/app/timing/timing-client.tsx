@@ -775,7 +775,6 @@ export function TimingClient() {
       historyHref="/timing/history"
       historyLoading={historyCardsQuery.isLoading}
       historyEmptyText="还没有择时报告"
-      eyebrow="组合决策"
       title="择时组合"
     >
       <WorkflowStageSwitcher
