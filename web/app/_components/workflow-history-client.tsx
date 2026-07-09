@@ -38,7 +38,6 @@ const historyHrefBySection: Record<WorkspaceSection, string | undefined> = {
   timing: "/timing/history",
   watchlists: undefined,
   companyResearch: "/company-research/history",
-  spaces: undefined,
   researchTargets: undefined,
 };
 
@@ -378,12 +377,6 @@ export function WorkflowHistoryClient(props: {
                     className="app-button app-button-primary"
                   >
                     查看详情
-                  </Link>
-                  <Link
-                    href={`/spaces?addRunId=${runDetailQuery.data.id}`}
-                    className="app-button"
-                  >
-                    加入 Space
                   </Link>
                   {isLiveRun(runDetailQuery.data.status) ? (
                     <button

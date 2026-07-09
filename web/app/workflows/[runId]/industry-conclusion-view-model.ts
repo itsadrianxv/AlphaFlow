@@ -246,11 +246,6 @@ export function buildIndustryConclusionViewModel(params: {
       label: "查看单股报告",
       href: `/timing/reports/${params.timingReportCardIds[0]}`,
     });
-  } else {
-    overviewActions.push({
-      label: "加入 Space",
-      href: `/spaces?addRunId=${params.runId}`,
-    });
   }
 
   const notices: IndustryConclusionNotice[] = [];
@@ -278,12 +273,7 @@ export function buildIndustryConclusionViewModel(params: {
       title: "仍有待补缺口",
       description: result.reflection.summary,
       tone: "warning",
-      actions: [
-        {
-          label: "加入 Space",
-          href: `/spaces?addRunId=${params.runId}`,
-        },
-      ],
+      actions: [],
     });
   }
 

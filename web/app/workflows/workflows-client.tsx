@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -287,19 +286,6 @@ export function WorkflowsClient() {
       historyLoading={runsQuery.isLoading}
       historyEmptyText="还没有行业研究记录"
       title="行业研究"
-      actions={
-        <>
-          <Link href="/" className="app-button">
-            返回总览
-          </Link>
-          <Link href="/company-research" className="app-button">
-            公司研究
-          </Link>
-          <Link href="/screening" className="app-button app-button-primary">
-            股票筛选
-          </Link>
-        </>
-      }
     >
       <WorkflowStageSwitcher
         tabs={workflowsStageTabs}

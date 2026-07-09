@@ -37,7 +37,6 @@ import type {
 import { api, type RouterOutputs } from "~/trpc/react";
 
 type FormulaItem = RouterOutputs["screening"]["listFormulas"][number];
-type WorkspaceSummary = RouterOutputs["screening"]["listWorkspaces"][number];
 type WorkspaceDetail = RouterOutputs["screening"]["getWorkspace"];
 const emptyFormulas: FormulaItem[] = [];
 
@@ -1042,27 +1041,6 @@ export function ScreeningStudioClient() {
       activeHistoryId={selectedWorkspaceId ?? undefined}
       historyLoading={workspacesQuery.isLoading}
       historyEmptyText="还没有工作台"
-      actions={
-        <select
-          value={selectedWorkspaceId ?? ""}
-          onChange={(event) => {
-            const nextId = event.target.value;
-            if (!nextId) {
-              return;
-            }
-            setWorkspaceHydrated(false);
-            setSelectedWorkspaceId(nextId);
-          }}
-          className="app-input !w-[260px] max-w-full shrink-0"
-        >
-          <option value="">选择工作台</option>
-          {workspaceOptions.map((workspace: WorkspaceSummary) => (
-            <option key={workspace.id} value={workspace.id}>
-              {workspace.name}
-            </option>
-          ))}
-        </select>
-      }
     >
       {notice ? (
         <InlineNotice

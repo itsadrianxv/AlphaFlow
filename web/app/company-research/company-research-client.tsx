@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -361,19 +360,6 @@ export function CompanyResearchClient() {
       historyEmptyText="还没有公司判断记录"
       eyebrow="公司判断"
       title="公司判断"
-      actions={
-        <>
-          <Link href="/" className="app-button">
-            返回看板
-          </Link>
-          <Link href="/workflows" className="app-button app-button-primary">
-            打开行业研究
-          </Link>
-          <Link href="/timing" className="app-button app-button-success">
-            前往择时组合
-          </Link>
-        </>
-      }
     >
       <WorkflowStageSwitcher
         tabs={companyResearchStageTabs}

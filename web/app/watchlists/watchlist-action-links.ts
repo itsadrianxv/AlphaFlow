@@ -8,7 +8,6 @@ export type WatchlistActionLinks = {
   industryResearchHref: string;
   companyResearchHref: string | null;
   timingHref: string;
-  linkSpaceHref: string;
 };
 
 function buildStockSeed(stocks: WatchlistSelectedStock[]) {
@@ -58,16 +57,6 @@ export function buildWatchlistActionLinks(params: {
     timingSearch.set("stockCode", singleStock.stockCode);
   }
 
-  const linkSpaceSearch = new URLSearchParams({
-    watchListId: params.watchListId,
-  });
-  if (stockSeed) {
-    linkSpaceSearch.set("stockCodes", stockSeed);
-  }
-  if (stockNames) {
-    linkSpaceSearch.set("stockNames", stockNames);
-  }
-
   let companyResearchHref: string | null = null;
   if (params.selectedStocks.length === 1 && singleStock) {
     const companySearch = new URLSearchParams({
@@ -82,6 +71,5 @@ export function buildWatchlistActionLinks(params: {
     industryResearchHref: `/workflows?${industrySearch.toString()}`,
     companyResearchHref,
     timingHref: `/timing?${timingSearch.toString()}`,
-    linkSpaceHref: `/spaces?${linkSpaceSearch.toString()}`,
   };
 }

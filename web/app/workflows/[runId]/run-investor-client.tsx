@@ -291,9 +291,6 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
               查看单股报告
             </Link>
           ) : null}
-          <Link href={`/spaces?addRunId=${runId}`} className="app-button">
-            加入研究空间
-          </Link>
           {canApprove ? (
             <button
               type="button"

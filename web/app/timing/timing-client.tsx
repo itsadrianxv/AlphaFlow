@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -778,16 +777,6 @@ export function TimingClient() {
       historyEmptyText="还没有择时报告"
       eyebrow="组合决策"
       title="择时组合"
-      actions={
-        <>
-          <Link href="/workflows" className="app-button">
-            查看研究详情
-          </Link>
-          <Link href="/screening" className="app-button app-button-success">
-            返回机会池
-          </Link>
-        </>
-      }
     >
       <WorkflowStageSwitcher
         tabs={timingStageTabs}

@@ -138,14 +138,9 @@ export function WatchlistDetailClient({
       }
       showWatchlistsAction={false}
       actions={
-        <>
-          <Link href="/research-targets" className="app-button">
-            返回投研收藏
-          </Link>
-          <Link href="/spaces" className="app-button">
-            打开研究空间
-          </Link>
-        </>
+        <Link href="/research-targets" className="app-button">
+          返回投研收藏
+        </Link>
       }
     >
       {notice ? <InlineNotice tone="success" description={notice} /> : null}
@@ -179,12 +174,6 @@ export function WatchlistDetailClient({
               )}
               <Link href={actionLinks.timingHref} className="app-button">
                 择时
-              </Link>
-              <Link
-                href={actionLinks.linkSpaceHref}
-                className="app-button app-button-primary"
-              >
-                Link to Space
               </Link>
             </>
           }

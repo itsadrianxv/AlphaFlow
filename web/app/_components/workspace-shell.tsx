@@ -16,7 +16,6 @@ import {
   CompanyResearchIcon,
   MenuIcon,
   OverviewIcon,
-  ResearchSpacesIcon,
   ScreeningIcon,
   SidebarToggleIcon,
   TimingIcon,
@@ -42,7 +41,6 @@ export type WorkspaceSection =
   | "timing"
   | "watchlists"
   | "companyResearch"
-  | "spaces"
   | "researchTargets";
 
 export type WorkspaceSectionView = "default" | "history";
@@ -103,12 +101,6 @@ const sidebarNavItems: Array<{
     href: "/research-targets",
     label: "投研收藏",
     icon: WatchlistsIcon,
-  },
-  {
-    key: "spaces",
-    href: "/spaces",
-    label: "研究空间",
-    icon: ResearchSpacesIcon,
   },
 ];
 
