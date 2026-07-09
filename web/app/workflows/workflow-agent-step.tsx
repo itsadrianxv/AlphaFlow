@@ -4,7 +4,7 @@
 import React from "react";
 
 import { EmptyState, Panel } from "~/app/_components/ui";
-import { formatWorkflowNodeLabel } from "~/app/workflows/detail-labels";
+import { formatWorkflowDiagramNodeLabel } from "~/app/workflows/detail-labels";
 import { ResearchOpsPanels } from "~/app/workflows/research-ops-panels";
 import type { WorkflowDiagramRunDetail } from "~/app/workflows/workflow-diagram-runtime";
 import { buildWorkflowDiagramRuntimeState } from "~/app/workflows/workflow-diagram-runtime";
@@ -85,7 +85,7 @@ export function WorkflowAgentStep(props: {
   });
 
   const currentNodeLabel = run.currentNodeKey
-    ? formatWorkflowNodeLabel(run.currentNodeKey)
+    ? formatWorkflowDiagramNodeLabel(run.currentNodeKey)
     : "-";
 
   return (

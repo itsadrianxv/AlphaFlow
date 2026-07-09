@@ -1,3 +1,4 @@
+import { formatWorkflowDiagramNodeLabel } from "~/app/workflows/detail-labels";
 import type {
   WorkflowDiagramNodeRuntimeState,
   WorkflowDiagramNodeStatus,
@@ -212,7 +213,7 @@ function buildFallback(run: WorkflowDiagramRunDetail) {
     notice: `未找到 ${run.template.code}@${run.template.version ?? "latest"} 对应的状态图配置。`,
     orderedNodes: run.nodes.map((node) => ({
       id: node.nodeKey,
-      label: node.nodeKey,
+      label: formatWorkflowDiagramNodeLabel(node.nodeKey),
       status: getNodeStatus({
         runStatus: run.status,
         currentNodeKey: run.currentNodeKey,

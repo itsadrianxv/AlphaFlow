@@ -3,6 +3,7 @@
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, { useMemo, useState } from "react";
 import { cn, InlineNotice, StatusPill } from "~/app/_components/ui";
+import { formatWorkflowDiagramNodeLabel } from "~/app/workflows/detail-labels";
 import type {
   WorkflowDiagramNode,
   WorkflowDiagramNodeRuntimeState,
@@ -98,6 +99,7 @@ function NodeInspector(props: {
   }
 
   const status = state?.status ?? "idle";
+  const displayLabel = formatWorkflowDiagramNodeLabel(node.id, node.label);
 
   return (
     <div
@@ -110,7 +112,7 @@ function NodeInspector(props: {
             节点详情
           </div>
           <div className="mt-1 text-sm text-[var(--app-text)]">
-            {node.label}
+            {displayLabel}
           </div>
         </div>
         <StatusPill
@@ -119,7 +121,6 @@ function NodeInspector(props: {
         />
       </div>
       <div className="mt-3 grid gap-2 text-xs leading-5 text-[var(--app-text-muted)] md:grid-cols-2 xl:grid-cols-4">
-        <div>节点键：{node.id}</div>
         <div>节点类型：{node.kind}</div>
         <div>执行次数：{state?.attempt ?? "-"}</div>
         <div>耗时：{state?.durationMs ?? "-"} ms</div>
@@ -284,6 +285,10 @@ export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
           </svg>
           {spec.nodes.map((node) => {
             const state = getNodeState(runtime, node.id);
+            const displayLabel = formatWorkflowDiagramNodeLabel(
+              node.id,
+              node.label,
+            );
             const active =
               state.status === "active" ||
               state.status === "paused" ||
@@ -316,10 +321,7 @@ export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
                 data-node-status={state.status}
               >
                 <div className="text-sm font-medium leading-5">
-                  {node.label}
-                </div>
-                <div className="mt-1 text-[11px] leading-4 text-[var(--app-text-subtle)]">
-                  {node.id}
+                  {displayLabel}
                 </div>
               </button>
             );

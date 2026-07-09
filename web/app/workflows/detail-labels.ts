@@ -76,12 +76,16 @@ const workflowNodeLabelMap: Record<string, string> = {
   collect_company_evidence: "采集公司证据",
   agent0_clarify_scope: "澄清研究范围",
   agent1_company_briefing: "梳理公司简报",
+  agent1_extract_research_spec: "提炼研究任务",
   agent1_write_research_brief: "撰写研究简报",
   agent2_concept_mapping: "映射业务概念",
   agent2_plan_research_units: "规划研究单元",
+  agent2_trend_analysis: "分析主题趋势",
+  agent3_candidate_screening: "筛选候选标的",
   agent3_question_design: "设计关键问题",
   agent3_execute_research_units: "执行研究单元",
   agent3_source_grounding: "锚定信源范围",
+  agent4_credibility_and_competition: "核验可信度与竞争格局",
   agent4_evidence_collection: "采集研究证据",
   agent4_evidence_curation: "整理研究证据",
   agent4_source_grounding: "锚定信源范围",
@@ -89,7 +93,9 @@ const workflowNodeLabelMap: Record<string, string> = {
   agent5_gap_analysis: "分析研究缺口",
   agent5_gap_analysis_and_replan: "分析缺口并重规划",
   agent5_investment_synthesis: "生成投资结论",
+  agent5_report_synthesis: "汇总研究报告",
   agent6_compress_findings: "压缩研究发现",
+  agent6_reflection: "反思校验",
   agent7_reference_enrichment: "补充引用证据",
   agent8_finalize_report: "整理最终报告",
   agent8_investment_synthesis: "生成投资结论",
@@ -153,4 +159,23 @@ export function formatWorkflowNodeLabel(value?: string | null) {
   }
 
   return workflowNodeLabelMap[value] ?? value;
+}
+
+export function formatWorkflowDiagramNodeLabel(
+  nodeId?: string | null,
+  label?: string | null,
+) {
+  const baseLabel =
+    label && label !== nodeId ? label : formatWorkflowNodeLabel(nodeId);
+
+  if (!nodeId) {
+    return baseLabel;
+  }
+
+  const agentIndex = /^agent(\d+)_/.exec(nodeId)?.[1];
+  if (!agentIndex) {
+    return baseLabel;
+  }
+
+  return `${Number(agentIndex)}. ${baseLabel.replace(/^\d+\.\s*/, "")}`;
 }
