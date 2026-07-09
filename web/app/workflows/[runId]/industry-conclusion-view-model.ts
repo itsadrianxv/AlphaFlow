@@ -6,10 +6,7 @@ import {
   isIndustryResearchResult,
 } from "~/app/workflows/research-view-models";
 import type { ConfidenceClaimAnalysis } from "~/server/domain/intelligence/confidence";
-import {
-  INDUSTRY_RESEARCH_TEMPLATE_CODE,
-  type IndustryResearchResultDto,
-} from "~/server/domain/workflow/types";
+import { INDUSTRY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 
 export type IndustryConclusionSectionId =
   | "overview"
@@ -53,13 +50,6 @@ export type IndustryConclusionClaim = Pick<
   "claimId" | "claimText" | "label" | "explanation"
 >;
 
-export type IndustryConclusionResearchPlanItem = {
-  id: string;
-  title: string;
-  capability: string;
-  status: string;
-};
-
 export type IndustryConclusionViewModel = {
   query: string;
   generatedAtLabel: string;
@@ -89,7 +79,6 @@ export type IndustryConclusionViewModel = {
     qualityFlags: string[];
     missingRequirements: string[];
     claims: IndustryConclusionClaim[];
-    researchPlan: IndustryConclusionResearchPlanItem[];
   };
   risks: {
     summary: string;
@@ -180,17 +169,46 @@ function buildCompanyResearchHref(params: {
   return `/company-research?${search.toString()}`;
 }
 
-function buildResearchPlan(result: IndustryResearchResultDto) {
-  const runByUnitId = new Map(
-    (result.researchUnitRuns ?? []).map((item) => [item.unitId, item] as const),
-  );
+function shouldHideIndustryConclusionText(value?: string | null) {
+  const text = value?.trim();
 
-  return (result.researchPlan ?? []).slice(0, 4).map((item) => ({
-    id: item.id,
-    title: item.title,
-    capability: item.capability,
-    status: runByUnitId.get(item.id)?.status ?? "planned",
-  }));
+  if (!text) {
+    return true;
+  }
+
+  if (/^(Screened|Validated)\s+\d+\s+candidates\.$/.test(text)) {
+    return true;
+  }
+
+  const normalized = text.toLowerCase();
+
+  if (normalized.includes("heuristic fallback")) {
+    return true;
+  }
+
+  if (normalized.includes("evidence is within 30 days")) {
+    return true;
+  }
+
+  if (normalized.includes("only a single source")) {
+    return true;
+  }
+
+  if (normalized.includes("evidence is sufficient for synthesis")) {
+    return true;
+  }
+
+  return normalized.startsWith("industry research completed");
+}
+
+function cleanConclusionTextList(
+  items: Array<string | null | undefined>,
+  limit = 8,
+) {
+  return uniqueList(
+    items.filter((item) => !shouldHideIndustryConclusionText(item)),
+    limit,
+  );
 }
 
 export function buildIndustryConclusionViewModel(params: {
@@ -221,6 +239,7 @@ export function buildIndustryConclusionViewModel(params: {
     ],
     4,
   );
+  const visibleOverviewPoints = cleanConclusionTextList(overviewPoints, 4);
   const topPicks = result.topPicks.slice(0, 3).map((item) => ({
     stockCode: item.stockCode,
     stockName: item.stockName,
@@ -265,18 +284,6 @@ export function buildIndustryConclusionViewModel(params: {
     });
   }
 
-  if (
-    result.reflection?.status === "warn" ||
-    result.reflection?.status === "fail"
-  ) {
-    notices.push({
-      title: "仍有待补缺口",
-      description: result.reflection.summary,
-      tone: "warning",
-      actions: [],
-    });
-  }
-
   return {
     query: params.query ?? "",
     generatedAtLabel: formatDate(result.generatedAt),
@@ -318,8 +325,8 @@ export function buildIndustryConclusionViewModel(params: {
         : []),
     ],
     overviewPoints:
-      overviewPoints.length > 0
-        ? overviewPoints
+      visibleOverviewPoints.length > 0
+        ? visibleOverviewPoints
         : ["本轮行业结论已生成，可继续下钻。"],
     overviewActions,
     notices,
@@ -349,27 +356,18 @@ export function buildIndustryConclusionViewModel(params: {
       tripletLabel: confidenceAnalysis
         ? `${confidenceAnalysis.supportedCount}/${confidenceAnalysis.insufficientCount}/${confidenceAnalysis.contradictedCount}`
         : "0/0/0",
-      notes:
-        uniqueList(
-          [...(confidenceAnalysis?.notes ?? []), result.reflection?.summary],
-          5,
-        ).length > 0
-          ? uniqueList(
-              [
-                ...(confidenceAnalysis?.notes ?? []),
-                result.reflection?.summary,
-              ],
-              5,
-            )
-          : ["暂无可信度分析。"],
-      qualityFlags: uniqueList(
+      notes: cleanConclusionTextList(
+        [...(confidenceAnalysis?.notes ?? []), result.reflection?.summary],
+        5,
+      ),
+      qualityFlags: cleanConclusionTextList(
         [
           ...(result.qualityFlags ?? []),
           ...(result.reflection?.qualityFlags ?? []),
-        ],
+        ].filter((item) => item !== "open_questions_remaining"),
         6,
       ),
-      missingRequirements: uniqueList(
+      missingRequirements: cleanConclusionTextList(
         [
           ...(result.missingRequirements ?? []),
           ...(result.reflection?.missingRequirements ?? []),
@@ -382,15 +380,20 @@ export function buildIndustryConclusionViewModel(params: {
         label: item.label,
         explanation: item.explanation,
       })),
-      researchPlan: buildResearchPlan(result),
     },
     risks: {
-      summary:
-        result.gapAnalysis?.summary ||
-        digest.bearPoints[0] ||
-        "当前暂无结构化风险缺口。",
-      missingAreas: uniqueList(result.gapAnalysis?.missingAreas ?? [], 6),
-      riskSignals: uniqueList(
+      summary: shouldHideIndustryConclusionText(result.gapAnalysis?.summary)
+        ? digest.bearPoints.find(
+            (item) => !shouldHideIndustryConclusionText(item),
+          ) || "当前暂无结构化风险缺口。"
+        : result.gapAnalysis?.summary ||
+          digest.bearPoints[0] ||
+          "当前暂无结构化风险缺口。",
+      missingAreas: cleanConclusionTextList(
+        result.gapAnalysis?.missingAreas ?? [],
+        6,
+      ),
+      riskSignals: cleanConclusionTextList(
         [
           ...result.credibility.flatMap((item) => item.risks),
           ...digest.bearPoints,
@@ -405,11 +408,11 @@ export function buildIndustryConclusionViewModel(params: {
         6,
       ),
       nextActions:
-        uniqueList(
+        cleanConclusionTextList(
           [...(result.reflection?.suggestedFixes ?? []), ...digest.nextActions],
           6,
         ).length > 0
-          ? uniqueList(
+          ? cleanConclusionTextList(
               [
                 ...(result.reflection?.suggestedFixes ?? []),
                 ...digest.nextActions,

@@ -8,15 +8,11 @@ import { MarkdownContent } from "~/app/_components/markdown-content";
 import { Panel, StatusPill } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import type {
+  IndustryConclusionClaim,
   IndustryConclusionSectionId,
   IndustryConclusionViewModel,
 } from "~/app/workflows/[runId]/industry-conclusion-view-model";
-import {
-  formatClaimLabel,
-  formatResearchCapabilityLabel,
-  formatResearchStatusLabel,
-  formatRuntimeIssueLabel,
-} from "~/app/workflows/detail-labels";
+import { formatRuntimeIssueLabel } from "~/app/workflows/detail-labels";
 
 export type { IndustryConclusionViewModel } from "~/app/workflows/[runId]/industry-conclusion-view-model";
 
@@ -138,6 +134,108 @@ function MetricStrip(props: { model: IndustryConclusionViewModel }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+type ClaimCategoryId = "insufficient" | "supported" | "contradicted";
+
+const claimCategories: Array<{
+  id: ClaimCategoryId;
+  label: string;
+}> = [
+  { id: "insufficient", label: "证据不足" },
+  { id: "supported", label: "证据支持" },
+  { id: "contradicted", label: "存在冲突" },
+];
+
+function ClaimList(props: { claims: IndustryConclusionClaim[] }) {
+  if (props.claims.length === 0) {
+    return (
+      <p className="py-3 text-sm leading-6 text-[var(--app-text-subtle)]">
+        当前分类暂无断言。
+      </p>
+    );
+  }
+
+  return (
+    <div className="grid gap-0">
+      {props.claims.map((item) => (
+        <div
+          key={item.claimId}
+          className="border-b border-[var(--app-border-soft)] py-3 last:border-b-0"
+        >
+          <p className="text-sm leading-6 text-[var(--app-text-strong)]">
+            {item.claimText}
+          </p>
+          <MarkdownContent
+            content={item.explanation}
+            compact
+            className="mt-2"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ClaimPanel(props: { claims: IndustryConclusionClaim[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const [activeCategoryId, setActiveCategoryId] =
+    useState<ClaimCategoryId>("insufficient");
+  const activeClaims = props.claims.filter(
+    (claim) => claim.label === activeCategoryId,
+  );
+
+  return (
+    <Panel
+      title="结论断言"
+      surface="inset"
+      density="compact"
+      actions={
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          className="app-button"
+        >
+          {expanded ? "收起" : "展开"}
+        </button>
+      }
+    >
+      {expanded ? (
+        props.claims.length === 0 ? (
+          <p className="text-sm leading-6 text-[var(--app-text-subtle)]">
+            暂无结构化断言。
+          </p>
+        ) : (
+          <div className="grid gap-3">
+            <div className="flex flex-wrap gap-2">
+              {claimCategories.map((category) => {
+                const active = category.id === activeCategoryId;
+                const count = props.claims.filter(
+                  (claim) => claim.label === category.id,
+                ).length;
+
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    onClick={() => setActiveCategoryId(category.id)}
+                    className={
+                      active
+                        ? "rounded-[10px] border border-[var(--app-border-strong)] bg-[var(--app-panel-strong)] px-3 py-2 text-sm text-[var(--app-text-strong)]"
+                        : "rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-3 py-2 text-sm text-[var(--app-text-muted)] transition-colors hover:border-[var(--app-border-strong)] hover:text-[var(--app-text-strong)]"
+                    }
+                  >
+                    {category.label} {count}
+                  </button>
+                );
+              })}
+            </div>
+            <ClaimList claims={activeClaims} />
+          </div>
+        )
+      ) : null}
+    </Panel>
   );
 }
 
@@ -286,13 +384,6 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
         </dl>
       </Panel>
 
-      <Panel title="可信度说明" surface="inset" density="compact">
-        <DetailList
-          items={props.model.evidence.notes}
-          emptyText="暂无可信度说明。"
-        />
-      </Panel>
-
       {props.model.evidence.qualityFlags.length > 0 ||
       props.model.evidence.missingRequirements.length > 0 ? (
         <div className="grid gap-4 xl:grid-cols-2">
@@ -315,67 +406,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
         </div>
       ) : null}
 
-      <Panel title="结论断言" surface="inset" density="compact">
-        {props.model.evidence.claims.length === 0 ? (
-          <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
-            暂无结构化断言。
-          </p>
-        ) : (
-          <div className="grid gap-0">
-            {props.model.evidence.claims.map((item) => (
-              <div
-                key={item.claimId}
-                className="border-b border-[var(--app-border-soft)] py-3 last:border-b-0"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusPill
-                    label={formatClaimLabel(item.label)}
-                    tone="info"
-                  />
-                </div>
-                <p className="mt-3 text-sm leading-7 text-[var(--app-text-strong)]">
-                  {item.claimText}
-                </p>
-                <MarkdownContent
-                  content={item.explanation}
-                  compact
-                  className="mt-2"
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
-
-      <Panel title="研究单元摘要" surface="inset" density="compact">
-        {props.model.evidence.researchPlan.length === 0 ? (
-          <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
-            暂无研究单元记录。
-          </p>
-        ) : (
-          <div className="grid gap-0">
-            {props.model.evidence.researchPlan.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--app-border-soft)] py-3 last:border-b-0"
-              >
-                <div>
-                  <div className="text-sm text-[var(--app-text-strong)]">
-                    {item.title}
-                  </div>
-                  <div className="mt-1 text-xs tracking-[0.1em] text-[var(--app-text-subtle)]">
-                    {formatResearchCapabilityLabel(item.capability)}
-                  </div>
-                </div>
-                <StatusPill
-                  label={formatResearchStatusLabel(item.status)}
-                  tone="info"
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </Panel>
+      <ClaimPanel claims={props.model.evidence.claims} />
     </div>
   );
 }

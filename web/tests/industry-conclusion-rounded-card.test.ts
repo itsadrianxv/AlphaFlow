@@ -57,4 +57,22 @@ describe("IndustryConclusionDetail report layout", () => {
       "rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)]",
     );
   });
+
+  it("removes low-value industry conclusion blocks", () => {
+    expect(source).not.toContain('title="可信度说明"');
+    expect(source).not.toContain('title="研究单元摘要"');
+    expect(viewModelSource).not.toContain('title: "仍有待补缺口"');
+    expect(viewModelSource).toContain("cleanConclusionTextList");
+    expect(viewModelSource).toContain('item !== "open_questions_remaining"');
+  });
+
+  it("keeps conclusion claims collapsed with category navigation", () => {
+    expect(source).toContain("function ClaimPanel");
+    expect(source).toContain("useState(false)");
+    expect(source).toContain('useState<ClaimCategoryId>("insufficient")');
+    expect(source).toContain('{ id: "insufficient", label: "证据不足" }');
+    expect(source).toContain('{ id: "supported", label: "证据支持" }');
+    expect(source).toContain('{ id: "contradicted", label: "存在冲突" }');
+    expect(source).toContain("<ClaimPanel claims={props.model.evidence.claims} />");
+  });
 });
