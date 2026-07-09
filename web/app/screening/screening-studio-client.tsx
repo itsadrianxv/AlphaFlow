@@ -74,6 +74,7 @@ const stageCanvasClassName =
   "min-h-[calc(100vh-17rem)] xl:min-h-[calc(100vh-15rem)]";
 const stockSearchCanvasClassName =
   "min-h-[calc(66.667vh-11.333rem)] xl:min-h-[calc(66.667vh-10rem)]";
+const compactStageCanvasClassName = "self-start";
 const formulaMetricDragType = "application/x-screening-metric";
 const formulaOperatorButtons = ["+", "-", "*", "/"] as const;
 
@@ -378,14 +379,6 @@ export function ScreeningStudioClient() {
       resetFormulaEditor();
     },
     onError: (error) => setFormulaValidation(error.message),
-  });
-  const deleteFormulaMutation = api.screening.deleteFormula.useMutation({
-    onSuccess: async () => {
-      setNotice({ tone: "success", text: "公式已删除" });
-      await utils.screening.listFormulas.invalidate();
-      resetFormulaEditor();
-    },
-    onError: (error) => setNotice({ tone: "error", text: error.message }),
   });
   const createFinancialSnapshotMutation =
     api.researchTarget.createFinancialSnapshot.useMutation({
@@ -1088,7 +1081,7 @@ export function ScreeningStudioClient() {
           description="官方指标与自定义公式都在当前工作台里统一勾选。"
           className={
             activeTabId === "indicators"
-              ? `xl:col-span-7 ${stageCanvasClassName}`
+              ? `xl:col-span-7 ${compactStageCanvasClassName}`
               : "hidden"
           }
         >
@@ -1104,7 +1097,7 @@ export function ScreeningStudioClient() {
             placeholder="搜索官方指标（名称 / ID / 关键词）"
             className="app-input mb-3"
           />
-          <div className="max-h-[420px] overflow-auto rounded-[12px] border border-[var(--app-border-soft)]">
+          <div className="max-h-[360px] overflow-auto rounded-[12px] border border-[var(--app-border-soft)]">
             <div className="border-b border-[var(--app-border-soft)] px-4 py-3 text-xs text-[var(--app-text-subtle)]">
               官方指标
             </div>
@@ -1195,7 +1188,7 @@ export function ScreeningStudioClient() {
           description="把左侧官方指标拖到表达式里，并使用按钮插入加减乘除。"
           className={
             activeTabId === "indicators"
-              ? `xl:col-span-5 ${stageCanvasClassName}`
+              ? `xl:col-span-5 ${compactStageCanvasClassName}`
               : "hidden"
           }
           actions={
@@ -1266,59 +1259,6 @@ export function ScreeningStudioClient() {
                 {editingFormulaId ? "更新公式" : "保存公式"}
               </button>
             </div>
-            {formulas.length > 0 ? (
-              <div className="rounded-[12px] border border-[var(--app-border-soft)] p-3">
-                <div className="text-xs text-[var(--app-text-subtle)]">
-                  已保存公式
-                </div>
-                <div className="mt-2 grid gap-2">
-                  {formulas.map((formula: FormulaItem) => (
-                    <div
-                      key={formula.id}
-                      className="flex items-center justify-between gap-3 rounded-[10px] border border-[var(--app-border-soft)] px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate text-sm text-[var(--app-text)]">
-                          {formula.name}
-                        </div>
-                        <div className="truncate text-xs text-[var(--app-text-subtle)]">
-                          {formula.expression}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          className="app-button"
-                          onClick={() => {
-                            setEditingFormulaId(formula.id);
-                            setFormulaName(formula.name);
-                            setFormulaDescription(formula.description ?? "");
-                            setFormulaExpression(formula.expression);
-                            setFormulaTargetIndicators(
-                              formula.targetIndicators,
-                            );
-                            setFormulaValidation(null);
-                          }}
-                        >
-                          编辑
-                        </button>
-                        <button
-                          type="button"
-                          className="app-button"
-                          onClick={() =>
-                            void deleteFormulaMutation.mutateAsync({
-                              id: formula.id,
-                            })
-                          }
-                        >
-                          删除
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </div>
         </SectionCard>
 
@@ -1327,7 +1267,7 @@ export function ScreeningStudioClient() {
           description="改变期间设置不会自动取数，只有点击获取才会请求数据。"
           className={
             activeTabId === "period"
-              ? `xl:col-span-12 ${stageCanvasClassName}`
+              ? `xl:col-span-12 ${compactStageCanvasClassName}`
               : "hidden"
           }
         >
