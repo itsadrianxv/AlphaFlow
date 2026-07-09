@@ -21,6 +21,7 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
   }
 
   const runId = value.runId;
+  const userId = value.userId;
   const skillId = value.skillId;
   const rawSkillIds = Array.isArray(value.skillIds) ? value.skillIds : [];
   const prompt = value.prompt;
@@ -35,9 +36,11 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
 
   if (
     typeof runId !== "string" ||
+    typeof userId !== "string" ||
     typeof skillId !== "string" ||
     typeof prompt !== "string" ||
     !runId.trim() ||
+    !userId.trim() ||
     !skillId.trim() ||
     !prompt.trim() ||
     skillIds.length > 3
@@ -47,6 +50,7 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
 
   return {
     runId,
+    userId,
     sessionId: typeof value.sessionId === "string" ? value.sessionId : undefined,
     conversationId:
       typeof value.conversationId === "string" ? value.conversationId : undefined,

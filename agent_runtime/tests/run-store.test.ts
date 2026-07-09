@@ -6,6 +6,7 @@ describe("AgentRuntimeRunStore", () => {
     const store = new AgentRuntimeRunStore(60_000);
     store.createOrGet({
       runId: "run_1",
+      userId: "user_1",
       skillId: "alphaflow-research-assistant",
       skillIds: [
         "alphaflow-research-assistant",

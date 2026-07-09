@@ -1,4 +1,4 @@
-﻿import { promises as fs } from "node:fs";
+import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
@@ -21,6 +21,7 @@ import type { SkillRegistry } from "./skill-registry";
 import { createInternalTools } from "./tool-policy";
 import type { AgentRuntimeConfig, StartRunRequest } from "./types";
 import type { AgentRuntimeRunStore } from "./run-store";
+import { WebInternalClient } from "./web-internal-client";
 
 function extractMessageText(message: AgentMessage | unknown) {
   if (!message || typeof message !== "object") {
@@ -76,10 +77,24 @@ function createSeedMessage(role: "user" | "assistant", content: string): AgentMe
   };
 }
 
-function resolveSystemPrompt() {
+function resolveSystemPrompt(now = new Date()) {
+  const currentIso = now.toISOString();
+  const currentLocal = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    dateStyle: "full",
+    timeStyle: "long",
+  }).format(now);
   return [
     "你运行在 AlphaFlow agent-runtime sidecar 中。",
+    `当前日期时间：${currentLocal}`,
+    `当前时间 ISO：${currentIso}`,
+    "默认时区：Asia/Shanghai。",
+    "回答涉及新闻、价格、政策、法规、公司信息、人物任职、产品版本、API 文档、市场行情、财报、公告、排名等可能变化的信息时，必须基于上述当前时间判断资料是否过期。",
+    "如果搜索结果、网页或工具返回内容缺少发布时间、更新时间或数据日期，必须降低其证据权重，并在回答中说明不确定性。",
     "只能使用已注册工具，不要尝试访问本地项目文件、环境变量或任意 shell。",
+    "当用户提到“我的收藏”“我的行业”“我的公司”“我的自选股”“已有笔记”或“已保存报告”时，优先使用内部投研对象工具读取当前用户授权范围内的对象。",
+    "仅在用户明确提出分析、比较、补充、风险、催化、跟踪指标或类似请求时，才基于投研对象继续调用行情、财务、事件、资金流等市场数据工具；普通列举或查看请求不要主动补行情财务。",
+    "内部投研对象工具是只读工具，不得声称已经保存、修改、删除或加入收藏；如果用户要求保存，只输出可保存的文本草稿并说明当前运行不会写入收藏。",
     "默认使用中文输出，并在涉及数据、网页或筛选结果时说明来源。",
     "不得输出买卖建议、收益保证或确定性投资承诺。",
   ].join("\n");
@@ -220,6 +235,7 @@ function mapHarnessEvent(
 
 export class PiAdapter {
   private readonly pythonGatewayClient: PythonGatewayClient;
+  private readonly webInternalClient: WebInternalClient;
   private readonly sessionRepo: JsonlSessionRepo;
 
   constructor(
@@ -228,6 +244,7 @@ export class PiAdapter {
     private readonly store: AgentRuntimeRunStore,
   ) {
     this.pythonGatewayClient = new PythonGatewayClient(config);
+    this.webInternalClient = new WebInternalClient(config);
     const sessionEnv = new RestrictedExecutionEnv({
       cwd: process.cwd(),
       readRoots: [process.cwd(), path.resolve(config.sessionRoot)],
@@ -393,6 +410,9 @@ export class PiAdapter {
       },
       tools: createInternalTools({
         pythonGatewayClient: this.pythonGatewayClient,
+        webInternalClient: this.webInternalClient,
+        runId: request.runId,
+        userId: request.userId,
         maxToolCalls: this.config.maxToolCallsPerRun,
         toolTimeoutMs: this.config.toolTimeoutMs,
       }),
@@ -401,6 +421,26 @@ export class PiAdapter {
         "internal_web_fetch",
         "internal_concept_match",
         "internal_screening_query",
+        "internal_research_targets_list",
+        "internal_research_target_detail",
+        "internal_research_notes_list",
+        "internal_research_artifacts_list",
+        "internal_watchlist_detail",
+        "internal_stock_search",
+        "internal_stock_profile",
+        "internal_stock_bars",
+        "internal_stock_daily_basic",
+        "internal_index_market",
+        "internal_index_constituents",
+        "internal_moneyflow",
+        "internal_market_events",
+        "internal_shareholder_events",
+        "internal_financial_statements",
+        "internal_financial_indicators",
+        "internal_earnings_events",
+        "internal_fund_market",
+        "internal_convertible_bond_market",
+        "internal_macro_rates",
       ],
     });
 

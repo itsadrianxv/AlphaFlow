@@ -229,6 +229,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
 
     await this.deps.agentRuntimeClient.startRun({
       runId: state.runId,
+      userId: state.userId,
       sessionId: task.conversationId,
       conversationId: task.conversationId,
       userMessageId: task.userMessageId,

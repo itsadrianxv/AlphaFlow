@@ -20,6 +20,9 @@ export function readConfig(): AgentRuntimeConfig {
       "AGENT_RUNTIME_COMPACTION_TOKEN_THRESHOLD",
       48_000,
     ),
+    webInternalUrl:
+      process.env.ALPHAFLOW_WEB_INTERNAL_URL ?? "http://web:3000",
+    internalApiSecret: process.env.ALPHAFLOW_INTERNAL_API_SECRET ?? "",
     pythonServiceUrl:
       process.env.PYTHON_SERVICE_URL ?? "http://python-service:8000",
     pythonServiceTimeoutMs: readNumber("PYTHON_SERVICE_TIMEOUT_MS", 60_000),

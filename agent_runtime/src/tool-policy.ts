@@ -2,9 +2,13 @@ import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
 import { Type } from "@earendil-works/pi-ai";
 import { summarizeValue, truncateText } from "./json";
 import type { PythonGatewayClient } from "./python-gateway-client";
+import type { WebInternalClient } from "./web-internal-client";
 
 type ToolFactoryOptions = {
   pythonGatewayClient: PythonGatewayClient;
+  webInternalClient: WebInternalClient;
+  runId: string;
+  userId: string;
   maxToolCalls: number;
   toolTimeoutMs: number;
 };
@@ -75,6 +79,38 @@ export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
       timeout.cleanup();
     }
   };
+
+  const callWebInternal = async (
+    toolName: string,
+    params: Record<string, unknown>,
+    signal?: AbortSignal,
+  ) => {
+    guard(toolName);
+    const timeout = withTimeout(signal, options.toolTimeoutMs);
+
+    try {
+      const response = await options.webInternalClient.postToolOperation(
+        {
+          operation: toolName,
+          runId: options.runId,
+          userId: options.userId,
+          params,
+        },
+        timeout.signal,
+      );
+      return asTextResult({
+        source: "alphaflow-web",
+        operation: toolName,
+        request: summarizeValue(params, 800),
+        response: summarizeValue(response),
+      });
+    } finally {
+      timeout.cleanup();
+    }
+  };
+
+  const optionalString = () => Type.Optional(Type.String());
+  const includeList = () => Type.Optional(Type.Any());
 
   return [
     {
@@ -155,6 +191,365 @@ export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
           signal,
         );
       },
+    },
+    {
+      name: "internal_research_targets_list",
+      label: "内部投研对象列表",
+      description:
+        "读取当前用户收藏的投研对象概要，包括收藏公司、收藏行业和自选股。普通查看收藏对象时优先使用此工具。",
+      parameters: Type.Object({
+        types: Type.Optional(Type.Any()),
+        query: optionalString(),
+        limit: Type.Optional(Type.Number({ minimum: 1, maximum: 100 })),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callWebInternal(
+          "internal_research_targets_list",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_research_target_detail",
+      label: "内部投研对象详情",
+      description:
+        "读取当前用户某个投研对象的核心详情和关联内容计数，不返回完整长笔记或完整长报告。",
+      parameters: Type.Object({
+        targetRef: Type.Record(Type.String(), Type.Any()),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callWebInternal(
+          "internal_research_target_detail",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_research_notes_list",
+      label: "内部投研笔记列表",
+      description:
+        "读取当前用户投研笔记摘要。需要基于已有笔记继续分析、补充风险或整理问题时使用。",
+      parameters: Type.Object({
+        targetRef: Type.Optional(Type.Record(Type.String(), Type.Any())),
+        query: optionalString(),
+        limit: Type.Optional(Type.Number({ minimum: 1, maximum: 50 })),
+        contentLimit: Type.Optional(Type.Number({ minimum: 100, maximum: 2000 })),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callWebInternal(
+          "internal_research_notes_list",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_research_artifacts_list",
+      label: "内部研究报告列表",
+      description:
+        "读取当前用户已保存研究报告的摘要。需要参考已有报告继续分析或比较时使用。",
+      parameters: Type.Object({
+        targetRef: Type.Optional(Type.Record(Type.String(), Type.Any())),
+        artifactType: optionalString(),
+        query: optionalString(),
+        limit: Type.Optional(Type.Number({ minimum: 1, maximum: 50 })),
+        contentLimit: Type.Optional(Type.Number({ minimum: 100, maximum: 2000 })),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callWebInternal(
+          "internal_research_artifacts_list",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_watchlist_detail",
+      label: "内部自选股详情",
+      description:
+        "读取当前用户某个自选股列表的成员、备注和标签。分析自选股组合前先用此工具确认对象。",
+      parameters: Type.Object({
+        watchListId: Type.String({ minLength: 1 }),
+        stockLimit: Type.Optional(Type.Number({ minimum: 1, maximum: 100 })),
+        stockOffset: Type.Optional(Type.Number({ minimum: 0, maximum: 10000 })),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callWebInternal(
+          "internal_watchlist_detail",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_stock_search",
+      label: "内部股票搜索",
+      description: "按代码、名称、拼音或行业搜索 A 股基础证券信息。",
+      parameters: Type.Object({
+        keyword: Type.String({ minLength: 1 }),
+        limit: Type.Optional(Type.Number({ minimum: 1, maximum: 100 })),
+        listStatus: optionalString(),
+        exchange: optionalString(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_stock_search",
+          "/api/v1/capabilities/market/stock/search",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_stock_profile",
+      label: "内部股票画像",
+      description: "读取单只股票基础资料和上市公司经营资料。",
+      parameters: Type.Object({
+        stockCode: Type.String({ minLength: 1 }),
+        includeCompany: Type.Optional(Type.Boolean()),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_stock_profile",
+          "/api/v1/capabilities/market/stock/profile",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_stock_bars",
+      label: "内部股票行情",
+      description: "读取单只股票日线、周线或月线行情。",
+      parameters: Type.Object({
+        stockCode: Type.String({ minLength: 1 }),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        freq: optionalString(),
+        adjust: optionalString(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_stock_bars",
+          "/api/v1/capabilities/market/stock/bars",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_stock_daily_basic",
+      label: "内部股票每日指标",
+      description: "读取股票估值、换手率、市值、涨跌停状态等每日基本面指标。",
+      parameters: Type.Object({
+        stockCode: optionalString(),
+        tradeDate: optionalString(),
+        startDate: optionalString(),
+        endDate: optionalString(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_stock_daily_basic",
+          "/api/v1/capabilities/market/stock/daily-basic",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_index_market",
+      label: "内部指数行情",
+      description: "读取指数基础信息、行情和估值指标。",
+      parameters: Type.Object({
+        indexCode: Type.String({ minLength: 1 }),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        includeBasic: Type.Optional(Type.Boolean()),
+        includeValuation: Type.Optional(Type.Boolean()),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_index_market",
+          "/api/v1/capabilities/market/index/market",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_index_constituents",
+      label: "内部指数成分",
+      description: "读取指数成分股和权重。",
+      parameters: Type.Object({
+        indexCode: Type.String({ minLength: 1 }),
+        tradeDate: optionalString(),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        includeNames: Type.Optional(Type.Boolean()),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_index_constituents",
+          "/api/v1/capabilities/market/index/constituents",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_moneyflow",
+      label: "内部资金流",
+      description: "读取个股资金流、两融和沪深股通持股数据。",
+      parameters: Type.Object({
+        stockCode: optionalString(),
+        tradeDate: optionalString(),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        include: includeList(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_moneyflow",
+          "/api/v1/capabilities/market/stock/moneyflow",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_market_events",
+      label: "内部市场事件",
+      description: "读取龙虎榜、大宗交易、涨跌停价格等市场事件。",
+      parameters: Type.Object({
+        tradeDate: Type.String({ minLength: 8 }),
+        stockCode: optionalString(),
+        include: includeList(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_market_events",
+          "/api/v1/capabilities/market/events",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_shareholder_events",
+      label: "内部股东事件",
+      description: "读取股东户数、增减持、质押、解禁和回购事件。",
+      parameters: Type.Object({
+        stockCode: Type.String({ minLength: 1 }),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        include: includeList(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_shareholder_events",
+          "/api/v1/capabilities/market/stock/shareholder-events",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_financial_statements",
+      label: "内部三大报表",
+      description: "读取利润表、资产负债表和现金流量表核心字段。",
+      parameters: Type.Object({
+        stockCode: Type.String({ minLength: 1 }),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        period: optionalString(),
+        statement: optionalString(),
+        reportType: optionalString(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_financial_statements",
+          "/api/v1/capabilities/market/stock/financial-statements",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_financial_indicators",
+      label: "内部财务指标",
+      description: "读取盈利、成长、偿债、现金流、主营构成和审计意见。",
+      parameters: Type.Object({
+        stockCode: Type.String({ minLength: 1 }),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        period: optionalString(),
+        include: includeList(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_financial_indicators",
+          "/api/v1/capabilities/market/stock/financial-indicators",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_earnings_events",
+      label: "内部业绩事件",
+      description: "读取业绩预告、快报、披露预约和分红送转。",
+      parameters: Type.Object({
+        stockCode: Type.String({ minLength: 1 }),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        include: includeList(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_earnings_events",
+          "/api/v1/capabilities/market/stock/earnings-events",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_fund_market",
+      label: "内部基金市场",
+      description: "读取基金基础信息、净值、行情和持仓。",
+      parameters: Type.Object({
+        fundCode: Type.String({ minLength: 1 }),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        include: includeList(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_fund_market",
+          "/api/v1/capabilities/market/fund/market",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_convertible_bond_market",
+      label: "内部可转债市场",
+      description: "读取可转债基础条款、发行信息和行情。",
+      parameters: Type.Object({
+        bondCode: Type.String({ minLength: 1 }),
+        startDate: optionalString(),
+        endDate: optionalString(),
+        include: includeList(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_convertible_bond_market",
+          "/api/v1/capabilities/market/convertible-bond/market",
+          params as Record<string, unknown>,
+          signal,
+        ),
+    },
+    {
+      name: "internal_macro_rates",
+      label: "内部宏观利率",
+      description: "读取 SHIBOR、LPR、LIBOR、HIBOR 等利率序列。",
+      parameters: Type.Object({
+        startDate: optionalString(),
+        endDate: optionalString(),
+        include: includeList(),
+      }),
+      execute: async (_toolCallId, params, signal) =>
+        callPython(
+          "internal_macro_rates",
+          "/api/v1/capabilities/market/macro/rates",
+          params as Record<string, unknown>,
+          signal,
+        ),
     },
   ];
 }

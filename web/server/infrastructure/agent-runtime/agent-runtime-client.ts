@@ -53,6 +53,7 @@ export type AgentRuntimeRun = z.infer<typeof agentRuntimeRunSchema>;
 
 export type StartAgentRuntimeRunInput = {
   runId: string;
+  userId: string;
   sessionId?: string;
   conversationId?: string;
   userMessageId?: string;

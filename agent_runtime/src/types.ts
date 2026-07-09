@@ -39,6 +39,7 @@ export type SkillSummary = {
 
 export type StartRunRequest = {
   runId: string;
+  userId: string;
   sessionId?: string;
   conversationId?: string;
   userMessageId?: string;
@@ -92,6 +93,8 @@ export type AgentRuntimeConfig = {
   port: number;
   sessionRoot: string;
   compactionTokenThreshold: number;
+  webInternalUrl: string;
+  internalApiSecret: string;
   pythonServiceUrl: string;
   pythonServiceTimeoutMs: number;
   runTtlMs: number;
