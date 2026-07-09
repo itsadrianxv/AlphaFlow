@@ -187,6 +187,8 @@ export function AgentRuntimeClientPage() {
   const [activeRunId, setActiveRunId] = useState("");
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const [skillSelectionError, setSkillSelectionError] = useState("");
+  const [activeSkillCategory, setActiveSkillCategory] =
+    useState<string>("市场与题材");
   const [lastTargetRef, setLastTargetRef] = useState<ResearchTargetRef | null>(
     null,
   );
@@ -340,6 +342,21 @@ export function AgentRuntimeClientPage() {
 
     return [...orderedGroups, ...extraGroups];
   }, [skillsQuery.data?.items]);
+  const activeSkillGroup = useMemo(() => {
+    return (
+      groupedSkills.find((group) => group.category === activeSkillCategory) ??
+      groupedSkills[0]
+    );
+  }, [activeSkillCategory, groupedSkills]);
+
+  useEffect(() => {
+    if (
+      groupedSkills.length > 0 &&
+      !groupedSkills.some((group) => group.category === activeSkillCategory)
+    ) {
+      setActiveSkillCategory(groupedSkills[0]?.category ?? "市场与题材");
+    }
+  }, [activeSkillCategory, groupedSkills]);
 
   useEffect(() => {
     if (!skillMenuOpen) {
@@ -507,56 +524,78 @@ export function AgentRuntimeClientPage() {
                   : "pointer-events-none scale-95 opacity-0",
               ].join(" ")}
             >
-              <div className="max-h-[360px] overflow-y-auto py-1">
-                {groupedSkills.map((group) => (
-                  <div key={group.category} className="py-1">
-                    <div className="px-3 py-1.5 text-xs font-medium text-[var(--app-text-subtle)]">
-                      {group.category}
-                    </div>
-                    <div className="grid gap-0.5">
-                      {group.items.map((skill) => {
-                        const active = selectedSkillIds.includes(skill.id);
+              <div className="max-h-[300px] overflow-y-auto p-1">
+                <div className="grid gap-0.5">
+                  {(activeSkillGroup?.items ?? []).map((skill) => {
+                    const active = selectedSkillIds.includes(skill.id);
 
-                        return (
-                          <button
-                            key={skill.id}
-                            type="button"
-                            role="menuitemcheckbox"
-                            aria-checked={active}
-                            className={[
-                              "grid w-full gap-1 rounded-[10px] px-3 py-2.5 text-left text-sm transition-colors",
-                              active
-                                ? "bg-white text-black"
-                                : "text-[var(--app-text-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
-                            ].join(" ")}
-                            onClick={() => toggleSkill(skill.id)}
-                          >
-                            <span className="flex min-w-0 items-center justify-between gap-3">
-                              <span className="min-w-0 truncate font-medium">
-                                {skill.name}
-                              </span>
-                              {active ? (
-                                <span className="shrink-0 text-xs font-medium">
-                                  已选
-                                </span>
-                              ) : null}
+                    return (
+                      <button
+                        key={skill.id}
+                        type="button"
+                        role="menuitemcheckbox"
+                        aria-checked={active}
+                        className={[
+                          "grid w-full gap-1 rounded-[10px] px-3 py-2.5 text-left text-sm transition-colors",
+                          active
+                            ? "bg-white text-black"
+                            : "text-[var(--app-text-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
+                        ].join(" ")}
+                        onClick={() => toggleSkill(skill.id)}
+                      >
+                        <span className="flex min-w-0 items-center justify-between gap-3">
+                          <span className="min-w-0 truncate font-medium">
+                            {skill.name}
+                          </span>
+                          {active ? (
+                            <span className="shrink-0 text-xs font-medium">
+                              已选
                             </span>
-                            <span
-                              className={[
-                                "line-clamp-2 text-xs leading-5",
-                                active
-                                  ? "text-black/68"
-                                  : "text-[var(--app-text-subtle)]",
-                              ].join(" ")}
-                            >
-                              {skill.description}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                          ) : null}
+                        </span>
+                        <span
+                          className={[
+                            "line-clamp-2 text-xs leading-5",
+                            active
+                              ? "text-black/68"
+                              : "text-[var(--app-text-subtle)]",
+                          ].join(" ")}
+                        >
+                          {skill.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-1 border-t border-[var(--app-border-soft)] p-1 sm:grid-cols-4">
+                {skillCategoryOrder.map((category) => {
+                  const group = groupedSkills.find(
+                    (item) => item.category === category,
+                  );
+                  const active = activeSkillGroup?.category === category;
+
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      className={[
+                        "h-8 rounded-[8px] px-2 text-left text-xs font-medium transition-colors",
+                        active
+                          ? "bg-white text-black"
+                          : "text-[var(--app-text-subtle)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
+                      ].join(" ")}
+                      onClick={() => setActiveSkillCategory(category)}
+                    >
+                      <span className="block truncate">
+                        {category}
+                        {group ? ` ${group.items.length}` : ""}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
               {skillSelectionError ? (
                 <div className="border-t border-[var(--app-border-soft)] px-3 py-2 text-xs text-[var(--app-danger)]">
