@@ -391,7 +391,6 @@ export function ScreeningStudioClient() {
   const createFinancialSnapshotMutation =
     api.researchTarget.createFinancialSnapshot.useMutation({
       onSuccess: async (snapshot) => {
-        setNotice({ tone: "success", text: "财务快照已保存" });
         await utils.researchTarget.listFinancialSnapshots.invalidate();
         return snapshot;
       },
@@ -400,7 +399,6 @@ export function ScreeningStudioClient() {
   const generateComparisonArtifactMutation =
     api.researchTarget.generateComparisonArtifact.useMutation({
       onSuccess: async () => {
-        setNotice({ tone: "success", text: "比较报告已生成" });
         await utils.researchTarget.listArtifacts.invalidate();
       },
       onError: (error) => setNotice({ tone: "error", text: error.message }),
@@ -942,14 +940,6 @@ export function ScreeningStudioClient() {
       });
     }
 
-    setNotice({
-      tone: "success",
-      text: shouldGenerateComparisonReport
-        ? shouldSaveFinancialSnapshot
-          ? "快照已保存，比较报告已生成"
-          : "比较报告已生成"
-        : "快照已保存",
-    });
     setSnapshotSaveTargetMode(null);
   }
 
