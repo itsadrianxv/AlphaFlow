@@ -1,4 +1,5 @@
 import { RunInvestorClient } from "~/app/workflows/[runId]/run-investor-client";
+import { COMPANY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 
 type PageProps = {
   params: Promise<{
@@ -11,5 +12,10 @@ export default async function CompanyResearchRunDetailPage({
 }: PageProps) {
   const { runId } = await params;
 
-  return <RunInvestorClient runId={runId} />;
+  return (
+    <RunInvestorClient
+      runId={runId}
+      initialTemplateCode={COMPANY_RESEARCH_TEMPLATE_CODE}
+    />
+  );
 }

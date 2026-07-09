@@ -53,6 +53,7 @@ import { api } from "~/trpc/react";
 
 type RunInvestorClientProps = {
   runId: string;
+  initialTemplateCode?: string;
 };
 
 function formatDate(value?: Date | null) {
@@ -113,7 +114,10 @@ function getTitle(templateCode?: string) {
   return "研究结论";
 }
 
-export function RunInvestorClient({ runId }: RunInvestorClientProps) {
+export function RunInvestorClient({
+  runId,
+  initialTemplateCode,
+}: RunInvestorClientProps) {
   const utils = api.useUtils();
 
   const runQuery = api.workflow.getRun.useQuery(
@@ -148,7 +152,8 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
   });
 
   const run = runQuery.data;
-  const shellContext = resolveWorkflowShellContext(run?.template.code);
+  const templateCode = run?.template.code ?? initialTemplateCode;
+  const shellContext = resolveWorkflowShellContext(templateCode);
   const screeningHistoryQuery = api.screening.listWorkspaces.useQuery(
     { limit: 8, offset: 0 },
     {
@@ -204,10 +209,11 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
           ? timingHistoryQuery.isLoading
           : workflowHistoryQuery.isLoading;
   const canApprove =
-    run?.template.code === SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE &&
+    run !== undefined &&
+    templateCode === SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE &&
     run.status === "PAUSED";
   const digest = buildResearchDigest({
-    templateCode: run?.template.code,
+    templateCode,
     query: run?.query,
     status: run?.status,
     progressPercent: run?.progressPercent,
@@ -219,7 +225,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
     ? run.result
     : null;
   const companyDetailModel =
-    run?.template.code === COMPANY_RESEARCH_TEMPLATE_CODE
+    templateCode === COMPANY_RESEARCH_TEMPLATE_CODE && run
       ? buildCompanyResearchDetailModel({
           status: run.status,
           result: run.result,
@@ -228,16 +234,17 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
         })
       : null;
   const showCompanyDetailExperience =
-    run?.template.code === COMPANY_RESEARCH_TEMPLATE_CODE &&
+    run !== undefined &&
+    templateCode === COMPANY_RESEARCH_TEMPLATE_CODE &&
     (run.status === "SUCCEEDED" || run.status === "PAUSED") &&
     companyDetailModel !== null;
   const showDigestBanner = shouldShowRunDigestBanner({
-    templateCode: run?.template.code,
+    templateCode,
     status: run?.status,
     hasCompanyDetailModel: companyDetailModel !== null,
   });
   const industryResearchModePills =
-    run?.template.code === INDUSTRY_RESEARCH_TEMPLATE_CODE
+    templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE
       ? getIndustryResearchModePills(run?.result, run?.input)
       : [];
   const timingReportCardIds = extractTimingReportCardIds(run?.result);
@@ -252,9 +259,10 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
     timingReportCardIds,
   });
   const showIndustryConclusion =
-    run?.template.code === INDUSTRY_RESEARCH_TEMPLATE_CODE &&
+    templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE &&
     run?.status === "SUCCEEDED" &&
     industryConclusionModel !== null;
+  const showCompanyShell = templateCode === COMPANY_RESEARCH_TEMPLATE_CODE;
 
   return (
     <WorkspaceShell
@@ -267,11 +275,11 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
           : runId
       }
       historyLoading={historyLoading}
-      title={getTitle(run?.template.code)}
+      title={getTitle(templateCode)}
       description={
         showIndustryConclusion
           ? "把行业研究结论按总览、核心逻辑、证据与可信度、风险与下一步分段阅读。"
-          : "把核心投资结论、证据摘要、风险、下一步动作和可信度分析放在同一页查看。"
+          : undefined
       }
       contentWidth={showIndustryConclusion ? "wide" : "standard"}
       actions={
@@ -315,7 +323,7 @@ export function RunInvestorClient({ runId }: RunInvestorClientProps) {
         </>
       }
       summary={
-        showIndustryConclusion ? undefined : (
+        showIndustryConclusion || showCompanyShell ? undefined : (
           <>
             <KpiCard
               label="状态"

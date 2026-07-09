@@ -14,16 +14,24 @@ import {
 } from "~/app/workflows/workflow-diagram-specs";
 import { WorkflowStateDiagram } from "~/app/workflows/workflow-state-diagram";
 
-function hasResearchOps(result: unknown) {
+function hasVisibleResearchOps(
+  result: unknown,
+  options: {
+    showResearchPlan: boolean;
+    showReflection: boolean;
+  },
+) {
   if (!result || typeof result !== "object" || Array.isArray(result)) {
     return false;
   }
 
   const candidate = result as Record<string, unknown>;
   return (
-    Array.isArray(candidate.researchPlan) ||
+    (options.showResearchPlan && Array.isArray(candidate.researchPlan)) ||
     Array.isArray(candidate.replanRecords) ||
-    (typeof candidate.reflection === "object" && candidate.reflection !== null)
+    (options.showReflection &&
+      typeof candidate.reflection === "object" &&
+      candidate.reflection !== null)
   );
 }
 
@@ -62,15 +70,22 @@ function formatRunStatus(status: string) {
 export function WorkflowAgentStep(props: {
   run: WorkflowDiagramRunDetail | null;
   className?: string;
+  showResearchPlan?: boolean;
+  showReflection?: boolean;
 }) {
-  const { run, className } = props;
+  const {
+    run,
+    className,
+    showResearchPlan = true,
+    showReflection = true,
+  } = props;
 
   if (!run) {
     return (
       <div className={className}>
         <Panel
           title="Agent 状态图"
-          description="当前详情页没有可用的 workflow run 数据。"
+          description="当前详情页没有可用的工作流运行数据。"
         >
           <EmptyState title="暂无 Agent 运行数据" />
         </Panel>
@@ -91,14 +106,11 @@ export function WorkflowAgentStep(props: {
   return (
     <div className={className}>
       <div className="grid gap-6">
-        <Panel
-          title="Agent 状态图"
-          description="显示当前 workflow 的 Agent 拓扑、执行进度和已走过的路径。"
-        >
+        <Panel title="Agent 状态图">
           <WorkflowStateDiagram spec={spec} runtime={runtime} />
         </Panel>
 
-        <Panel title="运行摘要" description="保留详情页内的通用运行状态摘要。">
+        <Panel title="运行摘要">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
               <div className="text-xs text-[var(--app-text-soft)]">状态</div>
@@ -132,8 +144,15 @@ export function WorkflowAgentStep(props: {
           </div>
         </Panel>
 
-        {hasResearchOps(run.result) ? (
-          <ResearchOpsPanels result={run.result} />
+        {hasVisibleResearchOps(run.result, {
+          showResearchPlan,
+          showReflection,
+        }) ? (
+          <ResearchOpsPanels
+            result={run.result}
+            showResearchPlan={showResearchPlan}
+            showReflection={showReflection}
+          />
         ) : null}
       </div>
     </div>

@@ -66,6 +66,8 @@ type ReplanRecord = {
 type ResearchOpsPanelsProps = {
   result: unknown;
   className?: string;
+  showResearchPlan?: boolean;
+  showReflection?: boolean;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -262,19 +264,22 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
   const runs = parseUnitRuns(props.result);
   const reflection = parseReflection(props.result);
   const replans = parseReplans(props.result);
+  const showResearchPlan = props.showResearchPlan ?? true;
+  const showReflection = props.showReflection ?? true;
   const runByUnitId = new Map(runs.map((run) => [run.unitId, run] as const));
 
-  if (plan.length === 0 && !reflection && replans.length === 0) {
+  if (
+    (!showResearchPlan || plan.length === 0) &&
+    (!showReflection || !reflection) &&
+    replans.length === 0
+  ) {
     return null;
   }
 
   return (
     <div className={props.className}>
-      {plan.length > 0 ? (
-        <Panel
-          title="研究计划图谱"
-          description="按依赖深度展示研究单元、角色分工、交付物和回退能力。"
-        >
+      {showResearchPlan && plan.length > 0 ? (
+        <Panel title="研究计划图谱">
           <div className="grid gap-4">
             {planLevels.map((level) => (
               <section
@@ -438,11 +443,8 @@ export function ResearchOpsPanels(props: ResearchOpsPanelsProps) {
         </Panel>
       ) : null}
 
-      {reflection ? (
-        <Panel
-          title="反思摘要"
-          description="软门禁评审结果会保留合同得分、覆盖率和修复建议，但不阻塞最终交付。"
-        >
+      {showReflection && reflection ? (
+        <Panel title="反思摘要">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-[10px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
               <div className="text-xs text-[var(--app-text-soft)]">状态</div>

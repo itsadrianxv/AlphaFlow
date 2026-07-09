@@ -39,27 +39,27 @@ const companyResearchDetailTabs: WorkflowStageTab[] = [
   {
     id: "agent",
     label: "Agent 状态图",
-    summary: "先看 Agent 状态图、运行摘要和研究执行状态。",
+    summary: "",
   },
   {
     id: "summary",
     label: "投资结论",
-    summary: "先看立场、理由、风险和下一步动作。",
+    summary: "",
   },
   {
     id: "concepts",
     label: "业务与概念",
-    summary: "聚焦业务契合点、概念兑现和变现路径。",
+    summary: "",
   },
   {
     id: "questions",
     label: "关键问题",
-    summary: "按研究问题查看答案、置信度和证据预览。",
+    summary: "",
   },
   {
     id: "references",
     label: "引用与来源",
-    summary: "审查证据覆盖、来源类型和引用内容。",
+    summary: "",
   },
 ];
 
@@ -67,12 +67,12 @@ const companyResearchPausedTabs: WorkflowStageTab[] = [
   {
     id: "agent",
     label: "Agent 状态图",
-    summary: "先看 Agent 状态图、运行摘要和研究执行状态。",
+    summary: "",
   },
   {
     id: "paused",
     label: "已暂停",
-    summary: "查看阻塞项和下一步动作，确认如何继续。",
+    summary: "",
   },
 ];
 
@@ -448,6 +448,10 @@ export function buildCompanyResearchDetailModel(params: {
       status: params.status,
       result,
     });
+    const visibleDigest = {
+      ...digest,
+      metrics: digest.metrics.filter((item) => item.label !== "合同得分"),
+    };
 
     return {
       kind: "detail",
@@ -459,7 +463,7 @@ export function buildCompanyResearchDetailModel(params: {
         status: params.status,
         generatedAt: result.generatedAt,
       }),
-      digest,
+      digest: visibleDigest,
       confidenceSummary: findConfidenceSummary(
         extractConfidenceAnalysis(result),
       ),
@@ -558,6 +562,39 @@ function SummaryTab(props: { model: CompanyResearchDetailModel }) {
 
   return (
     <div className="grid gap-6">
+      <div className="grid gap-4 xl:grid-cols-3">
+        <KeyPointList
+          title="看多逻辑"
+          items={props.model.digest.bullPoints.map((item) => (
+            <MarkdownContent key={item} content={item} compact />
+          ))}
+          emptyText="暂无结构化看多逻辑。"
+          tone="success"
+        />
+        <KeyPointList
+          title="风险点"
+          items={props.model.digest.bearPoints.map((item) => (
+            <MarkdownContent key={item} content={item} compact />
+          ))}
+          emptyText="暂无结构化风险提示。"
+          tone="warning"
+        />
+        <KeyPointList
+          title="下一步动作"
+          items={
+            props.model.digest.nextActions.length > 0
+              ? props.model.digest.nextActions.map((item) => (
+                  <MarkdownContent key={item} content={item} compact />
+                ))
+              : props.model.digest.gaps.map((item) => (
+                  <MarkdownContent key={item} content={item} compact />
+                ))
+          }
+          emptyText="暂无后续动作。"
+          tone="info"
+        />
+      </div>
+
       <Panel
         title="结论摘要"
         description={
@@ -573,10 +610,7 @@ function SummaryTab(props: { model: CompanyResearchDetailModel }) {
         <SummaryMetricRow items={props.model.digest.metrics.slice(0, 4)} />
       </Panel>
 
-      <Panel
-        title="可信度摘要"
-        description="保留摘要层，不在主详情页展开逐条断言审核。"
-      >
+      <Panel title="可信度摘要">
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
             <div className="text-xs text-[var(--app-text-soft)]">
@@ -621,39 +655,6 @@ function SummaryTab(props: { model: CompanyResearchDetailModel }) {
           </div>
         ) : null}
       </Panel>
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <KeyPointList
-          title="看多逻辑"
-          items={props.model.digest.bullPoints.map((item) => (
-            <MarkdownContent key={item} content={item} compact />
-          ))}
-          emptyText="暂无结构化看多逻辑。"
-          tone="success"
-        />
-        <KeyPointList
-          title="风险点"
-          items={props.model.digest.bearPoints.map((item) => (
-            <MarkdownContent key={item} content={item} compact />
-          ))}
-          emptyText="暂无结构化风险提示。"
-          tone="warning"
-        />
-        <KeyPointList
-          title="下一步动作"
-          items={
-            props.model.digest.nextActions.length > 0
-              ? props.model.digest.nextActions.map((item) => (
-                  <MarkdownContent key={item} content={item} compact />
-                ))
-              : props.model.digest.gaps.map((item) => (
-                  <MarkdownContent key={item} content={item} compact />
-                ))
-          }
-          emptyText="暂无后续动作。"
-          tone="info"
-        />
-      </div>
     </div>
   );
 }
@@ -880,18 +881,12 @@ function ReferencesTab(props: {
 
   return (
     <div className="grid gap-6">
-      <Panel
-        title="证据覆盖"
-        description="先看本次公司研究用了多少证据，再下钻到具体引用。"
-      >
+      <Panel title="证据覆盖">
         <SummaryMetricRow items={props.model.referenceStats} />
       </Panel>
 
       <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-        <Panel
-          title="来源浏览"
-          description="按来源类型或信源层级切换引用列表。"
-        >
+        <Panel title="来源浏览">
           <div className="flex flex-wrap gap-2">
             {props.model.referenceFilters.map((item) => {
               const active = item.id === props.referenceFilterId;
@@ -936,10 +931,7 @@ function ReferencesTab(props: {
           </div>
         </Panel>
 
-        <Panel
-          title="引用列表"
-          description="展示提取事实、原文片段和来源链接。"
-        >
+        <Panel title="引用列表">
           {filteredReferences.length === 0 ? (
             <EmptyState
               title="当前筛选下暂无引用"
@@ -1012,8 +1004,7 @@ export function CompanyResearchDetailPanels(props: {
 }) {
   const activeTabId =
     props.activeTabId ?? companyResearchDetailTabs[0]?.id ?? "summary";
-  const expandedQuestionId =
-    props.expandedQuestionId ?? props.model.questionCards[0]?.id ?? null;
+  const expandedQuestionId = props.expandedQuestionId ?? null;
   const referenceFilterId = props.referenceFilterId ?? "all";
 
   return (
@@ -1022,7 +1013,13 @@ export function CompanyResearchDetailPanels(props: {
       activeTabId={activeTabId}
       onChange={props.onTabChange}
       panels={{
-        agent: <WorkflowAgentStep run={props.run ?? null} />,
+        agent: (
+          <WorkflowAgentStep
+            run={props.run ?? null}
+            showResearchPlan={false}
+            showReflection={false}
+          />
+        ),
         summary: <SummaryTab model={props.model} />,
         concepts: <ConceptsTab model={props.model} />,
         questions: (
@@ -1052,7 +1049,7 @@ export function CompanyResearchDetailContent(props: {
     companyResearchDetailTabs[0]?.id ?? "summary",
   );
   const [expandedQuestionId, setExpandedQuestionId] = useState<string | null>(
-    props.model.questionCards[0]?.id ?? null,
+    null,
   );
   const [referenceFilterId, setReferenceFilterId] = useState("all");
 
@@ -1064,7 +1061,7 @@ export function CompanyResearchDetailContent(props: {
       return expandedQuestionId;
     }
 
-    return props.model.questionCards[0]?.id ?? null;
+    return null;
   }, [expandedQuestionId, props.model.questionCards]);
 
   return (
@@ -1103,7 +1100,13 @@ export function CompanyResearchPausedFallbackPanel(props: {
         activeTabId={activeTabId}
         onChange={setActiveTabId}
         panels={{
-          agent: <WorkflowAgentStep run={props.run ?? null} />,
+          agent: (
+            <WorkflowAgentStep
+              run={props.run ?? null}
+              showResearchPlan={false}
+              showReflection={false}
+            />
+          ),
           paused: (
             <Panel
               title="已暂停"
