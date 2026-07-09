@@ -472,7 +472,6 @@ export function WorkspaceShell(props: {
     title,
     description,
     actions,
-    showWatchlistsAction = true,
     summary,
     workflowTabs = [],
     historyItems = [],
@@ -519,19 +518,7 @@ export function WorkspaceShell(props: {
       desktopCollapsed ? "true" : "false",
     );
   }, [desktopCollapsed, desktopStateReady]);
-  const shouldShowPageHeader = Boolean(
-    title || description || actions || showWatchlistsAction,
-  );
-  const headerActions = (
-    <>
-      {actions}
-      {showWatchlistsAction ? (
-        <Link href="/research-targets" className="app-button shrink-0">
-          投研收藏
-        </Link>
-      ) : null}
-    </>
-  );
+  const shouldShowPageHeader = Boolean(title || description || actions);
 
   return (
     <main
@@ -633,7 +620,7 @@ export function WorkspaceShell(props: {
             <PageHeader
               title={title}
               description={description}
-              actions={headerActions}
+              actions={actions}
               titleSize={titleSize}
             />
           ) : null}
