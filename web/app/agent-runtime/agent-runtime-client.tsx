@@ -41,6 +41,16 @@ const statusLabel = {
   CANCELLED: "已取消",
 } as const;
 
+const skillCategoryOrder = [
+  "市场与题材",
+  "个股研究",
+  "财报、公告与事件解读",
+  "选股与机会发现",
+  "估值与定价",
+  "交易计划与仓位风控",
+  "盘中监控与复盘",
+] as const;
+
 function buildHistoryItems(
   conversations: RouterOutputs["agentRuntime"]["listConversations"]["items"],
 ): WorkspaceHistoryItem[] {
@@ -307,6 +317,29 @@ export function AgentRuntimeClientPage() {
         .filter((skill): skill is AgentRuntimeSkill => Boolean(skill)),
     [selectedSkillIds, skillsQuery.data?.items],
   );
+  const groupedSkills = useMemo(() => {
+    const skillMap = new Map<string, AgentRuntimeSkill[]>();
+
+    for (const skill of skillsQuery.data?.items ?? []) {
+      const category = skill.category || "个股研究";
+      const group = skillMap.get(category) ?? [];
+      group.push(skill);
+      skillMap.set(category, group);
+    }
+
+    const orderedGroups = skillCategoryOrder
+      .map((category) => ({
+        category,
+        items: skillMap.get(category) ?? [],
+      }))
+      .filter((group) => group.items.length > 0);
+    const orderedCategorySet = new Set<string>(skillCategoryOrder);
+    const extraGroups = [...skillMap.entries()]
+      .filter(([category]) => !orderedCategorySet.has(category))
+      .map(([category, items]) => ({ category, items }));
+
+    return [...orderedGroups, ...extraGroups];
+  }, [skillsQuery.data?.items]);
 
   useEffect(() => {
     if (!skillMenuOpen) {
@@ -474,47 +507,56 @@ export function AgentRuntimeClientPage() {
                   : "pointer-events-none scale-95 opacity-0",
               ].join(" ")}
             >
-              <div className="max-h-[320px] overflow-y-auto py-1">
-                {(skillsQuery.data?.items ?? []).map((skill) => {
-                  const active = selectedSkillIds.includes(skill.id);
+              <div className="max-h-[360px] overflow-y-auto py-1">
+                {groupedSkills.map((group) => (
+                  <div key={group.category} className="py-1">
+                    <div className="px-3 py-1.5 text-xs font-medium text-[var(--app-text-subtle)]">
+                      {group.category}
+                    </div>
+                    <div className="grid gap-0.5">
+                      {group.items.map((skill) => {
+                        const active = selectedSkillIds.includes(skill.id);
 
-                  return (
-                    <button
-                      key={skill.id}
-                      type="button"
-                      role="menuitemcheckbox"
-                      aria-checked={active}
-                      className={[
-                        "grid w-full gap-1 rounded-[10px] px-3 py-2.5 text-left text-sm transition-colors",
-                        active
-                          ? "bg-white text-black"
-                          : "text-[var(--app-text-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
-                      ].join(" ")}
-                      onClick={() => toggleSkill(skill.id)}
-                    >
-                      <span className="flex min-w-0 items-center justify-between gap-3">
-                        <span className="min-w-0 truncate font-medium">
-                          {skill.name}
-                        </span>
-                        {active ? (
-                          <span className="shrink-0 text-xs font-medium">
-                            已选
-                          </span>
-                        ) : null}
-                      </span>
-                      <span
-                        className={[
-                          "line-clamp-2 text-xs leading-5",
-                          active
-                            ? "text-black/68"
-                            : "text-[var(--app-text-subtle)]",
-                        ].join(" ")}
-                      >
-                        {skill.description}
-                      </span>
-                    </button>
-                  );
-                })}
+                        return (
+                          <button
+                            key={skill.id}
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={active}
+                            className={[
+                              "grid w-full gap-1 rounded-[10px] px-3 py-2.5 text-left text-sm transition-colors",
+                              active
+                                ? "bg-white text-black"
+                                : "text-[var(--app-text-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
+                            ].join(" ")}
+                            onClick={() => toggleSkill(skill.id)}
+                          >
+                            <span className="flex min-w-0 items-center justify-between gap-3">
+                              <span className="min-w-0 truncate font-medium">
+                                {skill.name}
+                              </span>
+                              {active ? (
+                                <span className="shrink-0 text-xs font-medium">
+                                  已选
+                                </span>
+                              ) : null}
+                            </span>
+                            <span
+                              className={[
+                                "line-clamp-2 text-xs leading-5",
+                                active
+                                  ? "text-black/68"
+                                  : "text-[var(--app-text-subtle)]",
+                              ].join(" ")}
+                            >
+                              {skill.description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
               {skillSelectionError ? (
                 <div className="border-t border-[var(--app-border-soft)] px-3 py-2 text-xs text-[var(--app-danger)]">

@@ -33,6 +33,7 @@ export type SkillSummary = {
   id: string;
   name: string;
   description: string;
+  category: string;
   type: "prompt" | "tool";
   permissions: string[];
 };

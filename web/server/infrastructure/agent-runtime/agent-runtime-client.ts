@@ -9,6 +9,7 @@ const agentRuntimeSkillSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string(),
+  category: z.string().default("个股研究"),
   type: z.enum(["prompt", "tool"]),
   permissions: z.array(z.string()),
 });

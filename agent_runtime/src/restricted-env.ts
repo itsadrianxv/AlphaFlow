@@ -20,6 +20,10 @@ function isInside(candidate: string, root: string) {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+function toEnvPath(inputPath: string) {
+  return inputPath.replace(/\\/g, "/");
+}
+
 function toFileInfo(filePath: string, stats: { isFile(): boolean; isDirectory(): boolean; isSymbolicLink(): boolean; size: number; mtimeMs: number }): FileInfo {
   const kind = stats.isSymbolicLink()
     ? "symlink"
@@ -29,7 +33,7 @@ function toFileInfo(filePath: string, stats: { isFile(): boolean; isDirectory():
 
   return {
     name: path.basename(filePath),
-    path: filePath,
+    path: toEnvPath(filePath),
     kind,
     size: stats.size,
     mtimeMs: stats.mtimeMs,
