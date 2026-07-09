@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
-import React, { type ReactNode, useState } from "react";
+import React, { useState } from "react";
 
 import { MarkdownContent } from "~/app/_components/markdown-content";
-import { StatusPill } from "~/app/_components/ui";
+import { Panel, StatusPill } from "~/app/_components/ui";
+import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import type {
   IndustryConclusionSectionId,
   IndustryConclusionViewModel,
@@ -30,28 +31,6 @@ function toneClasses(tone: string) {
     return "border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] text-[var(--app-danger)]";
   }
   return "border-[var(--app-info-border)] bg-[var(--app-info-surface)] text-[var(--app-text-strong)]";
-}
-
-function SectionHeading(props: { title: string; description?: ReactNode }) {
-  return (
-    <div className="border-b border-[var(--app-border-soft)] pb-4">
-      <h3 className="font-[family-name:var(--font-heading)] text-[22px] leading-none text-[var(--app-text-strong)]">
-        {props.title}
-      </h3>
-      {props.description ? (
-        typeof props.description === "string" ||
-        typeof props.description === "number" ? (
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--app-text-muted)]">
-            {props.description}
-          </p>
-        ) : (
-          <div className="mt-3 max-w-3xl text-sm leading-7 text-[var(--app-text-muted)]">
-            {props.description}
-          </div>
-        )
-      ) : null}
-    </div>
-  );
 }
 
 function DetailList(props: { items: string[]; emptyText: string }) {
@@ -97,53 +76,136 @@ function ActionLinks(props: { model: IndustryConclusionViewModel }) {
   );
 }
 
+function NoticeList(props: { model: IndustryConclusionViewModel }) {
+  if (props.model.notices.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="grid gap-3">
+      {props.model.notices.map((notice, index) => (
+        <div
+          key={`${notice.title}-${index + 1}`}
+          className={`rounded-[12px] border px-4 py-3 ${toneClasses(notice.tone)}`}
+        >
+          <div className="text-sm font-medium text-[var(--app-text-strong)]">
+            {notice.title}
+          </div>
+          <MarkdownContent
+            content={notice.description}
+            compact
+            className="mt-2"
+          />
+          {notice.actions.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {notice.actions.map((action) => (
+                <Link
+                  key={`${action.label}-${action.href}`}
+                  href={action.href}
+                  className="app-button"
+                >
+                  {action.label}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MetricStrip(props: { model: IndustryConclusionViewModel }) {
+  return (
+    <dl className="grid overflow-hidden rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] sm:grid-cols-2 xl:grid-cols-5">
+      {props.model.metricStrip.map((metric, index) => (
+        <div
+          key={`${metric.label}-${metric.value}`}
+          className={`px-4 py-4 ${index > 0 ? "border-t border-[var(--app-border-soft)] sm:border-t-0 sm:border-l" : ""}`}
+        >
+          <dt className="text-xs text-[var(--app-text-subtle)]">
+            {metric.label}
+          </dt>
+          <dd className="app-data mt-2 text-[28px] leading-none text-[var(--app-text-strong)]">
+            {metric.value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function OverviewSection(props: { model: IndustryConclusionViewModel }) {
   return (
-    <div className="grid gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(260px,0.8fr)]">
-      <section className="grid gap-5">
-        <SectionHeading
-          title="本轮结论"
-          description={
-            <MarkdownContent content={props.model.summary} compact />
-          }
-        />
+    <div className="grid gap-6">
+      <Panel title="摘要总览" surface="inset">
+        <div className="grid gap-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill
+              label={props.model.verdictLabel}
+              tone={props.model.verdictTone}
+            />
+            <StatusPill label={props.model.statusLabel} tone="info" />
+            <StatusPill
+              label={`生成于 ${props.model.generatedAtLabel}`}
+              tone="neutral"
+            />
+            {props.model.modePills.map((item) => (
+              <StatusPill key={item} label={item} tone="info" />
+            ))}
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+            <div className="min-w-0">
+              <div className="text-sm text-[var(--app-text-muted)]">
+                {props.model.query || "行业研究结论"}
+              </div>
+              <h2 className="mt-2 font-[family-name:var(--font-heading)] text-[30px] leading-tight text-[var(--app-text-strong)] sm:text-[36px]">
+                {props.model.headline}
+              </h2>
+              <MarkdownContent
+                content={props.model.summary}
+                className="mt-4 max-w-4xl sm:text-base"
+              />
+            </div>
+            <div className="xl:justify-self-end">
+              <ActionLinks model={props.model} />
+            </div>
+          </div>
+
+          <MetricStrip model={props.model} />
+          <NoticeList model={props.model} />
+        </div>
+      </Panel>
+
+      <Panel title="摘要要点" surface="inset">
         <DetailList
           items={props.model.overviewPoints}
           emptyText="暂无额外摘要。"
         />
-      </section>
-      <section className="grid content-start gap-5 border-t border-[var(--app-border-soft)] pt-5 xl:border-t-0 xl:border-l xl:pl-6 xl:pt-0">
-        <SectionHeading title="下一步" />
-        <ActionLinks model={props.model} />
-      </section>
+      </Panel>
     </div>
   );
 }
 
 function LogicSection(props: { model: IndustryConclusionViewModel }) {
   return (
-    <div className="grid gap-8">
-      <section className="grid gap-5">
-        <SectionHeading
-          title="行业驱动"
-          description="先讲行业变化、兑现路径和竞争格局，再落到具体标的。"
-        />
+    <div className="grid gap-6">
+      <Panel title="行业驱动" surface="inset">
         <DetailList
           items={props.model.logic.industryDrivers}
           emptyText="暂无结构化行业驱动。"
         />
-      </section>
+      </Panel>
 
-      <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="竞争格局" />
+      <Panel title="竞争格局" surface="inset">
         <MarkdownContent
           content={props.model.logic.competitionSummary}
           compact
         />
-      </section>
+      </Panel>
 
-      <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="重点标的" />
+      <Panel title="重点标的" surface="inset">
         {props.model.logic.topPicks.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
             暂无重点标的。
@@ -177,46 +239,36 @@ function LogicSection(props: { model: IndustryConclusionViewModel }) {
             ))}
           </div>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }
 
 function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
   return (
-    <div className="grid gap-8">
-      <section className="grid gap-5">
-        <SectionHeading
-          title="证据校验"
-          description="先看支持/不足/冲突和覆盖率，再按需下看断言与研究单元。"
-        />
-        <dl className="grid overflow-hidden rounded-[14px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-6">
+      <Panel title="证据校验" surface="inset">
+        <dl className="grid overflow-hidden rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] sm:grid-cols-2 xl:grid-cols-4">
           <div className="border-b border-[var(--app-border-soft)] px-4 py-4 xl:border-r xl:border-b-0">
-            <dt className="text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-              可信度
-            </dt>
+            <dt className="text-xs text-[var(--app-text-subtle)]">可信度</dt>
             <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.scoreLabel}
             </dd>
           </div>
           <div className="border-b border-[var(--app-border-soft)] px-4 py-4 sm:border-l xl:border-r xl:border-b-0">
-            <dt className="text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-              等级
-            </dt>
+            <dt className="text-xs text-[var(--app-text-subtle)]">等级</dt>
             <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.levelLabel}
             </dd>
           </div>
           <div className="border-b border-[var(--app-border-soft)] px-4 py-4 xl:border-r xl:border-b-0">
-            <dt className="text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-              覆盖率
-            </dt>
+            <dt className="text-xs text-[var(--app-text-subtle)]">覆盖率</dt>
             <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.coverageLabel}
             </dd>
           </div>
           <div className="px-4 py-4 sm:border-l xl:border-l-0">
-            <dt className="text-[11px] uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
+            <dt className="text-xs text-[var(--app-text-subtle)]">
               支持/不足/冲突
             </dt>
             <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
@@ -224,42 +276,38 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
             </dd>
           </div>
         </dl>
-      </section>
+      </Panel>
 
-      <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="可信度说明" />
+      <Panel title="可信度说明" surface="inset">
         <DetailList
           items={props.model.evidence.notes}
           emptyText="暂无可信度说明。"
         />
-      </section>
+      </Panel>
 
       {props.model.evidence.qualityFlags.length > 0 ||
       props.model.evidence.missingRequirements.length > 0 ? (
-        <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6 xl:grid-cols-2">
-          <div className="grid gap-4">
-            <SectionHeading title="质量标记" />
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Panel title="质量标记" surface="inset">
             <DetailList
               items={props.model.evidence.qualityFlags.map((item) =>
                 formatRuntimeIssueLabel(item),
               )}
               emptyText="暂无质量标记。"
             />
-          </div>
-          <div className="grid gap-4">
-            <SectionHeading title="待补要求" />
+          </Panel>
+          <Panel title="待补要求" surface="inset">
             <DetailList
               items={props.model.evidence.missingRequirements.map((item) =>
                 formatRuntimeIssueLabel(item),
               )}
               emptyText="暂无待补要求。"
             />
-          </div>
-        </section>
+          </Panel>
+        </div>
       ) : null}
 
-      <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="结论断言" />
+      <Panel title="结论断言" surface="inset">
         {props.model.evidence.claims.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
             暂无结构化断言。
@@ -289,10 +337,9 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
             ))}
           </div>
         )}
-      </section>
+      </Panel>
 
-      <section className="grid gap-4 border-t border-[var(--app-border-soft)] pt-6">
-        <SectionHeading title="研究单元摘要" />
+      <Panel title="研究单元摘要" surface="inset">
         {props.model.evidence.researchPlan.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
             暂无研究单元记录。
@@ -320,55 +367,57 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
             ))}
           </div>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }
 
 function RisksSection(props: { model: IndustryConclusionViewModel }) {
   return (
-    <div className="grid gap-8">
-      <section className="grid gap-5">
-        <SectionHeading
-          title="风险判断"
-          description={
-            <MarkdownContent content={props.model.risks.summary} compact />
-          }
-        />
+    <div className="grid gap-6">
+      <Panel
+        title="风险判断"
+        surface="inset"
+        description={
+          <MarkdownContent content={props.model.risks.summary} compact />
+        }
+      >
         <div className="grid gap-6 xl:grid-cols-2">
-          <div className="grid gap-4">
-            <SectionHeading title="缺口" />
+          <div>
+            <div className="mb-3 text-sm font-medium text-[var(--app-text-strong)]">
+              缺口
+            </div>
             <DetailList
               items={props.model.risks.missingAreas}
               emptyText="暂无结构化缺口。"
             />
           </div>
-          <div className="grid gap-4">
-            <SectionHeading title="风险信号" />
+          <div>
+            <div className="mb-3 text-sm font-medium text-[var(--app-text-strong)]">
+              风险信号
+            </div>
             <DetailList
               items={props.model.risks.riskSignals}
               emptyText="暂无额外风险信号。"
             />
           </div>
         </div>
-      </section>
+      </Panel>
 
-      <section className="grid gap-6 border-t border-[var(--app-border-soft)] pt-6 xl:grid-cols-2">
-        <div className="grid gap-4">
-          <SectionHeading title="待回答问题" />
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Panel title="待回答问题" surface="inset">
           <DetailList
             items={props.model.risks.unansweredQuestions}
             emptyText="暂无待回答问题。"
           />
-        </div>
-        <div className="grid gap-4">
-          <SectionHeading title="下一步动作" />
+        </Panel>
+        <Panel title="下一步动作" surface="inset">
           <DetailList
             items={props.model.risks.nextActions}
             emptyText="暂无后续动作。"
           />
-        </div>
-      </section>
+        </Panel>
+      </div>
     </div>
   );
 }
@@ -384,132 +433,24 @@ export function IndustryConclusionDetail(props: {
     );
 
   return (
-    <article
+    <div
       data-industry-conclusion-detail="true"
       data-active-section={activeSectionId}
-      className="overflow-hidden rounded-[16px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] shadow-[var(--app-shadow-sm)]"
+      className="grid gap-6"
     >
-      <div className="border-b border-[var(--app-border-soft)] px-5 py-6 sm:px-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusPill label={model.verdictLabel} tone={model.verdictTone} />
-          <StatusPill label={model.statusLabel} tone="info" />
-          <StatusPill
-            label={`生成于 ${model.generatedAtLabel}`}
-            tone="neutral"
-          />
-          {model.modePills.map((item) => (
-            <StatusPill key={item} label={item} tone="info" />
-          ))}
-        </div>
-
-        <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--app-text-subtle)]">
-              {model.query || "行业研究结论"}
-            </div>
-            <h2 className="mt-3 font-[family-name:var(--font-heading)] text-[34px] leading-[0.96] text-[var(--app-text-strong)] sm:text-[42px]">
-              {model.headline}
-            </h2>
-            <MarkdownContent
-              content={model.summary}
-              className="mt-4 max-w-4xl sm:text-base"
-            />
-          </div>
-          <div className="xl:justify-self-end">
-            <ActionLinks model={model} />
-          </div>
-        </div>
-      </div>
-
-      {model.notices.length > 0 ? (
-        <div className="overflow-hidden border-b border-[var(--app-border-soft)]">
-          {model.notices.map((notice, index) => (
-            <div
-              key={`${notice.title}-${index + 1}`}
-              className={`px-5 py-4 sm:px-6 ${toneClasses(notice.tone)} ${index > 0 ? "border-t border-[var(--app-border-soft)]" : ""}`}
-            >
-              <div className="text-sm font-medium text-[var(--app-text-strong)]">
-                {notice.title}
-              </div>
-              <MarkdownContent
-                content={notice.description}
-                compact
-                className="mt-2"
-              />
-              {notice.actions.length > 0 ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {notice.actions.map((action) => (
-                    <Link
-                      key={`${action.label}-${action.href}`}
-                      href={action.href}
-                      className="app-button"
-                    >
-                      {action.label}
-                    </Link>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
-
-      <dl className="grid overflow-hidden border-b border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] sm:grid-cols-2 xl:grid-cols-5">
-        {model.metricStrip.map((metric, index) => (
-          <div
-            key={`${metric.label}-${metric.value}`}
-            className={`px-5 py-4 sm:px-6 ${index > 0 ? "border-t border-[var(--app-border-soft)] sm:border-t-0" : ""} xl:border-l xl:border-[var(--app-border-soft)]`}
-          >
-            <dt className="text-[11px] uppercase tracking-[0.16em] text-[var(--app-text-subtle)]">
-              {metric.label}
-            </dt>
-            <dd className="app-data mt-3 text-[28px] leading-none text-[var(--app-text-strong)]">
-              {metric.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-
-      <div className="grid gap-px overflow-hidden border-b border-[var(--app-border-soft)] bg-[var(--app-border-soft)] sm:grid-cols-2 xl:grid-cols-4">
-        {model.sections.map((section, index) => {
-          const active = section.id === activeSectionId;
-
-          return (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => setActiveSectionId(section.id)}
-              className={`min-h-[112px] bg-[var(--app-surface)] px-5 py-4 text-left transition-colors sm:px-6 ${
-                active
-                  ? "bg-[var(--app-surface-strong)] text-[var(--app-text-strong)]"
-                  : "text-[var(--app-text-muted)] hover:bg-[var(--app-bg-raised)] hover:text-[var(--app-text-strong)]"
-              }`}
-            >
-              <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--app-text-subtle)]">
-                步骤 {String(index + 1).padStart(2, "0")}
-              </span>
-              <span className="mt-3 block font-[family-name:var(--font-heading)] text-[24px] leading-none">
-                {section.label}
-              </span>
-              <span className="mt-3 block text-sm leading-6">
-                {section.summary}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="px-5 py-6 sm:px-6">
-        {activeSectionId === "overview" ? (
-          <OverviewSection model={model} />
-        ) : activeSectionId === "logic" ? (
-          <LogicSection model={model} />
-        ) : activeSectionId === "evidence" ? (
-          <EvidenceSection model={model} />
-        ) : (
-          <RisksSection model={model} />
-        )}
-      </div>
-    </article>
+      <WorkflowStageSwitcher
+        tabs={model.sections}
+        activeTabId={activeSectionId}
+        onChange={(sectionId) =>
+          setActiveSectionId(sectionId as IndustryConclusionSectionId)
+        }
+        panels={{
+          overview: <OverviewSection model={model} />,
+          logic: <LogicSection model={model} />,
+          evidence: <EvidenceSection model={model} />,
+          risks: <RisksSection model={model} />,
+        }}
+      />
+    </div>
   );
 }

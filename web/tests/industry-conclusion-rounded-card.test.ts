@@ -1,20 +1,23 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("IndustryConclusionDetail rounded card style", () => {
+describe("IndustryConclusionDetail report layout", () => {
   const source = readFileSync(
     "app/workflows/[runId]/industry-conclusion-detail.tsx",
     "utf8",
   );
 
-  it("renders the conclusion detail inside a rounded card", () => {
+  it("uses the shared four-step report switcher", () => {
     expect(source).toContain('data-industry-conclusion-detail="true"');
-    expect(source).toContain("rounded-[16px]");
-    expect(source).toContain("shadow-[var(--app-shadow-sm)]");
+    expect(source).toContain("<WorkflowStageSwitcher");
+    expect(source).toContain("tabs={model.sections}");
+    expect(source).toContain("overview: <OverviewSection model={model} />");
   });
 
-  it("rounds and clips nested metric and navigation regions", () => {
-    expect(source).toContain("overflow-hidden rounded-[14px]");
-    expect(source).toContain("grid overflow-hidden border-b");
+  it("keeps report summary and metrics inside the overview section", () => {
+    expect(source).toContain('title="摘要总览"');
+    expect(source).toContain("<MetricStrip model={props.model} />");
+    expect(source).toContain("<NoticeList model={props.model} />");
+    expect(source).toContain("props.model.headline");
   });
 });
