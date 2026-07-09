@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
@@ -53,6 +53,7 @@ type ColumnQuickFilterDraft = {
   value: string;
   valueType: WorkspaceFilterRule["valueType"];
 };
+type SnapshotSaveTargetMode = "company" | "industry";
 
 type NoticeState = {
   tone: "info" | "success" | "error";
@@ -115,7 +116,6 @@ function parseDelimitedCsv(value: string | null) {
 }
 
 export function ScreeningStudioClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const workspaceIdFromUrl = searchParams.get("workspaceId");
   const seedStockCodesFromUrl = parseDelimitedCsv(
@@ -157,6 +157,12 @@ export function ScreeningStudioClient() {
   );
   const [snapshotTargetRef, setSnapshotTargetRef] =
     useState<ResearchTargetRef | null>(null);
+  const [snapshotSaveTargetMode, setSnapshotSaveTargetMode] =
+    useState<SnapshotSaveTargetMode | null>(null);
+  const [shouldSaveFinancialSnapshot, setShouldSaveFinancialSnapshot] =
+    useState(true);
+  const [shouldGenerateComparisonReport, setShouldGenerateComparisonReport] =
+    useState(false);
   const [selectedSnapshotStockCodes, setSelectedSnapshotStockCodes] = useState<
     string[]
   >([]);
@@ -393,11 +399,9 @@ export function ScreeningStudioClient() {
     });
   const generateComparisonArtifactMutation =
     api.researchTarget.generateComparisonArtifact.useMutation({
-      onSuccess: async (artifact) => {
+      onSuccess: async () => {
         setNotice({ tone: "success", text: "比较报告已生成" });
         await utils.researchTarget.listArtifacts.invalidate();
-        const target = `${artifact.targetRef.type}:${artifact.targetRef.id}`;
-        router.push(`/research-targets?target=${encodeURIComponent(target)}`);
       },
       onError: (error) => setNotice({ tone: "error", text: error.message }),
     });
@@ -875,8 +879,8 @@ export function ScreeningStudioClient() {
     });
   }
 
-  function buildSelectedFinancialSnapshot() {
-    if (!resultSnapshot || !snapshotTargetRef) {
+  function buildSelectedFinancialSnapshot(targetRef: ResearchTargetRef | null) {
+    if (!resultSnapshot || !targetRef) {
       return null;
     }
 
@@ -892,7 +896,7 @@ export function ScreeningStudioClient() {
     };
 
     return {
-      targetRef: snapshotTargetRef,
+      targetRef,
       companyRefs: selectedLatestSnapshotRows.map((row) => ({
         stockCode: row.stockCode,
         stockName: row.stockName,
@@ -912,26 +916,41 @@ export function ScreeningStudioClient() {
     };
   }
 
-  async function handleSaveFinancialSnapshot() {
-    const payload = buildSelectedFinancialSnapshot();
-    if (!payload) {
-      setNotice({ tone: "error", text: "请先选择归档目标和股票行" });
-      return null;
-    }
-
-    return await createFinancialSnapshotMutation.mutateAsync(payload);
-  }
-
-  async function handleGenerateComparisonReport() {
-    const snapshot = await handleSaveFinancialSnapshot();
-    if (!snapshot) {
+  async function handleSaveSelectedRowsToTarget() {
+    if (!snapshotTargetRef) {
+      setNotice({ tone: "error", text: "请先选择公司或行业收藏" });
       return;
     }
 
-    await generateComparisonArtifactMutation.mutateAsync({
-      financialSnapshotId: snapshot.id,
-      title: `${workspaceName || "筛选结果"} - 财务比较报告`,
+    if (!shouldSaveFinancialSnapshot && !shouldGenerateComparisonReport) {
+      setNotice({ tone: "error", text: "请至少选择保存快照或生成比较报告" });
+      return;
+    }
+
+    const payload = buildSelectedFinancialSnapshot(snapshotTargetRef);
+    if (!payload) {
+      setNotice({ tone: "error", text: "请先选择要保存的结果行" });
+      return;
+    }
+
+    const snapshot = await createFinancialSnapshotMutation.mutateAsync(payload);
+
+    if (shouldGenerateComparisonReport) {
+      await generateComparisonArtifactMutation.mutateAsync({
+        financialSnapshotId: snapshot.id,
+        title: `${workspaceName || "筛选结果"} - 财务比较报告`,
+      });
+    }
+
+    setNotice({
+      tone: "success",
+      text: shouldGenerateComparisonReport
+        ? shouldSaveFinancialSnapshot
+          ? "快照已保存，比较报告已生成"
+          : "比较报告已生成"
+        : "快照已保存",
     });
+    setSnapshotSaveTargetMode(null);
   }
 
   async function handleSaveFormula() {
@@ -1702,62 +1721,127 @@ export function ScreeningStudioClient() {
                   />
                 ))}
               </div>
-              <div className="mt-4 rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4">
-                <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto]">
-                  <ResearchTargetPicker
-                    label="财务快照归档目标"
-                    value={snapshotTargetRef}
-                    onChange={setSnapshotTargetRef}
-                    allowedTypes={["company", "industry", "watchlist", "space"]}
-                    compact
-                  />
-                  <div className="flex flex-wrap items-end gap-2">
-                    <button
-                      type="button"
-                      className="app-button"
-                      onClick={toggleAllVisibleSnapshotStocks}
-                      disabled={visibleRows.length === 0}
-                    >
-                      {visibleRows.length > 0 &&
-                      visibleRows.every((row) =>
-                        selectedSnapshotStockCodes.includes(row.stockCode),
-                      )
-                        ? "取消全选"
-                        : "选择当前结果"}
-                    </button>
-                    <button
-                      type="button"
-                      className="app-button app-button-primary"
-                      disabled={
-                        !snapshotTargetRef ||
-                        selectedSnapshotRows.length === 0 ||
-                        createFinancialSnapshotMutation.isPending
-                      }
-                      onClick={() => void handleSaveFinancialSnapshot()}
-                    >
-                      保存快照
-                    </button>
-                    <button
-                      type="button"
-                      className="app-button app-button-success"
-                      disabled={
-                        !snapshotTargetRef ||
-                        selectedSnapshotRows.length === 0 ||
-                        createFinancialSnapshotMutation.isPending ||
-                        generateComparisonArtifactMutation.isPending
-                      }
-                      onClick={() => void handleGenerateComparisonReport()}
-                    >
-                      生成比较报告
-                    </button>
+              {selectedSnapshotRows.length > 0 ? (
+                <div className="fixed right-4 bottom-4 left-4 z-40 mx-auto grid max-w-4xl gap-2 md:left-auto">
+                  {snapshotSaveTargetMode ? (
+                    <div className="justify-self-end rounded-[12px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-3 shadow-[var(--app-shadow-lg)] md:w-[520px]">
+                      <ResearchTargetPicker
+                        label={
+                          snapshotSaveTargetMode === "company"
+                            ? "选择或创建公司收藏"
+                            : "选择或创建行业收藏"
+                        }
+                        value={snapshotTargetRef}
+                        onChange={setSnapshotTargetRef}
+                        allowedTypes={[snapshotSaveTargetMode]}
+                        compact
+                      />
+                      <div className="mt-3 grid gap-2 rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-3 text-sm text-[var(--app-text-muted)]">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={shouldSaveFinancialSnapshot}
+                            onChange={(event) =>
+                              setShouldSaveFinancialSnapshot(
+                                event.target.checked,
+                              )
+                            }
+                          />
+                          保存快照
+                        </label>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={shouldGenerateComparisonReport}
+                            onChange={(event) =>
+                              setShouldGenerateComparisonReport(
+                                event.target.checked,
+                              )
+                            }
+                          />
+                          生成比较报告
+                        </label>
+                      </div>
+                      <div className="mt-3 flex flex-wrap justify-end gap-2">
+                        <button
+                          type="button"
+                          className="app-button"
+                          onClick={() => setSnapshotSaveTargetMode(null)}
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          className="app-button app-button-primary"
+                          disabled={
+                            !snapshotTargetRef ||
+                            (!shouldSaveFinancialSnapshot &&
+                              !shouldGenerateComparisonReport) ||
+                            createFinancialSnapshotMutation.isPending ||
+                            generateComparisonArtifactMutation.isPending
+                          }
+                          onClick={() => void handleSaveSelectedRowsToTarget()}
+                        >
+                          {createFinancialSnapshotMutation.isPending ||
+                          generateComparisonArtifactMutation.isPending
+                            ? "处理中"
+                            : "确认保存"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="justify-self-end rounded-[12px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-2 shadow-[var(--app-shadow-lg)]">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="px-2 text-sm text-[var(--app-text-muted)]">
+                        已选择 {selectedSnapshotRows.length} 行
+                      </span>
+                      <button
+                        type="button"
+                        className="app-button"
+                        onClick={toggleAllVisibleSnapshotStocks}
+                      >
+                        {visibleRows.length > 0 &&
+                        visibleRows.every((row) =>
+                          selectedSnapshotStockCodes.includes(row.stockCode),
+                        )
+                          ? "取消全选"
+                          : "全选"}
+                      </button>
+                      <button
+                        type="button"
+                        className="app-button"
+                        onClick={() => setSelectedSnapshotStockCodes([])}
+                      >
+                        清除选择
+                      </button>
+                      <button
+                        type="button"
+                        className="app-button app-button-primary"
+                        onClick={() => {
+                          setSnapshotTargetRef((current) =>
+                            current?.type === "company" ? current : null,
+                          );
+                          setSnapshotSaveTargetMode("company");
+                        }}
+                      >
+                        保存到公司收藏
+                      </button>
+                      <button
+                        type="button"
+                        className="app-button app-button-success"
+                        onClick={() => {
+                          setSnapshotTargetRef((current) =>
+                            current?.type === "industry" ? current : null,
+                          );
+                          setSnapshotSaveTargetMode("industry");
+                        }}
+                      >
+                        保存到行业收藏
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <p className="mt-3 text-sm text-[var(--app-text-muted)]">
-                  已选择 {selectedSnapshotRows.length}{" "}
-                  家公司。单家公司可以保存为公司快照，多家公司适合挂到行业、自选股或
-                  Space。
-                </p>
-              </div>
+              ) : null}
               <details
                 className="mt-4 rounded-[12px] border border-[var(--app-border-soft)] p-4"
                 open={
