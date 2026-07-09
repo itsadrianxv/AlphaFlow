@@ -2,15 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import {
-  InlineNotice,
-  Panel,
-  StatusPill,
-  WorkspaceShell,
-} from "~/app/_components/ui";
+import { InlineNotice, Panel, WorkspaceShell } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-history";
 import { companyResearchStageTabs } from "~/app/company-research/company-research-stage-tabs";
+import { WorkflowVisualizationPanel } from "~/app/workflows/workflow-visualization-panel";
 import { COMPANY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { api } from "~/trpc/react";
 
@@ -30,24 +26,6 @@ function normalizeUrlInput(value: string) {
 
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
-
-const starterCases = [
-  {
-    companyName: "英伟达",
-    focusConcepts: "AI 服务器\n数据中心网络\n软件生态",
-    keyQuestion: "过去几个季度里，真正驱动利润率抬升的业务环节有哪些？",
-  },
-  {
-    companyName: "特斯拉",
-    focusConcepts: "储能\n自动驾驶\n机器人",
-    keyQuestion: "当前新业务增长是订单先行，还是利润已经开始兑现？",
-  },
-  {
-    companyName: "药明康德",
-    focusConcepts: "ADC\n多肽\n海外产能",
-    keyQuestion: "新业务增长背后，哪些指标能够证明需求与利润同步兑现？",
-  },
-];
 
 const stageCanvasClassName =
   "min-h-[calc(100vh-17rem)] xl:min-h-[calc(100vh-15rem)]";
@@ -160,30 +138,36 @@ export function CompanyResearchClient() {
   };
 
   const targetPanel = (
-    <Panel className={targetCanvasClassName} title="研究目标">
-      <div className="grid gap-4">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
-          <input
-            value={companyName}
-            onChange={(event) => setCompanyName(event.target.value)}
-            placeholder="公司名称，例如：英伟达"
-            className="app-input"
-          />
-          <input
-            value={stockCode}
-            onChange={(event) => setStockCode(event.target.value)}
-            placeholder="股票代码，可选"
-            className="app-input"
+    <>
+      <Panel className={targetCanvasClassName} title="研究目标">
+        <div className="grid gap-4">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
+            <input
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
+              placeholder="公司名称，例如：英伟达"
+              className="app-input"
+            />
+            <input
+              value={stockCode}
+              onChange={(event) => setStockCode(event.target.value)}
+              placeholder="股票代码，可选"
+              className="app-input"
+            />
+          </div>
+          <textarea
+            value={keyQuestion}
+            onChange={(event) => setKeyQuestion(event.target.value)}
+            placeholder="最想优先确认的问题，例如：过去几个季度里，真正驱动利润率上行的业务环节有哪些？"
+            className="app-textarea min-h-[120px]"
           />
         </div>
-        <textarea
-          value={keyQuestion}
-          onChange={(event) => setKeyQuestion(event.target.value)}
-          placeholder="最想优先确认的问题，例如：过去几个季度里，真正驱动利润率上行的业务环节有哪些？"
-          className="app-textarea min-h-[120px]"
-        />
-      </div>
-    </Panel>
+      </Panel>
+      <WorkflowVisualizationPanel
+        templateCode={COMPANY_RESEARCH_TEMPLATE_CODE}
+        title="公司判断 Agent 状态图"
+      />
+    </>
   );
 
   const sourcesPanel = (
@@ -251,37 +235,8 @@ export function CompanyResearchClient() {
     </Panel>
   );
 
-  const starterPanel = (
-    <Panel className={stageCanvasClassName} title="快速样例">
-      <div className="grid gap-3">
-        {starterCases.map((item) => (
-          <button
-            key={item.companyName}
-            type="button"
-            onClick={() => {
-              setCompanyName(item.companyName);
-              setFocusConcepts(item.focusConcepts);
-              setKeyQuestion(item.keyQuestion);
-            }}
-            className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-4 py-3 text-left transition-colors hover:border-[var(--app-flame)]"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-[var(--app-text-strong)]">
-                {item.companyName}
-              </p>
-              <StatusPill label="概念拆解" tone="info" />
-            </div>
-            <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
-              {item.keyQuestion}
-            </p>
-          </button>
-        ))}
-      </div>
-    </Panel>
-  );
-
   const launchPanel = (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.16fr)_minmax(360px,0.84fr)]">
+    <div className="grid gap-6">
       <Panel
         className={stageCanvasClassName}
         title="发起执行"
@@ -345,8 +300,6 @@ export function CompanyResearchClient() {
           ) : null}
         </div>
       </Panel>
-
-      {starterPanel}
     </div>
   );
 
