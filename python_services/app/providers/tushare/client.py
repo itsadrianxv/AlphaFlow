@@ -163,9 +163,14 @@ class TushareProviderClient:
         )
         return pd.DataFrame([asdict(bar) for bar in bars])
 
-    def get_theme_candidates(self, theme: str, limit: int) -> list[dict]:
+    def get_theme_candidates(
+        self,
+        theme: str,
+        limit: int,
+        concept_hints: list[dict] | None = None,
+    ) -> list[dict]:
         normalized_limit = max(1, min(limit, 30))
-        concepts = self._select_concepts(theme=theme, limit=3)
+        concepts = self._select_concepts(theme=theme, limit=3, concept_hints=concept_hints)
         candidates_by_code: dict[str, dict[str, Any]] = {}
         snapshot_map = self._load_snapshot_map(allow_empty=True)
 
@@ -202,9 +207,6 @@ class TushareProviderClient:
                 if not existing or item["heat"] > existing["heat"]:
                     candidates_by_code[stock_code] = item
 
-        if not candidates_by_code:
-            candidates_by_code = self._build_candidates_from_snapshot(theme, normalized_limit)
-
         return sorted(candidates_by_code.values(), key=lambda item: item["heat"], reverse=True)[
             :normalized_limit
         ]
@@ -212,11 +214,22 @@ class TushareProviderClient:
     def get_theme_news(self, theme: str, days: int, limit: int) -> list[dict]:
         return []
 
-    def get_theme_concepts(self, theme: str, limit: int) -> dict:
-        concepts = self._select_concepts(theme=theme, limit=limit)
+    def get_theme_concepts(
+        self,
+        theme: str,
+        limit: int,
+        concept_hints: list[dict] | None = None,
+    ) -> dict:
+        concepts = self._select_concepts(theme=theme, limit=limit, concept_hints=concept_hints)
         return {
             "theme": theme.strip(),
-            "matchedBy": "whitelist" if _RULES_REGISTRY.get_rules(theme).get("whitelist") else "auto",
+            "matchedBy": (
+                "whitelist"
+                if _RULES_REGISTRY.get_rules(theme).get("whitelist")
+                else "zhipu"
+                if any(item.get("matchedBy") == "zhipu" for item in concepts)
+                else "auto"
+            ),
             "concepts": [
                 {
                     "name": item["conceptName"],
@@ -531,7 +544,13 @@ class TushareProviderClient:
             points.append({"date": f"{year}-12-31", "value": value, "isEstimated": False})
         return points
 
-    def _select_concepts(self, *, theme: str, limit: int) -> list[dict[str, Any]]:
+    def _select_concepts(
+        self,
+        *,
+        theme: str,
+        limit: int,
+        concept_hints: list[dict] | None = None,
+    ) -> list[dict[str, Any]]:
         normalized_limit = max(1, min(limit, 20))
         catalog = self.get_concept_catalog()
         rules = _RULES_REGISTRY.get_rules(theme)
@@ -561,6 +580,8 @@ class TushareProviderClient:
             selected = [item for item in selected if item["confidence"] >= 0.55]
             if not selected:
                 selected = self._select_sw_hint_concepts(theme, catalog)
+            if not selected and concept_hints:
+                selected = self._select_hint_concepts(theme, catalog, concept_hints)
 
         if blacklist:
             selected = [
@@ -569,6 +590,41 @@ class TushareProviderClient:
                 if _normalize_text(item.get("conceptName")) not in blacklist
             ]
         return sorted(selected, key=lambda item: item["confidence"], reverse=True)[:normalized_limit]
+
+    def _select_hint_concepts(
+        self,
+        theme: str,
+        catalog: list[dict[str, Any]],
+        concept_hints: list[dict],
+    ) -> list[dict[str, Any]]:
+        matches: list[dict[str, Any]] = []
+        for hint in concept_hints:
+            hint_name = _normalize_text(hint.get("name"))
+            if not hint_name:
+                continue
+            aliases = [
+                _normalize_text(alias)
+                for alias in hint.get("aliases", [])
+                if _normalize_text(alias)
+            ]
+            terms = [hint_name, *aliases]
+            for item in catalog:
+                concept_key = _normalize_text(item.get("conceptName"))
+                if not concept_key:
+                    continue
+                if not any(term in concept_key or concept_key in term for term in terms):
+                    continue
+                confidence = _normalize_credibility_score(hint.get("confidence")) or 0.62
+                enriched = self._enrich_concept_match(
+                    item,
+                    theme,
+                    min(0.82, max(0.58, confidence)),
+                    "zhipu",
+                )
+                enriched["matchedBy"] = "zhipu"
+                enriched["reason"] = hint.get("reason") or enriched["reason"]
+                matches.append(enriched)
+        return matches
 
     def _select_sw_hint_concepts(
         self,
@@ -608,40 +664,6 @@ class TushareProviderClient:
         )
         result["source"] = item.get("source") or f"tushare:index_classify:{_SW_INDUSTRY_SOURCE}"
         return result
-
-    def _build_candidates_from_snapshot(self, theme: str, limit: int) -> dict[str, dict[str, Any]]:
-        snapshot_map = self._load_snapshot_map(allow_empty=True)
-        ranked = sorted(
-            snapshot_map.values(),
-            key=lambda item: (
-                _safe_float(item.get("turnoverRate")) or 0,
-                _safe_float(item.get("changePercent")) or 0,
-            ),
-            reverse=True,
-        )[: limit * 4]
-        results: dict[str, dict[str, Any]] = {}
-        for item in ranked:
-            stock_code = str(item.get("stockCode") or item.get("code") or "")
-            if not stock_code:
-                continue
-            results[stock_code] = {
-                "stockCode": stock_code,
-                "stockName": item.get("stockName") or item.get("name") or stock_code,
-                "reason": _build_candidate_reason(
-                    theme,
-                    _safe_float(item.get("changePercent")),
-                    _safe_float(item.get("turnoverRate")),
-                    None,
-                ),
-                "heat": _score_candidate_heat(
-                    concept_heat=52,
-                    change_pct=_safe_float(item.get("changePercent")),
-                    turnover=_safe_float(item.get("turnoverRate")),
-                    pe_ratio=None,
-                ),
-                "concept": theme,
-            }
-        return results
 
     def _resolve_concept_code(self, concept_name: str) -> str:
         normalized_name = _normalize_text(concept_name)

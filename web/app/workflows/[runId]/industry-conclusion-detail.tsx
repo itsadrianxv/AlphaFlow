@@ -297,6 +297,12 @@ function OverviewSection(props: { model: IndustryConclusionViewModel }) {
 function LogicSection(props: { model: IndustryConclusionViewModel }) {
   return (
     <div className="grid gap-4">
+      {props.model.logic.fullReportMarkdown ? (
+        <Panel title="研究正文" surface="inset" density="compact">
+          <MarkdownContent content={props.model.logic.fullReportMarkdown} />
+        </Panel>
+      ) : null}
+
       <Panel title="行业驱动" surface="inset" density="compact">
         <DetailList
           items={props.model.logic.industryDrivers}
@@ -314,7 +320,7 @@ function LogicSection(props: { model: IndustryConclusionViewModel }) {
       <Panel title="重点标的" surface="inset" density="compact">
         {props.model.logic.topPicks.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
-            暂无重点标的。
+            暂无足够相关标的。
           </p>
         ) : (
           <div className="grid gap-0">

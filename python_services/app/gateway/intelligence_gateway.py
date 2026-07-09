@@ -30,11 +30,17 @@ from app.providers.mappers import (
     to_theme_news_item,
 )
 from app.providers.tushare.client import TushareProviderClient
+from app.services.zhipu_search_client import ZhipuSearchClient
 
 
 class IntelligenceGateway:
-    def __init__(self, provider_client: TushareProviderClient | None = None) -> None:
+    def __init__(
+        self,
+        provider_client: TushareProviderClient | None = None,
+        zhipu_client: ZhipuSearchClient | None = None,
+    ) -> None:
         self._provider_client = provider_client or TushareProviderClient()
+        self._zhipu_client = zhipu_client or ZhipuSearchClient()
         self._retry_policy = RetryPolicy(max_attempts=1)
         self._cache = gateway_cache
 
@@ -99,7 +105,14 @@ class IntelligenceGateway:
             dataset="theme_concepts",
             provider=self._provider_client.provider_name,
             params={"theme": theme, "limit": limit},
-            fetcher=lambda: self._provider_client.get_theme_concepts(theme=theme, limit=limit),
+            fetcher=lambda: self._provider_client.get_theme_concepts(
+                theme=theme,
+                limit=limit,
+                concept_hints=self._zhipu_client.search_theme_concepts(
+                    theme=theme,
+                    limit=limit,
+                ),
+            ),
             cache_policy=get_cache_policy("theme_concepts"),
             retry_policy=self._retry_policy,
             cache=self._cache,

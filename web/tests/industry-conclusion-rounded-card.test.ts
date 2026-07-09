@@ -66,6 +66,13 @@ describe("IndustryConclusionDetail report layout", () => {
     expect(viewModelSource).toContain('item !== "open_questions_remaining"');
   });
 
+  it("shows full markdown report in the logic section when available", () => {
+    expect(source).toContain('title="研究正文"');
+    expect(source).toContain("props.model.logic.fullReportMarkdown");
+    expect(viewModelSource).toContain("fullReportMarkdown");
+    expect(source).toContain("暂无足够相关标的。");
+  });
+
   it("keeps conclusion claims collapsed with category navigation", () => {
     expect(source).toContain("function ClaimPanel");
     expect(source).toContain("useState(false)");

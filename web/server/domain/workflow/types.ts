@@ -339,6 +339,7 @@ export type IndustryResearchResultDto = {
   credibility: IndustryResearchCredibility[];
   topPicks: IndustryResearchTopPick[];
   competitionSummary: string;
+  fullReportMarkdown?: string;
   confidenceAnalysis?: ConfidenceAnalysis;
   brief?: ResearchBriefV2;
   clarificationRequest?: ResearchClarificationRequest;

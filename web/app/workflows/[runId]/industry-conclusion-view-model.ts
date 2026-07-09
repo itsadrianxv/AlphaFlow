@@ -66,6 +66,7 @@ export type IndustryConclusionViewModel = {
   notices: IndustryConclusionNotice[];
   sections: IndustryConclusionSection[];
   logic: {
+    fullReportMarkdown?: string;
     industryDrivers: string[];
     competitionSummary: string;
     topPicks: IndustryConclusionTopPick[];
@@ -332,6 +333,11 @@ export function buildIndustryConclusionViewModel(params: {
     notices,
     sections,
     logic: {
+      fullReportMarkdown:
+        typeof result.fullReportMarkdown === "string" &&
+        result.fullReportMarkdown.trim().length > 0
+          ? result.fullReportMarkdown
+          : undefined,
       industryDrivers: uniqueList(
         [
           ...result.credibility.flatMap((item) => item.highlights),

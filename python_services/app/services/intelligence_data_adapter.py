@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from app.providers.tushare.client import TushareProviderClient
+from app.services.zhipu_search_client import ZhipuSearchClient
 
 _CLIENT = TushareProviderClient()
+_ZHIPU_CLIENT = ZhipuSearchClient()
 
 
 class IntelligenceDataAdapter:
@@ -21,7 +23,12 @@ class IntelligenceDataAdapter:
 
     @staticmethod
     def get_candidates(theme: str, limit: int = 6) -> list[dict]:
-        return _CLIENT.get_theme_candidates(theme=theme, limit=limit)
+        concept_hints = _ZHIPU_CLIENT.search_theme_concepts(theme=theme, limit=5)
+        return _CLIENT.get_theme_candidates(
+            theme=theme,
+            limit=limit,
+            concept_hints=concept_hints,
+        )
 
     @staticmethod
     def get_theme_news_strict(theme: str, days: int = 7, limit: int = 20) -> list[dict]:
@@ -29,14 +36,24 @@ class IntelligenceDataAdapter:
 
     @staticmethod
     def get_candidates_strict(theme: str, limit: int = 6) -> list[dict]:
-        candidates = _CLIENT.get_theme_candidates(theme=theme, limit=limit)
+        concept_hints = _ZHIPU_CLIENT.search_theme_concepts(theme=theme, limit=5)
+        candidates = _CLIENT.get_theme_candidates(
+            theme=theme,
+            limit=limit,
+            concept_hints=concept_hints,
+        )
         if candidates:
             return candidates
         raise ValueError(f"主题“{theme.strip()}”暂无可用候选股数据")
 
     @staticmethod
     def match_theme_concepts(theme: str, limit: int = 5) -> dict:
-        return _CLIENT.get_theme_concepts(theme=theme, limit=limit)
+        concept_hints = _ZHIPU_CLIENT.search_theme_concepts(theme=theme, limit=limit)
+        return _CLIENT.get_theme_concepts(
+            theme=theme,
+            limit=limit,
+            concept_hints=concept_hints,
+        )
 
     @staticmethod
     def get_concept_rules(theme: str) -> dict:

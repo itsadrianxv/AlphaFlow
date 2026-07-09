@@ -26,11 +26,17 @@ from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
 from app.providers.mappers import to_market_stock, to_theme_candidate
 from app.providers.tushare.client import TushareProviderClient
+from app.services.zhipu_search_client import ZhipuSearchClient
 
 
 class MarketGateway:
-    def __init__(self, provider_client: TushareProviderClient | None = None) -> None:
+    def __init__(
+        self,
+        provider_client: TushareProviderClient | None = None,
+        zhipu_client: ZhipuSearchClient | None = None,
+    ) -> None:
         self._provider_client = provider_client or TushareProviderClient()
+        self._zhipu_client = zhipu_client or ZhipuSearchClient()
         self._retry_policy = RetryPolicy()
         self._theme_retry_policy = RetryPolicy(max_attempts=1)
         self._cache = gateway_cache
@@ -254,7 +260,14 @@ class MarketGateway:
             params={"theme": theme, "limit": limit},
             fetcher=lambda: [
                 to_theme_candidate(item)
-                for item in self._provider_client.get_theme_candidates(theme=theme, limit=limit)
+                for item in self._provider_client.get_theme_candidates(
+                    theme=theme,
+                    limit=limit,
+                    concept_hints=self._zhipu_client.search_theme_concepts(
+                        theme=theme,
+                        limit=5,
+                    ),
+                )
             ],
             cache_policy=get_cache_policy("theme_candidates"),
             retry_policy=self._theme_retry_policy,

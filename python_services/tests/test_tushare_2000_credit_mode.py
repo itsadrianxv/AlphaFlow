@@ -63,6 +63,14 @@ class FakeTushareRawProvider:
         return []
 
 
+class FakeZhipuClient:
+    def __init__(self, concepts: list[dict]) -> None:
+        self.concepts = concepts
+
+    def search_theme_concepts(self, theme: str, limit: int) -> list[dict]:
+        return self.concepts[:limit]
+
+
 def test_theme_concepts_use_sw_industries_without_calling_ths() -> None:
     provider = FakeTushareRawProvider()
     client = TushareProviderClient(provider=provider)
@@ -97,3 +105,36 @@ def test_concept_constituents_use_index_member_all_without_calling_ths_member() 
         and params == {"is_new": "Y", "l3_code": "851041.SI"}
         for dataset, params in provider.calls
     )
+
+
+def test_theme_candidates_do_not_fallback_to_unrelated_market_hot_stocks() -> None:
+    provider = FakeTushareRawProvider()
+    client = TushareProviderClient(provider=provider)
+
+    candidates = client.get_theme_candidates(theme="完全未知主题", limit=6)
+
+    assert candidates == []
+    assert any(dataset == "index_classify" for dataset, _params in provider.calls)
+    assert all(dataset != "ths_member" for dataset, _params in provider.calls)
+
+
+def test_theme_candidates_use_web_search_concept_hints_after_tushare_match_misses() -> None:
+    provider = FakeTushareRawProvider()
+    client = TushareProviderClient(provider=provider)
+
+    candidates = client.get_theme_candidates(
+        theme="国产办公软件替代",
+        limit=6,
+        concept_hints=[
+            {
+                "name": "软件开发",
+                "aliases": ["基础软件"],
+                "confidence": 0.86,
+                "reason": "Web Search 指向软件开发板块",
+            }
+        ],
+    )
+
+    assert candidates
+    assert candidates[0]["stockCode"] == "603019"
+    assert candidates[0]["concept"] == "软件开发"

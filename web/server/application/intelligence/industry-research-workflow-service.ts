@@ -109,6 +109,83 @@ function resolveTaskContract(state: IndustryResearchGraphState) {
   );
 }
 
+function formatMarkdownList(items: string[]) {
+  const normalized = uniqueStrings(items, 8);
+  if (normalized.length === 0) {
+    return "- 暂无足够信息。";
+  }
+
+  return normalized.map((item) => `- ${item}`).join("\n");
+}
+
+function buildFallbackIndustryReport(params: {
+  query: string;
+  overview: string;
+  heatScore: number;
+  heatConclusion: string;
+  candidates: IndustryResearchGraphState["candidates"];
+  credibility: IndustryResearchGraphState["credibility"];
+  topPicks: IndustryResearchResultDto["topPicks"];
+  competitionSummary: string;
+  gapAnalysis?: ResearchGapAnalysis;
+  compressedFindings?: CompressedFindings;
+}) {
+  const candidateLines = (params.topPicks ?? []).map((item) => {
+    const candidate = (params.candidates ?? []).find(
+      (candidateItem) => candidateItem.stockCode === item.stockCode,
+    );
+    const credibility = (params.credibility ?? []).find(
+      (credibilityItem) => credibilityItem.stockCode === item.stockCode,
+    );
+    const scoreText = candidate ? `，热度 ${candidate.score}` : "";
+    const credibilityText = credibility
+      ? `，可信度 ${credibility.credibilityScore}`
+      : "";
+    return `${item.stockName}（${item.stockCode}）：${item.reason}${scoreText}${credibilityText}`;
+  });
+
+  return [
+    `# ${params.query}行业研究报告`,
+    "",
+    "## 行业结论",
+    params.overview,
+    "",
+    "## 研究范围",
+    `本次研究围绕“${params.query}”，重点观察行业热度、主题相关标的、竞争格局和待验证风险。`,
+    "",
+    "## 产业链与驱动因素",
+    formatMarkdownList([
+      ...(params.compressedFindings?.highlights ?? []),
+      ...(params.credibility ?? []).flatMap((item) => item.highlights),
+    ]),
+    "",
+    "## 热度与催化",
+    `赛道热度为 ${params.heatScore.toFixed(0)}%。${params.heatConclusion}`,
+    "",
+    "## 重点标的",
+    candidateLines.length > 0
+      ? formatMarkdownList(candidateLines)
+      : "暂无足够相关标的。",
+    "",
+    "## 竞争格局",
+    params.competitionSummary || "暂无结构化竞争格局总结。",
+    "",
+    "## 风险与待验证问题",
+    formatMarkdownList([
+      ...(params.gapAnalysis?.missingAreas ?? []),
+      ...(params.credibility ?? []).flatMap((item) => item.risks),
+      ...(params.compressedFindings?.openQuestions ?? []),
+    ]),
+    "",
+    "## 后续跟踪清单",
+    formatMarkdownList([
+      "继续核验行业成分股与主题的真实业务关联。",
+      "跟踪成交活跃度、换手率和涨跌幅是否持续。",
+      "对重点标的进入公司研究，补充财务与公告证据。",
+    ]),
+  ].join("\n");
+}
+
 export class IndustryResearchWorkflowService {
   private readonly client: DeepSeekClient;
   private readonly intelligenceService: IntelligenceAgentService;
@@ -626,6 +703,87 @@ export class IndustryResearchWorkflowService {
     });
   }
 
+  private async writeFullReportMarkdown(params: {
+    state: IndustryResearchGraphState;
+    runtimeConfig: ResearchRuntimeConfig;
+    overview: string;
+    heatScore: number;
+    heatConclusion: string;
+    candidates: IndustryResearchGraphState["candidates"];
+    credibility: IndustryResearchGraphState["credibility"];
+    topPicks: IndustryResearchResultDto["topPicks"];
+    competitionSummary: string;
+  }) {
+    const fallback = buildFallbackIndustryReport({
+      query: params.state.query,
+      overview: params.overview,
+      heatScore: params.heatScore,
+      heatConclusion: params.heatConclusion,
+      candidates: params.candidates,
+      credibility: params.credibility,
+      topPicks: params.topPicks,
+      competitionSummary: params.competitionSummary,
+      gapAnalysis: params.state.gapAnalysis,
+      compressedFindings: params.state.compressedFindings,
+    });
+
+    const brief =
+      params.state.researchBrief ?? buildFallbackBrief(params.state);
+    const topPickText =
+      params.topPicks.length > 0
+        ? params.topPicks
+            .map(
+              (item) => `${item.stockName}(${item.stockCode}): ${item.reason}`,
+            )
+            .join("\n")
+        : "暂无足够相关标的。";
+
+    return this.client
+      .complete(
+        [
+          {
+            role: "system",
+            content: [
+              "你是A股行业研究员，请输出一篇体系化 markdown 行业研究正文。",
+              "只输出 markdown，不要包裹代码块。",
+              "必须使用这些二级标题：行业结论、研究范围、产业链与驱动因素、热度与催化、重点标的、竞争格局、风险与待验证问题、后续跟踪清单。",
+              "重点标的只能使用输入中给出的股票；如果输入为暂无足够相关标的，必须原样说明，不得编造股票。",
+              "避免空话，每个章节用短段落或项目符号表达。",
+            ].join("\n"),
+          },
+          {
+            role: "user",
+            content: [
+              `研究主题：${params.state.query}`,
+              `研究目标：${brief.researchGoal}`,
+              `必须回答：${brief.mustAnswerQuestions.join("；") || "无"}`,
+              `行业概览：${params.overview}`,
+              `热度：${params.heatScore.toFixed(0)}，${params.heatConclusion}`,
+              `压缩发现：${JSON.stringify(params.state.compressedFindings ?? {})}`,
+              `重点标的：\n${topPickText}`,
+              `候选标的：${JSON.stringify(params.candidates ?? [])}`,
+              `可信度：${JSON.stringify(params.credibility ?? [])}`,
+              `竞争格局：${params.competitionSummary}`,
+              `缺口分析：${JSON.stringify(params.state.gapAnalysis ?? {})}`,
+            ].join("\n\n"),
+          },
+        ],
+        fallback,
+        {
+          model:
+            params.state.structuredModelFinal ??
+            params.state.structuredModelInitial ??
+            params.runtimeConfig.models.report,
+          maxOutputTokens: 2400,
+          budgetPolicy: {
+            maxRetries: 1,
+            prioritySections: ["重点标的", "缺口分析", "候选标的", "可信度"],
+          },
+        },
+      )
+      .catch(() => fallback);
+  }
+
   async finalizeReport(params: {
     state: IndustryResearchGraphState;
     runtimeConfig: ResearchRuntimeConfig;
@@ -696,13 +854,28 @@ export class IndustryResearchWorkflowService {
       gapAnalysis: params.state.gapAnalysis,
       replanRecords: params.state.replanRecords,
     } satisfies IndustryResearchResultDto;
+    const fullReportMarkdown = await this.writeFullReportMarkdown({
+      state: params.state,
+      runtimeConfig: params.runtimeConfig,
+      overview,
+      heatScore: heatAnalysis.heatScore,
+      heatConclusion: heatAnalysis.heatConclusion,
+      candidates,
+      credibility: credibilityResult.credibility,
+      topPicks: report.topPicks,
+      competitionSummary: competition,
+    });
     const reflection = reflectIndustryResearch({
       taskContract,
-      result: report,
+      result: {
+        ...report,
+        fullReportMarkdown,
+      },
     });
 
     return {
       ...report,
+      fullReportMarkdown,
       reflection,
       contractScore: reflection.contractScore,
       qualityFlags: reflection.qualityFlags,
