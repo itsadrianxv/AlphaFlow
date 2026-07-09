@@ -5,6 +5,8 @@ import type {
   TechnicalAssessment,
   TimingCardDraft,
   TimingEngineBreakdownItem,
+  TimingExecutionCondition,
+  TimingIndicators,
   TimingPresetConfig,
   TimingRiskFlag,
   TimingSignalData,
@@ -50,6 +52,181 @@ function clamp(value: number, min: number, max: number) {
 
 function summarizeBreakdownLabel(item: TimingEngineBreakdownItem) {
   return `${item.label}: ${item.detail}`;
+}
+
+function formatConditionNote(condition: TimingExecutionCondition) {
+  const actual =
+    condition.actual === undefined || condition.actual === null
+      ? ""
+      : `当前 ${condition.actual}${condition.unit ?? ""}，`;
+  return `${condition.label}: ${actual}${condition.explanation}`;
+}
+
+function categoryForEngine(
+  key: TimingEngineBreakdownItem["key"],
+): TimingExecutionCondition["category"] {
+  switch (key) {
+    case "multiTimeframeAlignment":
+      return "TREND";
+    case "relativeStrength":
+      return "RELATIVE_STRENGTH";
+    case "liquidityStructure":
+    case "gapVolumeQuality":
+      return "LIQUIDITY";
+    case "breakoutFailure":
+      return "BREAKOUT";
+    case "volatilityPercentile":
+      return "VOLATILITY";
+    default:
+      return "TREND";
+  }
+}
+
+function conditionSeverity(
+  score: number,
+): TimingExecutionCondition["severity"] {
+  if (Math.abs(score) >= 55) {
+    return "CRITICAL";
+  }
+  if (Math.abs(score) >= 30) {
+    return "WARNING";
+  }
+  return "INFO";
+}
+
+function buildTriggerConditions(
+  breakdown: TimingEngineBreakdownItem[],
+  indicators: TimingIndicators,
+) {
+  const positive = breakdown
+    .filter((item) => item.status === "positive")
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 3)
+    .map(
+      (item): TimingExecutionCondition => ({
+        id: `trigger:${item.key}`,
+        kind: "TRIGGER",
+        category: categoryForEngine(item.key),
+        label: item.label,
+        metric: item.key,
+        operator: ">=",
+        threshold: 20,
+        actual: item.score,
+        lookbackDays: 20,
+        status: "TRIGGERED",
+        severity: conditionSeverity(item.score),
+        explanation: item.detail,
+      }),
+    );
+
+  if (
+    indicators.close >= indicators.ema20 &&
+    indicators.ema20 >= indicators.ema60
+  ) {
+    positive.unshift({
+      id: "trigger:price-above-ema20-ema60",
+      kind: "TRIGGER",
+      category: "TREND",
+      label: "价格站上中期均线",
+      metric: "close_vs_ema20_ema60",
+      operator: ">=",
+      threshold: "ema20 >= ema60",
+      actual: `${indicators.close}/${indicators.ema20}/${indicators.ema60}`,
+      status: "TRIGGERED",
+      severity: "INFO",
+      explanation:
+        "收盘价位于 EMA20 上方，且 EMA20 不弱于 EMA60，趋势结构具备继续观察价值。",
+    });
+  }
+
+  if (indicators.volumeRatio20 >= 1.1) {
+    positive.push({
+      id: "trigger:volume-ratio20",
+      kind: "TRIGGER",
+      category: "LIQUIDITY",
+      label: "成交量能确认",
+      metric: "volumeRatio20",
+      operator: ">=",
+      threshold: 1.1,
+      actual: indicators.volumeRatio20,
+      status: "TRIGGERED",
+      severity: "INFO",
+      explanation: "20 日量比高于 1.1，说明当前信号有一定成交配合。",
+    });
+  }
+
+  return positive.slice(0, 4);
+}
+
+function buildInvalidationConditions(
+  breakdown: TimingEngineBreakdownItem[],
+  indicators: TimingIndicators,
+) {
+  const negative = breakdown
+    .filter((item) => item.status === "negative")
+    .sort((left, right) => left.score - right.score)
+    .slice(0, 3)
+    .map(
+      (item): TimingExecutionCondition => ({
+        id: `invalidation:${item.key}`,
+        kind: "INVALIDATION",
+        category: categoryForEngine(item.key),
+        label: item.label,
+        metric: item.key,
+        operator: "<=",
+        threshold: -20,
+        actual: item.score,
+        lookbackDays: 20,
+        status: "TRIGGERED",
+        severity: conditionSeverity(item.score),
+        explanation: item.detail,
+      }),
+    );
+
+  const ema20BufferPct =
+    (indicators.close / Math.max(indicators.ema20, 0.0001) - 1) * 100;
+  negative.unshift({
+    id: "invalidation:close-below-ema20",
+    kind: "INVALIDATION",
+    category: "PRICE_LEVEL",
+    label: "跌破 EMA20",
+    metric: "close_vs_ema20",
+    operator: "<",
+    threshold: Number(indicators.ema20.toFixed(4)),
+    actual: Number(indicators.close.toFixed(4)),
+    unit: "",
+    lookbackDays: 2,
+    status:
+      indicators.close < indicators.ema20
+        ? "TRIGGERED"
+        : ema20BufferPct <= 2
+          ? "NEAR"
+          : "PENDING",
+    severity: indicators.close < indicators.ema20 ? "CRITICAL" : "WARNING",
+    explanation:
+      indicators.close < indicators.ema20
+        ? "收盘价已经跌破 EMA20，本次择时假设需要重评。"
+        : "若连续收盘跌破 EMA20，趋势假设需要重评。",
+  });
+
+  if (indicators.close <= indicators.ema60 || indicators.rsi.value <= 35) {
+    negative.push({
+      id: "invalidation:trend-or-momentum-break",
+      kind: "INVALIDATION",
+      category: "TREND",
+      label: "趋势或动能破坏",
+      metric: "close_vs_ema60_or_rsi",
+      operator: "<=",
+      threshold: "close<=ema60 或 RSI<=35",
+      actual: `close ${indicators.close} / ema60 ${indicators.ema60} / RSI ${indicators.rsi.value}`,
+      status: "TRIGGERED",
+      severity: "CRITICAL",
+      explanation:
+        "中期均线或动能指标已经进入防守区，继续执行进攻动作需要降级。",
+    });
+  }
+
+  return negative.slice(0, 4);
 }
 
 function toStatus(score: number): TimingEngineBreakdownItem["status"] {
@@ -247,12 +424,26 @@ export class TimingAnalysisService {
       .filter((item) => item.status === "negative")
       .sort((left, right) => left.score - right.score);
 
-    const triggerNotes = positiveFactors
-      .slice(0, 3)
-      .map((item) => summarizeBreakdownLabel(item));
-    const invalidationNotes = negativeFactors.length
-      ? negativeFactors.slice(0, 3).map((item) => summarizeBreakdownLabel(item))
-      : ["若多周期结构破坏且相对强弱继续下滑，本次择时假设需要重评。"];
+    const triggerConditions = buildTriggerConditions(
+      engineBreakdown,
+      indicators,
+    );
+    const invalidationConditions = buildInvalidationConditions(
+      engineBreakdown,
+      indicators,
+    );
+    const triggerNotes = triggerConditions.length
+      ? triggerConditions.map((item) => formatConditionNote(item))
+      : positiveFactors
+          .slice(0, 3)
+          .map((item) => summarizeBreakdownLabel(item));
+    const invalidationNotes = invalidationConditions.length
+      ? invalidationConditions.map((item) => formatConditionNote(item))
+      : negativeFactors.length
+        ? negativeFactors
+            .slice(0, 3)
+            .map((item) => summarizeBreakdownLabel(item))
+        : ["若多周期结构破坏且相对强弱继续下滑，本次择时假设需要重评。"];
 
     const topPositive = positiveFactors[0]?.label ?? "暂无明显优势";
     const topNegative = negativeFactors[0]?.label ?? "暂无显著拖累";
@@ -290,6 +481,8 @@ export class TimingAnalysisService {
         engineBreakdown,
         triggerNotes,
         invalidationNotes,
+        triggerConditions,
+        invalidationConditions,
         riskFlags: uniqueFlags(riskFlags),
         explanation,
         summary,

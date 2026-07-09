@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type {
   TimingBar,
   TimingCardDraft,
+  TimingExecutionCondition,
   TimingKronosForecast,
   TimingSignalData,
   TimingSourceType,
@@ -35,6 +36,62 @@ function hashBars(bars: TimingBar[]) {
   return createHash("sha256")
     .update(JSON.stringify(stablePayload))
     .digest("hex");
+}
+
+function buildKronosConditions(forecast: TimingKronosForecast): {
+  triggerConditions: TimingExecutionCondition[];
+  invalidationConditions: TimingExecutionCondition[];
+} {
+  const expectedReturn = forecast.summary.expectedReturnPct;
+  const maxDrawdown = forecast.summary.maxDrawdownPct;
+  const actual = `${expectedReturn.toFixed(2)}% / ${maxDrawdown.toFixed(2)}%`;
+
+  return {
+    triggerConditions:
+      forecast.summary.direction === "bullish" &&
+      expectedReturn >= 5 &&
+      maxDrawdown > -8
+        ? [
+            {
+              id: "trigger:kronos-forecast",
+              kind: "TRIGGER",
+              category: "FORECAST",
+              label: "Kronos 预测确认",
+              metric: "kronosForecast",
+              operator: ">=",
+              threshold: "预期收益 >= 5%，最大回撤 > -8%",
+              actual,
+              lookbackDays: forecast.predictionLength,
+              status: "TRIGGERED",
+              severity: "INFO",
+              explanation:
+                "Kronos 预测收益回撤结构偏正，可作为辅助确认，不替代价格信号。",
+            },
+          ]
+        : [],
+    invalidationConditions:
+      forecast.summary.direction === "bearish" ||
+      expectedReturn <= -3 ||
+      maxDrawdown <= -10
+        ? [
+            {
+              id: "invalidation:kronos-forecast",
+              kind: "INVALIDATION",
+              category: "FORECAST",
+              label: "Kronos 预测转弱",
+              metric: "kronosForecast",
+              operator: "<=",
+              threshold: "预期收益 <= -3% 或最大回撤 <= -10%",
+              actual,
+              lookbackDays: forecast.predictionLength,
+              status: "TRIGGERED",
+              severity: "WARNING",
+              explanation:
+                "Kronos 预测显示收益回撤结构偏弱，执行进攻动作需要降级确认。",
+            },
+          ]
+        : [],
+  };
 }
 
 export class KronosForecastWorkflowService {
@@ -115,10 +172,35 @@ export class KronosForecastWorkflowService {
           if (!forecast) {
             return this.attachMissingWarning(card);
           }
+          const kronosConditions = buildKronosConditions(forecast);
           return {
             ...card,
             reasoning: {
               ...card.reasoning,
+              signalContext: {
+                ...card.reasoning.signalContext,
+                triggerConditions: [
+                  ...(card.reasoning.signalContext.triggerConditions ?? []),
+                  ...kronosConditions.triggerConditions,
+                ],
+                invalidationConditions: [
+                  ...(card.reasoning.signalContext.invalidationConditions ??
+                    []),
+                  ...kronosConditions.invalidationConditions,
+                ],
+                triggerNotes: [
+                  ...card.reasoning.signalContext.triggerNotes,
+                  ...kronosConditions.triggerConditions.map(
+                    (condition) => condition.explanation,
+                  ),
+                ],
+                invalidationNotes: [
+                  ...card.reasoning.signalContext.invalidationNotes,
+                  ...kronosConditions.invalidationConditions.map(
+                    (condition) => condition.explanation,
+                  ),
+                ],
+              },
               kronosForecast: forecast.summary,
               kronosWarnings: forecast.warnings,
               actionRationale: `${card.reasoning.actionRationale} Kronos 预测：${formatDirectionLabel(forecast.summary.direction)}，预期收益 ${forecast.summary.expectedReturnPct.toFixed(2)}%，最大回撤 ${forecast.summary.maxDrawdownPct.toFixed(2)}%。`,

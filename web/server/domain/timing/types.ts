@@ -337,6 +337,29 @@ export type TimingEngineBreakdownItem = {
 
 export type TimingFactorBreakdownItem = TimingEngineBreakdownItem;
 
+export type TimingExecutionCondition = {
+  id: string;
+  kind: "TRIGGER" | "INVALIDATION";
+  category:
+    | "TREND"
+    | "RELATIVE_STRENGTH"
+    | "LIQUIDITY"
+    | "BREAKOUT"
+    | "VOLATILITY"
+    | "PRICE_LEVEL"
+    | "FORECAST";
+  label: string;
+  metric: string;
+  operator: ">=" | ">" | "<=" | "<" | "==" | "crosses_above" | "crosses_below";
+  threshold: number | string;
+  actual?: number | string | null;
+  unit?: string;
+  lookbackDays?: number;
+  status: "TRIGGERED" | "NEAR" | "PENDING" | "INVALIDATED";
+  severity: "INFO" | "WARNING" | "CRITICAL";
+  explanation: string;
+};
+
 export type TimingSignalReasoningContext = {
   direction: TimingDirection;
   compositeScore: number;
@@ -345,6 +368,8 @@ export type TimingSignalReasoningContext = {
   engineBreakdown: TimingEngineBreakdownItem[];
   triggerNotes: string[];
   invalidationNotes: string[];
+  triggerConditions?: TimingExecutionCondition[];
+  invalidationConditions?: TimingExecutionCondition[];
   riskFlags: TimingRiskFlag[];
   explanation: string;
   summary: string;
@@ -361,6 +386,8 @@ export type TechnicalAssessment = {
   engineBreakdown: TimingEngineBreakdownItem[];
   triggerNotes: string[];
   invalidationNotes: string[];
+  triggerConditions?: TimingExecutionCondition[];
+  invalidationConditions?: TimingExecutionCondition[];
   riskFlags: TimingRiskFlag[];
   explanation: string;
   signalContext: TimingSignalReasoningContext;
@@ -533,6 +560,18 @@ export type MarketContextFeatureSnapshot = {
   breadthScore: number;
   riskScore: number;
   stateScore: number;
+  northboundFlowScore?: number | null;
+  activityScore?: number | null;
+};
+
+export type MarketContextAvailability = {
+  daily: boolean;
+  dailyBasic: boolean;
+  indexDaily: boolean;
+  stockLimit?: boolean;
+  indexDailyBasic?: boolean;
+  hsgtFlow?: boolean;
+  warnings?: string[];
 };
 
 export type MarketContextSnapshot = {
@@ -545,6 +584,8 @@ export type MarketContextSnapshot = {
   volatilitySeries: MarketVolatilityPoint[];
   leadershipSeries: MarketLeadershipPoint[];
   features: MarketContextFeatureSnapshot;
+  source?: string;
+  availability?: MarketContextAvailability;
 };
 
 export type MarketContextAnalysis = {
@@ -629,6 +670,8 @@ export type TimingRecommendationReasoning = {
   actionRationale: string;
   kronosForecast?: TimingKronosForecastSummary;
   kronosWarnings?: string[];
+  triggerConditions?: TimingExecutionCondition[];
+  invalidationConditions?: TimingExecutionCondition[];
 };
 
 export type TimingRecommendationRecord = {

@@ -20,6 +20,7 @@ class FakeProClient:
     adj_factor_frames: dict[str, pd.DataFrame]
     daily_basic_frames: dict[str, pd.DataFrame]
     index_daily_frames: dict[str, pd.DataFrame]
+    stk_limit_frames: dict[str, pd.DataFrame] | None = None
 
     def stock_basic(self, **_kwargs):
         return self.stock_basic_frame.copy()
@@ -37,6 +38,10 @@ class FakeProClient:
 
     def index_daily(self, **kwargs):
         return self.index_daily_frames.get(kwargs["ts_code"], pd.DataFrame()).copy()
+
+    def stk_limit(self, **kwargs):
+        frames = self.stk_limit_frames or {}
+        return frames.get(kwargs.get("trade_date"), pd.DataFrame()).copy()
 
 
 def test_tushare_provider_maps_profile_and_qfq_bars(monkeypatch):
@@ -173,10 +178,21 @@ def test_tushare_provider_builds_market_snapshot(monkeypatch):
                     "volume_ratio": [1.2, 0.9],
                     "total_mv": [2_000_000.0, 300_000.0],
                     "circ_mv": [1_800_000.0, 280_000.0],
+                    "limit_status": ["U", None],
                 }
             )
         },
         index_daily_frames={},
+        stk_limit_frames={
+            "20260706": pd.DataFrame(
+                {
+                    "trade_date": ["20260706", "20260706"],
+                    "ts_code": ["600519.SH", "000001.SZ"],
+                    "up_limit": [112.2, 11.33],
+                    "down_limit": [91.8, 9.27],
+                }
+            )
+        },
     )
 
     monkeypatch.setenv("TUSHARE_TOKEN", "token-1")
@@ -190,6 +206,8 @@ def test_tushare_provider_builds_market_snapshot(monkeypatch):
     assert snapshot[0].changePercent == 2.0
     assert snapshot[0].turnoverRate == 1.1
     assert snapshot[0].marketCap == 2_000_000.0
+    assert snapshot[0].limitStatus == "U"
+    assert snapshot[0].upLimit == 112.2
 
 
 def test_tushare_provider_rejects_unknown_stock_code(monkeypatch):

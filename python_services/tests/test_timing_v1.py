@@ -224,6 +224,8 @@ def test_get_market_context_success(install_gateway) -> None:
                     volumeRatio=1.5,
                     marketCap=900_000.0,
                     floatMarketCap=850_000.0,
+                    limitStatus="D",
+                    downLimit=208.5,
                 ),
             ]
         )
@@ -238,4 +240,7 @@ def test_get_market_context_success(install_gateway) -> None:
     assert payload["data"]["latestBreadth"]["totalCount"] == 3
     assert len(payload["data"]["indexes"]) == 4
     assert payload["data"]["features"]["benchmarkStrength"] >= 0
+    assert payload["data"]["availability"]["daily"] is True
+    assert payload["data"]["availability"]["dailyBasic"] is True
+    assert payload["data"]["latestVolatility"]["limitDownLikeCount"] >= 1
     assert "latestLeadership" in payload["data"]

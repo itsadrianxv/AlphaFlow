@@ -185,6 +185,18 @@ class MarketContextFeatureSnapshot(BaseModel):
     breadthScore: float = Field(..., ge=0, le=100)
     riskScore: float = Field(..., ge=0, le=100)
     stateScore: float = Field(..., ge=0, le=100)
+    northboundFlowScore: float | None = None
+    activityScore: float | None = None
+
+
+class TimingMarketContextAvailability(BaseModel):
+    daily: bool
+    dailyBasic: bool
+    indexDaily: bool
+    stockLimit: bool = False
+    indexDailyBasic: bool = False
+    hsgtFlow: bool = False
+    warnings: list[str] = Field(default_factory=list)
 
 
 class MarketContextSnapshotData(BaseModel):
@@ -197,6 +209,8 @@ class MarketContextSnapshotData(BaseModel):
     volatilitySeries: list[MarketVolatilityPoint] = Field(default_factory=list)
     leadershipSeries: list[MarketLeadershipPoint] = Field(default_factory=list)
     features: MarketContextFeatureSnapshot
+    source: str | None = None
+    availability: TimingMarketContextAvailability | None = None
 
 
 class TimingBarsResponse(GatewayResponse[TimingBarsData]):

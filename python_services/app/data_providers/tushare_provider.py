@@ -810,7 +810,7 @@ class TushareProvider:
             daily_basic_frame = self._ensure_frame(
                 self._get_client().daily_basic(
                     trade_date=trade_date,
-                    fields="ts_code,trade_date,close,turnover_rate,turnover_rate_f,volume_ratio,total_mv,circ_mv",
+                    fields="ts_code,trade_date,close,turnover_rate,turnover_rate_f,volume_ratio,total_mv,circ_mv,limit_status",
                 )
             )
             merged = daily_frame.copy()
@@ -820,6 +820,25 @@ class TushareProvider:
                     on="ts_code",
                     how="left",
                     suffixes=("", "_basic"),
+                )
+
+            limit_frame = pd.DataFrame()
+            limit_loader = getattr(self._get_client(), "stk_limit", None)
+            if limit_loader is not None:
+                try:
+                    limit_frame = self._ensure_frame(
+                        limit_loader(
+                            trade_date=trade_date,
+                            fields="trade_date,ts_code,up_limit,down_limit",
+                        )
+                    )
+                except Exception:  # noqa: BLE001
+                    limit_frame = pd.DataFrame()
+            if not limit_frame.empty:
+                merged = merged.merge(
+                    limit_frame.drop(columns=["trade_date"], errors="ignore"),
+                    on="ts_code",
+                    how="left",
                 )
 
             rows: list[MarketSnapshotRow] = []
@@ -848,6 +867,9 @@ class TushareProvider:
                         volumeRatio=self._safe_float(row.get("volume_ratio")),
                         marketCap=self._safe_float(row.get("total_mv")),
                         floatMarketCap=self._safe_float(row.get("circ_mv")),
+                        limitStatus=self._pick_first_text(row, ["limit_status"]),
+                        upLimit=self._safe_float(row.get("up_limit")),
+                        downLimit=self._safe_float(row.get("down_limit")),
                     )
                 )
             if rows:

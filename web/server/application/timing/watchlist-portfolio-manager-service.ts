@@ -111,6 +111,13 @@ type Candidate = {
   positionContext: TimingPositionContext;
 };
 
+function hasTriggeredCriticalInvalidation(card: TimingCardDraft) {
+  return (card.reasoning.signalContext.invalidationConditions ?? []).some(
+    (condition) =>
+      condition.status === "TRIGGERED" && condition.severity === "CRITICAL",
+  );
+}
+
 export class WatchlistPortfolioManagerService {
   constructor(
     private readonly deps: {
@@ -170,6 +177,7 @@ export class WatchlistPortfolioManagerService {
         });
         const positionNormalizedAction = this.normalizeForPosition({
           action: marketNormalizedAction,
+          card,
           positionContext,
           marketContextAnalysis: params.marketContextAnalysis,
         });
@@ -185,6 +193,9 @@ export class WatchlistPortfolioManagerService {
           riskFlags.push("HIGH_CORRELATION");
         }
         if (positionContext.invalidationRisk === "AT_RISK") {
+          riskFlags.push("NEAR_INVALIDATION");
+        }
+        if (hasTriggeredCriticalInvalidation(card)) {
           riskFlags.push("NEAR_INVALIDATION");
         }
         if (
@@ -312,6 +323,10 @@ export class WatchlistPortfolioManagerService {
                   KRONOS_MISSING_WARNING,
                 ]),
               ],
+          triggerConditions:
+            candidate.card.reasoning.signalContext.triggerConditions,
+          invalidationConditions:
+            candidate.card.reasoning.signalContext.invalidationConditions,
         },
       };
     });
@@ -365,15 +380,28 @@ export class WatchlistPortfolioManagerService {
 
   private normalizeForPosition(params: {
     action: TimingAction;
+    card: TimingCardDraft;
     positionContext: TimingPositionContext;
     marketContextAnalysis: MarketContextAnalysis;
   }): TimingAction {
     const { positionContext } = params;
+    const triggeredCriticalInvalidation = hasTriggeredCriticalInvalidation(
+      params.card,
+    );
+    if (triggeredCriticalInvalidation && !positionContext.held) {
+      return params.action === "ADD" || params.action === "PROBE"
+        ? "WATCH"
+        : params.action;
+    }
+
     if (!positionContext.held) {
       return params.action;
     }
 
-    if (positionContext.invalidationRisk === "AT_RISK") {
+    if (
+      positionContext.invalidationRisk === "AT_RISK" ||
+      triggeredCriticalInvalidation
+    ) {
       if (params.action === "ADD") {
         return positionContext.pnlZone === "LOSS" ? "EXIT" : "TRIM";
       }

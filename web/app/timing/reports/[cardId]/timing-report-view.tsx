@@ -20,6 +20,7 @@ import {
   formatTimingVolatilityTrendLabel,
 } from "~/app/timing/timing-labels";
 import type {
+  TimingExecutionCondition,
   TimingReportPayload,
   TimingSignalEngineKey,
 } from "~/server/domain/timing/types";
@@ -53,6 +54,23 @@ const evidenceOrder: TimingSignalEngineKey[] = [
   "breakoutFailure",
   "gapVolumeQuality",
 ];
+
+const conditionStatusLabelMap: Record<string, string> = {
+  TRIGGERED: "已触发",
+  NEAR: "接近",
+  PENDING: "待确认",
+  INVALIDATED: "已失效",
+};
+
+const conditionStatusToneMap: Record<
+  string,
+  "neutral" | "info" | "success" | "warning"
+> = {
+  TRIGGERED: "success",
+  NEAR: "warning",
+  PENDING: "neutral",
+  INVALIDATED: "warning",
+};
 
 export type TimingReportStageId =
   | "summary"
@@ -314,12 +332,16 @@ function EvidenceTab(props: { report: TimingReportPayload }) {
 function ExecutionTab(props: { report: TimingReportPayload }) {
   const { report } = props;
   const signalContext = report.card.reasoning.signalContext;
+  const triggerConditions = signalContext.triggerConditions ?? [];
+  const invalidationConditions = signalContext.invalidationConditions ?? [];
 
   return (
     <div className="grid gap-6">
       <div className="grid gap-6 xl:grid-cols-2">
         <Panel title="触发条件" surface="inset">
-          {signalContext.triggerNotes.length > 0 ? (
+          {triggerConditions.length > 0 ? (
+            <ConditionList conditions={triggerConditions} />
+          ) : signalContext.triggerNotes.length > 0 ? (
             <ul className="grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
               {signalContext.triggerNotes.map((item) => (
                 <li
@@ -336,7 +358,9 @@ function ExecutionTab(props: { report: TimingReportPayload }) {
         </Panel>
 
         <Panel title="失效条件" surface="inset">
-          {signalContext.invalidationNotes.length > 0 ? (
+          {invalidationConditions.length > 0 ? (
+            <ConditionList conditions={invalidationConditions} />
+          ) : signalContext.invalidationNotes.length > 0 ? (
             <ul className="grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
               {signalContext.invalidationNotes.map((item) => (
                 <li
@@ -413,6 +437,58 @@ function ExecutionTab(props: { report: TimingReportPayload }) {
           )}
         </Panel>
       </div>
+    </div>
+  );
+}
+
+function ConditionList(props: { conditions: TimingExecutionCondition[] }) {
+  return (
+    <div className="grid gap-3">
+      {props.conditions.map((condition) => (
+        <article
+          key={condition.id}
+          className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] px-3 py-3"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-[var(--app-text)]">
+              {condition.label}
+            </span>
+            <StatusPill
+              label={
+                conditionStatusLabelMap[condition.status] ?? condition.status
+              }
+              tone={conditionStatusToneMap[condition.status] ?? "neutral"}
+            />
+            <StatusPill label={condition.severity} tone="info" />
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
+            {formatTimingNarrative(condition.explanation)}
+          </p>
+          <dl className="mt-2 grid gap-2 text-xs text-[var(--app-text-soft)] sm:grid-cols-3">
+            <div>
+              <dt>指标</dt>
+              <dd className="mt-1 text-[var(--app-text-muted)]">
+                {condition.metric}
+              </dd>
+            </div>
+            <div>
+              <dt>阈值</dt>
+              <dd className="mt-1 text-[var(--app-text-muted)]">
+                {condition.operator} {String(condition.threshold)}
+                {condition.unit ?? ""}
+              </dd>
+            </div>
+            <div>
+              <dt>当前</dt>
+              <dd className="mt-1 text-[var(--app-text-muted)]">
+                {condition.actual === undefined || condition.actual === null
+                  ? "-"
+                  : `${condition.actual}${condition.unit ?? ""}`}
+              </dd>
+            </div>
+          </dl>
+        </article>
+      ))}
     </div>
   );
 }

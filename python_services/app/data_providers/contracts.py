@@ -51,6 +51,9 @@ class MarketSnapshotRow:
     volumeRatio: float | None
     marketCap: float | None
     floatMarketCap: float | None
+    limitStatus: str | None = None
+    upLimit: float | None = None
+    downLimit: float | None = None
 
 
 @dataclass(frozen=True)

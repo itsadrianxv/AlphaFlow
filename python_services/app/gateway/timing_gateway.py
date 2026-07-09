@@ -17,6 +17,7 @@ from app.contracts.timing import (
     MarketIndexSnapshot,
     MarketLeadershipPoint,
     MarketVolatilityPoint,
+    TimingMarketContextAvailability,
     TimingBar,
     TimingBarsData,
     TimingBarsResponse,
@@ -40,11 +41,11 @@ from app.policies.retry_policy import RetryPolicy
 from app.services.timing_indicators import timing_indicators_service
 
 SIGNAL_BENCHMARK_CODES = ["510300", "510500", "159915"]
-MARKET_PROXY_CODES = [
-    ("510300", "CSI 300 ETF"),
-    ("510500", "CSI 500 ETF"),
-    ("159915", "ChiNext ETF"),
-    ("588000", "STAR 50 ETF"),
+MARKET_INDEX_CODES = [
+    ("000300.SH", "沪深300", "510300"),
+    ("000905.SH", "中证500", "510500"),
+    ("399006.SZ", "创业板指", "159915"),
+    ("000688.SH", "科创50", "588000"),
 ]
 
 
@@ -396,10 +397,18 @@ class TimingGateway:
         *,
         as_of_date: str | None,
     ) -> MarketContextSnapshotData:
+        warnings: list[str] = []
         universe = self._get_market_snapshot(
             self._market_context_provider,
             as_of_date=as_of_date,
         )
+        if not universe:
+            raise GatewayError(
+                code="market_snapshot_empty",
+                message="全市场日行情为空，无法生成择时市场环境。",
+                status_code=503,
+                provider=self._market_context_provider.provider_name,
+            )
 
         change_values = [
             float(item.changePercent or 0)
@@ -411,53 +420,46 @@ class TimingGateway:
             for item in universe
             if item.turnoverRate is not None
         ]
+        volume_ratio_values = [
+            float(item.volumeRatio or 0)
+            for item in universe
+            if item.volumeRatio is not None
+        ]
+        stock_limit_available = any(
+            bool(getattr(item, "limitStatus", None))
+            or getattr(item, "upLimit", None) is not None
+            or getattr(item, "downLimit", None) is not None
+            for item in universe
+        )
 
-        index_frames: dict[str, pd.DataFrame] = {}
-        indexes: list[MarketIndexSnapshot] = []
         resolved_as_of = self._resolve_universe_as_of(universe) or as_of_date
-
-        for code, fallback_name in MARKET_PROXY_CODES:
-            stock = self._get_stock_snapshot(self._market_context_provider, code)
-            history = self._get_stock_bars(
-                self._market_context_provider,
-                stock_code=code,
-                start_date=self._resolve_start_date(
-                    start=None,
-                    end=as_of_date,
-                    lookback_days=260,
-                ),
-                end_date=as_of_date,
-                adjust="qfq",
-            )
-            normalized = timing_indicators_service.normalize_history(history)
-            sliced = timing_indicators_service.slice_as_of(normalized, as_of_date)
-            enriched = timing_indicators_service.calculate_indicators(sliced)
-            latest = enriched.iloc[-1]
-            previous_close = float(enriched.iloc[-2]["close"]) if len(enriched.index) >= 2 else float(latest["close"])
-            change_pct = ((float(latest["close"]) / max(previous_close, 0.0001)) - 1) * 100
-            atr_ratio = float(latest["atr14"] / max(latest["close"], 0.0001))
-            resolved_as_of = latest["trade_date"].strftime("%Y-%m-%d")
-
-            index_frames[code] = enriched.tail(20).reset_index(drop=True)
-            indexes.append(
-                MarketIndexSnapshot(
-                    code=code,
-                    name=str(stock.get("name") or stock.get("stockName") or fallback_name),
-                    close=round(float(latest["close"]), 4),
-                    changePct=round(change_pct, 4),
-                    return5d=round(float(latest["return_5d"]) * 100, 4),
-                    return10d=round(float(latest["return_10d"]) * 100, 4),
-                    ema20=round(float(latest["ema20"]), 4),
-                    ema60=round(float(latest["ema60"]), 4),
-                    aboveEma20=bool(latest["close"] >= latest["ema20"]),
-                    aboveEma60=bool(latest["close"] >= latest["ema60"]),
-                    atrRatio=round(atr_ratio, 4),
-                    signalDirection=self._direction_from_price(float(latest["close"]), float(latest["ema20"]), float(latest["ema60"])),
-                )
+        index_frames, indexes, index_warnings = self._load_market_index_context(
+            as_of_date=as_of_date,
+        )
+        warnings.extend(index_warnings)
+        if len(indexes) < 2:
+            raise GatewayError(
+                code="market_indexes_unavailable",
+                message="可用指数行情少于 2 个，无法生成稳定的择时市场环境。",
+                status_code=503,
+                provider=self._market_context_provider.provider_name,
             )
 
-        latest_breadth = self._build_latest_breadth(change_values, turnover_values, resolved_as_of or datetime.now(UTC).strftime("%Y-%m-%d"))
-        latest_volatility = self._build_latest_volatility(change_values, indexes, resolved_as_of or datetime.now(UTC).strftime("%Y-%m-%d"))
+        latest_index_as_of = self._resolve_index_as_of(index_frames)
+        if latest_index_as_of:
+            resolved_as_of = latest_index_as_of
+
+        latest_breadth = self._build_latest_breadth(
+            change_values,
+            turnover_values,
+            resolved_as_of or datetime.now(UTC).strftime("%Y-%m-%d"),
+        )
+        latest_volatility = self._build_latest_volatility(
+            universe,
+            change_values,
+            indexes,
+            resolved_as_of or datetime.now(UTC).strftime("%Y-%m-%d"),
+        )
 
         breadth_series, volatility_series, leadership_series = self._build_market_series(
             index_frames=index_frames,
@@ -466,6 +468,12 @@ class TimingGateway:
         )
 
         latest_leadership = leadership_series[-1]
+        hsgt_flow_score, hsgt_available, hsgt_warning = self._resolve_hsgt_flow_score(
+            as_of_date=resolved_as_of,
+        )
+        if hsgt_warning:
+            warnings.append(hsgt_warning)
+        daily_basic_available = bool(turnover_values or volume_ratio_values)
         benchmark_strength = round(
             (
                 sum(
@@ -481,16 +489,48 @@ class TimingGateway:
             * 100,
             2,
         )
+        activity_score = round(
+            min(
+                100,
+                max(
+                    0,
+                    ((sum(turnover_values) / len(turnover_values)) if turnover_values else 0)
+                    * 10
+                    + ((sum(volume_ratio_values) / len(volume_ratio_values)) if volume_ratio_values else 1)
+                    * 20,
+                ),
+            ),
+            2,
+        )
         breadth_score = round(
             min(100, max(0, latest_breadth.positiveRatio * 70 + latest_breadth.aboveThreePctRatio * 30) * 100),
             2,
         )
         risk_score = round(
-            min(100, max(0, latest_volatility.highVolatilityRatio * 60 + latest_breadth.belowThreePctRatio * 40) * 100),
+            min(
+                100,
+                max(
+                    0,
+                    latest_volatility.highVolatilityRatio * 45
+                    + latest_breadth.belowThreePctRatio * 30
+                    + (latest_volatility.limitDownLikeCount / max(latest_breadth.totalCount, 1)) * 25,
+                )
+                * 100,
+            ),
             2,
         )
         state_score = round(
-            min(100, max(0, benchmark_strength * 0.45 + breadth_score * 0.35 + (100 - risk_score) * 0.2)),
+            min(
+                100,
+                max(
+                    0,
+                    benchmark_strength * 0.4
+                    + breadth_score * 0.32
+                    + (100 - risk_score) * 0.18
+                    + activity_score * 0.05
+                    + hsgt_flow_score * 0.05,
+                ),
+            ),
             2,
         )
 
@@ -508,8 +548,169 @@ class TimingGateway:
                 breadthScore=breadth_score,
                 riskScore=risk_score,
                 stateScore=state_score,
+                northboundFlowScore=hsgt_flow_score,
+                activityScore=activity_score,
+            ),
+            source="tushare:daily,daily_basic,index_daily,stk_limit,moneyflow_hsgt",
+            availability=TimingMarketContextAvailability(
+                daily=True,
+                dailyBasic=daily_basic_available,
+                indexDaily=True,
+                stockLimit=stock_limit_available,
+                indexDailyBasic=False,
+                hsgtFlow=hsgt_available,
+                warnings=warnings,
             ),
         )
+
+    def _load_market_index_context(
+        self,
+        *,
+        as_of_date: str | None,
+    ) -> tuple[dict[str, pd.DataFrame], list[MarketIndexSnapshot], list[str]]:
+        index_frames: dict[str, pd.DataFrame] = {}
+        indexes: list[MarketIndexSnapshot] = []
+        warnings: list[str] = []
+        start_date = self._resolve_start_date(
+            start=None,
+            end=as_of_date,
+            lookback_days=260,
+        )
+
+        for ts_code, fallback_name, legacy_code in MARKET_INDEX_CODES:
+            try:
+                history = self._load_index_history(
+                    ts_code=ts_code,
+                    legacy_code=legacy_code,
+                    start_date=start_date,
+                    end_date=as_of_date,
+                )
+                normalized = timing_indicators_service.normalize_history(history)
+                sliced = timing_indicators_service.slice_as_of(normalized, as_of_date)
+                enriched = timing_indicators_service.calculate_indicators(sliced)
+                index_frames[ts_code] = enriched.tail(20).reset_index(drop=True)
+                indexes.append(
+                    self._build_index_snapshot(
+                        code=ts_code,
+                        name=fallback_name,
+                        enriched=enriched,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(f"{ts_code} index_daily unavailable: {exc}")
+
+        return index_frames, indexes, warnings
+
+    def _load_index_history(
+        self,
+        *,
+        ts_code: str,
+        legacy_code: str,
+        start_date: str,
+        end_date: str | None,
+    ) -> pd.DataFrame:
+        raw_frame = self._get_raw_frame(
+            self._market_context_provider,
+            "index_daily",
+            ts_code=ts_code,
+            start_date=start_date,
+            **({"end_date": end_date.replace("-", "")} if end_date else {}),
+        )
+        if not raw_frame.empty:
+            return self._daily_bars_to_timing_frame(
+                [
+                    DailyBar(
+                        stockCode=ts_code,
+                        tradeDate=str(row.get("trade_date")),
+                        open=self._safe_float(row.get("open")),
+                        high=self._safe_float(row.get("high")),
+                        low=self._safe_float(row.get("low")),
+                        close=self._safe_float(row.get("close")),
+                        volume=self._safe_float(row.get("vol")),
+                        amount=self._safe_float(row.get("amount")),
+                        turnoverRate=None,
+                    )
+                    for _, row in raw_frame.iterrows()
+                ]
+            )
+
+        return self._get_stock_bars(
+            self._market_context_provider,
+            stock_code=legacy_code,
+            start_date=start_date,
+            end_date=end_date,
+            adjust="qfq",
+        )
+
+    def _build_index_snapshot(
+        self,
+        *,
+        code: str,
+        name: str,
+        enriched: pd.DataFrame,
+    ) -> MarketIndexSnapshot:
+        latest = enriched.iloc[-1]
+        previous_close = (
+            float(enriched.iloc[-2]["close"])
+            if len(enriched.index) >= 2
+            else float(latest["close"])
+        )
+        change_pct = ((float(latest["close"]) / max(previous_close, 0.0001)) - 1) * 100
+        atr_ratio = float(latest["atr14"] / max(latest["close"], 0.0001))
+
+        return MarketIndexSnapshot(
+            code=code,
+            name=name,
+            close=round(float(latest["close"]), 4),
+            changePct=round(change_pct, 4),
+            return5d=round(float(latest["return_5d"]) * 100, 4),
+            return10d=round(float(latest["return_10d"]) * 100, 4),
+            ema20=round(float(latest["ema20"]), 4),
+            ema60=round(float(latest["ema60"]), 4),
+            aboveEma20=bool(latest["close"] >= latest["ema20"]),
+            aboveEma60=bool(latest["close"] >= latest["ema60"]),
+            atrRatio=round(atr_ratio, 4),
+            signalDirection=self._direction_from_price(
+                float(latest["close"]),
+                float(latest["ema20"]),
+                float(latest["ema60"]),
+            ),
+        )
+
+    def _resolve_hsgt_flow_score(
+        self,
+        *,
+        as_of_date: str | None,
+    ) -> tuple[float, bool, str | None]:
+        end_date = (
+            datetime.strptime(as_of_date, "%Y-%m-%d")
+            if as_of_date
+            else datetime.now(UTC).replace(tzinfo=None)
+        )
+        try:
+            raw_frame = self._get_raw_frame(
+                self._market_context_provider,
+                "moneyflow_hsgt",
+                start_date=(end_date - timedelta(days=14)).strftime("%Y%m%d"),
+                end_date=end_date.strftime("%Y%m%d"),
+            )
+            if raw_frame.empty:
+                return 50.0, False, "moneyflow_hsgt unavailable: empty response"
+            row = raw_frame.sort_values("trade_date", ascending=False).iloc[0]
+            north_money = self._safe_float(row.get("north_money"))
+            if north_money is None:
+                return 50.0, False, "moneyflow_hsgt unavailable: north_money missing"
+            return max(0, min(100, 50 + north_money / 20)), True, None
+        except Exception as exc:  # noqa: BLE001
+            return 50.0, False, f"moneyflow_hsgt unavailable: {exc}"
+
+    def _resolve_index_as_of(self, index_frames: dict[str, pd.DataFrame]) -> str | None:
+        dates = []
+        for frame in index_frames.values():
+            if frame.empty:
+                continue
+            dates.append(frame.iloc[-1]["trade_date"].strftime("%Y-%m-%d"))
+        return max(dates) if dates else None
 
     def _build_latest_breadth(
         self,
@@ -537,12 +738,26 @@ class TimingGateway:
 
     def _build_latest_volatility(
         self,
+        universe: list[MarketSnapshotRow],
         change_values: list[float],
         indexes: list[MarketIndexSnapshot],
         as_of_date: str,
     ) -> MarketVolatilityPoint:
         total_count = max(len(change_values), 1)
         high_volatility_count = len([value for value in change_values if abs(value) >= 5])
+        limit_down_like_count = len(
+            [
+                item
+                for item in universe
+                if (getattr(item, "limitStatus", None) in {"D", "-1", "limit_down"})
+                or (
+                    item.close is not None
+                    and getattr(item, "downLimit", None) is not None
+                    and item.close <= float(getattr(item, "downLimit")) * 1.005
+                )
+                or (item.changePercent is not None and item.changePercent <= -9)
+            ]
+        )
         index_atr_ratio = (
             round(sum(item.atrRatio for item in indexes) / len(indexes), 4)
             if indexes
@@ -552,7 +767,7 @@ class TimingGateway:
             asOfDate=as_of_date,
             highVolatilityCount=high_volatility_count,
             highVolatilityRatio=round(high_volatility_count / total_count, 4),
-            limitDownLikeCount=len([value for value in change_values if value <= -9]),
+            limitDownLikeCount=limit_down_like_count,
             indexAtrRatio=index_atr_ratio,
         )
 
@@ -675,6 +890,22 @@ class TimingGateway:
                 return item.tradeDate
         return None
 
+    def _safe_float(self, value: object) -> float | None:
+        if value is None:
+            return None
+        try:
+            if pd.isna(value):
+                return None
+        except (TypeError, ValueError):
+            pass
+        text = str(value).strip()
+        if not text or text.lower() in {"nan", "none", "null", "--"}:
+            return None
+        try:
+            return float(text.replace(",", ""))
+        except ValueError:
+            return None
+
     def _get_stock_snapshot(self, provider: DataProvider, stock_code: str) -> dict[str, str]:
         try:
             return self._stock_profile_to_snapshot(provider.get_stock_profile(stock_code))
@@ -748,6 +979,21 @@ class TimingGateway:
             return provider.get_market_snapshot(as_of_date=as_of_date)
         except DataProviderError as exc:
             raise self._to_gateway_error(exc) from exc
+
+    def _get_raw_frame(
+        self,
+        provider: DataProvider,
+        dataset: str,
+        **params: str,
+    ) -> pd.DataFrame:
+        raw_loader = getattr(provider, "get_raw_frame", None)
+        if raw_loader is None:
+            return pd.DataFrame()
+        try:
+            frame = raw_loader(dataset, **params)
+        except DataProviderError as exc:
+            raise self._to_gateway_error(exc) from exc
+        return frame.copy() if isinstance(frame, pd.DataFrame) else pd.DataFrame()
 
     def _stock_profile_to_snapshot(self, profile: StockProfile) -> dict[str, str]:
         return {
