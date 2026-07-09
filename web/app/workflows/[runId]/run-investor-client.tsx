@@ -276,11 +276,7 @@ export function RunInvestorClient({
       }
       historyLoading={historyLoading}
       title={getTitle(templateCode)}
-      description={
-        showIndustryConclusion
-          ? "把行业研究结论按总览、核心逻辑、证据与可信度、风险与下一步分段阅读。"
-          : undefined
-      }
+      description={undefined}
       contentWidth={showIndustryConclusion ? "wide" : "standard"}
       actions={
         <>

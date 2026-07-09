@@ -104,22 +104,22 @@ const sections: IndustryConclusionSection[] = [
   {
     id: "overview",
     label: "总览",
-    summary: "结论、摘要、动作",
+    summary: "",
   },
   {
     id: "logic",
     label: "核心逻辑",
-    summary: "行业驱动与重点标的",
+    summary: "",
   },
   {
     id: "evidence",
     label: "证据与可信度",
-    summary: "支持/不足/冲突",
+    summary: "",
   },
   {
     id: "risks",
     label: "风险与下一步",
-    summary: "缺口、反例和动作",
+    summary: "",
   },
 ];
 

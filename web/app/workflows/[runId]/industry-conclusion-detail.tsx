@@ -47,7 +47,7 @@ function DetailList(props: { items: string[]; emptyText: string }) {
       {props.items.map((item, index) => (
         <li
           key={`${item}-${index + 1}`}
-          className="border-b border-[var(--app-border-soft)] py-3 text-sm leading-7 text-[var(--app-text-muted)] last:border-b-0"
+          className="border-b border-[var(--app-border-soft)] py-2.5 text-sm leading-6 text-[var(--app-text-muted)] last:border-b-0"
         >
           <MarkdownContent content={item} compact />
         </li>
@@ -57,6 +57,12 @@ function DetailList(props: { items: string[]; emptyText: string }) {
 }
 
 function ActionLinks(props: { model: IndustryConclusionViewModel }) {
+  const formatActionLabel = (label: string) =>
+    label
+      .replaceAll("Space", "研究空间")
+      .replaceAll("Report", "报告")
+      .replaceAll("Debug", "调试");
+
   return (
     <div className="flex flex-wrap gap-2">
       {props.model.overviewActions.map((action) => (
@@ -69,7 +75,7 @@ function ActionLinks(props: { model: IndustryConclusionViewModel }) {
               : "app-button"
           }
         >
-          {action.label.replace("Space", "研究空间")}
+          {formatActionLabel(action.label)}
         </Link>
       ))}
     </div>
@@ -82,7 +88,7 @@ function NoticeList(props: { model: IndustryConclusionViewModel }) {
   }
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-3 xl:grid-cols-2">
       {props.model.notices.map((notice, index) => (
         <div
           key={`${notice.title}-${index + 1}`}
@@ -117,16 +123,16 @@ function NoticeList(props: { model: IndustryConclusionViewModel }) {
 
 function MetricStrip(props: { model: IndustryConclusionViewModel }) {
   return (
-    <dl className="grid overflow-hidden rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] sm:grid-cols-2 xl:grid-cols-5">
+    <dl className="grid border-y border-[var(--app-border-soft)] sm:grid-cols-2 xl:grid-cols-5">
       {props.model.metricStrip.map((metric, index) => (
         <div
           key={`${metric.label}-${metric.value}`}
-          className={`px-4 py-4 ${index > 0 ? "border-t border-[var(--app-border-soft)] sm:border-t-0 sm:border-l" : ""}`}
+          className={`py-3 ${index > 0 ? "border-t border-[var(--app-border-soft)] sm:border-t-0 sm:border-l sm:px-4" : "sm:pr-4"} ${index === 0 ? "" : "px-0"}`}
         >
           <dt className="text-xs text-[var(--app-text-subtle)]">
             {metric.label}
           </dt>
-          <dd className="app-data mt-2 text-[28px] leading-none text-[var(--app-text-strong)]">
+          <dd className="app-data mt-1.5 text-2xl leading-none text-[var(--app-text-strong)]">
             {metric.value}
           </dd>
         </div>
@@ -137,9 +143,9 @@ function MetricStrip(props: { model: IndustryConclusionViewModel }) {
 
 function OverviewSection(props: { model: IndustryConclusionViewModel }) {
   return (
-    <div className="grid gap-6">
-      <Panel title="摘要总览" surface="inset">
-        <div className="grid gap-5">
+    <div className="grid gap-4">
+      <Panel title="摘要总览" surface="inset" density="compact">
+        <div className="grid gap-4">
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill
               label={props.model.verdictLabel}
@@ -155,17 +161,18 @@ function OverviewSection(props: { model: IndustryConclusionViewModel }) {
             ))}
           </div>
 
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
             <div className="min-w-0">
               <div className="text-sm text-[var(--app-text-muted)]">
                 {props.model.query || "行业研究结论"}
               </div>
-              <h2 className="mt-2 font-[family-name:var(--font-heading)] text-[30px] leading-tight text-[var(--app-text-strong)] sm:text-[36px]">
+              <h2 className="mt-1.5 font-[family-name:var(--font-heading)] text-2xl leading-tight text-[var(--app-text-strong)] sm:text-[28px]">
                 {props.model.headline}
               </h2>
               <MarkdownContent
                 content={props.model.summary}
-                className="mt-4 max-w-4xl sm:text-base"
+                compact
+                className="mt-3 max-w-4xl"
               />
             </div>
             <div className="xl:justify-self-end">
@@ -174,11 +181,12 @@ function OverviewSection(props: { model: IndustryConclusionViewModel }) {
           </div>
 
           <MetricStrip model={props.model} />
-          <NoticeList model={props.model} />
         </div>
       </Panel>
 
-      <Panel title="摘要要点" surface="inset">
+      <NoticeList model={props.model} />
+
+      <Panel title="摘要要点" surface="inset" density="compact">
         <DetailList
           items={props.model.overviewPoints}
           emptyText="暂无额外摘要。"
@@ -190,22 +198,22 @@ function OverviewSection(props: { model: IndustryConclusionViewModel }) {
 
 function LogicSection(props: { model: IndustryConclusionViewModel }) {
   return (
-    <div className="grid gap-6">
-      <Panel title="行业驱动" surface="inset">
+    <div className="grid gap-4">
+      <Panel title="行业驱动" surface="inset" density="compact">
         <DetailList
           items={props.model.logic.industryDrivers}
           emptyText="暂无结构化行业驱动。"
         />
       </Panel>
 
-      <Panel title="竞争格局" surface="inset">
+      <Panel title="竞争格局" surface="inset" density="compact">
         <MarkdownContent
           content={props.model.logic.competitionSummary}
           compact
         />
       </Panel>
 
-      <Panel title="重点标的" surface="inset">
+      <Panel title="重点标的" surface="inset" density="compact">
         {props.model.logic.topPicks.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
             暂无重点标的。
@@ -215,19 +223,19 @@ function LogicSection(props: { model: IndustryConclusionViewModel }) {
             {props.model.logic.topPicks.map((item) => (
               <div
                 key={`${item.stockCode}-${item.stockName}`}
-                className="grid gap-3 border-b border-[var(--app-border-soft)] py-4 last:border-b-0 md:grid-cols-[minmax(0,1fr)_auto]"
+                className="grid gap-3 border-b border-[var(--app-border-soft)] py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_auto]"
               >
                 <div>
-                  <div className="font-[family-name:var(--font-heading)] text-lg leading-none text-[var(--app-text-strong)]">
+                  <div className="font-[family-name:var(--font-heading)] text-base leading-none text-[var(--app-text-strong)]">
                     {item.stockName}
                   </div>
-                  <div className="mt-2 text-xs tracking-[0.1em] text-[var(--app-text-subtle)]">
+                  <div className="mt-1.5 text-xs text-[var(--app-text-subtle)]">
                     {item.stockCode}
                   </div>
                   <MarkdownContent
                     content={item.reason}
                     compact
-                    className="mt-3"
+                    className="mt-2"
                   />
                 </div>
                 <div className="md:self-start">
@@ -246,39 +254,39 @@ function LogicSection(props: { model: IndustryConclusionViewModel }) {
 
 function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
   return (
-    <div className="grid gap-6">
-      <Panel title="证据校验" surface="inset">
-        <dl className="grid overflow-hidden rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] sm:grid-cols-2 xl:grid-cols-4">
-          <div className="border-b border-[var(--app-border-soft)] px-4 py-4 xl:border-r xl:border-b-0">
+    <div className="grid gap-4">
+      <Panel title="证据校验" surface="inset" density="compact">
+        <dl className="grid border-y border-[var(--app-border-soft)] sm:grid-cols-2 xl:grid-cols-4">
+          <div className="border-b border-[var(--app-border-soft)] py-3 xl:border-r xl:border-b-0 xl:pr-4">
             <dt className="text-xs text-[var(--app-text-subtle)]">可信度</dt>
-            <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
+            <dd className="mt-1.5 font-[family-name:var(--font-data)] text-2xl leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.scoreLabel}
             </dd>
           </div>
-          <div className="border-b border-[var(--app-border-soft)] px-4 py-4 sm:border-l xl:border-r xl:border-b-0">
+          <div className="border-b border-[var(--app-border-soft)] py-3 sm:border-l sm:px-4 xl:border-r xl:border-b-0">
             <dt className="text-xs text-[var(--app-text-subtle)]">等级</dt>
-            <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
+            <dd className="mt-1.5 font-[family-name:var(--font-data)] text-2xl leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.levelLabel}
             </dd>
           </div>
-          <div className="border-b border-[var(--app-border-soft)] px-4 py-4 xl:border-r xl:border-b-0">
+          <div className="border-b border-[var(--app-border-soft)] py-3 xl:border-r xl:border-b-0 xl:px-4">
             <dt className="text-xs text-[var(--app-text-subtle)]">覆盖率</dt>
-            <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
+            <dd className="mt-1.5 font-[family-name:var(--font-data)] text-2xl leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.coverageLabel}
             </dd>
           </div>
-          <div className="px-4 py-4 sm:border-l xl:border-l-0">
+          <div className="py-3 sm:border-l sm:px-4 xl:border-l-0">
             <dt className="text-xs text-[var(--app-text-subtle)]">
               支持/不足/冲突
             </dt>
-            <dd className="mt-3 font-[family-name:var(--font-data)] text-[28px] leading-none text-[var(--app-text-strong)]">
+            <dd className="mt-1.5 font-[family-name:var(--font-data)] text-2xl leading-none text-[var(--app-text-strong)]">
               {props.model.evidence.tripletLabel}
             </dd>
           </div>
         </dl>
       </Panel>
 
-      <Panel title="可信度说明" surface="inset">
+      <Panel title="可信度说明" surface="inset" density="compact">
         <DetailList
           items={props.model.evidence.notes}
           emptyText="暂无可信度说明。"
@@ -287,8 +295,8 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
 
       {props.model.evidence.qualityFlags.length > 0 ||
       props.model.evidence.missingRequirements.length > 0 ? (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <Panel title="质量标记" surface="inset">
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Panel title="质量标记" surface="inset" density="compact">
             <DetailList
               items={props.model.evidence.qualityFlags.map((item) =>
                 formatRuntimeIssueLabel(item),
@@ -296,7 +304,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
               emptyText="暂无质量标记。"
             />
           </Panel>
-          <Panel title="待补要求" surface="inset">
+          <Panel title="待补要求" surface="inset" density="compact">
             <DetailList
               items={props.model.evidence.missingRequirements.map((item) =>
                 formatRuntimeIssueLabel(item),
@@ -307,7 +315,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
         </div>
       ) : null}
 
-      <Panel title="结论断言" surface="inset">
+      <Panel title="结论断言" surface="inset" density="compact">
         {props.model.evidence.claims.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
             暂无结构化断言。
@@ -317,7 +325,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
             {props.model.evidence.claims.map((item) => (
               <div
                 key={item.claimId}
-                className="border-b border-[var(--app-border-soft)] py-4 last:border-b-0"
+                className="border-b border-[var(--app-border-soft)] py-3 last:border-b-0"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusPill
@@ -339,7 +347,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
         )}
       </Panel>
 
-      <Panel title="研究单元摘要" surface="inset">
+      <Panel title="研究单元摘要" surface="inset" density="compact">
         {props.model.evidence.researchPlan.length === 0 ? (
           <p className="text-sm leading-7 text-[var(--app-text-subtle)]">
             暂无研究单元记录。
@@ -349,7 +357,7 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
             {props.model.evidence.researchPlan.map((item) => (
               <div
                 key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--app-border-soft)] py-4 last:border-b-0"
+                className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--app-border-soft)] py-3 last:border-b-0"
               >
                 <div>
                   <div className="text-sm text-[var(--app-text-strong)]">
@@ -374,15 +382,10 @@ function EvidenceSection(props: { model: IndustryConclusionViewModel }) {
 
 function RisksSection(props: { model: IndustryConclusionViewModel }) {
   return (
-    <div className="grid gap-6">
-      <Panel
-        title="风险判断"
-        surface="inset"
-        description={
-          <MarkdownContent content={props.model.risks.summary} compact />
-        }
-      >
-        <div className="grid gap-6 xl:grid-cols-2">
+    <div className="grid gap-4">
+      <Panel title="风险判断" surface="inset" density="compact">
+        <MarkdownContent content={props.model.risks.summary} compact />
+        <div className="mt-4 grid gap-4 xl:grid-cols-2">
           <div>
             <div className="mb-3 text-sm font-medium text-[var(--app-text-strong)]">
               缺口
@@ -404,14 +407,14 @@ function RisksSection(props: { model: IndustryConclusionViewModel }) {
         </div>
       </Panel>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Panel title="待回答问题" surface="inset">
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Panel title="待回答问题" surface="inset" density="compact">
           <DetailList
             items={props.model.risks.unansweredQuestions}
             emptyText="暂无待回答问题。"
           />
         </Panel>
-        <Panel title="下一步动作" surface="inset">
+        <Panel title="下一步动作" surface="inset" density="compact">
           <DetailList
             items={props.model.risks.nextActions}
             emptyText="暂无后续动作。"
@@ -436,7 +439,7 @@ export function IndustryConclusionDetail(props: {
     <div
       data-industry-conclusion-detail="true"
       data-active-section={activeSectionId}
-      className="grid gap-6"
+      className="grid gap-4"
     >
       <WorkflowStageSwitcher
         tabs={model.sections}
