@@ -1,8 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
 import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
+import { writePiAgentSelectionDraft } from "~/app/agent-runtime/selection-draft";
 import type { ResearchTargetRef } from "~/contracts/research-target";
 import { api } from "~/trpc/react";
 
@@ -11,6 +13,7 @@ type HighlightToNoteProps = {
   lastTargetRef?: ResearchTargetRef | null;
   floatingToolbar?: boolean;
   onLastTargetRefChange?: (targetRef: ResearchTargetRef | null) => void;
+  piAgentHref?: string;
   source?: Record<string, unknown>;
   children: ReactNode;
 };
@@ -52,6 +55,7 @@ function clamp(value: number, min: number, max: number) {
 }
 
 export function HighlightToNote(props: HighlightToNoteProps) {
+  const router = useRouter();
   const [selectedText, setSelectedText] = useState("");
   const [toolbarPosition, setToolbarPosition] =
     useState<ToolbarPosition | null>(null);
@@ -60,6 +64,7 @@ export function HighlightToNote(props: HighlightToNoteProps) {
     props.lastTargetRef ?? props.targetRef ?? null,
   );
   const [lastNoteId, setLastNoteId] = useState("");
+  const [piAgentDraftError, setPiAgentDraftError] = useState("");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const utils = api.useUtils();
   const targetsQuery = api.researchTarget.listTargets.useQuery(
@@ -112,6 +117,7 @@ export function HighlightToNote(props: HighlightToNoteProps) {
       const rect = range?.getBoundingClientRect();
       setSelectedText(text.slice(0, 4000));
       setPickerMode(null);
+      setPiAgentDraftError("");
       if (props.floatingToolbar && rect) {
         const maxLeft = Math.max(10, window.innerWidth - 430);
         setToolbarPosition({
@@ -126,7 +132,23 @@ export function HighlightToNote(props: HighlightToNoteProps) {
       setSelectedText("");
       setToolbarPosition(null);
       setPickerMode(null);
+      setPiAgentDraftError("");
     }
+  }
+
+  function askPiAgent() {
+    const saved = writePiAgentSelectionDraft({
+      text: selectedText,
+      createdAt: new Date().toISOString(),
+      source: props.source ?? null,
+    });
+
+    if (!saved) {
+      setPiAgentDraftError("无法暂存选中文本，请确认浏览器允许本地会话存储。");
+      return;
+    }
+
+    router.push(props.piAgentHref ?? "/agent-runtime?draft=selection");
   }
 
   const activeTargetRef = targetRef ?? props.lastTargetRef ?? null;
@@ -209,7 +231,20 @@ export function HighlightToNote(props: HighlightToNoteProps) {
                   ? `保存到${activeTargetLabel}`
                   : "保存到上次对象"}
               </button>
+              <button
+                type="button"
+                className="inline-flex h-9 items-center justify-center rounded-full border border-[var(--app-border-soft)] px-3 text-xs font-medium text-[var(--app-text-strong)] transition-colors hover:bg-[rgba(255,255,255,0.08)]"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={askPiAgent}
+              >
+                询问 Pi Agent
+              </button>
             </div>
+            {piAgentDraftError ? (
+              <div className="mt-2 max-w-[390px] rounded-[12px] border border-[var(--app-danger-border)] bg-[var(--app-danger-surface)] px-3 py-2 text-xs text-[var(--app-danger)]">
+                {piAgentDraftError}
+              </div>
+            ) : null}
             {activePickerConfig ? (
               <div className="mt-2 w-[min(390px,calc(100vw-20px))] rounded-[18px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-3 shadow-[var(--app-shadow-lg)]">
                 <ResearchTargetPicker

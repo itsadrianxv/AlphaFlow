@@ -6,6 +6,10 @@ import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { MarkdownContent } from "~/app/_components/markdown-content";
 import { InlineNotice, StatusPill, WorkspaceShell } from "~/app/_components/ui";
 import type { WorkspaceHistoryItem } from "~/app/_components/workspace-shell";
+import {
+  consumePiAgentSelectionDraft,
+  PI_AGENT_SELECTION_DRAFT_QUERY,
+} from "~/app/agent-runtime/selection-draft";
 import type { ResearchTargetRef } from "~/contracts/research-target";
 import { api, type RouterOutputs } from "~/trpc/react";
 
@@ -82,6 +86,7 @@ function ChatMessage(props: {
   liveText?: string;
   lastTargetRef?: ResearchTargetRef | null;
   onLastTargetRefChange?: (targetRef: ResearchTargetRef | null) => void;
+  piAgentHref: string;
 }) {
   const { message, liveText } = props;
   const isUser = message.role === "USER";
@@ -110,6 +115,7 @@ function ChatMessage(props: {
             lastTargetRef={props.lastTargetRef}
             floatingToolbar
             onLastTargetRefChange={props.onLastTargetRefChange}
+            piAgentHref={props.piAgentHref}
             source={{
               kind: "pi_agent_message",
               messageId: message.id,
@@ -193,6 +199,7 @@ export function AgentRuntimeClientPage() {
     null,
   );
   const skillMenuRef = useRef<HTMLDivElement | null>(null);
+  const promptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const migrationRequestedRef = useRef(false);
 
@@ -226,6 +233,27 @@ export function AgentRuntimeClientPage() {
     migrationRequestedRef.current = true;
     migrateMutation.mutate();
   }, [migrateMutation.mutate]);
+
+  useEffect(() => {
+    if (searchParams.get("draft") !== PI_AGENT_SELECTION_DRAFT_QUERY) {
+      return;
+    }
+
+    const draft = consumePiAgentSelectionDraft();
+    if (draft) {
+      setPrompt((current) =>
+        current.trim() ? `${current.trimEnd()}\n\n${draft.text}` : draft.text,
+      );
+      window.setTimeout(() => promptTextareaRef.current?.focus(), 0);
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams.toString());
+    nextSearchParams.delete("draft");
+    const nextQuery = nextSearchParams.toString();
+    router.replace(
+      nextQuery ? `/agent-runtime?${nextQuery}` : "/agent-runtime",
+    );
+  }, [router, searchParams]);
 
   useEffect(() => {
     const firstSkill = skillsQuery.data?.items[0]?.id;
@@ -477,6 +505,7 @@ export function AgentRuntimeClientPage() {
         </div>
         <div className="relative rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] transition-[border-color,box-shadow,background-color] focus-within:border-[var(--app-accent-strong)] focus-within:bg-[var(--app-bg-elevated)] focus-within:shadow-[0_0_0_3px_rgba(59,158,255,0.16)]">
           <textarea
+            ref={promptTextareaRef}
             className="min-h-[104px] w-full resize-none rounded-[22px] border-0 bg-transparent pt-4 pr-16 pb-16 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
@@ -683,6 +712,9 @@ export function AgentRuntimeClientPage() {
                   liveText={liveMessages[message.id]}
                   lastTargetRef={lastTargetRef}
                   onLastTargetRefChange={setLastTargetRef}
+                  piAgentHref={`/agent-runtime?conversationId=${encodeURIComponent(
+                    selectedConversationId,
+                  )}&draft=selection`}
                 />
               ))}
               <div ref={messagesEndRef} />
