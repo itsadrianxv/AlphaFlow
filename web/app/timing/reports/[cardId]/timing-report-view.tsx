@@ -6,7 +6,6 @@ import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher
 import { TimingReportChart } from "~/app/timing/reports/[cardId]/timing-report-chart";
 import {
   formatTimingActionLabel,
-  formatTimingBreadthTrendLabel,
   formatTimingDirectionLabel,
   formatTimingEngineLabel,
   formatTimingMarketStateLabel,
@@ -17,10 +16,8 @@ import {
   formatTimingReviewHorizonLabel,
   formatTimingReviewVerdictLabel,
   formatTimingRiskFlagLabel,
-  formatTimingVolatilityTrendLabel,
 } from "~/app/timing/timing-labels";
 import type {
-  TimingExecutionCondition,
   TimingReportPayload,
   TimingSignalEngineKey,
 } from "~/server/domain/timing/types";
@@ -55,23 +52,6 @@ const evidenceOrder: TimingSignalEngineKey[] = [
   "gapVolumeQuality",
 ];
 
-const conditionStatusLabelMap: Record<string, string> = {
-  TRIGGERED: "已触发",
-  NEAR: "接近",
-  PENDING: "待确认",
-  INVALIDATED: "已失效",
-};
-
-const conditionStatusToneMap: Record<
-  string,
-  "neutral" | "info" | "success" | "warning"
-> = {
-  TRIGGERED: "success",
-  NEAR: "warning",
-  PENDING: "neutral",
-  INVALIDATED: "warning",
-};
-
 export type TimingReportStageId =
   | "summary"
   | "evidence"
@@ -103,7 +83,7 @@ export const timingReportStageTabs: Array<
   },
 ];
 
-function formatDate(value?: Date | null) {
+function formatDate(value?: Date | string | null) {
   if (!value) {
     return "-";
   }
@@ -112,7 +92,7 @@ function formatDate(value?: Date | null) {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(value);
+  }).format(new Date(value));
 }
 
 function formatPct(value?: number | null) {
@@ -123,51 +103,16 @@ function formatPct(value?: number | null) {
   return `${value.toFixed(2)}%`;
 }
 
-function _BackgroundStrip(props: { report: TimingReportPayload }) {
-  const { report } = props;
-  const items = [
-    {
-      label: "股票名称/代码",
-      value: `${report.card.stockName} / ${report.card.stockCode}`,
-    },
-    {
-      label: "报告日期",
-      value:
-        report.card.asOfDate ?? report.card.signalSnapshot?.asOfDate ?? "-",
-    },
-    {
-      label: "操作倾向",
-      value: formatTimingActionLabel(report.card.actionBias),
-    },
-    {
-      label: "置信度",
-      value: String(report.card.confidence),
-    },
-    {
-      label: "市场状态",
-      value: formatTimingMarketStateLabel(report.marketContext.state),
-    },
-  ];
+function formatPrice(value?: number | null) {
+  if (value === null || value === undefined) {
+    return "-";
+  }
 
-  return (
-    <Panel surface="inset" density="compact">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        {items.map((item) => (
-          <div
-            key={item.label}
-            className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-bg-floating)] px-4 py-3"
-          >
-            <div className="text-xs text-[var(--app-text-soft)]">
-              {item.label}
-            </div>
-            <div className="mt-2 text-sm leading-6 text-[var(--app-text)]">
-              {item.value}
-            </div>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  );
+  return value.toFixed(2);
+}
+
+function formatDataStatus(value: "COMPLETE" | "FALLBACK") {
+  return value === "COMPLETE" ? "完整" : "降级";
 }
 
 function SummaryTab(props: { report: TimingReportPayload }) {
@@ -177,7 +122,7 @@ function SummaryTab(props: { report: TimingReportPayload }) {
   const asOfDate = report.card.asOfDate ?? signalSnapshot?.asOfDate ?? "-";
   const kronosForecast = report.card.reasoning.kronosForecast;
   const modelPredictionText = kronosForecast
-    ? `模型预测：${formatTimingDirectionLabel(kronosForecast.direction)}, 预期收益 ${kronosForecast.expectedReturnPct.toFixed(2)}%, 最大回撤 ${kronosForecast.maxDrawdownPct.toFixed(2)}%`
+    ? `模型预测：${formatTimingDirectionLabel(kronosForecast.direction)}，预期收益 ${kronosForecast.expectedReturnPct.toFixed(2)}%，最大回撤 ${kronosForecast.maxDrawdownPct.toFixed(2)}%`
     : "模型预测：暂不可用";
 
   return (
@@ -191,15 +136,12 @@ function SummaryTab(props: { report: TimingReportPayload }) {
             <span>报告日期 {asOfDate}</span>
           </div>
           <p>
-            综合择时评分 {signalContext.compositeScore.toFixed(1)} /
-            ±100，置信度 {report.card.confidence} / 100
+            综合择时评分 {signalContext.compositeScore.toFixed(1)} / ±100，
+            置信度 {report.card.confidence} / 100
           </p>
           <p>{modelPredictionText}</p>
           <p className="max-w-5xl text-[var(--app-text-muted)]">
-            注：择时评分计算公式从多周期一致性、相对强弱、波动率分位、流动性/换手结构、突破失败率、缺口与放量质量六个角度进行加权评分。具体计算公式为：综合分
-            = Σ(单角度得分 × 该角度权重 × 该角度证据强度) / Σ(该角度权重 ×
-            该角度证据强度)。综合分 &gt; 20 认为偏多；综合分 &lt; -20
-            认为偏空；其它得分认为中性。
+            择时评分由多周期一致性、相对强弱、波动率分位、流动性结构、突破失败率、缺口与放量质量六个角度加权计算。
           </p>
         </div>
       </Panel>
@@ -303,166 +245,223 @@ function EvidenceTab(props: { report: TimingReportPayload }) {
 }
 
 function ExecutionTab(props: { report: TimingReportPayload }) {
-  const { report } = props;
-  const signalContext = report.card.reasoning.signalContext;
-  const triggerConditions = signalContext.triggerConditions ?? [];
-  const invalidationConditions = signalContext.invalidationConditions ?? [];
+  const plan = props.report.executionPlan;
 
   return (
     <div className="grid gap-6">
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Panel title="触发条件" surface="inset">
-          {triggerConditions.length > 0 ? (
-            <ConditionList conditions={triggerConditions} />
-          ) : signalContext.triggerNotes.length > 0 ? (
-            <ul className="grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
-              {signalContext.triggerNotes.map((item) => (
-                <li
-                  key={item}
-                  className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] px-3 py-2"
-                >
-                  {formatTimingNarrative(item)}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState title="暂无触发条件" />
-          )}
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+        <Panel title="执行结论" surface="inset">
+          <div className="grid gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusPill
+                label={`原始 ${formatTimingActionLabel(plan.decision.rawAction)}`}
+                tone="info"
+              />
+              <StatusPill
+                label={`风控后 ${formatTimingActionLabel(plan.decision.finalAction)}`}
+                tone={actionToneMap[plan.decision.finalAction] ?? "neutral"}
+              />
+              <StatusPill
+                label={plan.decision.allowed ? "允许执行" : "暂不执行"}
+                tone={plan.decision.allowed ? "success" : "warning"}
+              />
+            </div>
+            {plan.decision.downgradeReasons.length > 0 ? (
+              <InfoList items={plan.decision.downgradeReasons} />
+            ) : (
+              <p className="text-sm leading-7 text-[var(--app-text-muted)]">
+                当前动作未被组合风控降级。
+              </p>
+            )}
+            {plan.decision.requiredConfirmations.length > 0 ? (
+              <div className="grid gap-2">
+                <div className="text-xs text-[var(--app-text-soft)]">
+                  待确认项
+                </div>
+                <InfoList items={plan.decision.requiredConfirmations} />
+              </div>
+            ) : null}
+          </div>
         </Panel>
 
-        <Panel title="失效条件" surface="inset">
-          {invalidationConditions.length > 0 ? (
-            <ConditionList conditions={invalidationConditions} />
-          ) : signalContext.invalidationNotes.length > 0 ? (
-            <ul className="grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
-              {signalContext.invalidationNotes.map((item) => (
-                <li
-                  key={item}
-                  className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] px-3 py-2"
-                >
-                  {formatTimingNarrative(item)}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState title="暂无失效条件" />
-          )}
+        <Panel title="仓位预算" surface="inset">
+          <MetricGrid
+            items={[
+              {
+                label: "当前仓位",
+                value: formatPct(plan.budget.currentWeightPct),
+              },
+              {
+                label: "建议下沿",
+                value: formatPct(plan.budget.suggestedMinPct),
+              },
+              {
+                label: "建议上沿",
+                value: formatPct(plan.budget.suggestedMaxPct),
+              },
+              {
+                label: "本次变化",
+                value: formatPct(plan.budget.targetDeltaPct),
+              },
+              {
+                label: "现金可用",
+                value: formatPct(plan.budget.availableCashPct),
+              },
+              {
+                label: "单票上限",
+                value: formatPct(plan.budget.maxSingleNamePct),
+              },
+              {
+                label: "组合预算",
+                value: formatPct(plan.budget.portfolioRiskBudgetPct),
+              },
+              {
+                label: "数据状态",
+                value: formatDataStatus(plan.budget.dataStatus),
+              },
+            ]}
+          />
         </Panel>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-        <Panel title="市场环境">
+        <Panel title="订单计划">
+          <div className="grid gap-4">
+            <MetricGrid
+              items={[
+                {
+                  label: "参考价",
+                  value: formatPrice(plan.orderPlan.referencePrice),
+                },
+                {
+                  label: "执行下沿",
+                  value: formatPrice(plan.orderPlan.entryZoneLow),
+                },
+                {
+                  label: "执行上沿",
+                  value: formatPrice(plan.orderPlan.entryZoneHigh),
+                },
+                {
+                  label: "追价上限",
+                  value: formatPrice(plan.orderPlan.chaseLimitPrice),
+                },
+                {
+                  label: "失效价",
+                  value: formatPrice(plan.orderPlan.stopPrice),
+                },
+              ]}
+            />
+            <InfoList items={plan.orderPlan.splitPlan} />
+            {plan.orderPlan.notes.length > 0 ? (
+              <InfoList items={plan.orderPlan.notes} muted />
+            ) : null}
+          </div>
+        </Panel>
+
+        <Panel title="组合约束" surface="inset">
           <div className="grid gap-4">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill
-                label={formatTimingMarketStateLabel(report.marketContext.state)}
-                tone={marketToneMap[report.marketContext.state] ?? "info"}
+                label={formatTimingMarketStateLabel(
+                  plan.constraints.marketState,
+                )}
+                tone={marketToneMap[plan.constraints.marketState] ?? "info"}
               />
               <StatusPill
                 label={formatTimingMarketTransitionLabel(
-                  report.marketContext.transition,
+                  plan.constraints.marketTransition,
                 )}
                 tone="info"
               />
               <StatusPill
-                label={`持续 ${report.marketContext.persistenceDays} 天`}
-              />
-              <StatusPill
-                label={formatTimingBreadthTrendLabel(
-                  report.marketContext.breadthTrend,
-                )}
-              />
-              <StatusPill
-                label={formatTimingVolatilityTrendLabel(
-                  report.marketContext.volatilityTrend,
-                )}
+                label={formatDataStatus(plan.constraints.dataStatus)}
+                tone={
+                  plan.constraints.dataStatus === "COMPLETE"
+                    ? "success"
+                    : "warning"
+                }
               />
             </div>
-            <p className="text-sm leading-7 text-[var(--app-text-muted)]">
-              {report.marketContext.summary}
-            </p>
-            <ul className="grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
-              {report.marketContext.constraints.map((item) => (
-                <li
-                  key={item}
-                  className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] px-3 py-2"
-                >
-                  {item}
-                </li>
-              ))}
-            </ul>
+            {plan.constraints.blockedActions.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {plan.constraints.blockedActions.map((action) => (
+                  <StatusPill
+                    key={action}
+                    label={`阻断 ${formatTimingActionLabel(action)}`}
+                    tone="warning"
+                  />
+                ))}
+              </div>
+            ) : null}
+            {plan.constraints.riskFlags.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {plan.constraints.riskFlags.map((flag) => (
+                  <StatusPill
+                    key={flag}
+                    label={formatTimingRiskFlagLabel(flag)}
+                    tone="warning"
+                  />
+                ))}
+              </div>
+            ) : null}
+            {plan.constraints.portfolioWarnings.length > 0 ? (
+              <InfoList items={plan.constraints.portfolioWarnings} />
+            ) : null}
+            {plan.constraints.missingContext.length > 0 ? (
+              <InfoList
+                items={plan.constraints.missingContext.map(
+                  (item) => `缺少${item}，当前为降级风控展示`,
+                )}
+                muted
+              />
+            ) : null}
+            {plan.constraints.blockedActions.length === 0 &&
+            plan.constraints.riskFlags.length === 0 &&
+            plan.constraints.portfolioWarnings.length === 0 &&
+            plan.constraints.missingContext.length === 0 ? (
+              <EmptyState title="暂无组合约束" />
+            ) : null}
           </div>
-        </Panel>
-
-        <Panel title="风险标签" surface="inset">
-          {report.card.riskFlags.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {report.card.riskFlags.map((flag) => (
-                <StatusPill
-                  key={flag}
-                  label={formatTimingRiskFlagLabel(flag)}
-                  tone="warning"
-                />
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="暂无风险标签" />
-          )}
         </Panel>
       </div>
     </div>
   );
 }
 
-function ConditionList(props: { conditions: TimingExecutionCondition[] }) {
+function MetricGrid(props: { items: Array<{ label: string; value: string }> }) {
   return (
-    <div className="grid gap-3">
-      {props.conditions.map((condition) => (
-        <article
-          key={condition.id}
+    <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {props.items.map((item) => (
+        <div
+          key={item.label}
           className="rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] px-3 py-3"
         >
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium text-[var(--app-text)]">
-              {condition.label}
-            </span>
-            <StatusPill
-              label={
-                conditionStatusLabelMap[condition.status] ?? condition.status
-              }
-              tone={conditionStatusToneMap[condition.status] ?? "neutral"}
-            />
-            <StatusPill label={condition.severity} tone="info" />
-          </div>
-          <p className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
-            {formatTimingNarrative(condition.explanation)}
-          </p>
-          <dl className="mt-2 grid gap-2 text-xs text-[var(--app-text-soft)] sm:grid-cols-3">
-            <div>
-              <dt>指标</dt>
-              <dd className="mt-1 text-[var(--app-text-muted)]">
-                {condition.metric}
-              </dd>
-            </div>
-            <div>
-              <dt>阈值</dt>
-              <dd className="mt-1 text-[var(--app-text-muted)]">
-                {condition.operator} {String(condition.threshold)}
-                {condition.unit ?? ""}
-              </dd>
-            </div>
-            <div>
-              <dt>当前</dt>
-              <dd className="mt-1 text-[var(--app-text-muted)]">
-                {condition.actual === undefined || condition.actual === null
-                  ? "-"
-                  : `${condition.actual}${condition.unit ?? ""}`}
-              </dd>
-            </div>
-          </dl>
-        </article>
+          <dt className="text-xs text-[var(--app-text-soft)]">{item.label}</dt>
+          <dd className="mt-1 text-sm font-medium text-[var(--app-text)]">
+            {item.value}
+          </dd>
+        </div>
       ))}
-    </div>
+    </dl>
+  );
+}
+
+function InfoList(props: { items: string[]; muted?: boolean }) {
+  return (
+    <ul className="grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
+      {props.items.map((item) => (
+        <li
+          key={item}
+          className={
+            props.muted
+              ? "rounded-[12px] border border-[var(--app-border-soft)] px-3 py-2 text-[var(--app-text-soft)]"
+              : "rounded-[12px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] px-3 py-2"
+          }
+        >
+          {formatTimingNarrative(item)}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -502,30 +501,18 @@ function ReviewTab(props: { report: TimingReportPayload }) {
                 </div>
               </div>
               <div className="mt-3 grid gap-3 md:grid-cols-3">
-                <div>
-                  <div className="text-xs text-[var(--app-text-soft)]">
-                    区间收益
-                  </div>
-                  <div className="mt-1 text-base text-[var(--app-text)]">
-                    {formatPct(item.actualReturnPct)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-[var(--app-text-soft)]">
-                    最大顺行
-                  </div>
-                  <div className="mt-1 text-base text-[var(--app-text)]">
-                    {formatPct(item.maxFavorableExcursionPct)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-[var(--app-text-soft)]">
-                    最大逆行
-                  </div>
-                  <div className="mt-1 text-base text-[var(--app-text)]">
-                    {formatPct(item.maxAdverseExcursionPct)}
-                  </div>
-                </div>
+                <MetricBlock
+                  label="区间收益"
+                  value={formatPct(item.actualReturnPct)}
+                />
+                <MetricBlock
+                  label="最大顺行"
+                  value={formatPct(item.maxFavorableExcursionPct)}
+                />
+                <MetricBlock
+                  label="最大逆行"
+                  value={formatPct(item.maxAdverseExcursionPct)}
+                />
               </div>
               {item.reviewSummary ? (
                 <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
@@ -537,6 +524,15 @@ function ReviewTab(props: { report: TimingReportPayload }) {
         </div>
       )}
     </Panel>
+  );
+}
+
+function MetricBlock(props: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs text-[var(--app-text-soft)]">{props.label}</div>
+      <div className="mt-1 text-base text-[var(--app-text)]">{props.value}</div>
+    </div>
   );
 }
 

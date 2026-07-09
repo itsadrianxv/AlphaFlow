@@ -231,6 +231,9 @@ export const timingRouter = createTRPCRouter({
           ctx.db,
         ),
         reviewRecordRepository: new PrismaTimingReviewRecordRepository(ctx.db),
+        recommendationRepository: new PrismaTimingRecommendationRepository(
+          ctx.db,
+        ),
         marketContextSnapshotRepository:
           new PrismaTimingMarketContextSnapshotRepository(ctx.db),
         kronosForecastSnapshotRepository:

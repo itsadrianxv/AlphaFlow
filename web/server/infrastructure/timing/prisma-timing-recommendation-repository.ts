@@ -96,6 +96,7 @@ export class PrismaTimingRecommendationRepository {
     watchListId?: string;
     portfolioSnapshotId?: string;
     workflowRunId?: string;
+    stockCode?: string;
   }) {
     const records = await this.prisma.timingRecommendation.findMany({
       where: {
@@ -103,6 +104,7 @@ export class PrismaTimingRecommendationRepository {
         watchListId: params.watchListId,
         portfolioSnapshotId: params.portfolioSnapshotId,
         workflowRunId: params.workflowRunId,
+        stockCode: params.stockCode,
       },
       take: params.limit,
       orderBy: [{ createdAt: "desc" }, { priority: "asc" }],

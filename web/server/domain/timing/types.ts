@@ -717,6 +717,52 @@ export type TimingRecommendationDraft = {
   reasoning: TimingRecommendationReasoning;
 };
 
+export type TimingExecutionDecision = {
+  rawAction: TimingAction;
+  finalAction: TimingAction;
+  allowed: boolean;
+  downgradeReasons: string[];
+  requiredConfirmations: string[];
+};
+
+export type TimingExecutionBudget = {
+  currentWeightPct: number | null;
+  suggestedMinPct: number | null;
+  suggestedMaxPct: number | null;
+  targetDeltaPct: number | null;
+  availableCashPct: number | null;
+  maxSingleNamePct: number | null;
+  portfolioRiskBudgetPct: number | null;
+  dataStatus: "COMPLETE" | "FALLBACK";
+};
+
+export type TimingExecutionOrderPlan = {
+  referencePrice: number | null;
+  entryZoneLow: number | null;
+  entryZoneHigh: number | null;
+  chaseLimitPrice: number | null;
+  stopPrice: number | null;
+  splitPlan: string[];
+  notes: string[];
+};
+
+export type TimingExecutionConstraints = {
+  marketState: TimingMarketState;
+  marketTransition: TimingMarketTransition;
+  blockedActions: TimingAction[];
+  portfolioWarnings: string[];
+  riskFlags: TimingRiskFlag[];
+  dataStatus: "COMPLETE" | "FALLBACK";
+  missingContext: string[];
+};
+
+export type TimingExecutionPlan = {
+  decision: TimingExecutionDecision;
+  budget: TimingExecutionBudget;
+  orderPlan: TimingExecutionOrderPlan;
+  constraints: TimingExecutionConstraints;
+};
+
 export type TimingReviewRecord = {
   id: string;
   userId: string;
@@ -852,6 +898,8 @@ export type TimingReportPayload = {
   chartLevels: TimingChartLevels;
   evidence: TimingReportEvidence;
   marketContext: MarketContextAnalysis;
+  recommendation?: TimingRecommendationRecord | null;
+  executionPlan: TimingExecutionPlan;
   reviewTimeline: TimingReviewRecord[];
   kronosForecast?: TimingKronosForecast;
 };

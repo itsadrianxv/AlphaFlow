@@ -1,4 +1,5 @@
 import type { MarketRegimeService } from "~/server/application/timing/market-regime-service";
+import { TimingExecutionPlanService } from "~/server/application/timing/timing-execution-plan-service";
 import type {
   MarketContextAnalysis,
   TimingAnalysisCardRecord,
@@ -13,6 +14,7 @@ import type {
 import type { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
 import type { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
 import type { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
+import type { PrismaTimingRecommendationRepository } from "~/server/infrastructure/timing/prisma-timing-recommendation-repository";
 import type { PrismaTimingReviewRecordRepository } from "~/server/infrastructure/timing/prisma-timing-review-record-repository";
 import type { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
 import type { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
@@ -216,6 +218,10 @@ export class TimingReportService {
         PrismaTimingReviewRecordRepository,
         "listForUser"
       >;
+      recommendationRepository?: Pick<
+        PrismaTimingRecommendationRepository,
+        "listForUser"
+      >;
       marketContextSnapshotRepository: Pick<
         PrismaTimingMarketContextSnapshotRepository,
         "getByAsOfDate" | "listRecent" | "upsert"
@@ -229,8 +235,13 @@ export class TimingReportService {
         "getBars" | "getMarketContext"
       >;
       marketRegimeService: Pick<MarketRegimeService, "analyze">;
+      executionPlanService?: TimingExecutionPlanService;
     },
   ) {}
+
+  private get executionPlanService() {
+    return this.deps.executionPlanService ?? new TimingExecutionPlanService();
+  }
 
   async getTimingReport(params: {
     userId: string;
@@ -250,38 +261,52 @@ export class TimingReportService {
       return null;
     }
 
-    const [bars, reviewTimeline, marketSnapshot, kronosForecastSnapshot] =
-      await Promise.all([
-        hasFrozenBars(card.signalSnapshot?.bars)
-          ? Promise.resolve(card.signalSnapshot?.bars ?? [])
-          : this.deps.timingDataClient
-              .getBars({
-                stockCode: card.stockCode,
-                end: asOfDate,
-              })
-              .then(async (barsResponse) => {
-                if (card.signalSnapshotId) {
-                  await this.deps.signalSnapshotRepository.updateFrozenBars({
-                    signalSnapshotId: card.signalSnapshotId,
-                    bars: barsResponse.bars,
-                  });
-                }
+    const [
+      bars,
+      reviewTimeline,
+      marketSnapshot,
+      kronosForecastSnapshot,
+      recommendations,
+    ] = await Promise.all([
+      hasFrozenBars(card.signalSnapshot?.bars)
+        ? Promise.resolve(card.signalSnapshot?.bars ?? [])
+        : this.deps.timingDataClient
+            .getBars({
+              stockCode: card.stockCode,
+              end: asOfDate,
+            })
+            .then(async (barsResponse) => {
+              if (card.signalSnapshotId) {
+                await this.deps.signalSnapshotRepository.updateFrozenBars({
+                  signalSnapshotId: card.signalSnapshotId,
+                  bars: barsResponse.bars,
+                });
+              }
 
-                return barsResponse.bars;
-              }),
-        this.deps.reviewRecordRepository.listForUser({
-          userId: params.userId,
-          stockCode: card.stockCode,
-          limit: 5,
-          completedOnly: true,
-        }),
-        this.deps.marketContextSnapshotRepository.getByAsOfDate(asOfDate),
-        this.deps.kronosForecastSnapshotRepository?.getLatestForStock({
-          userId: params.userId,
-          stockCode: card.stockCode,
-          asOfDate,
-        }) ?? Promise.resolve(null),
-      ]);
+              return barsResponse.bars;
+            }),
+      this.deps.reviewRecordRepository.listForUser({
+        userId: params.userId,
+        stockCode: card.stockCode,
+        limit: 5,
+        completedOnly: true,
+      }),
+      this.deps.marketContextSnapshotRepository.getByAsOfDate(asOfDate),
+      this.deps.kronosForecastSnapshotRepository?.getLatestForStock({
+        userId: params.userId,
+        stockCode: card.stockCode,
+        asOfDate,
+      }) ?? Promise.resolve(null),
+      card.workflowRunId && card.watchListId
+        ? (this.deps.recommendationRepository?.listForUser({
+            userId: params.userId,
+            limit: 1,
+            workflowRunId: card.workflowRunId,
+            watchListId: card.watchListId,
+            stockCode: card.stockCode,
+          }) ?? Promise.resolve([]))
+        : Promise.resolve([]),
+    ]);
 
     const marketContext =
       marketSnapshot?.analysis ??
@@ -289,13 +314,23 @@ export class TimingReportService {
         card,
         asOfDate,
       });
+    const chartLevels = computeChartLevels(bars);
+    const recommendation = recommendations[0] ?? null;
 
     return {
       card,
       bars,
-      chartLevels: computeChartLevels(bars),
+      chartLevels,
       evidence: buildEvidence(card.signalSnapshot?.signalContext.engines ?? []),
       marketContext,
+      recommendation,
+      executionPlan: this.executionPlanService.build({
+        card,
+        bars,
+        chartLevels,
+        marketContext,
+        recommendation,
+      }),
       reviewTimeline,
       kronosForecast: kronosForecastSnapshot?.forecast,
     };
