@@ -1,7 +1,7 @@
 "use client";
 
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
-import React, { useMemo, useState } from "react";
+import React from "react";
 import { cn, InlineNotice, StatusPill } from "~/app/_components/ui";
 import { formatWorkflowDiagramNodeLabel } from "~/app/workflows/detail-labels";
 import type {
@@ -79,31 +79,24 @@ function getNodeState(
   return runtime.nodeStates[nodeId] ?? { status: "idle" };
 }
 
-function NodeInspector(props: {
-  node: WorkflowDiagramNode | null;
-  state?: WorkflowDiagramNodeRuntimeState;
+function NodeTooltip(props: {
+  node: WorkflowDiagramNode;
+  state: WorkflowDiagramNodeRuntimeState;
+  placement: "left" | "right";
+  tooltipId: string;
 }) {
-  const { node, state } = props;
-
-  if (!node) {
-    return (
-      <div className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4">
-        <div className="text-sm font-medium text-[var(--app-text-strong)]">
-          节点详情
-        </div>
-        <p className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
-          选择一个节点，查看状态、时序和输出摘要。
-        </p>
-      </div>
-    );
-  }
-
-  const status = state?.status ?? "idle";
+  const { node, placement, state, tooltipId } = props;
+  const status = state.status;
   const displayLabel = formatWorkflowDiagramNodeLabel(node.id, node.label);
 
   return (
     <div
-      className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4"
+      id={tooltipId}
+      role="tooltip"
+      className={cn(
+        "pointer-events-none absolute top-0 z-20 hidden w-[360px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 text-left shadow-[var(--app-shadow-sm)] group-hover:block group-focus-within:block",
+        placement === "right" ? "left-full ml-3" : "right-full mr-3",
+      )}
       data-node-inspector="true"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -122,18 +115,18 @@ function NodeInspector(props: {
       </div>
       <div className="mt-3 grid gap-2 text-xs leading-5 text-[var(--app-text-muted)] md:grid-cols-2 xl:grid-cols-4">
         <div>节点类型：{node.kind}</div>
-        <div>执行次数：{state?.attempt ?? "-"}</div>
-        <div>耗时：{state?.durationMs ?? "-"} ms</div>
-        <div>开始时间：{formatDate(state?.startedAt)}</div>
-        <div>完成时间：{formatDate(state?.completedAt)}</div>
-        <div>最近事件：{state?.eventSummary ?? "-"}</div>
-        <div>错误信息：{state?.errorCode ?? state?.errorMessage ?? "-"}</div>
+        <div>执行次数：{state.attempt ?? "-"}</div>
+        <div>耗时：{state.durationMs ?? "-"} ms</div>
+        <div>开始时间：{formatDate(state.startedAt)}</div>
+        <div>完成时间：{formatDate(state.completedAt)}</div>
+        <div>最近事件：{state.eventSummary ?? "-"}</div>
+        <div>错误信息：{state.errorCode ?? state.errorMessage ?? "-"}</div>
       </div>
       <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
         {node.description}
       </p>
-      {state?.output !== undefined ? (
-        <pre className="mt-3 overflow-auto border border-[var(--app-border-soft)] bg-[var(--app-code-bg)] p-3 text-xs leading-5 text-[var(--app-text-muted)]">
+      {state.output !== undefined ? (
+        <pre className="mt-3 max-h-28 overflow-auto border border-[var(--app-border-soft)] bg-[var(--app-code-bg)] p-3 text-xs leading-5 text-[var(--app-text-muted)]">
           {compactValue(state.output)}
         </pre>
       ) : null}
@@ -173,17 +166,6 @@ function FallbackDiagram(props: { runtime: WorkflowDiagramRuntimeState }) {
 
 export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
   const { spec, runtime } = props;
-  const initialSelectedNodeId =
-    runtime.currentNodeId ?? spec?.nodes[0]?.id ?? null;
-  const [selectedNodeId, setSelectedNodeId] = useState(initialSelectedNodeId);
-
-  const selectedNode = useMemo(() => {
-    if (!spec || !selectedNodeId) {
-      return null;
-    }
-
-    return spec.nodes.find((node) => node.id === selectedNodeId) ?? null;
-  }, [selectedNodeId, spec]);
 
   if (!spec) {
     return <FallbackDiagram runtime={runtime} />;
@@ -292,48 +274,57 @@ export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
             const active =
               state.status === "active" ||
               state.status === "paused" ||
-              selectedNodeId === node.id;
+              runtime.currentNodeId === node.id;
+            const hasRoomOnRight =
+              node.x + node.width + 384 <= spec.layout.width;
+            const tooltipPlacement =
+              hasRoomOnRight || node.x < 384 ? "right" : "left";
+            const tooltipId = `workflow-node-tooltip-${node.id}`;
 
             return (
-              <button
+              <div
                 key={node.id}
-                type="button"
-                onClick={() => setSelectedNodeId(node.id)}
-                className={cn(
-                  "absolute border bg-[var(--app-surface)] px-3 py-2 text-left transition-colors",
-                  active
-                    ? "border-[var(--app-border-strong)] text-[var(--app-text-strong)]"
-                    : "border-[var(--app-border-soft)] text-[var(--app-text-muted)]",
-                  state.status === "failed" &&
-                    "border-[var(--app-danger-border)] bg-[var(--app-danger-surface)]",
-                  state.status === "done" &&
-                    "border-[var(--app-success-border)] bg-[var(--app-success-surface)]",
-                  state.status === "paused" &&
-                    "border-[var(--app-warning-border)] bg-[var(--app-warning-surface)]",
-                )}
+                className="group absolute"
                 style={{
                   left: node.x,
                   top: node.y,
                   width: node.width,
                   minHeight: node.height,
                 }}
-                data-node-id={node.id}
-                data-node-status={state.status}
               >
-                <div className="text-sm font-medium leading-5">
-                  {displayLabel}
-                </div>
-              </button>
+                <button
+                  type="button"
+                  aria-describedby={tooltipId}
+                  className={cn(
+                    "h-full min-h-[inherit] w-full border bg-[var(--app-surface)] px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent-strong)]",
+                    active
+                      ? "border-[var(--app-border-strong)] text-[var(--app-text-strong)]"
+                      : "border-[var(--app-border-soft)] text-[var(--app-text-muted)]",
+                    state.status === "failed" &&
+                      "border-[var(--app-danger-border)] bg-[var(--app-danger-surface)]",
+                    state.status === "done" &&
+                      "border-[var(--app-success-border)] bg-[var(--app-success-surface)]",
+                    state.status === "paused" &&
+                      "border-[var(--app-warning-border)] bg-[var(--app-warning-surface)]",
+                  )}
+                  data-node-id={node.id}
+                  data-node-status={state.status}
+                >
+                  <span className="block text-sm font-medium leading-5">
+                    {displayLabel}
+                  </span>
+                </button>
+                <NodeTooltip
+                  node={node}
+                  placement={tooltipPlacement}
+                  state={state}
+                  tooltipId={tooltipId}
+                />
+              </div>
             );
           })}
         </div>
       </div>
-      <NodeInspector
-        node={selectedNode}
-        state={
-          selectedNode ? getNodeState(runtime, selectedNode.id) : undefined
-        }
-      />
     </div>
   );
 }
