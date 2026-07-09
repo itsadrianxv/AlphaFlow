@@ -175,59 +175,32 @@ function SummaryTab(props: { report: TimingReportPayload }) {
   const signalContext = report.card.reasoning.signalContext;
   const signalSnapshot = report.card.signalSnapshot;
   const asOfDate = report.card.asOfDate ?? signalSnapshot?.asOfDate ?? "-";
+  const kronosForecast = report.card.reasoning.kronosForecast;
+  const modelPredictionText = kronosForecast
+    ? `模型预测：${formatTimingDirectionLabel(kronosForecast.direction)}, 预期收益 ${kronosForecast.expectedReturnPct.toFixed(2)}%, 最大回撤 ${kronosForecast.maxDrawdownPct.toFixed(2)}%`
+    : "模型预测：暂不可用";
 
   return (
     <div className="grid gap-6">
       <Panel title="当前结论" surface="inset">
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-          <div className="grid gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <StatusPill
-                label={formatTimingActionLabel(report.card.actionBias)}
-                tone={actionToneMap[report.card.actionBias] ?? "neutral"}
-              />
-              <StatusPill
-                label={`置信度 ${report.card.confidence}`}
-                tone="info"
-              />
-              <StatusPill label={`报告日期 ${asOfDate}`} />
-            </div>
-            <p className="max-w-4xl text-base leading-7 text-[var(--app-text)]">
-              {formatTimingNarrative(report.card.summary)}
-            </p>
-            <p className="max-w-4xl text-sm leading-7 text-[var(--app-text-muted)]">
-              {formatTimingNarrative(report.card.reasoning.actionRationale)}
-            </p>
+        <div className="grid gap-3 text-sm leading-7 text-[var(--app-text)]">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+            <span>
+              当前结论：{formatTimingActionLabel(report.card.actionBias)}
+            </span>
+            <span>报告日期 {asOfDate}</span>
           </div>
-          <div className="grid gap-3 rounded-[14px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4">
-            <div className="grid gap-2 sm:grid-cols-3">
-              <div>
-                <div className="text-xs text-[var(--app-text-soft)]">
-                  收盘价
-                </div>
-                <div className="mt-2 text-2xl text-[var(--app-text)]">
-                  {signalSnapshot?.indicators.close.toFixed(2) ?? "-"}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-[var(--app-text-soft)]">RSI</div>
-                <div className="mt-2 text-2xl text-[var(--app-text)]">
-                  {signalSnapshot?.indicators.rsi.value.toFixed(1) ?? "-"}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-[var(--app-text-soft)]">
-                  量比 20D
-                </div>
-                <div className="mt-2 text-2xl text-[var(--app-text)]">
-                  {signalSnapshot?.indicators.volumeRatio20.toFixed(2) ?? "-"}
-                </div>
-              </div>
-            </div>
-            <p className="text-sm leading-6 text-[var(--app-text-muted)]">
-              {formatTimingNarrative(signalContext.summary)}
-            </p>
-          </div>
+          <p>
+            综合择时评分 {signalContext.compositeScore.toFixed(1)} /
+            ±100，置信度 {report.card.confidence} / 100
+          </p>
+          <p>{modelPredictionText}</p>
+          <p className="max-w-5xl text-[var(--app-text-muted)]">
+            注：择时评分计算公式从多周期一致性、相对强弱、波动率分位、流动性/换手结构、突破失败率、缺口与放量质量六个角度进行加权评分。具体计算公式为：综合分
+            = Σ(单角度得分 × 该角度权重 × 该角度证据强度) / Σ(该角度权重 ×
+            该角度证据强度)。综合分 &gt; 20 认为偏多；综合分 &lt; -20
+            认为偏空；其它得分认为中性。
+          </p>
         </div>
       </Panel>
 
