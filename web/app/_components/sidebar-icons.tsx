@@ -151,3 +151,12 @@ export function CloseIcon(props: IconProps) {
     </BaseIcon>
   );
 }
+
+export function SearchIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <circle cx="10.8" cy="10.8" r="5.8" />
+      <path d="m15.2 15.2 4.3 4.3" />
+    </BaseIcon>
+  );
+}

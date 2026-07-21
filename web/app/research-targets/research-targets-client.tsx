@@ -2,8 +2,15 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { MarkdownContent } from "~/app/_components/markdown-content";
+import { CloseIcon, SearchIcon } from "~/app/_components/sidebar-icons";
 import {
   EmptyState,
   InlineNotice,
@@ -13,6 +20,10 @@ import {
 } from "~/app/_components/ui";
 import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
+import {
+  buildResearchTargetSearchResults,
+  type ResearchTargetSearchResult,
+} from "~/app/research-targets/research-target-search";
 import type {
   ResearchTargetRef,
   ResearchTargetType,
@@ -101,6 +112,177 @@ function parseTargetType(value: string | null): SelectableTargetType | null {
 
 function isSelectableTargetType(value: string): value is SelectableTargetType {
   return selectableTargetTypes.includes(value as SelectableTargetType);
+}
+
+function HighlightedSnippet(props: { text: string; query: string }) {
+  const { text, query } = props;
+  const normalizedText = text.toLocaleLowerCase();
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const matchIndex = normalizedQuery
+    ? normalizedText.indexOf(normalizedQuery)
+    : -1;
+
+  if (matchIndex < 0) {
+    return <span>{text}</span>;
+  }
+
+  const matchEnd = matchIndex + normalizedQuery.length;
+  return (
+    <>
+      {text.slice(0, matchIndex)}
+      <mark className="bg-[rgba(255,128,31,0.24)] text-[var(--app-text-strong)]">
+        {text.slice(matchIndex, matchEnd)}
+      </mark>
+      {text.slice(matchEnd)}
+    </>
+  );
+}
+
+function ResearchTargetSearchDialog(props: {
+  open: boolean;
+  query: string;
+  setQuery: (value: string) => void;
+  results: ResearchTargetSearchResult[];
+  loading: boolean;
+  onClose: () => void;
+  onSelect: (result: ResearchTargetSearchResult) => void;
+}) {
+  const { open, query, setQuery, results, loading, onClose, onSelect } = props;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const previousActiveElement = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    inputRef.current?.focus();
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onCloseRef.current();
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previousActiveElement instanceof HTMLElement) {
+        previousActiveElement.focus();
+      }
+    };
+  }, [open]);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(0,0,0,0.72)] px-4 pt-[9vh] sm:pt-[12vh]"
+      role="presentation"
+    >
+      <button
+        type="button"
+        aria-label="关闭搜索"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <section
+        id="research-target-search-dialog"
+        className="relative z-10 flex max-h-[78vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[12px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] shadow-[var(--app-shadow-lg)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="research-target-search-title"
+      >
+        <div className="flex items-center gap-3 border-b border-[var(--app-border-soft)] px-4 py-3 sm:px-5">
+          <SearchIcon className="h-5 w-5 shrink-0 text-[var(--app-text-muted)]" />
+          <h2 id="research-target-search-title" className="sr-only">
+            搜索投研收藏
+          </h2>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索投研对象、笔记、财务快照或研究报告"
+            aria-label="搜索投研收藏"
+            className="min-w-0 flex-1 bg-transparent text-base text-[var(--app-text-strong)] outline-none placeholder:text-[var(--app-text-soft)]"
+          />
+          <button
+            type="button"
+            aria-label="关闭搜索"
+            title="关闭搜索"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-[var(--app-text-muted)] transition-colors hover:bg-[var(--app-bg-elevated)] hover:text-[var(--app-text-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent-strong)]"
+            onClick={onClose}
+          >
+            <CloseIcon className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-[120px] overflow-y-auto p-2 sm:p-3" aria-live="polite">
+          {loading ? (
+            <p className="px-3 py-8 text-center text-sm text-[var(--app-text-muted)]">
+              正在加载可搜索内容
+            </p>
+          ) : !query.trim() ? (
+            <p className="px-3 py-8 text-center text-sm text-[var(--app-text-muted)]">
+              输入关键词
+            </p>
+          ) : results.length === 0 ? (
+            <p className="px-3 py-8 text-center text-sm text-[var(--app-text-muted)]">
+              没有匹配的投研收藏
+            </p>
+          ) : (
+            <div className="grid gap-1">
+              <p className="px-3 pb-2 text-xs text-[var(--app-text-subtle)]">
+                找到 {results.length} 个对象
+              </p>
+              {results.map((result) => (
+                <button
+                  key={`${result.target.ref.type}:${result.target.ref.id}`}
+                  type="button"
+                  className="grid gap-2 rounded-[8px] border border-transparent px-3 py-3 text-left transition-colors hover:border-[var(--app-border-soft)] hover:bg-[var(--app-bg-elevated)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--app-accent-strong)]"
+                  onClick={() => onSelect(result)}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm font-medium text-[var(--app-text-strong)]">
+                      {result.target.label}
+                    </span>
+                    <span className="shrink-0 text-xs text-[var(--app-text-subtle)]">
+                      {targetTypeLabel(result.target.ref.type)}
+                    </span>
+                  </span>
+                  <span className="grid gap-1.5">
+                    {result.matches.map((match) => (
+                      <span
+                        key={`${match.source}:${match.text}`}
+                        className="grid gap-0.5 text-xs leading-5 text-[var(--app-text-muted)] sm:grid-cols-[76px_minmax(0,1fr)] sm:gap-2"
+                      >
+                        <span className="text-[var(--app-text-subtle)]">
+                          {match.source}
+                        </span>
+                        <span className="break-words">
+                          <HighlightedSnippet text={match.text} query={query} />
+                        </span>
+                      </span>
+                    ))}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 function asRecord(value: unknown) {
@@ -884,6 +1066,8 @@ export function ResearchTargetsClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [activeTargetType, setActiveTargetType] =
     useState<SelectableTargetType>(
       () =>
@@ -973,22 +1157,46 @@ export function ResearchTargetsClient() {
       limit: 100,
       offset: 0,
     },
-    { enabled: visibleTargets.length > 0 },
+    { enabled: targets.length > 0 },
   );
   const snapshotsQuery = api.researchTarget.listFinancialSnapshots.useQuery(
     {
       limit: 100,
       offset: 0,
     },
-    { enabled: visibleTargets.length > 0 },
+    { enabled: targets.length > 0 },
   );
   const artifactsQuery = api.researchTarget.listArtifacts.useQuery(
     {
       limit: 100,
       offset: 0,
     },
-    { enabled: visibleTargets.length > 0 },
+    { enabled: targets.length > 0 },
   );
+
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const searchResults = useMemo(
+    () =>
+      buildResearchTargetSearchResults({
+        query: deferredSearchQuery,
+        targets,
+        notes: notesQuery.data ?? [],
+        snapshots: snapshotsQuery.data ?? [],
+        artifacts: artifactsQuery.data ?? [],
+      }),
+    [
+      artifactsQuery.data,
+      deferredSearchQuery,
+      notesQuery.data,
+      snapshotsQuery.data,
+      targets,
+    ],
+  );
+  const searchLoading =
+    targetsQuery.isLoading ||
+    notesQuery.isLoading ||
+    snapshotsQuery.isLoading ||
+    artifactsQuery.isLoading;
 
   const createCompanyMutation = api.researchTarget.createCompany.useMutation({
     onSuccess: async (created) => {
@@ -1099,19 +1307,55 @@ export function ResearchTargetsClient() {
       historyLoading={targetsQuery.isLoading}
       historyEmptyText="暂无投研对象"
       actions={
-        <button
-          type="button"
-          className="app-button app-button-primary"
-          onClick={() => {
-            setCreateMode(activeTargetType);
-            setCreateOpen((current) => !current);
-          }}
-        >
-          新建
-        </button>
+        <>
+          <button
+            type="button"
+            className="app-button"
+            aria-expanded={searchOpen}
+            aria-controls="research-target-search-dialog"
+            onClick={() => {
+              setSearchQuery("");
+              setSearchOpen(true);
+            }}
+          >
+            <SearchIcon className="h-4 w-4" />
+            搜索
+          </button>
+          <button
+            type="button"
+            className="app-button app-button-primary"
+            onClick={() => {
+              setCreateMode(activeTargetType);
+              setCreateOpen((current) => !current);
+            }}
+          >
+            新建
+          </button>
+        </>
       }
       showWatchlistsAction={false}
     >
+      <ResearchTargetSearchDialog
+        open={searchOpen}
+        query={searchQuery}
+        setQuery={setSearchQuery}
+        results={searchResults}
+        loading={searchLoading}
+        onClose={() => {
+          setSearchOpen(false);
+          setSearchQuery("");
+        }}
+        onSelect={(result) => {
+          setSearchOpen(false);
+          setSearchQuery("");
+          router.push(
+            `/research-targets?target=${encodeURIComponent(
+              serializeRef(result.target.ref),
+            )}`,
+          );
+        }}
+      />
+
       <WorkflowStageSwitcher
         tabs={researchTargetViewTabs}
         activeTabId={activeTargetType}
