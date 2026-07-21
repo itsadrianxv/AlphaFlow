@@ -6,6 +6,7 @@ import type {
   WorkflowDiagramSpec,
   WorkflowDiagramVisitedEdge,
 } from "~/app/workflows/workflow-diagram";
+import { parseWorkflowNodeInsight } from "~/contracts/workflow-node-insight";
 
 type WorkflowNodeRunStatus =
   | "PENDING"
@@ -73,6 +74,35 @@ function getEventNodeKey(event: WorkflowEventInfo) {
   return isRecord(event.payload) && typeof event.payload.nodeKey === "string"
     ? event.payload.nodeKey
     : undefined;
+}
+
+function getInsightFromOutput(output: unknown) {
+  if (!isRecord(output)) {
+    return undefined;
+  }
+
+  const parsed = parseWorkflowNodeInsight(output.insight);
+  return parsed.success ? parsed.data : undefined;
+}
+
+function getPausedNodeInsight(params: {
+  run: WorkflowDiagramRunDetail;
+  nodeKey: string;
+}) {
+  const event = [...params.run.events]
+    .sort((left, right) => right.sequence - left.sequence)
+    .find(
+      (item) =>
+        item.eventType === "RUN_PAUSED" &&
+        getEventNodeKey(item) === params.nodeKey,
+    );
+
+  if (!event || !isRecord(event.payload)) {
+    return undefined;
+  }
+
+  const parsed = parseWorkflowNodeInsight(event.payload.insight);
+  return parsed.success ? parsed.data : undefined;
 }
 
 function getNodeStatus(params: {
@@ -248,6 +278,7 @@ export function buildWorkflowDiagramRuntimeState(params: {
             errorCode: node.errorCode,
             errorMessage: node.errorMessage,
             output: node.output,
+            insight: getInsightFromOutput(node.output),
           },
         ]),
       ),
@@ -288,6 +319,9 @@ export function buildWorkflowDiagramRuntimeState(params: {
           errorCode: nodeRun?.errorCode,
           errorMessage: nodeRun?.errorMessage,
           output: nodeRun?.output,
+          insight:
+            getInsightFromOutput(nodeRun?.output) ??
+            getPausedNodeInsight({ run: params.run, nodeKey: node.id }),
           eventSummary,
         } satisfies WorkflowDiagramNodeRuntimeState,
       ];

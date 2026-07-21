@@ -1,4 +1,5 @@
 import { WorkflowEventType, WorkflowNodeRunStatus } from "@prisma/client";
+import { attachWorkflowNodeInsight } from "~/contracts/workflow-node-insight";
 import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
 import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
 import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
@@ -52,6 +53,43 @@ class RunCancelledError extends Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function supportsNodeInsight(graph: WorkflowGraphRunner) {
+  return (
+    graph.templateCode === "industry_research" ||
+    graph.templateCode === "company_research_center"
+  );
+}
+
+function getPersistedNodeOutput(params: {
+  graph: WorkflowGraphRunner;
+  nodeKey: WorkflowNodeKey;
+  state: WorkflowGraphState;
+}) {
+  const output = params.graph.getNodeOutput(params.nodeKey, params.state);
+  return supportsNodeInsight(params.graph)
+    ? attachWorkflowNodeInsight(output)
+    : output;
+}
+
+function getPausedNodeEventPayload(params: {
+  graph: WorkflowGraphRunner;
+  nodeKey: WorkflowNodeKey;
+  state: WorkflowGraphState;
+}) {
+  const payload = params.graph.getNodeEventPayload(
+    params.nodeKey,
+    params.state,
+  );
+
+  if (!supportsNodeInsight(params.graph)) {
+    return payload;
+  }
+
+  const { nodeKey: _nodeKey, ...insightSource } = payload;
+  const output = attachWorkflowNodeInsight(insightSource);
+  return output.insight ? { ...payload, insight: output.insight } : payload;
 }
 
 function mapEventType(
@@ -364,7 +402,11 @@ export class WorkflowExecutionService {
               runId,
               nodeRunId,
               nodeKey,
-              output: graph.getNodeOutput(nodeKey, updatedState),
+              output: getPersistedNodeOutput({
+                graph,
+                nodeKey,
+                state: updatedState,
+              }),
               durationMs: 0,
               reason: String(payload.reason ?? "skipped"),
               eventPayload: payload,
@@ -405,7 +447,11 @@ export class WorkflowExecutionService {
               runId,
               nodeRunId,
               nodeKey,
-              output: graph.getNodeOutput(nodeKey, updatedState),
+              output: getPersistedNodeOutput({
+                graph,
+                nodeKey,
+                state: updatedState,
+              }),
               durationMs,
               eventPayload: graph.getNodeEventPayload(nodeKey, updatedState),
             });
@@ -484,7 +530,11 @@ export class WorkflowExecutionService {
           progressPercent: pausedState.progressPercent,
           reason: error.reason,
           eventPayload: pausedNodeKey
-            ? graph.getNodeEventPayload(pausedNodeKey, pausedState)
+            ? getPausedNodeEventPayload({
+                graph,
+                nodeKey: pausedNodeKey,
+                state: pausedState,
+              })
             : {},
         });
         await this.publishLatestEvent(

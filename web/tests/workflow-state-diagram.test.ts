@@ -8,7 +8,7 @@ import type {
 } from "~/app/workflows/workflow-diagram";
 
 describe("WorkflowStateDiagram", () => {
-  it("把节点详情渲染为节点 hover/focus 浮层", () => {
+  it("把节点详情渲染为可聚焦的动态信息弹层", () => {
     const spec: WorkflowDiagramSpec = {
       templateCode: "industry_research",
       templateVersion: 1,
@@ -37,7 +37,18 @@ describe("WorkflowStateDiagram", () => {
           status: "active",
           attempt: 1,
           eventSummary: "正在分析问题",
-          output: { query: "半导体" },
+          insight: {
+            fields: [
+              {
+                label: "本次识别的重点",
+                value: {
+                  kind: "list",
+                  items: ["AI 服务器需求", "先进制程供给"],
+                },
+              },
+            ],
+            downstreamNote: "将据此规划行业趋势与公司筛选。",
+          },
         },
       },
       visitedNodeIds: ["question"],
@@ -50,10 +61,13 @@ describe("WorkflowStateDiagram", () => {
     );
 
     expect(html).toContain('aria-describedby="workflow-node-tooltip-question"');
-    expect(html).toContain('role="tooltip"');
-    expect(html).toContain("group-hover:block");
-    expect(html).toContain("group-focus-within:block");
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("pointer-events-auto");
     expect(html).toContain("节点详情");
+    expect(html).toContain("本节点作用");
+    expect(html).toContain("本次识别的重点");
+    expect(html).toContain("对下一步的影响");
     expect(html).not.toContain("选择一个节点");
   });
 });

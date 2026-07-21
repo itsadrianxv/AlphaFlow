@@ -1,7 +1,6 @@
 "use client";
 
-/* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
-import React from "react";
+import React, { useState } from "react";
 import { cn, InlineNotice, StatusPill } from "~/app/_components/ui";
 import { formatWorkflowDiagramNodeLabel } from "~/app/workflows/detail-labels";
 import type {
@@ -10,6 +9,10 @@ import type {
   WorkflowDiagramRuntimeState,
   WorkflowDiagramSpec,
 } from "~/app/workflows/workflow-diagram";
+import type {
+  WorkflowNodeInsight,
+  WorkflowNodeInsightField,
+} from "~/contracts/workflow-node-insight";
 
 type WorkflowStateDiagramProps = {
   spec: WorkflowDiagramSpec | null;
@@ -51,27 +54,6 @@ function formatDate(value?: Date | string | null) {
   }).format(value instanceof Date ? value : new Date(value));
 }
 
-function compactValue(value: unknown) {
-  if (value === null || value === undefined) {
-    return "-";
-  }
-
-  if (typeof value === "string") {
-    return value.length > 160 ? `${value.slice(0, 160)}...` : value;
-  }
-
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-
-  try {
-    const text = JSON.stringify(value);
-    return text.length > 160 ? `${text.slice(0, 160)}...` : text;
-  } catch {
-    return "-";
-  }
-}
-
 function getNodeState(
   runtime: WorkflowDiagramRuntimeState,
   nodeId: string,
@@ -79,22 +61,156 @@ function getNodeState(
   return runtime.nodeStates[nodeId] ?? { status: "idle" };
 }
 
+function InsightFieldValue(props: { field: WorkflowNodeInsightField }) {
+  const { field } = props;
+  const value = field.value;
+
+  if (value.kind === "text") {
+    return (
+      <p className="text-sm leading-6 text-[var(--app-text)]">{value.text}</p>
+    );
+  }
+
+  if (value.kind === "list") {
+    return (
+      <ul className="grid gap-1.5 text-sm leading-6 text-[var(--app-text)]">
+        {value.items.map((item) => (
+          <li
+            key={`${field.label}-${item}`}
+            className="relative pl-3 before:absolute before:ml-[-0.75rem] before:text-[var(--app-text-subtle)] before:content-['-']"
+          >
+            {item}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (value.kind === "key_values") {
+    return (
+      <dl className="grid gap-x-4 gap-y-1.5 text-sm leading-6 sm:grid-cols-[minmax(96px,0.45fr)_minmax(0,1fr)]">
+        {value.items.map((item) => (
+          <React.Fragment key={`${field.label}-${item.label}`}>
+            <dt className="text-[var(--app-text-subtle)]">{item.label}</dt>
+            <dd className="text-[var(--app-text)]">{item.value}</dd>
+          </React.Fragment>
+        ))}
+      </dl>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto border border-[var(--app-border-soft)]">
+      <table className="w-full border-collapse text-left text-xs leading-5 text-[var(--app-text)]">
+        <thead className="bg-[var(--app-panel-soft)] text-[var(--app-text-subtle)]">
+          <tr>
+            {value.columns.map((column) => (
+              <th
+                key={column}
+                className="border-b border-[var(--app-border-soft)] px-2 py-1.5 font-medium"
+              >
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {value.rows.map((row) => (
+            <tr key={`${field.label}-${row.join("|")}`}>
+              {row.map((cell, cellIndex) => {
+                const column = value.columns.at(cellIndex) ?? "字段";
+                return (
+                  <td
+                    key={`${column}-${cell}`}
+                    className="border-b border-[var(--app-border-soft)] px-2 py-1.5 align-top last:border-b-0"
+                  >
+                    {cell}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function NodeInsightContent(props: { insight: WorkflowNodeInsight }) {
+  const { insight } = props;
+
+  return (
+    <div className="mt-4 grid gap-4">
+      {insight.summary ? (
+        <p className="text-sm leading-6 text-[var(--app-text)]">
+          {insight.summary}
+        </p>
+      ) : null}
+      {insight.fields.map((field) => (
+        <section key={field.label} className="grid gap-1.5">
+          <h4 className="text-sm font-medium text-[var(--app-text-strong)]">
+            {field.label}
+          </h4>
+          <InsightFieldValue field={field} />
+          {field.citations?.length ? (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs leading-5">
+              {field.citations.map((citation) =>
+                citation.url ? (
+                  <a
+                    key={citation.referenceId}
+                    href={citation.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[var(--app-accent-strong)] hover:underline"
+                  >
+                    {citation.label}
+                  </a>
+                ) : (
+                  <span
+                    key={citation.referenceId}
+                    className="text-[var(--app-text-subtle)]"
+                  >
+                    {citation.label}
+                  </span>
+                ),
+              )}
+            </div>
+          ) : null}
+        </section>
+      ))}
+      {insight.downstreamNote ? (
+        <section className="border-t border-[var(--app-border-soft)] pt-3">
+          <h4 className="text-sm font-medium text-[var(--app-text-strong)]">
+            对下一步的影响
+          </h4>
+          <p className="mt-1.5 text-sm leading-6 text-[var(--app-text)]">
+            {insight.downstreamNote}
+          </p>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 function NodeTooltip(props: {
   node: WorkflowDiagramNode;
   state: WorkflowDiagramNodeRuntimeState;
   placement: "left" | "right";
   tooltipId: string;
+  visible: boolean;
 }) {
-  const { node, placement, state, tooltipId } = props;
+  const { node, placement, state, tooltipId, visible } = props;
   const status = state.status;
   const displayLabel = formatWorkflowDiagramNodeLabel(node.id, node.label);
 
   return (
     <div
       id={tooltipId}
-      role="tooltip"
+      role="dialog"
+      aria-label={`${displayLabel}详情`}
       className={cn(
-        "pointer-events-none absolute top-0 z-20 hidden w-[360px] border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 text-left shadow-[var(--app-shadow-sm)] group-hover:block group-focus-within:block",
+        "pointer-events-auto absolute top-0 z-20 w-[min(460px,calc(100vw-2rem))] max-h-[min(70vh,620px)] overflow-y-auto border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 text-left shadow-[var(--app-shadow-sm)]",
+        visible ? "block" : "hidden",
         placement === "right" ? "left-full ml-3" : "right-full mr-3",
       )}
       data-node-inspector="true"
@@ -113,23 +229,25 @@ function NodeTooltip(props: {
           tone={statusToneMap[status] ?? "neutral"}
         />
       </div>
-      <div className="mt-3 grid gap-2 text-xs leading-5 text-[var(--app-text-muted)] md:grid-cols-2 xl:grid-cols-4">
+      <section className="mt-4 border-b border-[var(--app-border-soft)] pb-4">
+        <h4 className="text-sm font-medium text-[var(--app-text-strong)]">
+          本节点作用
+        </h4>
+        <p className="mt-1.5 text-sm leading-6 text-[var(--app-text-muted)]">
+          {node.description}
+        </p>
+      </section>
+      {state.insight ? <NodeInsightContent insight={state.insight} /> : null}
+      <div className="mt-4 grid gap-x-4 gap-y-1.5 border-t border-[var(--app-border-soft)] pt-3 text-xs leading-5 text-[var(--app-text-subtle)] sm:grid-cols-2">
         <div>节点类型：{node.kind}</div>
         <div>执行次数：{state.attempt ?? "-"}</div>
         <div>耗时：{state.durationMs ?? "-"} ms</div>
         <div>开始时间：{formatDate(state.startedAt)}</div>
         <div>完成时间：{formatDate(state.completedAt)}</div>
-        <div>最近事件：{state.eventSummary ?? "-"}</div>
-        <div>错误信息：{state.errorCode ?? state.errorMessage ?? "-"}</div>
+        {state.errorCode || state.errorMessage ? (
+          <div>错误信息：{state.errorCode ?? state.errorMessage}</div>
+        ) : null}
       </div>
-      <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
-        {node.description}
-      </p>
-      {state.output !== undefined ? (
-        <pre className="mt-3 max-h-28 overflow-auto border border-[var(--app-border-soft)] bg-[var(--app-code-bg)] p-3 text-xs leading-5 text-[var(--app-text-muted)]">
-          {compactValue(state.output)}
-        </pre>
-      ) : null}
     </div>
   );
 }
@@ -166,6 +284,7 @@ function FallbackDiagram(props: { runtime: WorkflowDiagramRuntimeState }) {
 
 export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
   const { spec, runtime } = props;
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
 
   if (!spec) {
     return <FallbackDiagram runtime={runtime} />;
@@ -282,9 +401,24 @@ export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
             const tooltipId = `workflow-node-tooltip-${node.id}`;
 
             return (
-              <div
+              <fieldset
                 key={node.id}
-                className="group absolute"
+                className="absolute"
+                aria-label={`${displayLabel} 节点详情`}
+                onMouseEnter={() => setActiveNodeId(node.id)}
+                onMouseLeave={() =>
+                  setActiveNodeId((current) =>
+                    current === node.id ? null : current,
+                  )
+                }
+                onFocusCapture={() => setActiveNodeId(node.id)}
+                onBlurCapture={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) {
+                    setActiveNodeId((current) =>
+                      current === node.id ? null : current,
+                    );
+                  }
+                }}
                 style={{
                   left: node.x,
                   top: node.y,
@@ -295,6 +429,18 @@ export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
                 <button
                   type="button"
                   aria-describedby={tooltipId}
+                  aria-expanded={activeNodeId === node.id}
+                  onClick={() =>
+                    setActiveNodeId((current) =>
+                      current === node.id ? null : node.id,
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setActiveNodeId(null);
+                      event.currentTarget.blur();
+                    }
+                  }}
                   className={cn(
                     "h-full min-h-[inherit] w-full border bg-[var(--app-surface)] px-3 py-2 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent-strong)]",
                     active
@@ -319,8 +465,9 @@ export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
                   placement={tooltipPlacement}
                   state={state}
                   tooltipId={tooltipId}
+                  visible={activeNodeId === node.id}
                 />
-              </div>
+              </fieldset>
             );
           })}
         </div>

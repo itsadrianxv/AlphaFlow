@@ -57,6 +57,7 @@ export type WorkflowDiagramNodeRuntimeState = {
   errorCode?: string | null;
   errorMessage?: string | null;
   output?: unknown;
+  insight?: WorkflowNodeInsight;
   eventSummary?: string;
 };
 
@@ -81,3 +82,5 @@ export type WorkflowDiagramRuntimeState = {
     orderedNodes: WorkflowDiagramFallbackNode[];
   } | null;
 };
+
+import type { WorkflowNodeInsight } from "~/contracts/workflow-node-insight";
