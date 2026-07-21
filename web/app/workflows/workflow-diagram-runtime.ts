@@ -444,8 +444,8 @@ export function buildWorkflowDiagramRuntimeState(params: {
     .filter((nodeKey): nodeKey is string => Boolean(nodeKey))
     .find(
       (nodeKey) =>
-        (nodeStates[nodeKey]?.status === "active" ||
-          nodeStates[nodeKey]?.status === "paused"),
+        nodeStates[nodeKey]?.status === "active" ||
+        nodeStates[nodeKey]?.status === "paused",
     );
 
   return {
