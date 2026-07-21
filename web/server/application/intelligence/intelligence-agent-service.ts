@@ -220,6 +220,13 @@ export class IntelligenceAgentService {
     concept: string,
     candidates: IndustryResearchCandidate[],
   ): Promise<CandidateCredibilityResult> {
+    if (candidates.length === 0) {
+      return {
+        credibility: [],
+        evidenceList: [],
+      };
+    }
+
     const evidenceList = await this.dataClient.getEvidenceBatch({
       concept,
       stockCodes: candidates.map((candidate) => candidate.stockCode),
