@@ -276,6 +276,7 @@ services:
       STOCK_CODES_CSV_PATH: ${STOCK_CODES_CSV_PATH:-/repo/data/stock_codes.csv}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       WORKFLOW_WORKER_POLL_INTERVAL_MS: ${WORKFLOW_WORKER_POLL_INTERVAL_MS:-2000}
+      WORKFLOW_WORKER_CONCURRENCY: ${WORKFLOW_WORKER_CONCURRENCY:-10}
     volumes:
       - ../web:/repo/web
       - ../data:/repo/data:ro

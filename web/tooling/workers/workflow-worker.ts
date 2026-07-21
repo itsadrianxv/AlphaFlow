@@ -197,6 +197,7 @@ const executionService = new WorkflowExecutionService({
 const workerId =
   process.env.WORKFLOW_WORKER_ID ?? `workflow-worker-${randomUUID()}`;
 const pollIntervalMs = env.WORKFLOW_WORKER_POLL_INTERVAL_MS;
+const concurrency = env.WORKFLOW_WORKER_CONCURRENCY;
 
 let shuttingDown = false;
 
@@ -223,8 +224,11 @@ process.on("SIGTERM", () => {
 });
 
 async function main() {
-  console.info(`[workflow-worker] started: ${workerId}`);
+  console.info(
+    `[workflow-worker] started: ${workerId} (concurrency=${concurrency})`,
+  );
 
+  // 先恢复遗留的运行中任务，避免启动并发槽位后重复恢复同一个任务。
   while (!shuttingDown) {
     try {
       const recovered =
@@ -233,18 +237,35 @@ async function main() {
       if (recovered) {
         continue;
       }
-
-      const picked = await executionService.executeNextPendingRun(workerId);
-
-      if (!picked) {
-        await sleep(pollIntervalMs);
-      }
+      break;
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown error";
       console.error(`[workflow-worker] loop error: ${message}`);
       await sleep(pollIntervalMs);
     }
   }
+
+  const runSlot = async (slot: number) => {
+    while (!shuttingDown) {
+      try {
+        const picked = await executionService.executeNextPendingRun(workerId);
+
+        if (!picked) {
+          // 仅在没有任务时轮询，避免空队列时持续占用数据库连接。
+          await sleep(pollIntervalMs);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "unknown error";
+        console.error(`[workflow-worker] slot ${slot} error: ${message}`);
+        await sleep(pollIntervalMs);
+      }
+    }
+  };
+
+  await Promise.all(
+    Array.from({ length: concurrency }, (_, index) => runSlot(index + 1)),
+  );
 }
 
 void main();

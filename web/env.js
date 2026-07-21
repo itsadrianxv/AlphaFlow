@@ -93,6 +93,7 @@ export const env = createEnv({
       .int()
       .positive()
       .default(2000),
+    WORKFLOW_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
     SCREENING_WORKER_POLL_INTERVAL_MS: z.coerce
       .number()
       .int()
@@ -148,8 +149,7 @@ export const env = createEnv({
       process.env.KRONOS_SERVICE_TIMEOUT_MS,
       120_000,
     ),
-    AGENT_RUNTIME_URL:
-      process.env.AGENT_RUNTIME_URL ?? "http://127.0.0.1:8020",
+    AGENT_RUNTIME_URL: process.env.AGENT_RUNTIME_URL ?? "http://127.0.0.1:8020",
     AGENT_RUNTIME_TIMEOUT_MS: readPositiveNumberEnv(
       process.env.AGENT_RUNTIME_TIMEOUT_MS,
       300_000,
@@ -187,6 +187,10 @@ export const env = createEnv({
     WORKFLOW_WORKER_POLL_INTERVAL_MS: readPositiveNumberEnv(
       process.env.WORKFLOW_WORKER_POLL_INTERVAL_MS,
       2000,
+    ),
+    WORKFLOW_WORKER_CONCURRENCY: readPositiveNumberEnv(
+      process.env.WORKFLOW_WORKER_CONCURRENCY,
+      10,
     ),
     SCREENING_WORKER_POLL_INTERVAL_MS: readPositiveNumberEnv(
       process.env.SCREENING_WORKER_POLL_INTERVAL_MS,
