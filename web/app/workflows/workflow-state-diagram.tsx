@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn, InlineNotice, StatusPill } from "~/app/_components/ui";
 import { formatWorkflowDiagramNodeLabel } from "~/app/workflows/detail-labels";
 import type {
@@ -209,7 +209,7 @@ function NodeTooltip(props: {
       role="dialog"
       aria-label={`${displayLabel}详情`}
       className={cn(
-        "pointer-events-auto absolute top-0 z-20 w-[min(460px,calc(100vw-2rem))] max-h-[min(70vh,620px)] overflow-y-auto border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 text-left shadow-[var(--app-shadow-sm)]",
+        "pointer-events-auto absolute top-0 z-20 w-[min(460px,calc(100vw-2rem))] max-h-[min(70vh,620px)] overscroll-contain overflow-y-auto border border-[var(--app-border-soft)] bg-[var(--app-surface)] p-4 text-left shadow-[var(--app-shadow-sm)]",
         visible ? "block" : "hidden",
         placement === "right" ? "left-full ml-3" : "right-full mr-3",
       )}
@@ -303,6 +303,33 @@ function FallbackDiagram(props: { runtime: WorkflowDiagramRuntimeState }) {
 export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
   const { spec, runtime } = props;
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
+  const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const cancelScheduledClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const scheduleClose = (nodeId: string) => {
+    cancelScheduledClose();
+    closeTimerRef.current = setTimeout(() => {
+      setActiveNodeId((current) =>
+        current === nodeId ? pinnedNodeId : current,
+      );
+      closeTimerRef.current = null;
+    }, 180);
+  };
 
   if (!spec) {
     return <FallbackDiagram runtime={runtime} />;
@@ -423,17 +450,16 @@ export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
                 key={node.id}
                 className="absolute"
                 aria-label={`${displayLabel} 节点详情`}
-                onMouseEnter={() => setActiveNodeId(node.id)}
-                onMouseLeave={() =>
-                  setActiveNodeId((current) =>
-                    current === node.id ? null : current,
-                  )
-                }
+                onMouseEnter={() => {
+                  cancelScheduledClose();
+                  setActiveNodeId(node.id);
+                }}
+                onMouseLeave={() => scheduleClose(node.id)}
                 onFocusCapture={() => setActiveNodeId(node.id)}
                 onBlurCapture={(event) => {
                   if (!event.currentTarget.contains(event.relatedTarget)) {
                     setActiveNodeId((current) =>
-                      current === node.id ? null : current,
+                      current === node.id ? pinnedNodeId : current,
                     );
                   }
                 }}
@@ -448,13 +474,17 @@ export function WorkflowStateDiagram(props: WorkflowStateDiagramProps) {
                   type="button"
                   aria-describedby={tooltipId}
                   aria-expanded={activeNodeId === node.id}
-                  onClick={() =>
-                    setActiveNodeId((current) =>
+                  data-node-pinned={pinnedNodeId === node.id}
+                  onClick={() => {
+                    cancelScheduledClose();
+                    setPinnedNodeId((current) =>
                       current === node.id ? null : node.id,
-                    )
-                  }
+                    );
+                    setActiveNodeId(node.id);
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {
+                      setPinnedNodeId(null);
                       setActiveNodeId(null);
                       event.currentTarget.blur();
                     }
