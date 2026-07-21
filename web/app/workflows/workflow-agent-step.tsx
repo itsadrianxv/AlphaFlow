@@ -3,10 +3,13 @@
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React from "react";
 
-import { EmptyState, Panel } from "~/app/_components/ui";
+import { EmptyState, Panel, StatusPill } from "~/app/_components/ui";
 import { formatWorkflowDiagramNodeLabel } from "~/app/workflows/detail-labels";
 import { ResearchOpsPanels } from "~/app/workflows/research-ops-panels";
-import type { WorkflowDiagramRunDetail } from "~/app/workflows/workflow-diagram-runtime";
+import type {
+  WorkflowDiagramLiveEvent,
+  WorkflowDiagramRunDetail,
+} from "~/app/workflows/workflow-diagram-runtime";
 import { buildWorkflowDiagramRuntimeState } from "~/app/workflows/workflow-diagram-runtime";
 import {
   getLatestWorkflowDiagramSpec,
@@ -72,12 +75,16 @@ export function WorkflowAgentStep(props: {
   className?: string;
   showResearchPlan?: boolean;
   showReflection?: boolean;
+  liveEvents?: WorkflowDiagramLiveEvent[];
+  connectionState?: "idle" | "connected" | "reconnecting";
 }) {
   const {
     run,
     className,
     showResearchPlan = true,
     showReflection = true,
+    liveEvents,
+    connectionState,
   } = props;
 
   if (!run) {
@@ -97,7 +104,12 @@ export function WorkflowAgentStep(props: {
   const runtime = buildWorkflowDiagramRuntimeState({
     spec,
     run,
+    liveEvents,
   });
+
+  const latestProgress = liveEvents?.at(-1)?.progressPercent;
+  const progressPercent =
+    typeof latestProgress === "number" ? latestProgress : run.progressPercent;
 
   const currentNodeLabel = run.currentNodeKey
     ? formatWorkflowDiagramNodeLabel(run.currentNodeKey)
@@ -106,7 +118,16 @@ export function WorkflowAgentStep(props: {
   return (
     <div className={className}>
       <div className="grid gap-6">
-        <Panel title="Agent 状态图">
+        <Panel
+          title="Agent 状态图"
+          actions={
+            connectionState === "connected" ? (
+              <StatusPill label="实时已连接" tone="success" />
+            ) : connectionState === "reconnecting" ? (
+              <StatusPill label="正在重连" tone="warning" />
+            ) : undefined
+          }
+        >
           <WorkflowStateDiagram spec={spec} runtime={runtime} />
         </Panel>
 
@@ -121,7 +142,7 @@ export function WorkflowAgentStep(props: {
             <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">
               <div className="text-xs text-[var(--app-text-soft)]">进度</div>
               <div className="mt-2 text-lg text-[var(--app-text)]">
-                {run.progressPercent}%
+                {progressPercent}%
               </div>
             </div>
             <div className="rounded-[12px] border border-[var(--app-border)] bg-[var(--app-panel)] px-4 py-3">

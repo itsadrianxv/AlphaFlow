@@ -46,7 +46,9 @@ const WorkflowState = Annotation.Root({
   researchUnits: Annotation<IndustryResearchGraphState["researchUnits"]>,
   researchUnitRuns: Annotation<IndustryResearchGraphState["researchUnitRuns"]>,
   researchNotes: Annotation<IndustryResearchGraphState["researchNotes"]>,
-  compressedFindings: Annotation<IndustryResearchGraphState["compressedFindings"]>,
+  compressedFindings: Annotation<
+    IndustryResearchGraphState["compressedFindings"]
+  >,
   gapAnalysis: Annotation<IndustryResearchGraphState["gapAnalysis"]>,
   replanRecords: Annotation<IndustryResearchGraphState["replanRecords"]>,
   reflection: Annotation<IndustryResearchGraphState["reflection"]>,
@@ -162,7 +164,9 @@ function buildEscalationMetadata(
     autoEscalationReason: reason,
     structuredModelInitial:
       state.structuredModelInitial ??
-      resolveIndustryResearchStructuredModel(state.requestedDepth ?? "standard"),
+      resolveIndustryResearchStructuredModel(
+        state.requestedDepth ?? "standard",
+      ),
     structuredModelFinal: "deepseek-reasoner" as const,
   };
 }
@@ -172,6 +176,20 @@ abstract class IndustryResearchLangGraphBase extends BaseWorkflowLangGraph<
   IndustryResearchNodeKey
 > {
   readonly templateCode = INDUSTRY_RESEARCH_TEMPLATE_CODE;
+
+  protected getNodeProgressPayload(nodeKey: IndustryResearchNodeKey) {
+    const messageByNodeKey: Record<IndustryResearchNodeKey, string> = {
+      agent0_clarify_scope: "正在识别研究主题、范围与约束条件",
+      agent1_extract_research_spec: "正在生成研究问题、任务契约与执行单元",
+      agent2_trend_analysis: "正在汇总行业趋势、热度与市场变化",
+      agent3_candidate_screening: "正在筛选与主题相关的候选标的",
+      agent4_credibility_and_competition: "正在核验证据质量并分析竞争格局",
+      agent5_report_synthesis: "正在综合证据并形成行业研究结论",
+      agent6_reflection: "正在检查研究缺口、质量与后续重规划需求",
+    };
+
+    return { message: messageByNodeKey[nodeKey] };
+  }
 
   buildInitialState(
     params: WorkflowGraphBuildInitialStateParams,

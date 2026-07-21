@@ -302,6 +302,36 @@ abstract class CompanyResearchLangGraphBase<
 > extends BaseWorkflowLangGraph<CompanyResearchGraphState, NodeKey> {
   readonly templateCode = COMPANY_RESEARCH_TEMPLATE_CODE;
 
+  protected getNodeProgressPayload(nodeKey: NodeKey) {
+    const messageByNodeKey: Record<string, string> = {
+      agent0_clarify_scope: "正在核对公司研究范围与关键约束",
+      agent1_company_briefing: "正在梳理公司背景与研究简报",
+      agent1_write_research_brief: "正在生成公司研究简报与关注重点",
+      agent2_concept_mapping: "正在映射公司业务、概念与受益路径",
+      agent2_plan_research_units: "正在规划需要执行的研究单元",
+      agent3_question_design: "正在设计需要验证的关键研究问题",
+      agent3_execute_research_units: "正在采集并整理各研究单元的证据",
+      agent3_source_grounding: "正在建立可验证的一手与权威信源",
+      agent4_evidence_collection: "正在收集公司经营与行业相关证据",
+      agent4_evidence_curation: "正在去重、筛选并整理研究证据",
+      agent4_source_grounding: "正在补充可验证的来源与证据链",
+      agent4_synthesis: "正在综合已收集的信息形成阶段判断",
+      agent5_gap_analysis: "正在识别证据缺口并决定补充方向",
+      agent5_gap_analysis_and_replan: "正在检查信息缺口并重规划研究路径",
+      agent5_investment_synthesis: "正在综合证据形成投资判断",
+      agent6_compress_findings: "正在压缩整理关键发现与待验证问题",
+      agent7_reference_enrichment: "正在补全引用信息与来源关联",
+      agent8_finalize_report: "正在汇总研究结论并生成报告",
+      agent8_investment_synthesis: "正在生成最终投资判断与风险提示",
+      agent9_evidence_curation: "正在复核证据覆盖与引用质量",
+      agent9_reflection: "正在复盘研究质量与未解决问题",
+      agent10_reference_enrichment: "正在补充引用细节与来源说明",
+      agent11_investment_synthesis: "正在完成最终投资结论与置信度判断",
+    };
+
+    return { message: messageByNodeKey[nodeKey] ?? "正在执行公司研究任务" };
+  }
+
   buildInitialState(
     params: WorkflowGraphBuildInitialStateParams,
   ): CompanyResearchGraphState {

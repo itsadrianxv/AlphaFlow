@@ -9,6 +9,7 @@ import type { ConfidenceClaimAnalysis } from "~/server/domain/intelligence/confi
 import { INDUSTRY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 
 export type IndustryConclusionSectionId =
+  | "agent"
   | "overview"
   | "logic"
   | "evidence"
@@ -91,6 +92,11 @@ export type IndustryConclusionViewModel = {
 };
 
 const sections: IndustryConclusionSection[] = [
+  {
+    id: "agent",
+    label: "Agent 状态图",
+    summary: "",
+  },
   {
     id: "overview",
     label: "总览",

@@ -31,6 +31,15 @@ type WorkflowEventInfo = {
   occurredAt: Date | string;
 };
 
+export type WorkflowDiagramLiveEvent = {
+  sequence: number;
+  eventType: string;
+  nodeKey?: string;
+  progressPercent?: number;
+  payload?: Record<string, unknown>;
+  occurredAt: Date | string;
+};
+
 type WorkflowNodeInfo = {
   id: string;
   nodeKey: string;
@@ -76,6 +85,78 @@ function getEventNodeKey(event: WorkflowEventInfo) {
     : undefined;
 }
 
+function getEventMessage(event: WorkflowEventInfo) {
+  if (!isRecord(event.payload) || typeof event.payload.message !== "string") {
+    return undefined;
+  }
+
+  const message = event.payload.message.trim();
+  return message.length > 0 ? message.slice(0, 240) : undefined;
+}
+
+function getLatestNodeEvent(events: WorkflowEventInfo[], nodeKey: string) {
+  return events
+    .filter((event) => getEventNodeKey(event) === nodeKey)
+    .sort((left, right) => right.sequence - left.sequence)
+    .at(0);
+}
+
+function getNodeStatusFromEvent(event?: WorkflowEventInfo) {
+  if (!event) {
+    return undefined;
+  }
+
+  if (
+    event.eventType === "NODE_STARTED" ||
+    event.eventType === "NODE_PROGRESS"
+  ) {
+    return "active" as const;
+  }
+
+  if (event.eventType === "NODE_SUCCEEDED") {
+    return isRecord(event.payload) && event.payload.skipped === true
+      ? ("skipped" as const)
+      : ("done" as const);
+  }
+
+  if (event.eventType === "NODE_FAILED") {
+    return "failed" as const;
+  }
+
+  if (event.eventType === "RUN_PAUSED") {
+    return "paused" as const;
+  }
+
+  return undefined;
+}
+
+function mergeEvents(params: {
+  run: WorkflowDiagramRunDetail;
+  liveEvents?: WorkflowDiagramLiveEvent[];
+}) {
+  const events = new Map<number, WorkflowEventInfo>();
+
+  for (const event of params.run.events) {
+    events.set(event.sequence, event);
+  }
+
+  for (const event of params.liveEvents ?? []) {
+    events.set(event.sequence, {
+      id: `live-${event.sequence}`,
+      sequence: event.sequence,
+      eventType: event.eventType,
+      payload: event.nodeKey
+        ? { ...(event.payload ?? {}), nodeKey: event.nodeKey }
+        : event.payload,
+      occurredAt: event.occurredAt,
+    });
+  }
+
+  return [...events.values()].sort(
+    (left, right) => left.sequence - right.sequence,
+  );
+}
+
 function getInsightFromOutput(output: unknown) {
   if (!isRecord(output)) {
     return undefined;
@@ -110,7 +191,13 @@ function getNodeStatus(params: {
   currentNodeKey?: string | null;
   nodeKey: string;
   nodeRun?: WorkflowNodeInfo;
+  latestEvent?: WorkflowEventInfo;
 }): WorkflowDiagramNodeStatus {
+  const eventStatus = getNodeStatusFromEvent(params.latestEvent);
+  if (eventStatus) {
+    return eventStatus;
+  }
+
   if (params.currentNodeKey === params.nodeKey) {
     if (params.runStatus === "PAUSED") {
       return "paused";
@@ -257,7 +344,13 @@ function buildFallback(run: WorkflowDiagramRunDetail) {
 export function buildWorkflowDiagramRuntimeState(params: {
   spec: WorkflowDiagramSpec | null;
   run: WorkflowDiagramRunDetail;
+  liveEvents?: WorkflowDiagramLiveEvent[];
 }): WorkflowDiagramRuntimeState {
+  const events = mergeEvents({
+    run: params.run,
+    liveEvents: params.liveEvents,
+  });
+
   if (!params.spec) {
     return {
       currentNodeId: params.run.currentNodeKey ?? null,
@@ -270,6 +363,7 @@ export function buildWorkflowDiagramRuntimeState(params: {
               currentNodeKey: params.run.currentNodeKey,
               nodeKey: node.nodeKey,
               nodeRun: node,
+              latestEvent: getLatestNodeEvent(events, node.nodeKey),
             }),
             startedAt: node.startedAt,
             completedAt: node.completedAt,
@@ -295,18 +389,25 @@ export function buildWorkflowDiagramRuntimeState(params: {
   const nodeStates = Object.fromEntries(
     params.spec.nodes.map((node) => {
       const nodeRun = nodeRunMap.get(node.id);
+      const latestEvent = getLatestNodeEvent(events, node.id);
       const status = getNodeStatus({
         runStatus: params.run.status,
         currentNodeKey: params.run.currentNodeKey,
         nodeKey: node.id,
         nodeRun,
+        latestEvent,
       });
-      const eventSummary =
-        params.run.events
-          .filter((event) => getEventNodeKey(event) === node.id)
-          .slice(-1)
-          .map((event) => event.eventType)
-          .at(0) ?? undefined;
+      const latestProgress =
+        status === "active" || status === "paused"
+          ? [...events]
+              .reverse()
+              .find(
+                (event) =>
+                  event.eventType === "NODE_PROGRESS" &&
+                  getEventNodeKey(event) === node.id &&
+                  Boolean(getEventMessage(event)),
+              )
+          : undefined;
 
       return [
         node.id,
@@ -322,7 +423,13 @@ export function buildWorkflowDiagramRuntimeState(params: {
           insight:
             getInsightFromOutput(nodeRun?.output) ??
             getPausedNodeInsight({ run: params.run, nodeKey: node.id }),
-          eventSummary,
+          eventSummary: latestEvent?.eventType,
+          latestProgress: latestProgress
+            ? {
+                message: getEventMessage(latestProgress) as string,
+                occurredAt: latestProgress.occurredAt,
+              }
+            : undefined,
         } satisfies WorkflowDiagramNodeRuntimeState,
       ];
     }),
@@ -331,15 +438,24 @@ export function buildWorkflowDiagramRuntimeState(params: {
   const visitedNodeIds = Object.entries(nodeStates)
     .filter(([, state]) => state.status !== "idle")
     .map(([nodeId]) => nodeId);
+  const activeNodeId = [...events]
+    .reverse()
+    .map((event) => getEventNodeKey(event))
+    .filter((nodeKey): nodeKey is string => Boolean(nodeKey))
+    .find(
+      (nodeKey) =>
+        (nodeStates[nodeKey]?.status === "active" ||
+          nodeStates[nodeKey]?.status === "paused"),
+    );
 
   return {
-    currentNodeId: params.run.currentNodeKey ?? null,
+    currentNodeId: activeNodeId ?? params.run.currentNodeKey ?? null,
     nodeStates,
     visitedNodeIds,
     visitedEdges: deriveVisitedEdges({
       spec: params.spec,
       nodeStates,
-      events: params.run.events,
+      events,
     }),
     fallback: null,
   };

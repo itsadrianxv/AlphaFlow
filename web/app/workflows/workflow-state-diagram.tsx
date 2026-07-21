@@ -237,7 +237,25 @@ function NodeTooltip(props: {
           {node.description}
         </p>
       </section>
+      {state.latestProgress ? (
+        <section className="mt-4 border-b border-[var(--app-border-soft)] pb-4">
+          <h4 className="text-sm font-medium text-[var(--app-text-strong)]">
+            当前进度
+          </h4>
+          <p className="mt-1.5 text-sm leading-6 text-[var(--app-text)]">
+            {state.latestProgress.message}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-[var(--app-text-subtle)]">
+            更新于 {formatDate(state.latestProgress.occurredAt)}
+          </p>
+        </section>
+      ) : null}
       {state.insight ? <NodeInsightContent insight={state.insight} /> : null}
+      {(status === "done" || status === "skipped") && !state.insight ? (
+        <p className="mt-4 text-sm leading-6 text-[var(--app-text-muted)]">
+          节点已完成，正在加载本次运行的节点洞察。
+        </p>
+      ) : null}
       <div className="mt-4 grid gap-x-4 gap-y-1.5 border-t border-[var(--app-border-soft)] pt-3 text-xs leading-5 text-[var(--app-text-subtle)] sm:grid-cols-2">
         <div>节点类型：{node.kind}</div>
         <div>执行次数：{state.attempt ?? "-"}</div>

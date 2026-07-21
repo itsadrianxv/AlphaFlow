@@ -13,6 +13,8 @@ import type {
   IndustryConclusionViewModel,
 } from "~/app/workflows/[runId]/industry-conclusion-view-model";
 import { formatRuntimeIssueLabel } from "~/app/workflows/detail-labels";
+import { WorkflowAgentStep } from "~/app/workflows/workflow-agent-step";
+import type { WorkflowDiagramRunDetail } from "~/app/workflows/workflow-diagram-runtime";
 
 export type { IndustryConclusionViewModel } from "~/app/workflows/[runId]/industry-conclusion-view-model";
 
@@ -464,6 +466,7 @@ function RisksSection(props: { model: IndustryConclusionViewModel }) {
 
 export function IndustryConclusionDetail(props: {
   model: IndustryConclusionViewModel;
+  run?: WorkflowDiagramRunDetail | null;
   initialSectionId?: IndustryConclusionSectionId;
 }) {
   const { model, initialSectionId } = props;
@@ -485,6 +488,7 @@ export function IndustryConclusionDetail(props: {
           setActiveSectionId(sectionId as IndustryConclusionSectionId)
         }
         panels={{
+          agent: <WorkflowAgentStep run={props.run ?? null} />,
           overview: <OverviewSection model={model} />,
           logic: <LogicSection model={model} />,
           evidence: <EvidenceSection model={model} />,

@@ -39,6 +39,8 @@ import {
   getIndustryResearchModePills,
   isCompanyResearchResult,
 } from "~/app/workflows/research-view-models";
+import { useWorkflowRunEvents } from "~/app/workflows/use-workflow-run-events";
+import { WorkflowAgentStep } from "~/app/workflows/workflow-agent-step";
 import { resolveWorkflowShellContext } from "~/app/workflows/workflow-shell-context";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
@@ -153,6 +155,16 @@ export function RunInvestorClient({
 
   const run = runQuery.data;
   const templateCode = run?.template.code ?? initialTemplateCode;
+  const isLiveResearchRun =
+    (templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE ||
+      templateCode === COMPANY_RESEARCH_TEMPLATE_CODE) &&
+    (run?.status === "PENDING" ||
+      run?.status === "RUNNING" ||
+      run?.status === "PAUSED");
+  const { events: liveEvents, connectionState } = useWorkflowRunEvents({
+    runId,
+    enabled: Boolean(isLiveResearchRun),
+  });
   const shellContext = resolveWorkflowShellContext(templateCode);
   const screeningHistoryQuery = api.screening.listWorkspaces.useQuery(
     { limit: 8, offset: 0 },
@@ -363,12 +375,20 @@ export function RunInvestorClient({
           title="未找到该任务"
           description="该任务可能已被删除，或当前账号没有访问权限。"
         />
+      ) : isLiveResearchRun ? (
+        <WorkflowAgentStep
+          run={run ?? null}
+          liveEvents={liveEvents}
+          connectionState={connectionState}
+          showResearchPlan={false}
+          showReflection={false}
+        />
       ) : showIndustryConclusion && industryConclusionModel ? (
         <HighlightToNote
           floatingToolbar
           source={{ kind: "workflow_run", runId }}
         >
-          <IndustryConclusionDetail model={industryConclusionModel} />
+          <IndustryConclusionDetail model={industryConclusionModel} run={run} />
         </HighlightToNote>
       ) : (
         <HighlightToNote

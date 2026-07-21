@@ -59,6 +59,10 @@ export type WorkflowDiagramNodeRuntimeState = {
   output?: unknown;
   insight?: WorkflowNodeInsight;
   eventSummary?: string;
+  latestProgress?: {
+    message: string;
+    occurredAt: Date | string;
+  };
 };
 
 export type WorkflowDiagramVisitedEdge = {

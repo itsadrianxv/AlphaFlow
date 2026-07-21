@@ -113,6 +113,13 @@ export abstract class BaseWorkflowLangGraph<
     return [];
   }
 
+  protected getNodeProgressPayload(
+    _nodeKey: NodeKey,
+    _state: State,
+  ): Record<string, unknown> {
+    return { message: "正在执行节点任务" };
+  }
+
   protected getResumeNodeKey(startNodeIndex?: number): NodeKey | undefined {
     if (startNodeIndex === undefined) {
       return undefined;
@@ -228,9 +235,10 @@ export abstract class BaseWorkflowLangGraph<
           };
 
           await params.hooks?.onNodeStarted?.(nodeKey);
-          await params.hooks?.onNodeProgress?.(nodeKey, {
-            message: "Node is running",
-          });
+          await params.hooks?.onNodeProgress?.(
+            nodeKey,
+            this.getNodeProgressPayload(nodeKey, state),
+          );
           continue;
         }
 

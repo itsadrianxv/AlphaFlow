@@ -37,6 +37,10 @@ describe("WorkflowStateDiagram", () => {
           status: "active",
           attempt: 1,
           eventSummary: "正在分析问题",
+          latestProgress: {
+            message: "正在整理研究约束与必答问题。",
+            occurredAt: new Date(0),
+          },
           insight: {
             fields: [
               {
@@ -66,6 +70,8 @@ describe("WorkflowStateDiagram", () => {
     expect(html).toContain("pointer-events-auto");
     expect(html).toContain("节点详情");
     expect(html).toContain("本节点作用");
+    expect(html).toContain("当前进度");
+    expect(html).toContain("正在整理研究约束与必答问题。");
     expect(html).toContain("本次识别的重点");
     expect(html).toContain("对下一步的影响");
     expect(html).not.toContain("选择一个节点");
