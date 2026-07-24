@@ -91,6 +91,52 @@ describe("Impact Mapping", () => {
     expect(portfolioEdge?.basis).toBe("fact");
   });
 
+  it("没有组合时将宏观分析中的全部候选股作为虚拟组合", async () => {
+    const service = new ImpactMappingService({
+      prisma: {
+        portfolioSnapshot: { findFirst: vi.fn(async () => null) },
+        watchList: { findMany: vi.fn(async () => []) },
+        savedCompany: { findMany: vi.fn(async () => []) },
+        savedIndustry: { findMany: vi.fn(async () => []) },
+      },
+      marketContextClient: {
+        getSnapshot: vi.fn(async () => ({
+          hotThemes: [
+            {
+              candidateStocks: [
+                { stockCode: "603019", stockName: "中科曙光" },
+                { stockCode: "300750", stockName: "宁德时代" },
+              ],
+            },
+            {
+              candidateStocks: [
+                { stockCode: "603019", stockName: "中科曙光" },
+                { stockCode: "600519", stockName: "贵州茅台" },
+              ],
+            },
+          ],
+        })),
+      },
+    } as never);
+
+    const result = await service.loadContext(
+      "user-1",
+      impactMappingInputSchema.parse({ mode: "radar" }),
+    );
+
+    expect(result.portfolio?.name).toBe("宏观分析候选股");
+    expect(result.portfolio?.positions).toEqual([
+      { stockCode: "603019", stockName: "中科曙光", currentWeightPct: 100 / 3 },
+      { stockCode: "300750", stockName: "宁德时代", currentWeightPct: 100 / 3 },
+      { stockCode: "600519", stockName: "贵州茅台", currentWeightPct: 100 / 3 },
+    ]);
+    expect(result.companies.map((company) => company.stockCode)).toEqual([
+      "603019",
+      "300750",
+      "600519",
+    ]);
+  });
+
   it("把新闻原文持久化为 observation 证据", async () => {
     const create = vi.fn(async (params) => ({
       id: "context-1",

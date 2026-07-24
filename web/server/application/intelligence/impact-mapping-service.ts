@@ -1,23 +1,24 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import type { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
 import type { EvidenceCitation } from "~/server/domain/evidence-context/types";
 import {
   type ImpactContext,
   type ImpactEdge,
-  impactEdgeSchema,
   type ImpactMappingInput,
   type ImpactMappingResult,
   type ImpactRadarEvent,
   type ImpactScenario,
-  impactScenarioSchema,
   type ImpactTimelineItem,
+  impactEdgeSchema,
+  impactScenarioSchema,
 } from "~/server/domain/intelligence/impact-mapping";
 import type { ThemeNewsItem } from "~/server/domain/intelligence/types";
 import type { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import type { PrismaEvidenceContextRepository } from "~/server/infrastructure/evidence-context/prisma-evidence-context-repository";
 import type { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
-import type { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
+import type { PythonMarketContextClient } from "~/server/infrastructure/intelligence/python-market-context-client";
 
 type WebEvidence = {
   id: string;
@@ -112,7 +113,8 @@ function fallbackScenarios(event: ThemeNewsItem): ImpactScenario[] {
       triggers: ["事件相关政策、订单或价格信号继续得到确认"],
       confirmationSignals: ["后续公开信息与当前事件方向一致"],
       invalidationConditions: ["关键事实被修正或执行力度明显低于预期"],
-      affectedTargets: event.relatedStocks.length > 0 ? event.relatedStocks : ["相关行业"],
+      affectedTargets:
+        event.relatedStocks.length > 0 ? event.relatedStocks : ["相关行业"],
       rationale: "基于当前事件方向的延续性推演。",
       basis: "assumption",
     },
@@ -123,7 +125,8 @@ function fallbackScenarios(event: ThemeNewsItem): ImpactScenario[] {
       triggers: ["出现相反政策、供需或竞争信号"],
       confirmationSignals: ["价格、订单或资本开支数据转弱"],
       invalidationConditions: ["当前趋势获得新的高可信证据支持"],
-      affectedTargets: event.relatedStocks.length > 0 ? event.relatedStocks : ["相关行业"],
+      affectedTargets:
+        event.relatedStocks.length > 0 ? event.relatedStocks : ["相关行业"],
       rationale: "用于检查当前叙事可能失效的路径。",
       basis: "assumption",
     },
@@ -136,12 +139,16 @@ export class ImpactMappingService {
       prisma: PrismaClient;
       dataClient: PythonIntelligenceDataClient;
       capabilityClient: PythonCapabilityGatewayClient;
+      marketContextClient?: Pick<PythonMarketContextClient, "getSnapshot">;
       evidenceRepository: PrismaEvidenceContextRepository;
       evidenceAwareLlmClient: EvidenceAwareLlmClient;
     },
   ) {}
 
-  async loadContext(userId: string, input: ImpactMappingInput): Promise<ImpactContext> {
+  async loadContext(
+    userId: string,
+    input: ImpactMappingInput,
+  ): Promise<ImpactContext> {
     const [portfolio, watchLists, savedCompanies, savedIndustries] =
       await Promise.all([
         input.portfolioSnapshotId
@@ -174,7 +181,36 @@ export class ImpactMappingService {
         }),
       ]);
 
-    const positions = parsePositions(portfolio?.positions);
+    let positions = parsePositions(portfolio?.positions);
+    let effectivePortfolio: ImpactContext["portfolio"] = portfolio
+      ? { id: portfolio.id, name: portfolio.name, positions }
+      : undefined;
+    if (!portfolio && this.deps.marketContextClient) {
+      try {
+        const marketContext = await this.deps.marketContextClient.getSnapshot();
+        const candidates = [
+          ...new Map(
+            marketContext.hotThemes
+              .flatMap((theme) => theme.candidateStocks)
+              .map((stock) => [stock.stockCode, stock] as const),
+          ).values(),
+        ];
+        const weight = candidates.length > 0 ? 100 / candidates.length : 0;
+        positions = candidates.map((stock) => ({
+          ...stock,
+          currentWeightPct: weight,
+        }));
+        if (positions.length > 0) {
+          effectivePortfolio = {
+            id: "market-context-candidates",
+            name: "宏观分析候选股",
+            positions,
+          };
+        }
+      } catch {
+        // 宏观分析暂不可用时保留原有空组合降级行为。
+      }
+    }
     const normalizedWatchLists = watchLists.map((watchList) => ({
       id: watchList.id,
       name: watchList.name,
@@ -201,7 +237,9 @@ export class ImpactMappingService {
         ...current,
         stockCode: stock.stockCode,
         companyName: current?.companyName || stock.stockName || stock.stockCode,
-        aliases: unique([...(current?.aliases ?? []), stock.stockName].filter(Boolean)),
+        aliases: unique(
+          [...(current?.aliases ?? []), stock.stockName].filter(Boolean),
+        ),
       });
     }
 
@@ -219,10 +257,10 @@ export class ImpactMappingService {
       : [];
 
     return {
-      portfolio: portfolio
+      portfolio: effectivePortfolio
         ? {
-            id: portfolio.id,
-            name: portfolio.name,
+            id: effectivePortfolio.id,
+            name: effectivePortfolio.name,
             positions,
           }
         : undefined,
@@ -275,7 +313,11 @@ export class ImpactMappingService {
     if (input.mode === "trace") {
       let cursor = new Date(input.traceCursor ?? selectedEvent.publishedAt);
       const windows = Math.ceil(input.traceMaxDays / 30);
-      for (let index = 0; index < windows && news.length < input.traceMaxEvents; index += 1) {
+      for (
+        let index = 0;
+        index < windows && news.length < input.traceMaxEvents;
+        index += 1
+      ) {
         cursor = new Date(cursor.getTime() - 30 * 86_400_000);
         try {
           const batch = await this.deps.dataClient.getNewsRadar({
@@ -324,7 +366,10 @@ export class ImpactMappingService {
       return {
         id,
         itemKey: `news:${news.id}`,
-        status: news.analysisStatus === "partial" ? ("partial" as const) : ("available" as const),
+        status:
+          news.analysisStatus === "partial"
+            ? ("partial" as const)
+            : ("available" as const),
         extractedFact: news.summary,
         snippet: news.content ?? news.summary,
         valueJson: {
@@ -341,8 +386,12 @@ export class ImpactMappingService {
         publishedAt: news.publishedAt,
         fetchedAt: now,
         warnings: news.warnings ?? [],
-        limitations: news.analysisStatus === "partial" ? ["news_analysis_partial"] : [],
-        metadata: { eventType: news.eventType, relevanceScore: news.relevanceScore },
+        limitations:
+          news.analysisStatus === "partial" ? ["news_analysis_partial"] : [],
+        metadata: {
+          eventType: news.eventType,
+          relevanceScore: news.relevanceScore,
+        },
         recordKind: "observation" as const,
         lineageId: `impact-event:${news.id}`,
         derivedFromItemIds: [],
@@ -385,7 +434,8 @@ export class ImpactMappingService {
           {
             id: randomUUID(),
             blockKey: "news",
-            status: params.collected.warnings.length > 0 ? "partial" : "available",
+            status:
+              params.collected.warnings.length > 0 ? "partial" : "available",
             sourceType: "mixed_news",
             sourceName: "Minishare 与公开网页",
             fetchedAt: now,
@@ -412,7 +462,11 @@ export class ImpactMappingService {
     return params.collected.news
       .map((event) => {
         const evidenceId = params.persisted.itemIdBySourceId[event.id];
-        const edges = this.buildDeterministicEdges(event, params.context, evidenceId);
+        const edges = this.buildDeterministicEdges(
+          event,
+          params.context,
+          evidenceId,
+        );
         const portfolioHits = unique(
           edges
             .filter((edge) => edge.level === "portfolio")
@@ -423,7 +477,12 @@ export class ImpactMappingService {
           impactEdges: edges,
           portfolioHits,
           importanceScore: Math.round(
-            Math.min(100, event.relevanceScore * 70 + edges.length * 4 + portfolioHits.length * 8),
+            Math.min(
+              100,
+              event.relevanceScore * 70 +
+                edges.length * 4 +
+                portfolioHits.length * 8,
+            ),
           ),
         };
       })
@@ -523,7 +582,10 @@ export class ImpactMappingService {
   }): Promise<{ scenarios: ImpactScenario[]; warnings: string[] }> {
     const event = params.collected.selectedEvent ?? params.collected.news[0];
     if (!event) return { scenarios: [], warnings: ["selected_event_missing"] };
-    const fallback = { scenarios: fallbackScenarios(event), warnings: ["scenario_model_fallback"] };
+    const fallback = {
+      scenarios: fallbackScenarios(event),
+      warnings: ["scenario_model_fallback"],
+    };
     const response = await this.deps.evidenceAwareLlmClient.complete({
       userId: params.userId,
       workflowRunId: params.runId,
@@ -654,7 +716,8 @@ export class ImpactMappingService {
     return {
       mode: params.input.mode,
       analysisStatus:
-        warnings.length > 0 || params.collected.news.some((item) => item.analysisStatus === "partial")
+        warnings.length > 0 ||
+        params.collected.news.some((item) => item.analysisStatus === "partial")
           ? "partial"
           : "complete",
       asOf: new Date().toISOString(),
@@ -693,13 +756,17 @@ export class ImpactMappingService {
     return event;
   }
 
-  private async collectWebEvidence(event: ThemeNewsItem): Promise<WebEvidence[]> {
+  private async collectWebEvidence(
+    event: ThemeNewsItem,
+  ): Promise<WebEvidence[]> {
     const queries = unique([
       `${event.title} 供应商 客户 竞争对手`,
       `${event.title} 替代技术 地区 商品`,
     ]);
     const batches = await Promise.all(
-      queries.map((query) => this.deps.capabilityClient.search({ query, limit: 4 })),
+      queries.map((query) =>
+        this.deps.capabilityClient.search({ query, limit: 4 }),
+      ),
     );
     const byUrl = new Map<string, WebEvidence>();
     for (const item of batches.flat()) {
@@ -731,8 +798,14 @@ export class ImpactMappingService {
         targetType: attribution.targetType,
         stockCode: attribution.targetId?.match(/^\d{6}$/)?.[0],
         relation: attribution.relation,
-        direction: event.sentiment === "neutral" ? "uncertain" : event.sentiment,
-        strength: attribution.confidence >= 0.8 ? "high" : attribution.confidence >= 0.6 ? "medium" : "low",
+        direction:
+          event.sentiment === "neutral" ? "uncertain" : event.sentiment,
+        strength:
+          attribution.confidence >= 0.8
+            ? "high"
+            : attribution.confidence >= 0.6
+              ? "medium"
+              : "low",
         confidence: attribution.confidence,
         rationale: attribution.reason || event.matchReason,
         evidenceItemIds,
@@ -761,7 +834,8 @@ export class ImpactMappingService {
         targetType: portfolioCodes.has(stockCode) ? "holding" : "watchlist",
         stockCode,
         relation: "证券代码命中",
-        direction: event.sentiment === "neutral" ? "uncertain" : event.sentiment,
+        direction:
+          event.sentiment === "neutral" ? "uncertain" : event.sentiment,
         strength: portfolioCodes.has(stockCode) ? "high" : "medium",
         confidence: 1,
         rationale: portfolioCodes.has(stockCode)
@@ -782,7 +856,8 @@ export class ImpactMappingService {
         direction: "uncertain",
         strength: "low",
         confidence: event.relevanceScore,
-        rationale: event.matchReason || "新闻已召回，但尚无可验证的直接实体归属。",
+        rationale:
+          event.matchReason || "新闻已召回，但尚无可验证的直接实体归属。",
         evidenceItemIds,
         basis: "inference",
       });

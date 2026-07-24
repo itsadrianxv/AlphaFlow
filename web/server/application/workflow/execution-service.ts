@@ -31,6 +31,7 @@ import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-cl
 import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
 import { PrismaScreeningInsightRepository } from "~/server/infrastructure/intelligence/prisma-screening-insight-repository";
 import { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
+import { PythonMarketContextClient } from "~/server/infrastructure/intelligence/python-market-context-client";
 import { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
 import { PrismaScreeningSessionRepository } from "~/server/infrastructure/screening/prisma-screening-session-repository";
 import {
@@ -169,6 +170,7 @@ export function createWorkflowExecutionService(
   const impactMappingService = new ImpactMappingService({
     prisma,
     dataClient: intelligenceDataClient,
+    marketContextClient: new PythonMarketContextClient(),
     capabilityClient: capabilityGatewayClient,
     evidenceRepository: evidenceContextWriter,
     evidenceAwareLlmClient,
