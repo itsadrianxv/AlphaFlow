@@ -7,12 +7,8 @@ import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher
 import { TimingReportChart } from "~/app/timing/reports/[cardId]/timing-report-chart";
 import {
   formatTimingActionLabel,
-  formatTimingDirectionLabel,
-  formatTimingEngineLabel,
   formatTimingMarketStateLabel,
   formatTimingMarketTransitionLabel,
-  formatTimingMetricLabel,
-  formatTimingMetricValue,
   formatTimingNarrative,
   formatTimingReviewHorizonLabel,
   formatTimingReviewVerdictLabel,
@@ -21,7 +17,6 @@ import {
 import type {
   TimingReportPayload,
   TimingReportSeriesPayload,
-  TimingSignalEngineKey,
   TimingTimeframe,
 } from "~/server/domain/timing/types";
 
@@ -31,6 +26,7 @@ const actionToneMap: Record<
 > = {
   WATCH: "neutral",
   PROBE: "warning",
+  ENTER: "success",
   ADD: "success",
   HOLD: "info",
   TRIM: "warning",
@@ -45,15 +41,6 @@ const marketToneMap: Record<
   NEUTRAL: "info",
   RISK_OFF: "warning",
 };
-
-const evidenceOrder: TimingSignalEngineKey[] = [
-  "multiTimeframeAlignment",
-  "relativeStrength",
-  "volatilityPercentile",
-  "liquidityStructure",
-  "breakoutFailure",
-  "gapVolumeQuality",
-];
 
 export type TimingReportStageId =
   | "summary"
@@ -126,13 +113,10 @@ function SummaryTab(props: {
   seriesLoading: boolean;
 }) {
   const { report, series, timeframe, onTimeframeChange, seriesLoading } = props;
-  const signalContext = report.card.reasoning.signalContext;
   const signalSnapshot = report.card.signalSnapshot;
   const asOfDate = report.card.asOfDate ?? signalSnapshot?.asOfDate ?? "-";
-  const kronosForecast = report.card.reasoning.kronosForecast;
-  const modelPredictionText = kronosForecast
-    ? `模型预测：${formatTimingDirectionLabel(kronosForecast.direction)}，预期收益 ${kronosForecast.expectedReturnPct.toFixed(2)}%，最大回撤 ${kronosForecast.maxDrawdownPct.toFixed(2)}%`
-    : "模型预测：暂不可用";
+  const audit =
+    report.card.decisionAudit ?? report.card.reasoning.decisionAudit;
 
   return (
     <div className="grid gap-6">
@@ -140,24 +124,56 @@ function SummaryTab(props: {
         <div className="grid gap-3 text-sm leading-7 text-[var(--app-text)]">
           <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
             <span>
-              当前结论：{formatTimingActionLabel(report.card.actionBias)}
+              最终动作：
+              {audit?.finalAction
+                ? formatTimingActionLabel(audit.finalAction)
+                : "不产生动作"}
             </span>
             <span>报告日期 {asOfDate}</span>
           </div>
-          <p>
-            综合择时评分 {signalContext.compositeScore.toFixed(1)} / ±100，
-            置信度 {report.card.confidence} / 100
-          </p>
+          {audit ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricBlock label="决策状态" value={audit.status} />
+              <MetricBlock
+                label="潜在动作"
+                value={
+                  audit.potentialAction
+                    ? formatTimingActionLabel(audit.potentialAction)
+                    : "无"
+                }
+              />
+              <MetricBlock
+                label="最终动作"
+                value={
+                  audit.finalAction
+                    ? formatTimingActionLabel(audit.finalAction)
+                    : "无"
+                }
+              />
+              <MetricBlock
+                label="否决风险"
+                value={audit.riskUnresolved ? "尚未排除" : "已排除"}
+              />
+            </div>
+          ) : (
+            <EmptyState title="该记录没有 v2 决策审计，无法形成专业择时结论" />
+          )}
           <div className="text-sm text-[var(--app-text-muted)]">
             依据{" "}
             <EvidenceContextCitations
               citations={report.card.reasoning.evidenceCitations}
             />
           </div>
-          <p>{modelPredictionText}</p>
-          <p className="max-w-5xl text-[var(--app-text-muted)]">
-            择时评分由多周期一致性、相对强弱、波动率分位、流动性结构、突破失败率、缺口与放量质量六个角度加权计算。
-          </p>
+          {audit ? (
+            <p className="max-w-5xl text-[var(--app-text-muted)]">
+              策略修订 {audit.strategyRevisionId ?? "-"}，配置哈希{" "}
+              {audit.configHash ?? "-"}，规则引擎 {audit.engineVersion}
+              ，特征版本 {audit.featureVersion}。
+            </p>
+          ) : null}
+          {audit?.gateTrace.length ? (
+            <InfoList items={audit.gateTrace} />
+          ) : null}
         </div>
       </Panel>
 
@@ -183,6 +199,12 @@ function EvidenceTab(props: {
   seriesLoading: boolean;
 }) {
   const { report, series, timeframe, onTimeframeChange, seriesLoading } = props;
+  const audit =
+    report.card.decisionAudit ?? report.card.reasoning.decisionAudit;
+  const manifest =
+    report.card.reasoning.dataManifest ??
+    report.card.signalSnapshot?.dataManifest ??
+    [];
 
   return (
     <div className="grid gap-6">
@@ -197,75 +219,105 @@ function EvidenceTab(props: {
         />
       </Panel>
 
-      <Panel title="六大择时模型">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {evidenceOrder.map((key) => {
-            const evidence = report.evidence[key];
-
-            return (
-              <article
-                key={evidence.key}
-                className="rounded-[14px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-base font-medium text-[var(--app-text)]">
-                    {formatTimingEngineLabel(evidence.key)}
-                  </div>
-                  <StatusPill
-                    label={`${formatTimingDirectionLabel(evidence.direction)} · ${evidence.score}`}
-                    tone={
-                      evidence.direction === "bullish"
-                        ? "success"
-                        : evidence.direction === "bearish"
-                          ? "warning"
-                          : "info"
-                    }
-                  />
-                </div>
-                <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
-                  {formatTimingNarrative(evidence.detail)}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <StatusPill
-                    label={`置信度 ${(evidence.confidence * 100).toFixed(0)}%`}
-                    tone="info"
-                  />
-                  <StatusPill
-                    label={`权重 ${(evidence.weight * 100).toFixed(0)}%`}
-                  />
-                </div>
-                {evidence.warnings.length > 0 ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {evidence.warnings.map((warning) => (
-                      <StatusPill
-                        key={`${evidence.key}-${warning}`}
-                        label={formatTimingRiskFlagLabel(warning)}
-                        tone="warning"
-                      />
-                    ))}
-                  </div>
-                ) : null}
-                <dl className="mt-4 grid gap-2 text-sm text-[var(--app-text-muted)]">
-                  {Object.entries(evidence.metrics).map(
-                    ([metricKey, value]) => (
-                      <div
-                        key={`${evidence.key}-${metricKey}`}
-                        className="flex items-center justify-between gap-4 rounded-[10px] border border-[var(--app-border-soft)] px-3 py-2"
-                      >
-                        <dt className="text-[var(--app-text-soft)]">
-                          {formatTimingMetricLabel(metricKey)}
-                        </dt>
-                        <dd className="text-[var(--app-text)]">
-                          {formatTimingMetricValue(metricKey, value)}
-                        </dd>
+      <Panel title="确定性规则审计">
+        {audit ? (
+          <div className="overflow-x-auto">
+            <table className="app-table min-w-[980px]">
+              <thead>
+                <tr>
+                  <th>角色</th>
+                  <th>规则</th>
+                  <th>指标 / 周期</th>
+                  <th>实际值</th>
+                  <th>运算 / 阈值</th>
+                  <th>数据日</th>
+                  <th>结果</th>
+                </tr>
+              </thead>
+              <tbody>
+                {audit.ruleEvaluations.map((rule) => (
+                  <tr key={rule.ruleId}>
+                    <td>{rule.role}</td>
+                    <td>
+                      <div className="font-medium text-[var(--app-text-strong)]">
+                        {rule.ruleName}
                       </div>
-                    ),
-                  )}
-                </dl>
-              </article>
-            );
-          })}
-        </div>
+                      <div className="text-xs text-[var(--app-text-subtle)]">
+                        {rule.explanation}
+                      </div>
+                    </td>
+                    <td>
+                      {rule.indicatorId} · {rule.timeframe}
+                    </td>
+                    <td>{String(rule.actual ?? "-")}</td>
+                    <td>
+                      {rule.operator} {String(rule.threshold)}
+                    </td>
+                    <td>{rule.asOfDate ?? "-"}</td>
+                    <td>
+                      <StatusPill
+                        label={rule.status}
+                        tone={
+                          rule.status === "PASSED"
+                            ? "success"
+                            : rule.status === "FAILED"
+                              ? "neutral"
+                              : "warning"
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState title="没有可用的规则审计" />
+        )}
+      </Panel>
+
+      <Panel title="冻结数据清单">
+        {manifest.length ? (
+          <div className="overflow-x-auto">
+            <table className="app-table min-w-[900px]">
+              <thead>
+                <tr>
+                  <th>数据集</th>
+                  <th>来源</th>
+                  <th>周期</th>
+                  <th>数据日</th>
+                  <th>完整性</th>
+                  <th>行数</th>
+                  <th>内容哈希</th>
+                </tr>
+              </thead>
+              <tbody>
+                {manifest.map((item) => (
+                  <tr
+                    key={`${item.dataset}-${item.timeframe ?? ""}-${item.contentHash}`}
+                  >
+                    <td>{item.dataset}</td>
+                    <td>{item.source}</td>
+                    <td>{item.timeframe ?? "-"}</td>
+                    <td>{item.dataDate ?? "-"}</td>
+                    <td>
+                      {item.completeness}
+                      {item.degradationReason
+                        ? `：${item.degradationReason}`
+                        : ""}
+                    </td>
+                    <td>{item.rowCount}</td>
+                    <td className="max-w-48 truncate font-mono text-xs">
+                      {item.contentHash}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyState title="没有冻结数据清单" />
+        )}
       </Panel>
     </div>
   );

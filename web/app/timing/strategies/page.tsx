@@ -1,18 +1,16 @@
 import React from "react";
-import { TimingRunConsole } from "~/app/timing/timing-run-console";
+import { TimingStrategyEditor } from "~/app/timing/strategies/timing-strategy-editor";
 import { TimingLoginRedirectNotice } from "~/app/timing/timing-login-redirect-notice";
 import { auth } from "~/server/auth";
 
-export default async function TimingPage() {
+export default async function TimingStrategiesPage() {
   const session = await auth();
-
   if (!session?.user) {
-    return <TimingLoginRedirectNotice redirectTo="/timing" />;
+    return <TimingLoginRedirectNotice redirectTo="/timing/strategies" />;
   }
-
   return (
     <React.Suspense fallback={null}>
-      <TimingRunConsole />
+      <TimingStrategyEditor />
     </React.Suspense>
   );
 }

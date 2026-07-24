@@ -224,6 +224,7 @@ export function TimingClient() {
     },
   );
   const presetsQuery = api.timing.listTimingPresets.useQuery();
+  const timingStrategiesQuery = api.timing.listTimingStrategies.useQuery();
   const historyCardsQuery = api.timing.listTimingCards.useQuery(
     { limit: 20 },
     {
@@ -367,6 +368,9 @@ export function TimingClient() {
   ]);
 
   const presets = presetsQuery.data ?? [];
+  const publishedRevisionId =
+    timingStrategiesQuery.data?.find((strategy) => strategy.activeRevisionId)
+      ?.activeRevisionId ?? "";
 
   useEffect(() => {
     if (!presetSelectionInitialized && !selectedPresetId && presets[0]?.id) {
@@ -578,7 +582,8 @@ export function TimingClient() {
 
     await startSingleMutation.mutateAsync({
       stockCode: singleStock.stockCode,
-      presetId: selectedPresetId || undefined,
+      revisionId: publishedRevisionId,
+      analysisDateMode: "LATEST_COMPLETE",
     });
   }
 
@@ -589,7 +594,8 @@ export function TimingClient() {
 
     await startWatchlistCardsMutation.mutateAsync({
       watchListId,
-      presetId: selectedPresetId || undefined,
+      revisionId: publishedRevisionId,
+      analysisDateMode: "LATEST_COMPLETE",
     });
   }
 
@@ -601,7 +607,8 @@ export function TimingClient() {
     await startWatchlistTimingMutation.mutateAsync({
       watchListId,
       portfolioSnapshotId: selectedPortfolioId,
-      presetId: selectedPresetId || undefined,
+      revisionId: publishedRevisionId,
+      analysisDateMode: "LATEST_COMPLETE",
     });
   }
 
