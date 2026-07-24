@@ -196,8 +196,8 @@ export function HighlightToNote(props: HighlightToNoteProps) {
                       className={[
                         "inline-flex h-9 items-center justify-center rounded-full px-3 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
                         active
-                          ? "bg-white text-black"
-                          : "text-[var(--app-text-strong)] hover:bg-[rgba(255,255,255,0.08)]",
+                          ? "bg-[var(--app-primary-surface)] text-[var(--app-on-primary)]"
+                          : "text-[var(--app-text-strong)] hover:bg-[var(--app-hover-surface)]",
                       ].join(" ")}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => {
@@ -218,7 +218,7 @@ export function HighlightToNote(props: HighlightToNoteProps) {
               )}
               <button
                 type="button"
-                className="inline-flex h-9 items-center justify-center rounded-full bg-white px-3 text-xs font-medium text-black transition-colors hover:bg-[rgba(255,255,255,0.86)] disabled:cursor-not-allowed disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
+                className="inline-flex h-9 items-center justify-center rounded-full bg-[var(--app-primary-surface)] px-3 text-xs font-medium text-[var(--app-on-primary)] transition-colors hover:bg-[var(--app-primary-surface-hover)] disabled:cursor-not-allowed disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
                 disabled={!activeTargetRef || createNoteMutation.isPending}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
@@ -233,7 +233,7 @@ export function HighlightToNote(props: HighlightToNoteProps) {
               </button>
               <button
                 type="button"
-                className="inline-flex h-9 items-center justify-center rounded-full border border-[var(--app-border-soft)] px-3 text-xs font-medium text-[var(--app-text-strong)] transition-colors hover:bg-[rgba(255,255,255,0.08)]"
+                className="inline-flex h-9 items-center justify-center rounded-full border border-[var(--app-border-soft)] px-3 text-xs font-medium text-[var(--app-text-strong)] transition-colors hover:bg-[var(--app-hover-surface)]"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={askPiAgent}
               >

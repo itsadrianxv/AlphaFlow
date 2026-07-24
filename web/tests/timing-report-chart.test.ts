@@ -44,4 +44,43 @@ describe("择时报告多周期 KLine", () => {
     expect(seriesNames).toContain("60周高点");
     expect(seriesNames).toContain("20周低点");
   });
+
+  it("浅色主题只替换图表颜色，不改变数据系列", () => {
+    const input = {
+      timeframe: "DAILY" as const,
+      bars: [
+        {
+          tradeDate: "2026-07-03",
+          open: 10,
+          high: 12,
+          low: 8,
+          close: 11,
+          volume: 100,
+        },
+      ],
+      chartLevels,
+      showBollinger: true,
+      showVolume: true,
+      showMovingAverages: {
+        ema5: true,
+        ema20: true,
+        ema60: false,
+        ema120: false,
+      },
+    };
+    const darkOption = buildTimingReportChartOption(input, "dark");
+    const lightOption = buildTimingReportChartOption(input, "light");
+
+    expect(lightOption.series).toHaveLength(darkOption.series.length);
+    expect(lightOption.series).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          itemStyle: expect.objectContaining({ color: "#1a7f37" }),
+        }),
+      ]),
+    );
+    expect(lightOption.tooltip).toEqual(
+      expect.objectContaining({ backgroundColor: "rgba(255, 255, 255, 0.98)" }),
+    );
+  });
 });

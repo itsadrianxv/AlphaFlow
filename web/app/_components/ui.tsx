@@ -379,7 +379,7 @@ export function LegacyWorkspaceShell(props: {
   if ((section as string) !== "__legacy_sidebar__") {
     return (
       <main className="app-shell" data-workflow-shell="mistral">
-        <header className="sticky top-0 z-20 border-b border-[var(--app-border-soft)] bg-[rgba(0,0,0,0.9)] backdrop-blur-sm">
+        <header className="sticky top-0 z-20 border-b border-[var(--app-border-soft)] bg-[var(--app-panel)] backdrop-blur-sm">
           <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               {primaryNavigation}

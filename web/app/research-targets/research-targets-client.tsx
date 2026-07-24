@@ -130,7 +130,7 @@ function HighlightedSnippet(props: { text: string; query: string }) {
   return (
     <>
       {text.slice(0, matchIndex)}
-      <mark className="bg-[rgba(255,128,31,0.24)] text-[var(--app-text-strong)]">
+      <mark className="bg-[var(--app-mark)] text-[var(--app-text-strong)]">
         {text.slice(matchIndex, matchEnd)}
       </mark>
       {text.slice(matchEnd)}
@@ -187,7 +187,7 @@ function ResearchTargetSearchDialog(props: {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-[rgba(0,0,0,0.72)] px-4 pt-[9vh] sm:pt-[12vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-[var(--app-overlay)] px-4 pt-[9vh] sm:pt-[12vh]"
       role="presentation"
     >
       <button

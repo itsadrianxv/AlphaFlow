@@ -2,6 +2,7 @@
 
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, { useEffect, useRef, useState } from "react";
+import { type ThemeMode, useTheme } from "~/app/_components/theme-provider";
 import { StatusPill } from "~/app/_components/ui";
 import { formatKronosModelLabel } from "~/app/timing/timing-labels";
 import type {
@@ -21,6 +22,78 @@ type MovingAverageVisibility = {
 
 const MISSING_DATA = "-" as const;
 type MissingData = typeof MISSING_DATA;
+
+export type TimingReportChartColors = {
+  up: string;
+  down: string;
+  volume: string;
+  ema5: string;
+  ema20: string;
+  ema60: string;
+  ema120: string;
+  bollingerStrong: string;
+  bollingerSoft: string;
+  levelHigh: string;
+  levelLow: string;
+  forecast: string;
+  forecastArea: string;
+  text: string;
+  textMuted: string;
+  surface: string;
+  border: string;
+  axis: string;
+  grid: string;
+};
+
+export function getTimingReportChartColors(
+  theme: ThemeMode = "dark",
+): TimingReportChartColors {
+  if (theme === "light") {
+    return {
+      up: "#1a7f37",
+      down: "#cf222e",
+      volume: "#0969da",
+      ema5: "#9a6700",
+      ema20: "#0969da",
+      ema60: "#8250df",
+      ema120: "#57606a",
+      bollingerStrong: "rgba(87, 96, 106, 0.46)",
+      bollingerSoft: "rgba(87, 96, 106, 0.3)",
+      levelHigh: "rgba(154, 103, 0, 0.86)",
+      levelLow: "rgba(207, 34, 46, 0.82)",
+      forecast: "#0f766e",
+      forecastArea: "rgba(15, 118, 110, 0.14)",
+      text: "#24292f",
+      textMuted: "rgba(87, 96, 106, 0.78)",
+      surface: "rgba(255, 255, 255, 0.98)",
+      border: "rgba(31, 35, 40, 0.18)",
+      axis: "rgba(87, 96, 106, 0.42)",
+      grid: "rgba(87, 96, 106, 0.18)",
+    };
+  }
+
+  return {
+    up: "#11ff99",
+    down: "#ff2047",
+    volume: "#3b9eff",
+    ema5: "#ffc53d",
+    ema20: "#3b9eff",
+    ema60: "#9a77ff",
+    ema120: "#ffffff",
+    bollingerStrong: "rgba(255, 255, 255, 0.34)",
+    bollingerSoft: "rgba(255, 255, 255, 0.24)",
+    levelHigh: "rgba(255, 197, 61, 0.78)",
+    levelLow: "rgba(255, 32, 71, 0.76)",
+    forecast: "#14b8a6",
+    forecastArea: "rgba(20, 184, 166, 0.16)",
+    text: "#f0f0f0",
+    textMuted: "rgba(240, 240, 240, 0.62)",
+    surface: "rgba(8, 11, 16, 0.96)",
+    border: "rgba(214, 235, 253, 0.19)",
+    axis: "rgba(214, 235, 253, 0.16)",
+    grid: "rgba(214, 235, 253, 0.08)",
+  };
+}
 
 export type TimingReportChartInput = {
   timeframe?: TimingTimeframe;
@@ -157,7 +230,11 @@ function buildHistoricalPriceAxisBounds(input: TimingReportChartInput) {
   };
 }
 
-export function buildTimingReportChartOption(input: TimingReportChartInput) {
+export function buildTimingReportChartOption(
+  input: TimingReportChartInput,
+  theme: ThemeMode = "dark",
+) {
+  const colors = getTimingReportChartColors(theme);
   const timeframe = input.timeframe ?? "DAILY";
   const unit = timeframeUnit(timeframe);
   const dates = input.bars.map((bar) => bar.tradeDate);
@@ -186,10 +263,10 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
         return bar ? [bar.open, bar.close, bar.low, bar.high] : MISSING_DATA;
       }),
       itemStyle: {
-        color: "#11ff99",
-        color0: "#ff2047",
-        borderColor: "#11ff99",
-        borderColor0: "#ff2047",
+        color: colors.up,
+        color0: colors.down,
+        borderColor: colors.up,
+        borderColor0: colors.down,
       },
       xAxisIndex: 0,
       yAxisIndex: 0,
@@ -207,7 +284,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             xAxisIndex: 1,
             yAxisIndex: 1,
             itemStyle: {
-              color: "#3b9eff",
+              color: colors.volume,
               opacity: 0.72,
             },
           },
@@ -220,7 +297,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             type: "line",
             data: lineSeriesData(input.chartLevels.ema5, allDates),
             symbol: "none",
-            lineStyle: { color: "#ffc53d", width: 1.5 },
+            lineStyle: { color: colors.ema5, width: 1.5 },
           },
         ]
       : []),
@@ -231,7 +308,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             type: "line",
             data: lineSeriesData(input.chartLevels.ema20, allDates),
             symbol: "none",
-            lineStyle: { color: "#3b9eff", width: 1.5 },
+            lineStyle: { color: colors.ema20, width: 1.5 },
           },
         ]
       : []),
@@ -242,7 +319,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             type: "line",
             data: lineSeriesData(input.chartLevels.ema60, allDates),
             symbol: "none",
-            lineStyle: { color: "#9a77ff", width: 1.2 },
+            lineStyle: { color: colors.ema60, width: 1.2 },
           },
         ]
       : []),
@@ -253,7 +330,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             type: "line",
             data: lineSeriesData(input.chartLevels.ema120, allDates),
             symbol: "none",
-            lineStyle: { color: "#ffffff", width: 1.2, opacity: 0.72 },
+            lineStyle: { color: colors.ema120, width: 1.2, opacity: 0.72 },
           },
         ]
       : []),
@@ -267,7 +344,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
               ...missingValues(allDates.length - dates.length),
             ],
             symbol: "none",
-            lineStyle: { color: "rgba(255,255,255,0.34)", width: 1 },
+            lineStyle: { color: colors.bollingerStrong, width: 1 },
           },
           {
             name: "BOLL 中轨",
@@ -277,7 +354,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
               ...missingValues(allDates.length - dates.length),
             ],
             symbol: "none",
-            lineStyle: { color: "rgba(255,255,255,0.24)", width: 1 },
+            lineStyle: { color: colors.bollingerSoft, width: 1 },
           },
           {
             name: "BOLL 下轨",
@@ -287,7 +364,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
               ...missingValues(allDates.length - dates.length),
             ],
             symbol: "none",
-            lineStyle: { color: "rgba(255,255,255,0.34)", width: 1 },
+            lineStyle: { color: colors.bollingerStrong, width: 1 },
           },
         ]
       : []),
@@ -295,13 +372,13 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
       `60${unit}高点`,
       input.chartLevels.recentHigh60d,
       allDates.length,
-      "rgba(255, 197, 61, 0.78)",
+      colors.levelHigh,
     ),
     buildHorizontalLine(
       `20${unit}低点`,
       input.chartLevels.recentLow20d,
       allDates.length,
-      "rgba(255, 32, 71, 0.76)",
+      colors.levelLow,
     ),
     ...(input.forecast
       ? [
@@ -317,7 +394,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             symbol: "none",
             lineStyle: { opacity: 0 },
             areaStyle: {
-              color: "rgba(20, 184, 166, 0.16)",
+              color: colors.forecastArea,
               origin: "end",
             },
             stack: "kronos-band",
@@ -334,7 +411,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             symbol: "none",
             lineStyle: { opacity: 0 },
             areaStyle: {
-              color: "rgba(20, 184, 166, 0.16)",
+              color: colors.forecastArea,
               origin: "start",
             },
             stack: "kronos-band",
@@ -350,7 +427,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
             }),
             symbol: "none",
             lineStyle: {
-              color: "#14b8a6",
+              color: colors.forecast,
               width: 1.8,
               type: "dashed",
             },
@@ -366,7 +443,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
       top: 0,
       left: 0,
       textStyle: {
-        color: "rgba(240, 240, 240, 0.62)",
+        color: colors.textMuted,
       },
     },
     tooltip: {
@@ -374,10 +451,10 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
       axisPointer: {
         type: "cross",
       },
-      backgroundColor: "rgba(8, 11, 16, 0.96)",
-      borderColor: "rgba(214, 235, 253, 0.19)",
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
       textStyle: {
-        color: "#f0f0f0",
+        color: colors.text,
       },
     },
     grid: [
@@ -401,11 +478,11 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
         boundaryGap: true,
         axisLine: {
           lineStyle: {
-            color: "rgba(214, 235, 253, 0.16)",
+            color: colors.axis,
           },
         },
         axisLabel: {
-          color: "rgba(240, 240, 240, 0.38)",
+          color: colors.textMuted,
           hideOverlap: true,
         },
       },
@@ -416,7 +493,7 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
         gridIndex: 1,
         axisLine: {
           lineStyle: {
-            color: "rgba(214, 235, 253, 0.16)",
+            color: colors.axis,
           },
         },
         axisLabel: {
@@ -433,16 +510,16 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
         ...priceAxisBounds,
         axisLine: {
           lineStyle: {
-            color: "rgba(214, 235, 253, 0.16)",
+            color: colors.axis,
           },
         },
         splitLine: {
           lineStyle: {
-            color: "rgba(214, 235, 253, 0.08)",
+            color: colors.grid,
           },
         },
         axisLabel: {
-          color: "rgba(240, 240, 240, 0.48)",
+          color: colors.textMuted,
         },
       },
       {
@@ -451,14 +528,14 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
         splitNumber: 2,
         axisLine: {
           lineStyle: {
-            color: "rgba(214, 235, 253, 0.16)",
+            color: colors.axis,
           },
         },
         splitLine: {
           show: false,
         },
         axisLabel: {
-          color: "rgba(240, 240, 240, 0.38)",
+          color: colors.textMuted,
         },
       },
     ],
@@ -480,9 +557,10 @@ export function syncTimingReportChart(params: {
   };
   element: unknown;
   input: TimingReportChartInput;
+  theme?: ThemeMode;
 }) {
   const chart = params.init(params.element);
-  const option = buildTimingReportChartOption(params.input);
+  const option = buildTimingReportChartOption(params.input, params.theme);
   let disposed = false;
   let frameId: number | undefined;
 
@@ -536,6 +614,7 @@ export function TimingReportChart(props: {
     seriesLoading = false,
   } = props;
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const { theme } = useTheme();
   const [showBollinger, setShowBollinger] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
   const [showMovingAverages, setShowMovingAverages] =
@@ -589,6 +668,7 @@ export function TimingReportChart(props: {
           forecast,
           timeframe,
         },
+        theme,
       });
     }
 
@@ -606,6 +686,7 @@ export function TimingReportChart(props: {
     showBollinger,
     showMovingAverages,
     showVolume,
+    theme,
   ]);
 
   return (

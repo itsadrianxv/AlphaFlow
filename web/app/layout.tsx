@@ -8,7 +8,13 @@ import {
   Space_Grotesk,
 } from "next/font/google";
 
+import {
+  THEME_STORAGE_KEY,
+  ThemeProvider,
+} from "~/app/_components/theme-provider";
 import { TRPCReactProvider } from "~/trpc/react";
+
+const themeBootstrapScript = `(() => { try { const theme = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)}); if (theme === "light" || theme === "dark") { document.documentElement.dataset.theme = theme; document.documentElement.style.colorScheme = theme; } } catch {} })();`;
 
 const displaySerif = Cormorant_Garamond({
   subsets: ["latin"],
@@ -48,11 +54,16 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <script id="theme-bootstrap">{themeBootstrapScript}</script>
+      </head>
       <body
         className={`${displaySerif.variable} ${displaySans.variable} ${bodySans.variable} ${codeMono.variable} antialiased`}
       >
-        <TRPCReactProvider>{children}</TRPCReactProvider>
+        <ThemeProvider>
+          <TRPCReactProvider>{children}</TRPCReactProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

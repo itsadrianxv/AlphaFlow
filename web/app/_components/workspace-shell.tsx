@@ -15,13 +15,16 @@ import {
   CloseIcon,
   CompanyResearchIcon,
   MenuIcon,
+  MoonIcon,
   OverviewIcon,
   ScreeningIcon,
   SidebarToggleIcon,
+  SunIcon,
   TimingIcon,
   WatchlistsIcon,
   WorkflowsIcon,
 } from "~/app/_components/sidebar-icons";
+import { useTheme } from "~/app/_components/theme-provider";
 import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
 
 export const DESKTOP_SIDEBAR_STORAGE_KEY =
@@ -113,6 +116,24 @@ function SidebarBrand(props: { onNavigate?: () => void }) {
         AlphaFlow
       </div>
     </Link>
+  );
+}
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  const nextThemeLabel = theme === "dark" ? "浅色主题" : "暗色主题";
+  const Icon = theme === "dark" ? SunIcon : MoonIcon;
+
+  return (
+    <button
+      type="button"
+      aria-label={`切换至${nextThemeLabel}`}
+      title={`切换至${nextThemeLabel}`}
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-sidebar-bg)] text-[var(--app-text-strong)] transition-colors hover:bg-[var(--app-panel-strong)]"
+      onClick={toggleTheme}
+    >
+      <Icon className="h-[18px] w-[18px]" />
+    </button>
   );
 }
 
@@ -354,25 +375,28 @@ function SidebarRail(props: {
               <Link
                 href="/agent-runtime"
                 onClick={onNavigate}
-                className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-[var(--app-border-soft)] px-3 text-xs font-medium text-[var(--app-text-muted)] transition-colors hover:border-[rgba(255,255,255,0.28)] hover:bg-[var(--app-panel-strong)] hover:text-[var(--app-text-strong)]"
+                className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-[var(--app-border-soft)] px-3 text-xs font-medium text-[var(--app-text-muted)] transition-colors hover:border-[var(--app-hover-border)] hover:bg-[var(--app-panel-strong)] hover:text-[var(--app-text-strong)]"
               >
                 新对话
               </Link>
             ) : null}
           </div>
-          <button
-            type="button"
-            aria-label="Toggle sidebar"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-sidebar-bg)] text-[var(--app-text-strong)] transition-colors hover:bg-[var(--app-panel-strong)]"
-            onClick={onToggleSidebar}
-          >
-            <span
-              className="app-sidebar-toggle-icon"
-              data-collapsed={collapsed ? "true" : "false"}
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
+            <button
+              type="button"
+              aria-label="切换侧边栏"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-sidebar-bg)] text-[var(--app-text-strong)] transition-colors hover:bg-[var(--app-panel-strong)]"
+              onClick={onToggleSidebar}
             >
-              <SidebarToggleIcon className="h-[18px] w-[18px]" />
-            </span>
-          </button>
+              <span
+                className="app-sidebar-toggle-icon"
+                data-collapsed={collapsed ? "true" : "false"}
+              >
+                <SidebarToggleIcon className="h-[18px] w-[18px]" />
+              </span>
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -570,6 +594,9 @@ export function WorkspaceShell(props: {
               <MenuIcon className="h-[18px] w-[18px]" />
             </button>
             <SidebarBrand />
+            <div className="ml-auto">
+              <ThemeToggle />
+            </div>
           </div>
         </div>
 
@@ -578,7 +605,7 @@ export function WorkspaceShell(props: {
             <button
               type="button"
               aria-label="Close navigation menu"
-              className="absolute inset-0 bg-[rgba(0,0,0,0.72)]"
+              className="absolute inset-0 bg-[var(--app-overlay)]"
               onClick={() => setMobileOpen(false)}
             />
             <aside className="relative z-10 flex h-full w-[280px] max-w-[82vw] flex-col border-r border-[var(--app-border-soft)] bg-[var(--app-sidebar-bg)] px-4 py-4 shadow-[var(--app-shadow-lg)]">

@@ -160,3 +160,27 @@ export function SearchIcon(props: IconProps) {
     </BaseIcon>
   );
 }
+
+export function SunIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <circle cx="12" cy="12" r="3.5" />
+      <path d="M12 2.5v2" />
+      <path d="M12 19.5v2" />
+      <path d="m4.58 4.58 1.42 1.42" />
+      <path d="m18 18 1.42 1.42" />
+      <path d="M2.5 12h2" />
+      <path d="M19.5 12h2" />
+      <path d="m4.58 19.42 1.42-1.42" />
+      <path d="m18 6 1.42-1.42" />
+    </BaseIcon>
+  );
+}
+
+export function MoonIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <path d="M20 15.3A8.2 8.2 0 0 1 8.7 4 8.2 8.2 0 1 0 20 15.3Z" />
+    </BaseIcon>
+  );
+}
