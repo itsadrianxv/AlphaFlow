@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, Query, Request
 
 from app.contracts.common import StockBatchRequest
 from app.contracts.market import (
     IndicatorHistoryResponse,
     IndustriesResponse,
+    MarketHeatmapResponse,
     MarketStockBatchResponse,
     MarketStockResponse,
     StockCodesResponse,
@@ -27,6 +30,17 @@ _VALID_HISTORY_INDICATORS = {
     "NET_PROFIT",
     "DEBT_RATIO",
 }
+
+
+@router.get("/heatmap", response_model=MarketHeatmapResponse)
+async def get_market_heatmap(
+    request: Request,
+    concept_limit: Literal[8, 15] = Query(15, alias="conceptLimit"),
+):
+    return market_gateway.get_heatmap_snapshot(
+        request_id=request.state.request_id,
+        concept_limit=concept_limit,
+    )
 
 
 @router.get("/stocks/codes", response_model=StockCodesResponse)

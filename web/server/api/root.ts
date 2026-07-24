@@ -1,4 +1,5 @@
 import { agentRuntimeRouter } from "~/server/api/routers/agent-runtime";
+import { heatmapRouter } from "~/server/api/routers/heatmap";
 import { intelligenceRouter } from "~/server/api/routers/intelligence";
 import { marketContextRouter } from "~/server/api/routers/market-context";
 import { postRouter } from "~/server/api/routers/post";
@@ -17,6 +18,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
   agentRuntime: agentRuntimeRouter,
+  heatmap: heatmapRouter,
   intelligence: intelligenceRouter,
   marketContext: marketContextRouter,
   post: postRouter,

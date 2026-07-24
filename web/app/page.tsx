@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ImpactMappingWorkspace } from "~/app/_components/impact-mapping-workspace";
 import { MarketContextSection } from "~/app/_components/market-context-section";
 import { ActionStrip, SectionCard, WorkspaceShell } from "~/app/_components/ui";
+import { MarketHeatmapClient } from "~/app/heatmap/market-heatmap-client";
 import { formatTimingNarrative } from "~/app/timing/timing-labels";
 import { getTemplateLabel } from "~/app/workflows/research-view-models";
 import { auth } from "~/server/auth";
@@ -193,6 +194,8 @@ export default async function Home() {
             </Link>
           }
         />
+
+        {signedIn ? <MarketHeatmapClient /> : null}
 
         <ImpactMappingWorkspace signedIn={signedIn} />
 

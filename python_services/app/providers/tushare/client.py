@@ -47,6 +47,9 @@ class TushareProviderClient:
     def get_all_stock_codes(self) -> list[str]:
         return [profile.stockCode for profile in self._provider.get_stock_universe()]
 
+    def is_a_share_trading_day(self, trading_date: date) -> bool:
+        return self._provider.is_a_share_trading_day(trading_date)
+
     def get_stock_universe(self) -> list[dict[str, Any]]:
         snapshot_map = self._load_snapshot_map(allow_empty=True)
         rows: list[dict[str, Any]] = []
@@ -379,6 +382,96 @@ class TushareProviderClient:
         boards = [self._build_hot_board(row, catalog[_pick_text(row, ["ts_code"])], limit_rows) for row in selected]
         self._assign_board_heat_scores(boards)
         return boards
+
+    def get_market_heatmap_snapshot(
+        self,
+        limit: int = 15,
+        prefer_intraday: bool = False,
+    ) -> dict[str, Any]:
+        """构建供 A 股概念热力图使用的紧凑快照。"""
+        normalized_limit = max(1, min(limit, 15))
+        catalog = {item["conceptCode"]: item for item in self.get_concept_catalog()}
+        hot_frame = self._raw_frame("ths_hot", market="概念板块", is_new="N")
+        if hot_frame.empty:
+            raise DataUnavailableError("THS concept hot list is unavailable", provider=self.provider_name)
+
+        hot_rows = sorted(
+            (row for _, row in hot_frame.iterrows() if _pick_text(row, ["ts_code"]) in catalog),
+            key=lambda row: int(_safe_float(row.get("rank")) or 10**9),
+        )[:normalized_limit]
+        if not hot_rows:
+            raise DataUnavailableError("THS concept hot list has no recognized concepts", provider=self.provider_name)
+
+        market_rows = self._provider.get_market_snapshot()
+        market_by_code = {row.stockCode: row for row in market_rows if row.marketCap is not None}
+        market_cap_as_of = max((row.tradeDate for row in market_rows), default="")
+        trade_date = _format_ymd(_pick_text(hot_rows[0], ["trade_date"])) or market_cap_as_of
+        intraday_change_map = self._load_intraday_change_map() if prefer_intraday else {}
+        concepts: list[dict[str, Any]] = []
+        for hot_row in hot_rows:
+            concept_code = _pick_text(hot_row, ["ts_code"])
+            catalog_item = catalog[concept_code]
+            stocks: list[dict[str, Any]] = []
+            for member in self.get_concept_constituents(catalog_item["conceptName"], concept_code):
+                snapshot = market_by_code.get(member["stockCode"])
+                if snapshot is None or snapshot.marketCap is None or snapshot.marketCap <= 0:
+                    continue
+                stocks.append(
+                    {
+                        "stockCode": snapshot.stockCode,
+                        "stockName": snapshot.stockName or member["stockName"],
+                        "marketCap": snapshot.marketCap,
+                        "changePercent": intraday_change_map.get(snapshot.stockCode, snapshot.changePercent),
+                    }
+                )
+            if not stocks:
+                continue
+            stocks.sort(key=lambda item: item["marketCap"], reverse=True)
+            total_market_cap = sum(item["marketCap"] for item in stocks)
+            weighted_change_numerator = sum(
+                item["marketCap"] * item["changePercent"]
+                for item in stocks
+                if item["changePercent"] is not None
+            )
+            weighted_change_denominator = sum(
+                item["marketCap"] for item in stocks if item["changePercent"] is not None
+            )
+            concepts.append(
+                {
+                    "conceptCode": concept_code,
+                    "conceptName": catalog_item["conceptName"],
+                    "hotRank": int(_safe_float(hot_row.get("rank")) or 1),
+                    "hotScore": _safe_float(hot_row.get("hot")),
+                    "marketCap": total_market_cap,
+                    "changePercent": round(weighted_change_numerator / weighted_change_denominator, 2)
+                    if weighted_change_denominator
+                    else None,
+                    "stocks": stocks,
+                }
+            )
+        if not concepts:
+            raise DataUnavailableError("No listed A-share constituents in heatmap snapshot", provider=self.provider_name)
+        return {
+            "tradeDate": trade_date,
+            "marketCapAsOf": market_cap_as_of or trade_date,
+            "priceSource": "rt_min" if intraday_change_map else "daily",
+            "concepts": concepts,
+        }
+
+    def _load_intraday_change_map(self) -> dict[str, float]:
+        """实时分钟接口可用时返回最新涨跌幅。"""
+        frame = self._safe_raw_frame("rt_min", freq="1min")
+        if frame.empty:
+            return {}
+        changes: dict[str, float] = {}
+        for _, row in frame.iterrows():
+            stock_code = _normalize_stock_code(_pick_text(row, ["ts_code", "code"]))
+            close = _safe_float(row.get("close"))
+            pre_close = _safe_float(row.get("pre_close"))
+            if not stock_code or close is None or pre_close in {None, 0}:
+                continue
+            changes[stock_code] = round((close / pre_close - 1) * 100, 4)
+        return changes
 
     def _load_limit_rows(self, trade_date: str) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

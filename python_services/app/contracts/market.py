@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from app.contracts.common import BatchItemError
@@ -81,6 +83,30 @@ class ThemeCandidatesData(BaseModel):
     candidates: list[ThemeCandidate]
 
 
+class MarketHeatmapStock(BaseModel):
+    stockCode: str
+    stockName: str
+    marketCap: float = Field(..., ge=0)
+    changePercent: float | None = None
+
+
+class MarketHeatmapConcept(BaseModel):
+    conceptCode: str
+    conceptName: str
+    hotRank: int = Field(..., ge=1)
+    hotScore: float | None = None
+    marketCap: float = Field(..., ge=0)
+    changePercent: float | None = None
+    stocks: list[MarketHeatmapStock] = Field(default_factory=list)
+
+
+class MarketHeatmapData(BaseModel):
+    tradeDate: str
+    marketCapAsOf: str
+    priceSource: Literal["daily", "rt_min"]
+    concepts: list[MarketHeatmapConcept] = Field(default_factory=list)
+
+
 class MarketStockResponse(GatewayResponse[MarketStock]):
     pass
 
@@ -90,6 +116,10 @@ class MarketStockBatchResponse(GatewayResponse[MarketStockBatchData]):
 
 
 class ThemeCandidatesResponse(GatewayResponse[ThemeCandidatesData]):
+    pass
+
+
+class MarketHeatmapResponse(GatewayResponse[MarketHeatmapData]):
     pass
 
 

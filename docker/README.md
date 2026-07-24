@@ -91,6 +91,16 @@ TZ=Asia/Shanghai
 docker compose --env-file docker/.env -f docker/docker-compose.yml exec -T python-service python -m app.jobs.refresh_screening_stock_universe
 ```
 
+## 刷新 A 股概念热力图
+
+热力图快照在每个交易日午间和收盘后刷新。任务会通过 `trade_cal` 自动跳过非交易日，午间优先使用 `rt_min`，收盘后使用日线正式数据。将以下任务加入宿主机 cron：
+
+```cron
+TZ=Asia/Shanghai
+35 11 * * 1-5 cd /path/to/stock-screening-boost && docker compose --env-file docker/.env -f docker/docker-compose.yml exec -T python-service python -m app.jobs.refresh_market_heatmap >> /var/log/alphaflow-heatmap.log 2>&1
+10 15 * * 1-5 cd /path/to/stock-screening-boost && docker compose --env-file docker/.env -f docker/docker-compose.yml exec -T python-service python -m app.jobs.refresh_market_heatmap >> /var/log/alphaflow-heatmap.log 2>&1
+```
+
 ## 配置校验
 
 ```bash

@@ -25,6 +25,7 @@ _DATASET_POLICIES: dict[str, CachePolicy] = {
     "theme_news": CachePolicy(fresh_ttl_seconds=300, stale_ttl_seconds=1800),
     "theme_concepts": CachePolicy(fresh_ttl_seconds=600, stale_ttl_seconds=7200),
     "market_context_snapshot": CachePolicy(fresh_ttl_seconds=1800, stale_ttl_seconds=7200),
+    "market_heatmap_snapshot": CachePolicy(fresh_ttl_seconds=21600, stale_ttl_seconds=259200),
     "concept_catalog": CachePolicy(fresh_ttl_seconds=86400, stale_ttl_seconds=259200),
     "concept_constituents": CachePolicy(fresh_ttl_seconds=86400, stale_ttl_seconds=259200),
     "company_evidence": CachePolicy(fresh_ttl_seconds=21600, stale_ttl_seconds=86400),

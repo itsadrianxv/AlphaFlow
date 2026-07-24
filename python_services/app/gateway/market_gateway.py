@@ -10,6 +10,8 @@ from app.contracts.market import (
     IndicatorHistoryPoint,
     IndicatorHistoryResponse,
     IndustriesData,
+    MarketHeatmapData,
+    MarketHeatmapResponse,
     IndustriesResponse,
     MarketStockBatchData,
     MarketStockBatchResponse,
@@ -276,6 +278,46 @@ class MarketGateway:
                 as_of=result.as_of,
             ),
             data=ThemeCandidatesData(theme=theme, candidates=result.data),
+        )
+
+    def get_heatmap_snapshot(
+        self,
+        request_id: str,
+        concept_limit: int,
+        force_refresh: bool = False,
+        prefer_intraday: bool = False,
+    ) -> MarketHeatmapResponse:
+        started_at = time.perf_counter()
+        result = execute_cached(
+            dataset="market_heatmap_snapshot",
+            provider=self._provider_client.provider_name,
+            params={"conceptLimit": 15},
+            fetcher=lambda: MarketHeatmapData(
+                **self._provider_client.get_market_heatmap_snapshot(
+                    limit=15,
+                    prefer_intraday=prefer_intraday,
+                )
+            ),
+            cache_policy=get_cache_policy("market_heatmap_snapshot"),
+            retry_policy=self._theme_retry_policy,
+            cache=self._cache,
+            force_refresh=force_refresh,
+            allow_stale=True,
+        )
+        return MarketHeatmapResponse(
+            meta=build_meta(
+                request_id=request_id,
+                provider=result.provider,
+                started_at=started_at,
+                cache_hit=result.cache_hit,
+                is_stale=result.is_stale,
+                warnings=result.warnings,
+                as_of=result.as_of,
+            ),
+            data=MarketHeatmapData(
+                **result.data.model_dump(exclude={"concepts"}),
+                concepts=result.data.concepts[:concept_limit],
+            ),
         )
 
     def _build_stock_codes_data(self) -> StockCodesData:
