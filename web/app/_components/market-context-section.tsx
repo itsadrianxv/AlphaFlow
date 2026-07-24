@@ -1,41 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { InlineNotice, SectionCard, StatusPill } from "~/app/_components/ui";
+import { InlineNotice, SectionCard } from "~/app/_components/ui";
 import {
   buildMarketContextHref,
   findMatchingHotThemes,
   type MarketContextSectionTarget,
 } from "~/app/market-context/market-context-links";
+import type { MarketContextSnapshot } from "~/contracts/market-context";
 import { api } from "~/trpc/react";
-
-const regimeToneMap = {
-  risk_on: "success",
-  neutral: "info",
-  risk_off: "warning",
-  unknown: "neutral",
-} as const;
-
-const regimeLabelMap = {
-  risk_on: "风险偏好修复",
-  neutral: "中性环境",
-  risk_off: "防守环境",
-  unknown: "环境待确认",
-} as const;
-
-const flowToneMap = {
-  inflow: "success",
-  outflow: "warning",
-  flat: "info",
-  unknown: "neutral",
-} as const;
-
-const flowLabelMap = {
-  inflow: "北向净流入",
-  outflow: "北向净流出",
-  flat: "北向平衡",
-  unknown: "北向待确认",
-} as const;
 
 const actionLabelMap: Record<MarketContextSectionTarget, string> = {
   home: "发起行业研究",
@@ -44,6 +17,24 @@ const actionLabelMap: Record<MarketContextSectionTarget, string> = {
   screening: "导入种子池",
   timing: "打开择时",
 };
+
+function uniqueHotThemes(hotThemes: MarketContextSnapshot["hotThemes"]) {
+  const seenBoardCodes = new Set<string>();
+  return hotThemes.filter((theme) => {
+    if (seenBoardCodes.has(theme.marketEvidence.boardCode)) {
+      return false;
+    }
+    seenBoardCodes.add(theme.marketEvidence.boardCode);
+    return true;
+  });
+}
+
+function removeHeatText(text: string) {
+  return text
+    .replace(/[，,]?\s*热度\s*[\d,.]+\s*[；;]?/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
 
 export function MarketContextSection(props: {
   section: MarketContextSectionTarget;
@@ -82,39 +73,12 @@ export function MarketContextSection(props: {
   }
 
   const snapshot = snapshotQuery.data;
-  const sectionHint =
-    section === "home"
-      ? snapshot.downstreamHints.workflows
-      : snapshot.downstreamHints[section];
-  const hotThemes = snapshot.hotThemes.slice(0, 5);
+  const hotThemes = uniqueHotThemes(snapshot.hotThemes).slice(0, 5);
   const matchedThemes = findMatchingHotThemes(hotThemes, currentStockCodes);
-  const statusLabel =
-    snapshot.status === "complete"
-      ? "上下文完整"
-      : snapshot.status === "partial"
-        ? "上下文部分可用"
-        : "上下文待补齐";
 
   return (
-    <SectionCard title="宏观分析" description={sectionHint.summary}>
+    <SectionCard title="宏观分析">
       <div className="grid gap-4">
-        <div className="flex flex-wrap gap-2">
-          <StatusPill
-            label={regimeLabelMap[snapshot.regime.overallTone]}
-            tone={regimeToneMap[snapshot.regime.overallTone]}
-          />
-          <StatusPill
-            label={flowLabelMap[snapshot.flow.direction]}
-            tone={flowToneMap[snapshot.flow.direction]}
-          />
-          <StatusPill label={statusLabel} tone="neutral" />
-        </div>
-
-        <div className="grid gap-2 text-sm leading-6 text-[var(--app-text-muted)]">
-          <p>{snapshot.regime.summary}</p>
-          <p>{snapshot.flow.summary}</p>
-        </div>
-
         {matchedThemes.length > 0 ? (
           <InlineNotice
             tone="info"
@@ -139,19 +103,13 @@ export function MarketContextSection(props: {
                     <div className="text-lg leading-7 text-[var(--app-text-strong)]">
                       {theme.theme}
                     </div>
-                    <div className="mt-1 text-xs text-[var(--app-text-subtle)]">
-                      THS 热榜第 {theme.marketEvidence.rank} 名 ·{" "}
-                      {theme.marketEvidence.boardCode}
-                    </div>
                   </div>
-                  <StatusPill
-                    label={`热度 ${theme.heatScore.toFixed(0)}`}
-                    tone="info"
-                  />
                 </div>
-                <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
-                  {theme.whyHot}
-                </p>
+                {removeHeatText(theme.whyHot) ? (
+                  <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
+                    {removeHeatText(theme.whyHot)}
+                  </p>
+                ) : null}
                 <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs leading-5 text-[var(--app-text-subtle)]">
                   <span>成分股 {theme.marketEvidence.constituentCount}</span>
                   <span>
