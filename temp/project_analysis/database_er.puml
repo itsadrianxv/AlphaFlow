@@ -1,0 +1,685 @@
+@startchen
+title 股票筛选增强项目数据库范式设计
+
+' 来源：web/prisma/schema.prisma
+' 字段以主键、外键和业务核心字段为主；Json/String[] 字段表示结构化快照或集合边界。
+
+entity User {
+  id <<key>>
+  name
+  email
+}
+
+entity Account {
+  id <<key>>
+  userId <<FK>>
+  provider
+  providerAccountId
+}
+
+entity Session {
+  id <<key>>
+  userId <<FK>>
+  sessionToken
+  expires
+}
+
+entity VerificationToken {
+  identifier <<key>>
+  token <<key>>
+  expires
+}
+
+entity Post {
+  id <<key>>
+  name
+  createdById <<FK>>
+  createdAt
+}
+
+entity ScreeningWorkspace {
+  id <<key>>
+  userId <<FK>>
+  name
+  stockCodes
+  indicatorIds
+  formulaIds
+  timeConfig
+  filterRules
+  resultSnapshot
+}
+
+entity ScreeningFormula {
+  id <<key>>
+  userId <<FK>>
+  name
+  expression
+  targetIndicators
+  categoryId
+}
+
+entity WatchList {
+  id <<key>>
+  userId <<FK>>
+  name
+  stocks
+}
+
+entity ResearchSpace {
+  id <<key>>
+  userId <<FK>>
+  name
+  briefJson
+}
+
+entity ResearchSpaceRunLink {
+  id <<key>>
+  spaceId <<FK>>
+  runId <<FK>>
+  note
+}
+
+entity ResearchSpaceWatchListLink {
+  id <<key>>
+  spaceId <<FK>>
+  watchListId <<FK>>
+}
+
+entity ResearchSpaceStockLink {
+  id <<key>>
+  spaceId <<FK>>
+  stockCode
+  stockName
+}
+
+entity SavedCompany {
+  id <<key>>
+  userId <<FK>>
+  stockCode
+  companyName
+  tags
+  metadataJson
+}
+
+entity SavedIndustry {
+  id <<key>>
+  userId <<FK>>
+  name
+  source
+  relatedCompaniesJson
+  metadataJson
+}
+
+entity ResearchNote {
+  id <<key>>
+  userId <<FK>>
+  targetType
+  targetId
+  title
+  contentMarkdown
+  sourceJson
+}
+
+entity FinancialSnapshot {
+  id <<key>>
+  userId <<FK>>
+  targetType
+  targetId
+  companyRefsJson
+  metricSetJson
+  periodRangeJson
+  rawSnapshotJson
+}
+
+entity ResearchArtifact {
+  id <<key>>
+  userId <<FK>>
+  targetType
+  targetId
+  financialSnapshotId <<FK>>
+  artifactType
+  payloadJson
+}
+
+entity EvidenceContext {
+  id <<key>>
+  userId <<FK>>
+  workflowRunId <<FK>>
+  subjectType
+  subjectId
+  phase
+  metadataJson
+}
+
+entity EvidenceContextBlock {
+  id <<key>>
+  contextId <<FK>>
+  blockKey
+  status
+  sourceType
+  sourceId
+  metadataJson
+}
+
+entity EvidenceContextItem {
+  id <<key>>
+  contextId <<FK>>
+  blockId <<FK>>
+  userId <<FK>>
+  itemKey
+  status
+  extractedFact
+  sourceType
+  lineageId
+  contentHash
+}
+
+entity ResearchContextSnapshot {
+  id <<key>>
+  userId <<FK>>
+  workflowRunId <<FK>>
+  requestGroupId
+  requestSequence
+  purpose
+  model
+  messagesJson
+  qualityJson
+  status
+}
+
+entity ResearchContextSnapshotItem {
+  id <<key>>
+  snapshotId <<FK>>
+  evidenceItemId <<FK>>
+  ordinal
+  projectionJson
+  projectionHash
+}
+
+entity ResearchClaim {
+  id <<key>>
+  snapshotId <<FK>>
+  artifactKey
+  ordinal
+  text
+  status
+  qualityFlags
+}
+
+entity ResearchClaimCitation {
+  id <<key>>
+  claimId <<FK>>
+  evidenceItemId <<FK>>
+  relation
+}
+
+entity ResearchReminder {
+  id <<key>>
+  userId <<FK>>
+  timingReviewRecordId <<FK>>
+  stockCode
+  reminderType
+  scheduledAt
+  status
+}
+
+entity TimingSignalSnapshot {
+  id <<key>>
+  userId <<FK>>
+  workflowRunId <<FK>>
+  stockCode
+  asOfDate
+  timeframe
+  bars
+  indicators
+  signalContext
+}
+
+entity TimingAnalysisCard {
+  id <<key>>
+  userId <<FK>>
+  workflowRunId <<FK>>
+  watchListId <<FK>>
+  presetId <<FK>>
+  signalSnapshotId <<FK>>
+  stockCode
+  actionBias
+  confidence
+  reasoning
+}
+
+entity PortfolioSnapshot {
+  id <<key>>
+  userId <<FK>>
+  name
+  baseCurrency
+  cash
+  totalCapital
+  positions
+  riskPreferences
+}
+
+entity TimingRecommendation {
+  id <<key>>
+  userId <<FK>>
+  workflowRunId <<FK>>
+  portfolioSnapshotId <<FK>>
+  watchListId <<FK>>
+  presetId <<FK>>
+  stockCode
+  action
+  priority
+  confidence
+  reasoning
+}
+
+entity TimingReviewRecord {
+  id <<key>>
+  userId <<FK>>
+  analysisCardId <<FK>>
+  recommendationId <<FK>>
+  stockCode
+  reviewHorizon
+  scheduledAt
+  actualReturnPct
+  verdict
+}
+
+entity TimingPreset {
+  id <<key>>
+  userId <<FK>>
+  name
+  config
+}
+
+entity TimingMarketContextSnapshot {
+  id <<key>>
+  asOfDate <<key>>
+  state
+  transition
+  persistenceDays
+  snapshotJson
+  analysisJson
+}
+
+entity TimingFeedbackObservation {
+  id <<key>>
+  userId <<FK>>
+  reviewRecordId <<FK>>
+  recommendationId <<FK>>
+  presetId <<FK>>
+  stockCode
+  reviewHorizon
+  actualReturnPct
+  verdict
+}
+
+entity TimingPresetAdjustmentSuggestion {
+  id <<key>>
+  userId <<FK>>
+  presetId <<FK>>
+  kind
+  status
+  title
+  patch
+  metrics
+}
+
+entity WorkflowTemplate {
+  id <<key>>
+  code
+  version
+  graphConfig
+  inputSchema
+  isActive
+}
+
+entity WorkflowRun {
+  id <<key>>
+  templateId <<FK>>
+  userId <<FK>>
+  query
+  input
+  status
+  progressPercent
+  currentNodeKey
+  result
+}
+
+entity TimingKronosForecastSnapshot {
+  id <<key>>
+  userId <<FK>>
+  workflowRunId <<FK>>
+  stockCode
+  asOfDate
+  timeframe
+  modelName
+  forecastJson
+}
+
+entity WorkflowNodeRun {
+  id <<key>>
+  runId <<FK>>
+  nodeKey
+  agentName
+  attempt
+  status
+  input
+  output
+}
+
+entity WorkflowEvent {
+  id <<key>>
+  runId <<FK>>
+  nodeRunId <<FK>>
+  sequence
+  eventType
+  payload
+  occurredAt
+}
+
+entity AgentToolCall {
+  id <<key>>
+  workflowRunId <<FK>>
+  skillId
+  toolName
+  status
+  inputSummary
+  outputSummary
+}
+
+entity AgentArtifact {
+  id <<key>>
+  workflowRunId <<FK>>
+  kind
+  title
+  contentType
+  uri
+  payload
+}
+
+entity AgentConversation {
+  id <<key>>
+  userId <<FK>>
+  title
+  status
+  piSessionId
+  legacyWorkflowRunId <<FK>>
+}
+
+entity AgentConversationMessage {
+  id <<key>>
+  conversationId <<FK>>
+  workflowRunId <<FK>>
+  role
+  content
+  status
+  sequence
+  metadata
+}
+
+relationship 拥有账号 {
+}
+relationship 拥有会话 {
+}
+relationship 发布帖子 {
+}
+relationship 拥有筛选工作台 {
+}
+relationship 拥有筛选公式 {
+}
+relationship 拥有观察列表 {
+}
+relationship 拥有研究空间 {
+}
+relationship 保存公司 {
+}
+relationship 保存行业 {
+}
+relationship 撰写研究笔记 {
+}
+relationship 拥有财务快照 {
+}
+relationship 生成研究产物 {
+}
+relationship 拥有证据上下文 {
+}
+relationship 拥有证据条目 {
+}
+relationship 拥有研究上下文快照 {
+}
+relationship 拥有择时信号快照 {
+}
+relationship 拥有择时分析卡 {
+}
+relationship 拥有组合快照 {
+}
+relationship 拥有择时建议 {
+}
+relationship 创建复盘记录 {
+}
+relationship 配置择时预设 {
+}
+relationship 执行工作流 {
+}
+relationship 关联空间运行 {
+}
+relationship 关联空间观察列表 {
+}
+relationship 关联空间股票 {
+}
+relationship 生成研究上下文 {
+}
+relationship 包含上下文条目 {
+}
+relationship 包含证据区块 {
+}
+relationship 包含证据项 {
+}
+relationship 投影证据项 {
+}
+relationship 提出研究主张 {
+}
+relationship 引用证据项 {
+}
+relationship 关联复盘提醒 {
+}
+relationship 生成分析卡 {
+}
+relationship 使用择时预设 {
+}
+relationship 读取信号快照 {
+}
+relationship 生成择时建议 {
+}
+relationship 关联投资组合 {
+}
+relationship 关联观察列表 {
+}
+relationship 关联复盘分析卡 {
+}
+relationship 关联复盘建议 {
+}
+relationship 记录复盘反馈 {
+}
+relationship 形成工作流节点 {
+}
+relationship 记录工作流事件 {
+}
+relationship 记录工具调用 {
+}
+relationship 产出Agent产物 {
+}
+relationship 拥有 Agent 对话 {
+}
+relationship 包含对话消息 {
+}
+relationship 消息关联工作流 {
+}
+relationship 对话关联旧工作流 {
+}
+relationship 关联证据工作流 {
+}
+relationship 关联研究快照工作流 {
+}
+relationship 关联择时信号工作流 {
+}
+relationship 关联择时卡工作流 {
+}
+relationship 关联择时建议工作流 {
+}
+relationship 关联预测工作流 {
+}
+relationship 用户获得反馈观察 {
+}
+relationship 用户获得预设调整建议 {
+}
+relationship 关联空间工作流 {
+}
+relationship 关联工作流模板 {
+}
+relationship 节点事件 {
+}
+
+User -1- 拥有账号
+拥有账号 -N- Account
+User -1- 拥有会话
+拥有会话 -N- Session
+User -1- 发布帖子
+发布帖子 -N- Post
+User -1- 拥有筛选工作台
+拥有筛选工作台 -N- ScreeningWorkspace
+User -1- 拥有筛选公式
+拥有筛选公式 -N- ScreeningFormula
+User -1- 拥有观察列表
+拥有观察列表 -N- WatchList
+User -1- 拥有研究空间
+拥有研究空间 -N- ResearchSpace
+User -1- 保存公司
+保存公司 -N- SavedCompany
+User -1- 保存行业
+保存行业 -N- SavedIndustry
+User -1- 撰写研究笔记
+撰写研究笔记 -N- ResearchNote
+User -1- 拥有财务快照
+拥有财务快照 -N- FinancialSnapshot
+User -1- 生成研究产物
+生成研究产物 -N- ResearchArtifact
+User -1- 拥有证据上下文
+拥有证据上下文 -N- EvidenceContext
+User -1- 拥有证据条目
+拥有证据条目 -N- EvidenceContextItem
+User -1- 拥有研究上下文快照
+拥有研究上下文快照 -N- ResearchContextSnapshot
+User -1- 拥有择时信号快照
+拥有择时信号快照 -N- TimingSignalSnapshot
+User -1- 拥有择时分析卡
+拥有择时分析卡 -N- TimingAnalysisCard
+User -1- 拥有组合快照
+拥有组合快照 -N- PortfolioSnapshot
+User -1- 拥有择时建议
+拥有择时建议 -N- TimingRecommendation
+User -1- 创建复盘记录
+创建复盘记录 -N- TimingReviewRecord
+User -1- 配置择时预设
+配置择时预设 -N- TimingPreset
+User -1- 用户获得反馈观察
+用户获得反馈观察 -N- TimingFeedbackObservation
+User -1- 用户获得预设调整建议
+用户获得预设调整建议 -N- TimingPresetAdjustmentSuggestion
+User -1- 执行工作流
+执行工作流 -N- WorkflowRun
+User -1- 拥有 Agent 对话
+拥有 Agent 对话 -N- AgentConversation
+
+ResearchSpace -1- 关联空间运行
+关联空间运行 -N- ResearchSpaceRunLink
+WorkflowRun -1- 关联空间运行
+ResearchSpace -1- 关联空间观察列表
+关联空间观察列表 -N- ResearchSpaceWatchListLink
+WatchList -1- 关联空间观察列表
+ResearchSpace -1- 关联空间股票
+关联空间股票 -N- ResearchSpaceStockLink
+
+FinancialSnapshot -1- 生成研究产物
+生成研究产物 -N- ResearchArtifact
+
+EvidenceContext -1- 包含证据区块
+包含证据区块 -N- EvidenceContextBlock
+EvidenceContext -1- 包含上下文条目
+包含上下文条目 -N- EvidenceContextItem
+EvidenceContextBlock -1- 包含证据项
+包含证据项 -N- EvidenceContextItem
+ResearchContextSnapshot -1- 投影证据项
+投影证据项 -N- ResearchContextSnapshotItem
+EvidenceContextItem -1- 投影证据项
+ResearchContextSnapshot -1- 提出研究主张
+提出研究主张 -N- ResearchClaim
+ResearchClaim -1- 引用证据项
+引用证据项 -N- ResearchClaimCitation
+EvidenceContextItem -1- 引用证据项
+
+TimingReviewRecord -1- 关联复盘提醒
+关联复盘提醒 -N- ResearchReminder
+TimingSignalSnapshot -1- 生成分析卡
+生成分析卡 -N- TimingAnalysisCard
+TimingPreset -1- 使用择时预设
+使用择时预设 -N- TimingAnalysisCard
+TimingSignalSnapshot -1- 读取信号快照
+读取信号快照 -N- TimingAnalysisCard
+TimingPreset -1- 生成择时建议
+生成择时建议 -N- TimingRecommendation
+PortfolioSnapshot -1- 关联投资组合
+关联投资组合 -N- TimingRecommendation
+WatchList -1- 关联观察列表
+关联观察列表 -N- TimingRecommendation
+TimingAnalysisCard -1- 关联复盘分析卡
+关联复盘分析卡 -N- TimingReviewRecord
+TimingRecommendation -1- 关联复盘建议
+关联复盘建议 -N- TimingReviewRecord
+TimingReviewRecord -1- 记录复盘反馈
+记录复盘反馈 -1- TimingFeedbackObservation
+TimingRecommendation -1- 关联反馈观察
+关联反馈观察 -N- TimingFeedbackObservation
+TimingPreset -1- 关联反馈预设
+关联反馈预设 -N- TimingFeedbackObservation
+TimingPreset -1- 关联调整预设
+关联调整预设 -N- TimingPresetAdjustmentSuggestion
+User -1- 用户获得反馈观察
+用户获得反馈观察 -N- TimingFeedbackObservation
+User -1- 用户获得预设调整建议
+用户获得预设调整建议 -N- TimingPresetAdjustmentSuggestion
+
+WorkflowTemplate -1- 关联工作流模板
+关联工作流模板 -N- WorkflowRun
+WorkflowRun -1- 形成工作流节点
+形成工作流节点 -N- WorkflowNodeRun
+WorkflowRun -1- 记录工作流事件
+记录工作流事件 -N- WorkflowEvent
+WorkflowNodeRun -1- 节点事件
+节点事件 -N- WorkflowEvent
+WorkflowRun -1- 记录工具调用
+记录工具调用 -N- AgentToolCall
+WorkflowRun -1- 产出Agent产物
+产出Agent产物 -N- AgentArtifact
+AgentConversation -1- 包含对话消息
+包含对话消息 -N- AgentConversationMessage
+WorkflowRun -1- 消息关联工作流
+消息关联工作流 -N- AgentConversationMessage
+WorkflowRun -1- 对话关联旧工作流
+对话关联旧工作流 -1- AgentConversation
+
+WorkflowRun -1- 关联证据工作流
+关联证据工作流 -N- EvidenceContext
+WorkflowRun -1- 关联研究快照工作流
+关联研究快照工作流 -N- ResearchContextSnapshot
+WorkflowRun -1- 关联择时信号工作流
+关联择时信号工作流 -N- TimingSignalSnapshot
+WorkflowRun -1- 关联择时卡工作流
+关联择时卡工作流 -N- TimingAnalysisCard
+WorkflowRun -1- 关联择时建议工作流
+关联择时建议工作流 -N- TimingRecommendation
+WorkflowRun -1- 关联预测工作流
+关联预测工作流 -N- TimingKronosForecastSnapshot
+
+@endchen
