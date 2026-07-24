@@ -120,6 +120,7 @@ class MinishareNewsProvider:
         industries: tuple[RadarIndustry, ...],
         days: int,
         limit: int,
+        end_at: datetime | None = None,
     ) -> NewsRetrievalResult:
         terms = [*_MACRO_TERMS]
         stocks: list[str] = []
@@ -136,7 +137,11 @@ class MinishareNewsProvider:
             terms=tuple(_unique_text(terms)),
             related_stocks=tuple(_unique_text(stocks)),
         )
-        end_at = datetime.now(_SHANGHAI)
+        end_at = end_at or datetime.now(_SHANGHAI)
+        if end_at.tzinfo is None:
+            end_at = end_at.replace(tzinfo=_SHANGHAI)
+        else:
+            end_at = end_at.astimezone(_SHANGHAI)
         raw_items, warnings = self._fetch_sources(
             start_at=end_at - timedelta(days=days),
             end_at=end_at,

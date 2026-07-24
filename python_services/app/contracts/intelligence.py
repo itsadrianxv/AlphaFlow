@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -56,6 +57,7 @@ class NewsRadarIndustryInput(BaseModel):
 class NewsRadarRequest(BaseModel):
     days: int = Field(default=7, ge=1, le=30)
     limit: int = Field(default=50, ge=1, le=50)
+    endAt: datetime | None = None
     companies: list[NewsRadarCompanyInput] = Field(default_factory=list, max_length=100)
     industries: list[NewsRadarIndustryInput] = Field(default_factory=list, max_length=20)
     includeMacro: bool = True

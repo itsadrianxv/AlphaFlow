@@ -28,6 +28,26 @@ type ScopedNewsGatewayData = {
   newsItems: ThemeNewsItem[];
 };
 
+type NewsRadarGatewayData = {
+  days: number;
+  companyCount: number;
+  industryCount: number;
+  newsItems: ThemeNewsItem[];
+};
+
+export type NewsRadarRequest = {
+  days?: number;
+  limit?: number;
+  endAt?: string;
+  companies: Array<{
+    stockCode: string;
+    companyName: string;
+    aliases?: string[];
+  }>;
+  industries: Array<{ name: string; aliases?: string[] }>;
+  includeMacro?: boolean;
+};
+
 type ThemeCandidatesGatewayData = {
   theme: string;
   candidates: IntelligenceCandidateItem[];
@@ -162,6 +182,24 @@ export class PythonIntelligenceDataClient {
     const search = new URLSearchParams({ days: String(params.days ?? 7), limit: String(params.limit ?? 20) });
     const payload = await this.request<ScopedNewsGatewayData>(
       this.intelligencePath(`/stocks/${encodeURIComponent(params.stockCode)}/news?${search.toString()}`),
+    );
+    return payload.newsItems;
+  }
+
+  async getNewsRadar(params: NewsRadarRequest): Promise<ThemeNewsItem[]> {
+    const payload = await this.request<NewsRadarGatewayData>(
+      this.intelligencePath("/news/radar"),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          days: params.days ?? 7,
+          limit: params.limit ?? 50,
+          endAt: params.endAt,
+          companies: params.companies,
+          industries: params.industries,
+          includeMacro: params.includeMacro ?? true,
+        }),
+      },
     );
     return payload.newsItems;
   }

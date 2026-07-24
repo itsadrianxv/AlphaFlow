@@ -32,6 +32,7 @@ async def get_news_radar(
         industries=[item.model_dump() for item in body.industries],
         days=body.days,
         limit=body.limit,
+        end_at=body.endAt,
     )
 
 

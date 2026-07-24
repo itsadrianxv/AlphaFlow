@@ -56,6 +56,7 @@ export const WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE =
 export const SCREENING_TO_TIMING_TEMPLATE_CODE = "screening_to_timing_v1";
 export const TIMING_REVIEW_LOOP_TEMPLATE_CODE = "timing_review_loop_v1";
 export const PI_AGENT_RUN_TEMPLATE_CODE = "pi_agent_run_v1";
+export const IMPACT_MAPPING_TEMPLATE_CODE = "impact_mapping_v1";
 
 export const INDUSTRY_RESEARCH_NODE_KEYS = [
   "agent0_clarify_scope",
@@ -181,6 +182,16 @@ export const PI_AGENT_RUN_NODE_KEYS = [
   "persist_agent_result",
 ] as const;
 
+export const IMPACT_MAPPING_NODE_KEYS = [
+  "load_impact_context",
+  "collect_impact_evidence",
+  "persist_impact_observations",
+  "map_impact_layers",
+  "build_impact_timeline",
+  "forecast_impact_scenarios",
+  "persist_impact_analysis",
+] as const;
+
 export type IndustryResearchNodeKey =
   (typeof INDUSTRY_RESEARCH_NODE_KEYS)[number];
 export type CompanyResearchNodeKey =
@@ -201,6 +212,7 @@ export type ScreeningToTimingNodeKey =
 export type TimingReviewLoopNodeKey =
   (typeof TIMING_REVIEW_LOOP_NODE_KEYS)[number];
 export type PiAgentRunNodeKey = (typeof PI_AGENT_RUN_NODE_KEYS)[number];
+export type ImpactMappingNodeKey = (typeof IMPACT_MAPPING_NODE_KEYS)[number];
 export type WorkflowNodeKey =
   | IndustryResearchNodeKey
   | CompanyResearchNodeKey
@@ -211,6 +223,7 @@ export type WorkflowNodeKey =
   | ScreeningToTimingNodeKey
   | TimingReviewLoopNodeKey
   | PiAgentRunNodeKey
+  | ImpactMappingNodeKey
   | string;
 
 export type IndustryResearchStructuredModel =

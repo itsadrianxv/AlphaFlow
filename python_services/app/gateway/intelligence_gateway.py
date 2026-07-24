@@ -127,6 +127,7 @@ class IntelligenceGateway:
         industries: list[dict],
         days: int,
         limit: int,
+        end_at=None,
         force_refresh: bool = False,
     ) -> NewsRadarResponse:
         started_at = time.perf_counter()
@@ -162,12 +163,14 @@ class IntelligenceGateway:
                 "industries": [item.__dict__ for item in normalized_industries],
                 "days": days,
                 "limit": limit,
+                "endAt": end_at.isoformat() if end_at else None,
             },
             fetcher=lambda: self._news_provider.get_radar(
                 companies=normalized_companies,
                 industries=normalized_industries,
                 days=days,
                 limit=limit,
+                end_at=end_at,
             ),
             cache_policy=get_cache_policy("theme_news"),
             retry_policy=self._retry_policy,

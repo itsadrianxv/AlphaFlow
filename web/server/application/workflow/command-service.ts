@@ -7,10 +7,12 @@ import type {
   ResearchPreferenceInput,
   ResearchTaskContract,
 } from "~/server/domain/workflow/research";
+import type { ImpactMappingInput } from "~/server/domain/intelligence/impact-mapping";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   getWorkflowNodeKeysFromGraphConfig,
   INDUSTRY_RESEARCH_TEMPLATE_CODE,
+  IMPACT_MAPPING_TEMPLATE_CODE,
   PI_AGENT_RUN_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_TEMPLATE_CODE,
@@ -122,6 +124,13 @@ export type StartPiAgentRunCommand = {
   userMessageId?: string;
   assistantMessageId?: string;
   context?: Record<string, unknown>;
+  templateVersion?: number;
+  idempotencyKey?: string;
+};
+
+export type StartImpactMappingCommand = {
+  userId: string;
+  input: ImpactMappingInput;
   templateVersion?: number;
   idempotencyKey?: string;
 };
@@ -375,6 +384,22 @@ export class WorkflowCommandService {
     });
   }
 
+  async startImpactMapping(command: StartImpactMappingCommand) {
+    const eventLabel = command.input.eventId
+      ? ` - ${command.input.eventId.slice(0, 8)}`
+      : "";
+    return this.startWorkflow({
+      userId: command.userId,
+      query: `影响映射 ${command.input.mode}${eventLabel}`,
+      templateCode: IMPACT_MAPPING_TEMPLATE_CODE,
+      templateVersion: command.templateVersion,
+      input: command.input,
+      idempotencyKey:
+        command.idempotencyKey ??
+        `impact-mapping:${command.userId}:${command.input.mode}:${command.input.baseRunId ?? "latest"}:${command.input.eventId ?? "radar"}:${command.input.traceCursor ?? "current"}`,
+    });
+  }
+
   async cancelRun(userId: string, runId: string) {
     const run = await this.repository.requestCancellation(runId, userId);
 
@@ -589,6 +614,10 @@ export class WorkflowCommandService {
 
     if (!template && command.templateCode === PI_AGENT_RUN_TEMPLATE_CODE) {
       template = await this.repository.ensurePiAgentRunTemplate();
+    }
+
+    if (!template && command.templateCode === IMPACT_MAPPING_TEMPLATE_CODE) {
+      template = await this.repository.ensureImpactMappingTemplate();
     }
 
     if (!template) {

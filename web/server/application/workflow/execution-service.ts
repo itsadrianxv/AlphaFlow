@@ -4,6 +4,8 @@ import { CompanyResearchAgentService } from "~/server/application/intelligence/c
 import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
 import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
+import { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
+import { ImpactMappingService } from "~/server/application/intelligence/impact-mapping-service";
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
@@ -24,6 +26,7 @@ import { AgentRuntimeClient } from "~/server/infrastructure/agent-runtime/agent-
 import { PrismaAgentConversationRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-conversation-repository";
 import { PrismaAgentRuntimeRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-runtime-repository";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
+import { PrismaEvidenceContextRepository } from "~/server/infrastructure/evidence-context/prisma-evidence-context-repository";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
 import { PrismaScreeningInsightRepository } from "~/server/infrastructure/intelligence/prisma-screening-insight-repository";
@@ -38,6 +41,7 @@ import {
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
 import { WorkflowGraphRegistry } from "~/server/infrastructure/workflow/langgraph/graph-registry";
 import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
+import { ImpactMappingLangGraph } from "~/server/infrastructure/workflow/langgraph/impact-mapping-graph";
 import { PiAgentRuntimeLangGraph } from "~/server/infrastructure/workflow/langgraph/pi-agent-runtime-graph";
 import { ScreeningInsightPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph";
 import type { WorkflowGraphRunner } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
@@ -157,6 +161,18 @@ export function createWorkflowExecutionService(
     pythonCapabilityGatewayClient: capabilityGatewayClient,
     pythonIntelligenceDataClient: intelligenceDataClient,
   });
+  const evidenceContextWriter = new PrismaEvidenceContextRepository(prisma);
+  const evidenceAwareLlmClient = new EvidenceAwareLlmClient(
+    deepSeekClient,
+    evidenceContextWriter,
+  );
+  const impactMappingService = new ImpactMappingService({
+    prisma,
+    dataClient: intelligenceDataClient,
+    capabilityClient: capabilityGatewayClient,
+    evidenceRepository: evidenceContextWriter,
+    evidenceAwareLlmClient,
+  });
   const industryResearchWorkflowService = new IndustryResearchWorkflowService({
     client: deepSeekClient,
     intelligenceService,
@@ -185,6 +201,7 @@ export function createWorkflowExecutionService(
     runtimeStore: options?.runtimeStore ?? new RedisWorkflowRuntimeStore(),
     graphs: options?.graphs ?? [
       new IndustryResearchLangGraph(industryResearchWorkflowService),
+      new ImpactMappingLangGraph(impactMappingService),
       new LegacyCompanyResearchLangGraph(companyResearchService),
       new CompanyResearchLangGraph(companyResearchService),
       new ODRCompanyResearchLangGraph(companyResearchWorkflowService),

@@ -14,6 +14,8 @@ import {
   COMPANY_RESEARCH_V4_NODE_KEYS,
   INDUSTRY_RESEARCH_NODE_KEYS,
   INDUSTRY_RESEARCH_TEMPLATE_CODE,
+  IMPACT_MAPPING_NODE_KEYS,
+  IMPACT_MAPPING_TEMPLATE_CODE,
   PI_AGENT_RUN_NODE_KEYS,
   PI_AGENT_RUN_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_NODE_KEYS,
@@ -580,6 +582,41 @@ export class PrismaWorkflowRunRepository {
         graphConfig: {
           nodes: PI_AGENT_RUN_NODE_KEYS,
         },
+        inputSchema,
+        isActive: true,
+      },
+    });
+  }
+
+  async ensureImpactMappingTemplate() {
+    const inputSchema = {
+      type: "object",
+      required: ["mode"],
+      properties: {
+        mode: { enum: ["radar", "deep_dive", "trace"] },
+        portfolioSnapshotId: { type: "string" },
+        watchListIds: { type: "array", items: { type: "string" }, maxItems: 5 },
+        eventId: { type: "string" },
+        baseRunId: { type: "string" },
+        days: { type: "integer", minimum: 1, maximum: 30 },
+        traceCursor: { type: "string" },
+        traceMaxDays: { type: "integer", minimum: 30, maximum: 365 },
+        traceMaxEvents: { type: "integer", minimum: 1, maximum: 30 },
+      },
+    } as const;
+    return this.prisma.workflowTemplate.upsert({
+      where: {
+        code_version: { code: IMPACT_MAPPING_TEMPLATE_CODE, version: 1 },
+      },
+      create: {
+        code: IMPACT_MAPPING_TEMPLATE_CODE,
+        version: 1,
+        graphConfig: { nodes: IMPACT_MAPPING_NODE_KEYS },
+        inputSchema,
+        isActive: true,
+      },
+      update: {
+        graphConfig: { nodes: IMPACT_MAPPING_NODE_KEYS },
         inputSchema,
         isActive: true,
       },

@@ -4,12 +4,14 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { WorkflowCommandService } from "~/server/application/workflow/command-service";
 import { WorkflowQueryService } from "~/server/application/workflow/query-service";
+import { impactMappingInputSchema } from "~/server/domain/intelligence/impact-mapping";
 import {
   isWorkflowDomainError,
   WORKFLOW_ERROR_CODES,
 } from "~/server/domain/workflow/errors";
 import {
   INDUSTRY_RESEARCH_TEMPLATE_CODE,
+  IMPACT_MAPPING_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
@@ -290,6 +292,14 @@ const startTimingReviewLoopInput = z.object({
   idempotencyKey: z.string().min(8).max(128).optional(),
 });
 
+const startImpactMappingInput = z.intersection(
+  impactMappingInputSchema,
+  z.object({
+    templateVersion: z.number().int().positive().optional(),
+    idempotencyKey: z.string().min(8).max(160).optional(),
+  }),
+);
+
 const getRunInput = z.object({
   runId: z.string().cuid(),
 });
@@ -312,6 +322,44 @@ const approveScreeningInsightsInput = z.object({
 });
 
 export const workflowRouter = createTRPCRouter({
+  startImpactMapping: protectedProcedure
+    .input(startImpactMappingInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const repository = new PrismaWorkflowRunRepository(ctx.db);
+        const commandService = new WorkflowCommandService(repository);
+        return await commandService.startImpactMapping({
+          userId: ctx.session.user.id,
+          input: impactMappingInputSchema.parse(input),
+          templateVersion: input.templateVersion,
+          idempotencyKey: input.idempotencyKey,
+        });
+      } catch (error) {
+        throw mapWorkflowError(error);
+      }
+    }),
+
+  getLatestImpactMapping: protectedProcedure.query(async ({ ctx }) => {
+    const run = await ctx.db.workflowRun.findFirst({
+      where: {
+        userId: ctx.session.user.id,
+        status: WorkflowRunStatus.SUCCEEDED,
+        template: { is: { code: IMPACT_MAPPING_TEMPLATE_CODE } },
+      },
+      orderBy: { completedAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        progressPercent: true,
+        input: true,
+        result: true,
+        createdAt: true,
+        completedAt: true,
+      },
+    });
+    return run;
+  }),
+
   startIndustryResearch: protectedProcedure
     .input(startIndustryResearchInput)
     .mutation(async ({ ctx, input }) => {
