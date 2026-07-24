@@ -115,6 +115,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 Market provider：
 
 - `TUSHARE_TOKEN`：TuShare 数据接口 Token
+- `SCREENING_STOCK_UNIVERSE_FILE`：筛选搜索股票池 JSON 快照路径（默认 `data/screening_stock_universe.json`）
 
 缓存与降级：
 

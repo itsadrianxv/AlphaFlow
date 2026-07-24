@@ -74,6 +74,21 @@ docker compose --env-file docker/.env -f docker/docker-compose.yml run --rm pyth
 
 更新 `data/ths_concept_catalog.csv` 后无需重建镜像，后续请求会按文件更新时间自动热加载。
 
+## 刷新筛选股票池
+
+筛选页和自选股页的股票搜索只读取 `data/screening_stock_universe.json`。请在宿主机配置 Cron，以中国时区的每个工作日 18:00 触发；任务会再用 TuShare `trade_cal` 判断是否为 A 股交易日，节假日会正常跳过。
+
+```cron
+TZ=Asia/Shanghai
+0 18 * * 1-5 cd /path/to/stock-screening-boost && docker compose --env-file docker/.env -f docker/docker-compose.yml exec -T python-service python -m app.jobs.refresh_screening_stock_universe >> /var/log/alphaflow-screening-universe.log 2>&1
+```
+
+首次部署后可手动执行同一条 `docker compose ... exec` 命令生成股票池。刷新失败时，任务会保持最后一次成功文件不变并以非零退出状态结束。
+
+```bash
+docker compose --env-file docker/.env -f docker/docker-compose.yml exec -T python-service python -m app.jobs.refresh_screening_stock_universe
+```
+
 ## 配置校验
 
 ```bash

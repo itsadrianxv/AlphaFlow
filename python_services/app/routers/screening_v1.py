@@ -13,6 +13,10 @@ from app.services.screening_formula_engine import SafeFormulaEngine
 from app.services.screening_periods import resolve_periods
 from app.services.screening_query_service import ScreeningQueryService
 from app.services.screening_universe import ScreeningStockSearcher
+from app.services.screening_stock_universe_store import (
+    ScreeningStockUniverseStore,
+    StockUniverseUnavailableError,
+)
 
 router = APIRouter(prefix="/api/v1/screening", tags=["screening-v1"])
 
@@ -31,19 +35,8 @@ class ScreeningQueryRequest(BaseModel):
 
 @lru_cache(maxsize=1)
 def get_stock_searcher() -> ScreeningStockSearcher:
-    provider = get_default_data_provider()
-
-    def load_universe():
-        return [
-            {
-                "stockCode": profile.stockCode,
-                "stockName": profile.stockName,
-                "market": profile.market,
-            }
-            for profile in provider.get_stock_universe()
-        ]
-
-    return ScreeningStockSearcher(universe_loader=load_universe)
+    store = ScreeningStockUniverseStore()
+    return ScreeningStockSearcher(universe_loader=store.load_records, ttl_seconds=0)
 
 
 @router.get("/stocks/search")
@@ -53,6 +46,8 @@ def search_stocks(
 ):
     try:
         return get_stock_searcher().search(keyword, limit)
+    except StockUniverseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

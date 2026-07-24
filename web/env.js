@@ -74,7 +74,6 @@ export const env = createEnv({
       .positive()
       .default(60),
     TUSHARE_TOKEN: z.string().optional(),
-    STOCK_CODES_CSV_PATH: z.string().optional(),
     DEEPSEEK_API_KEY: z.string().optional(),
     DEEPSEEK_BASE_URL: z.string().url().default("https://api.deepseek.com"),
     DEEPSEEK_TIMEOUT_MS: z.coerce
@@ -163,7 +162,6 @@ export const env = createEnv({
       60,
     ),
     TUSHARE_TOKEN: process.env.TUSHARE_TOKEN,
-    STOCK_CODES_CSV_PATH: process.env.STOCK_CODES_CSV_PATH,
     DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
     DEEPSEEK_BASE_URL:
       process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com",

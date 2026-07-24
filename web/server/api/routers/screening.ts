@@ -22,7 +22,7 @@ import {
 import { normalizeFormulaExpression } from "~/server/api/routers/screening-formula-normalizer";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
-import { LocalStockSearchService } from "~/server/infrastructure/screening/local-stock-search-service";
+import { PythonScreeningWorkbenchClient } from "~/server/infrastructure/screening/python-screening-workbench-client";
 
 type ScreeningFormulaRecord = {
   id: string;
@@ -228,7 +228,10 @@ export const screeningRouter = createTRPCRouter({
       }),
     )
     .query(async ({ input }) =>
-      new LocalStockSearchService().search(input.keyword, input.limit),
+      new PythonScreeningWorkbenchClient().searchStocks(
+        input.keyword,
+        input.limit,
+      ),
     ),
 
   listIndicatorCatalog: protectedProcedure.query(async () => {

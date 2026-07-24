@@ -32,14 +32,15 @@ class ScreeningStockSearcher:
         if not normalized:
             return []
 
-        results: list[dict[str, str]] = []
+        code_matches: list[dict[str, str]] = []
+        name_matches: list[dict[str, str]] = []
         for item in self._get_universe():
             stock_code = item["stockCode"]
             stock_name = item["stockName"]
             market = item.get("market", "")
 
             if normalized in stock_code.lower():
-                results.append(
+                code_matches.append(
                     StockSearchMatch(
                         stockCode=stock_code,
                         stockName=stock_name,
@@ -50,7 +51,7 @@ class ScreeningStockSearcher:
                 continue
 
             if normalized in stock_name.lower():
-                results.append(
+                name_matches.append(
                     StockSearchMatch(
                         stockCode=stock_code,
                         stockName=stock_name,
@@ -59,10 +60,7 @@ class ScreeningStockSearcher:
                     ).__dict__
                 )
 
-            if len(results) >= limit:
-                break
-
-        return results[:limit]
+        return [*code_matches, *name_matches][:limit]
 
     def _get_universe(self) -> list[dict[str, str]]:
         cached = self._cache

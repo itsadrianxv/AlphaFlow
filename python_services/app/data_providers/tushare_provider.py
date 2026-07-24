@@ -247,6 +247,46 @@ class TushareProvider:
         return matches
 
     def get_daily_bars(
+    def is_a_share_trading_day(self, trading_date: date) -> bool:
+        date_text = trading_date.strftime("%Y%m%d")
+        frame = self._ensure_frame(
+            self._get_client().trade_cal(
+                exchange="SSE",
+                start_date=date_text,
+                end_date=date_text,
+            )
+        )
+        if frame.empty:
+            return False
+        return any(str(item).strip() == "1" for item in frame.get("is_open", []))
+
+    def get_stock_search_universe(self) -> list[dict[str, str]]:
+        frame = self._ensure_frame(
+            self._get_client().stock_basic(
+                exchange="",
+                list_status="L",
+                fields="ts_code,symbol,name,exchange,list_status",
+            )
+        )
+        market_by_exchange = {"SSE": "SH", "SZSE": "SZ", "BSE": "BJ"}
+        records: list[dict[str, str]] = []
+        seen_codes: set[str] = set()
+        for _, row in frame.iterrows():
+            stock_code = self._normalize_stock_code(row.get("symbol"))
+            stock_name = str(row.get("name") or "").strip()
+            market = market_by_exchange.get(str(row.get("exchange") or "").strip().upper())
+            if not stock_code or not stock_name or not market or stock_code in seen_codes:
+                continue
+            seen_codes.add(stock_code)
+            records.append(
+                {
+                    "stockCode": stock_code,
+                    "stockName": stock_name,
+                    "market": market,
+                }
+            )
+        return sorted(records, key=lambda item: item["stockCode"])
+
         self,
         stock_code: str,
         start_date: str | None = None,
