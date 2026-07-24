@@ -686,7 +686,9 @@ export class ImpactMappingService {
       select: { result: true },
     });
     const result = asObject(run?.result) as Partial<ImpactMappingResult>;
-    const event = result.events?.find((item) => item.event.id === eventId)?.event;
+    const event =
+      result.events?.find((item) => item.event.id === eventId)?.event ??
+      (result.selectedEvent?.id === eventId ? result.selectedEvent : undefined);
     if (!event) throw new Error("基准运行中不存在指定事件");
     return event;
   }

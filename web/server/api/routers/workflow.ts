@@ -345,13 +345,14 @@ export const workflowRouter = createTRPCRouter({
     }),
 
   getLatestImpactMapping: protectedProcedure.query(async ({ ctx }) => {
-    const run = await ctx.db.workflowRun.findFirst({
+    const runs = await ctx.db.workflowRun.findMany({
       where: {
         userId: ctx.session.user.id,
         status: WorkflowRunStatus.SUCCEEDED,
         template: { is: { code: IMPACT_MAPPING_TEMPLATE_CODE } },
       },
       orderBy: { completedAt: "desc" },
+      take: 20,
       select: {
         id: true,
         status: true,
@@ -362,7 +363,17 @@ export const workflowRouter = createTRPCRouter({
         completedAt: true,
       },
     });
-    return run;
+    return (
+      runs.find((run) => {
+        const input = run.input;
+        return (
+          input !== null &&
+          typeof input === "object" &&
+          !Array.isArray(input) &&
+          input.mode === "radar"
+        );
+      }) ?? null
+    );
   }),
 
   startIndustryResearch: protectedProcedure

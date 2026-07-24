@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { env } from "~/env";
+import { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
 import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
 import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
 import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
+import { ImpactMappingService } from "~/server/application/intelligence/impact-mapping-service";
 import { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
@@ -21,6 +23,7 @@ import { AgentRuntimeClient } from "~/server/infrastructure/agent-runtime/agent-
 import { PrismaAgentConversationRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-conversation-repository";
 import { PrismaAgentRuntimeRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-runtime-repository";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
+import { PrismaEvidenceContextRepository } from "~/server/infrastructure/evidence-context/prisma-evidence-context-repository";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
 import { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
@@ -43,6 +46,7 @@ import {
   LegacyCompanyResearchLangGraph,
   ODRCompanyResearchLangGraph,
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
+import { ImpactMappingLangGraph } from "~/server/infrastructure/workflow/langgraph/impact-mapping-graph";
 import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
 import { PiAgentRuntimeLangGraph } from "~/server/infrastructure/workflow/langgraph/pi-agent-runtime-graph";
 import { TimingReviewLoopLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-review-loop-graph";
@@ -72,6 +76,17 @@ const researchToolRegistry = new ResearchToolRegistry({
   deepSeekClient,
   pythonCapabilityGatewayClient: capabilityGatewayClient,
   pythonIntelligenceDataClient: pythonDataClient,
+});
+const evidenceContextRepository = new PrismaEvidenceContextRepository(db);
+const impactMappingService = new ImpactMappingService({
+  prisma: db,
+  dataClient: pythonDataClient,
+  capabilityClient: capabilityGatewayClient,
+  evidenceRepository: evidenceContextRepository,
+  evidenceAwareLlmClient: new EvidenceAwareLlmClient(
+    deepSeekClient,
+    evidenceContextRepository,
+  ),
 });
 const industryResearchWorkflowService = new IndustryResearchWorkflowService({
   client: deepSeekClient,
@@ -130,6 +145,7 @@ const executionService = new WorkflowExecutionService({
   runtimeStore: new RedisWorkflowRuntimeStore(),
   graphs: [
     new IndustryResearchLangGraph(industryResearchWorkflowService),
+    new ImpactMappingLangGraph(impactMappingService),
     new CompanyResearchLangGraph(companyResearchService),
     new LegacyCompanyResearchLangGraph(companyResearchService),
     new ODRCompanyResearchLangGraph(companyResearchWorkflowService),
