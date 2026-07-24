@@ -7,6 +7,8 @@ import time
 
 from app.contracts.common import BatchItemError
 from app.contracts.intelligence import (
+    NewsRadarData,
+    NewsRadarResponse,
     StockEvidenceBatchData,
     StockEvidenceBatchResponse,
     StockEvidenceData,
@@ -21,7 +23,7 @@ from app.contracts.intelligence import (
     ThemeNewsResponse,
 )
 from app.contracts.meta import GatewayWarning
-from app.gateway.common import GatewayError, build_meta, execute_cached, gateway_cache
+from app.gateway.common import GatewayError, GatewayFetchResult, build_meta, execute_cached, gateway_cache
 from app.infrastructure.metrics.recorder import metrics_recorder
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
@@ -32,8 +34,7 @@ from app.providers.mappers import (
     to_theme_news_item,
 )
 from app.providers.tushare.client import TushareProviderClient
-from app.providers.minishare.news import MinishareNewsProvider, NewsQuery
-from app.services.zhipu_search_client import ZhipuSearchClient
+from app.providers.minishare.news import MinishareNewsProvider, NewsQuery, RadarCompany, RadarIndustry
 
 
 class IntelligenceGateway:
@@ -41,11 +42,9 @@ class IntelligenceGateway:
         self,
         provider_client: TushareProviderClient | None = None,
         news_provider: MinishareNewsProvider | None = None,
-        zhipu_client: ZhipuSearchClient | None = None,
     ) -> None:
         self._provider_client = provider_client or TushareProviderClient()
         self._news_provider = news_provider or MinishareNewsProvider()
-        self._zhipu_client = zhipu_client or ZhipuSearchClient()
         self._retry_policy = RetryPolicy(max_attempts=1)
         self._cache = gateway_cache
 
@@ -58,7 +57,6 @@ class IntelligenceGateway:
         force_refresh: bool = False,
     ) -> ThemeNewsResponse:
         started_at = time.perf_counter()
-        metrics_recorder.record_theme_request(dataset="theme_news", theme=theme)
         result = self._get_news_result(
             query=NewsQuery(scope="theme", target=theme, days=days, limit=limit, terms=(theme,)),
             force_refresh=force_refresh,
@@ -101,17 +99,99 @@ class IntelligenceGateway:
         )
 
     def _get_news_result(self, *, query: NewsQuery, force_refresh: bool):
-        metrics_recorder.record_theme_request(dataset=f"{query.scope}_news", theme=query.target)
-        return execute_cached(
+        cached = execute_cached(
             dataset=f"{query.scope}_news",
             provider=self._news_provider.provider_name,
             params={"scope": query.scope, "target": query.target, "days": query.days, "limit": query.limit, "terms": list(query.terms), "stocks": list(query.related_stocks)},
-            fetcher=lambda: [to_theme_news_item(item) for item in self._news_provider.get_news(query)],
+            fetcher=lambda: self._news_provider.get_news_result(query),
             cache_policy=get_cache_policy("theme_news"),
             retry_policy=self._retry_policy,
             cache=self._cache,
             force_refresh=force_refresh,
             allow_stale=False,
+        )
+        return GatewayFetchResult(
+            data=[to_theme_news_item(item) for item in cached.data.items],
+            provider=cached.provider,
+            cache_hit=cached.cache_hit,
+            is_stale=cached.is_stale,
+            as_of=cached.as_of,
+            warnings=self._dedupe_warnings([*cached.warnings, *cached.data.warnings]),
+        )
+
+    def get_news_radar(
+        self,
+        request_id: str,
+        *,
+        companies: list[dict],
+        industries: list[dict],
+        days: int,
+        limit: int,
+        force_refresh: bool = False,
+    ) -> NewsRadarResponse:
+        started_at = time.perf_counter()
+        normalized_companies = tuple(
+            RadarCompany(
+                stock_code=str(item.get("stockCode") or "").strip(),
+                company_name=str(item.get("companyName") or "").strip()
+                or str(item.get("stockCode") or "").strip(),
+                aliases=tuple(
+                    str(value).strip()
+                    for value in item.get("aliases") or []
+                    if str(value).strip()
+                ),
+            )
+            for item in companies
+        )
+        normalized_industries = tuple(
+            RadarIndustry(
+                name=str(item.get("name") or "").strip(),
+                aliases=tuple(
+                    str(value).strip()
+                    for value in item.get("aliases") or []
+                    if str(value).strip()
+                ),
+            )
+            for item in industries
+        )
+        cached = execute_cached(
+            dataset="news_radar",
+            provider=self._news_provider.provider_name,
+            params={
+                "companies": [item.__dict__ for item in normalized_companies],
+                "industries": [item.__dict__ for item in normalized_industries],
+                "days": days,
+                "limit": limit,
+            },
+            fetcher=lambda: self._news_provider.get_radar(
+                companies=normalized_companies,
+                industries=normalized_industries,
+                days=days,
+                limit=limit,
+            ),
+            cache_policy=get_cache_policy("theme_news"),
+            retry_policy=self._retry_policy,
+            cache=self._cache,
+            force_refresh=force_refresh,
+            allow_stale=False,
+        )
+        warnings = self._dedupe_warnings([*cached.warnings, *cached.data.warnings])
+        return NewsRadarResponse(
+            meta=build_meta(
+                request_id=request_id,
+                provider=cached.provider,
+                started_at=started_at,
+                cache_hit=cached.cache_hit,
+                is_stale=cached.is_stale,
+                warnings=warnings,
+                as_of=cached.as_of,
+            ),
+            data=NewsRadarData(
+                days=days,
+                companyCount=len(normalized_companies),
+                industryCount=len(normalized_industries),
+                newsItems=[to_theme_news_item(item) for item in cached.data.items],
+            ),
         )
 
     def get_theme_concepts(
@@ -122,19 +202,11 @@ class IntelligenceGateway:
         force_refresh: bool = False,
     ) -> ThemeConceptsResponse:
         started_at = time.perf_counter()
-        metrics_recorder.record_theme_request(dataset="theme_concepts", theme=theme)
         result = execute_cached(
             dataset="theme_concepts",
             provider=self._provider_client.provider_name,
             params={"theme": theme, "limit": limit},
-            fetcher=lambda: self._provider_client.get_theme_concepts(
-                theme=theme,
-                limit=limit,
-                concept_hints=self._zhipu_client.search_theme_concepts(
-                    theme=theme,
-                    limit=limit,
-                ),
-            ),
+            fetcher=lambda: self._provider_client.get_theme_concepts(theme=theme, limit=limit),
             cache_policy=get_cache_policy("theme_concepts"),
             retry_policy=self._retry_policy,
             cache=self._cache,

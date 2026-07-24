@@ -99,8 +99,10 @@ def test_get_v1_stock_evidence_batch_fetches_stocks_concurrently():
 
 def test_intelligence_gateway_uses_minishare_news_provider():
     with patch(
-        "app.gateway.intelligence_gateway.MinishareNewsProvider.get_news",
-        return_value=[],
+        "app.gateway.intelligence_gateway.MinishareNewsProvider.get_news_result",
+        return_value=__import__(
+            "app.providers.minishare.news", fromlist=["NewsRetrievalResult"]
+        ).NewsRetrievalResult(items=[]),
     ):
         response = client.get("/api/v1/intelligence/themes/AI/news")
 
@@ -112,6 +114,49 @@ def test_intelligence_gateway_uses_minishare_news_provider():
     assert payload["data"]["newsItems"] == []
     assert payload["meta"]["provider"] == "minishare"
     assert payload["meta"]["warnings"] == []
+
+
+def test_v1_news_radar_returns_standardized_items():
+    result_type = __import__(
+        "app.providers.minishare.news", fromlist=["NewsRetrievalResult"]
+    ).NewsRetrievalResult
+    with patch(
+        "app.gateway.intelligence_gateway.MinishareNewsProvider.get_radar",
+        return_value=result_type(
+            items=[
+                {
+                    "id": "event-1",
+                    "title": "算力资本开支扩大",
+                    "summary": "行业扩产",
+                    "content": "完整正文",
+                    "source": "minishare:major",
+                    "sourceKind": "major",
+                    "publishedAt": "2026-07-24T10:00:00+08:00",
+                    "sentiment": "positive",
+                    "relevanceScore": 0.9,
+                    "relatedStocks": ["603019"],
+                    "scopeTags": ["industry"],
+                    "analysisStatus": "complete",
+                }
+            ]
+        ),
+    ):
+        response = client.post(
+            "/api/v1/intelligence/news/radar",
+            json={
+                "days": 7,
+                "limit": 10,
+                "companies": [
+                    {"stockCode": "603019", "companyName": "中科曙光"}
+                ],
+                "industries": [{"name": "算力"}],
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["data"]["companyCount"] == 1
+    assert payload["data"]["newsItems"][0]["content"] == "完整正文"
 
 
 def test_v1_theme_concepts_returns_stale_cache_when_provider_fails():

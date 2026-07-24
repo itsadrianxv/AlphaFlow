@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, Request
 
 from app.contracts.intelligence import (
+    NewsRadarRequest,
+    NewsRadarResponse,
     StockEvidenceBatchRequest,
     StockEvidenceBatchResponse,
     StockEvidenceResponse,
@@ -17,6 +19,20 @@ from app.gateway.common import GatewayError, is_valid_stock_code
 from app.gateway.intelligence_gateway import intelligence_gateway
 
 router = APIRouter(prefix="/api/v1/intelligence")
+
+
+@router.post("/news/radar", response_model=NewsRadarResponse)
+async def get_news_radar(
+    request: Request,
+    body: NewsRadarRequest,
+):
+    return intelligence_gateway.get_news_radar(
+        request_id=request.state.request_id,
+        companies=[item.model_dump() for item in body.companies],
+        industries=[item.model_dump() for item in body.industries],
+        days=body.days,
+        limit=body.limit,
+    )
 
 
 @router.get("/themes/{theme}/news", response_model=ThemeNewsResponse)

@@ -95,6 +95,13 @@ def to_theme_news_item(raw: dict) -> ThemeNewsItem:
         scopeTags=list(raw.get("scopeTags") or []),
         eventType=str(raw.get("eventType") or "其他").strip() or "其他",
         matchReason=str(raw.get("matchReason") or "").strip(),
+        content=str(raw.get("content") or ""),
+        url=str(raw.get("url") or "").strip() or None,
+        sourceKind=str(raw.get("sourceKind") or "fast").strip(),
+        sourceRefs=list(raw.get("sourceRefs") or []),
+        attributions=list(raw.get("attributions") or []),
+        analysisStatus=str(raw.get("analysisStatus") or "complete").strip(),
+        warnings=list(raw.get("warnings") or []),
     )
 
 

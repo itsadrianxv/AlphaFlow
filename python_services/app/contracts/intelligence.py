@@ -22,6 +22,13 @@ class ThemeNewsItem(BaseModel):
     scopeTags: list[Literal["macro", "theme", "industry", "company"]] = Field(default_factory=list)
     eventType: str = "其他"
     matchReason: str = ""
+    content: str = ""
+    url: str | None = None
+    sourceKind: Literal["fast", "major", "cctv"] = "fast"
+    sourceRefs: list[dict] = Field(default_factory=list)
+    attributions: list[dict] = Field(default_factory=list)
+    analysisStatus: Literal["complete", "partial"] = "complete"
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ThemeNewsData(BaseModel):
@@ -32,6 +39,32 @@ class ThemeNewsData(BaseModel):
 class ScopedNewsData(BaseModel):
     scope: Literal["macro", "industry", "company"]
     target: str
+    newsItems: list[ThemeNewsItem]
+
+
+class NewsRadarCompanyInput(BaseModel):
+    stockCode: str = Field(..., pattern=r"^\d{6}$")
+    companyName: str = ""
+    aliases: list[str] = Field(default_factory=list, max_length=20)
+
+
+class NewsRadarIndustryInput(BaseModel):
+    name: str = Field(..., min_length=1)
+    aliases: list[str] = Field(default_factory=list, max_length=20)
+
+
+class NewsRadarRequest(BaseModel):
+    days: int = Field(default=7, ge=1, le=30)
+    limit: int = Field(default=50, ge=1, le=50)
+    companies: list[NewsRadarCompanyInput] = Field(default_factory=list, max_length=100)
+    industries: list[NewsRadarIndustryInput] = Field(default_factory=list, max_length=20)
+    includeMacro: bool = True
+
+
+class NewsRadarData(BaseModel):
+    days: int
+    companyCount: int
+    industryCount: int
     newsItems: list[ThemeNewsItem]
 
 
@@ -207,6 +240,10 @@ class ThemeNewsResponse(GatewayResponse[ThemeNewsData]):
 
 
 class ScopedNewsResponse(GatewayResponse[ScopedNewsData]):
+    pass
+
+
+class NewsRadarResponse(GatewayResponse[NewsRadarData]):
     pass
 
 

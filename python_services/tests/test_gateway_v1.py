@@ -123,20 +123,25 @@ def test_get_v1_market_batch_reports_partial_errors() -> None:
 
 
 def test_get_v1_theme_news_success() -> None:
+    result_type = __import__(
+        "app.providers.minishare.news", fromlist=["NewsRetrievalResult"]
+    ).NewsRetrievalResult
     with patch(
-        "app.gateway.intelligence_gateway.MinishareNewsProvider.get_news",
-        return_value=[
-            {
-                "id": "ai-1",
-                "title": "AI 算力需求提升",
-                "summary": "产业链景气度持续改善。",
-                "source": "minishare:news",
-                "publishedAt": "2026-03-08T08:00:00+00:00",
-                "sentiment": "positive",
-                "relevanceScore": 0.92,
-                "relatedStocks": ["603019"],
-            }
-        ],
+        "app.gateway.intelligence_gateway.MinishareNewsProvider.get_news_result",
+        return_value=result_type(
+            items=[
+                {
+                    "id": "ai-1",
+                    "title": "AI 算力需求提升",
+                    "summary": "产业链景气度持续改善。",
+                    "source": "minishare:news",
+                    "publishedAt": "2026-03-08T08:00:00+00:00",
+                    "sentiment": "positive",
+                    "relevanceScore": 0.92,
+                    "relatedStocks": ["603019"],
+                }
+            ]
+        ),
     ):
         response = client.get("/api/v1/intelligence/themes/AI/news")
 
