@@ -1,17 +1,9 @@
 import Link from "next/link";
-import { statusTone } from "~/app/_components/status-tone";
-import {
-  ActionStrip,
-  EmptyState,
-  ProgressBar,
-  SectionCard,
-  StatusPill,
-  WorkspaceShell,
-} from "~/app/_components/ui";
-import { primaryWorkflowStages } from "~/app/_components/workflow-stage-config";
+import { ImpactMappingWorkspace } from "~/app/_components/impact-mapping-workspace";
+import { MarketContextSection } from "~/app/_components/market-context-section";
+import { ActionStrip, SectionCard, WorkspaceShell } from "~/app/_components/ui";
 import { formatTimingNarrative } from "~/app/timing/timing-labels";
 import { getTemplateLabel } from "~/app/workflows/research-view-models";
-import { buildRunDetailHref } from "~/app/workflows/run-detail-href";
 import { auth } from "~/server/auth";
 import { api, HydrateClient } from "~/trpc/server";
 
@@ -202,6 +194,8 @@ export default async function Home() {
           }
         />
 
+        <ImpactMappingWorkspace signedIn={signedIn} />
+
         {loadError ? (
           <SectionCard surface="inset" density="compact">
             <div className="text-sm leading-6 text-[var(--app-danger)]">
@@ -210,178 +204,7 @@ export default async function Home() {
           </SectionCard>
         ) : null}
 
-        <SectionCard title="主流程">
-          <div className="grid gap-4 lg:grid-cols-4">
-            {primaryWorkflowStages.map((stage, index) => {
-              const isScreening = stage.id === "screening";
-              const isResearch = stage.id === "workflows";
-              const isCompany = stage.id === "companyResearch";
-              const stageMeta = isScreening
-                ? `${recentScreeningWorkspaces.length} 个工作台`
-                : isResearch
-                  ? `${liveRuns.length} 条研究在运行`
-                  : isCompany
-                    ? `${allWorkflowRuns.length} 条研究可延伸为公司判断`
-                    : `${latestRecommendations.length} 条最新组合建议`;
-
-              return (
-                <Link
-                  key={stage.id}
-                  href={stage.href}
-                  className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-5 py-5 transition-colors hover:border-[var(--app-flame)] hover:bg-[var(--app-surface-strong)]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] uppercase tracking-[0.18em] text-[var(--app-text-subtle)]">
-                      Stage {index + 1}
-                    </span>
-                    <span className="app-workflow-index">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                  </div>
-                  <div className="mt-4 text-[30px] leading-none text-[var(--app-text-strong)]">
-                    {stage.label}
-                  </div>
-                  <div className="mt-4 text-sm leading-6 text-[var(--app-text-muted)]">
-                    {stage.summary}
-                  </div>
-                  <div className="mt-4 text-xs uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-                    {stageMeta}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </SectionCard>
-
-        <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-          <SectionCard
-            title="继续当前研究"
-            actions={
-              <Link href="/workflows" className="app-button">
-                打开研究入口
-              </Link>
-            }
-          >
-            {!signedIn ? (
-              <EmptyState
-                title="登录后查看进行中的研究"
-                description="登录后会自动合并当前研究、筛选工作台和组合建议。"
-                actions={
-                  <Link href="/login" className="app-button app-button-primary">
-                    登录
-                  </Link>
-                }
-              />
-            ) : liveRuns.length === 0 ? (
-              <EmptyState
-                title="当前没有进行中的研究"
-                description="可以从行业研究页直接输入问题，或从筛选结果继续推进。"
-              />
-            ) : (
-              <div className="grid gap-4">
-                {liveRuns.slice(0, 4).map((run) => (
-                  <article
-                    key={run.id}
-                    className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-5 py-5"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <StatusPill
-                            label={getTemplateLabel(run.templateCode)}
-                            tone="info"
-                          />
-                          <StatusPill
-                            label={`${run.progressPercent}%`}
-                            tone={statusTone(run.status)}
-                          />
-                        </div>
-                        <div className="mt-4 text-xl leading-tight text-[var(--app-text-strong)]">
-                          {run.query}
-                        </div>
-                        <div className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
-                          {run.currentNodeKey ?? "等待结果更新"}
-                        </div>
-                      </div>
-                      <div className="text-xs uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-                        {formatDate(run.createdAt)}
-                      </div>
-                    </div>
-                    <ProgressBar
-                      value={run.progressPercent}
-                      tone={statusTone(run.status)}
-                      className="mt-5"
-                    />
-                    <div className="mt-4">
-                      <Link
-                        href={buildRunDetailHref({
-                          runId: run.id,
-                          templateCode: run.templateCode,
-                        })}
-                        className="app-button app-button-primary"
-                      >
-                        继续处理
-                      </Link>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-
-          <SectionCard
-            title="最近结论"
-            actions={
-              <Link href="/timing" className="app-button">
-                查看组合建议
-              </Link>
-            }
-          >
-            {!signedIn ? (
-              <EmptyState title="登录后查看最新结论" />
-            ) : latestRecommendations.length === 0 ? (
-              <EmptyState title="还没有新的组合建议" />
-            ) : (
-              <div className="grid gap-4">
-                {latestRecommendations.map((item) => (
-                  <article
-                    key={item.id}
-                    className="border border-[var(--app-border-soft)] bg-[var(--app-surface)] px-5 py-5"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusPill
-                        label={actionLabelMap[item.action] ?? item.action}
-                        tone="success"
-                      />
-                      <StatusPill
-                        label={`优先级 ${item.priority}`}
-                        tone="warning"
-                      />
-                    </div>
-                    <div className="mt-4 text-xl leading-tight text-[var(--app-text-strong)]">
-                      {item.stockName} · {item.stockCode}
-                    </div>
-                    <div className="mt-2 text-sm leading-6 text-[var(--app-text-muted)]">
-                      {formatTimingNarrative(item.reasoning.actionRationale)}
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs uppercase tracking-[0.14em] text-[var(--app-text-subtle)]">
-                      <span>
-                        建议区间 {formatPct(item.suggestedMinPct)} 至{" "}
-                        {formatPct(item.suggestedMaxPct)}
-                      </span>
-                      <Link
-                        href="/timing/history"
-                        className="app-button app-button-primary"
-                      >
-                        查看报告历史
-                      </Link>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </SectionCard>
-        </div>
+        {signedIn ? <MarketContextSection section="home" /> : null}
       </WorkspaceShell>
     </HydrateClient>
   );
