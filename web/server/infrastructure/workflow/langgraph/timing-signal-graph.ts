@@ -1,7 +1,5 @@
 import { Annotation, StateGraph } from "@langchain/langgraph";
-import type { KronosForecastWorkflowService } from "~/server/application/timing/kronos-forecast-workflow-service";
-import type { TimingAnalysisService } from "~/server/application/timing/timing-analysis-service";
-import { resolveTimingPresetConfig } from "~/server/domain/timing/preset";
+import type { TimingRuleAnalysisService } from "~/server/application/timing/timing-rule-analysis-service";
 import type {
   TimingSignalPipelineGraphState,
   TimingSignalPipelineInput,
@@ -14,7 +12,7 @@ import {
   TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
 } from "~/server/domain/workflow/types";
 import type { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
-import type { PrismaTimingPresetRepository } from "~/server/infrastructure/timing/prisma-timing-preset-repository";
+import type { PrismaTimingPresetRevisionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-revision-repository";
 import type { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
 import type { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
 import type { WorkflowGraphBuildInitialStateParams } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
@@ -24,6 +22,23 @@ import {
   addSequentialEdges,
   addWorkflowNodes,
 } from "~/server/infrastructure/workflow/langgraph/workflow-graph-builder";
+import type { TimingPresetConfigV2, TimingTimeframe } from "~/server/domain/timing/types";
+
+function collectIndicatorIds(config: TimingPresetConfigV2) {
+  return [...new Set(config.ruleGroups.flatMap((group) =>
+    group.rules.filter((rule) => rule.enabled).map((rule) => rule.indicatorId),
+  ))];
+}
+
+function collectTimeframes(config: TimingPresetConfigV2) {
+  return [...new Set([
+    ...config.timeframePlan.contextTimeframes,
+    config.timeframePlan.decisionTimeframe,
+    config.timeframePlan.executionTimeframe,
+    config.timeframePlan.fallbackExecutionTimeframe,
+    ...config.ruleGroups.flatMap((group) => group.rules.map((rule) => rule.timeframe)),
+  ].filter((item): item is TimingTimeframe => Boolean(item)))];
+}
 
 const WorkflowState = Annotation.Root({
   runId: Annotation<string>,
@@ -33,7 +48,7 @@ const WorkflowState = Annotation.Root({
   resumeFromNodeKey: Annotation<WorkflowNodeKey | undefined>,
   currentNodeKey: Annotation<TimingSignalPipelineNodeKey | undefined>,
   timingInput: Annotation<TimingSignalPipelineInput>,
-  preset: Annotation<TimingSignalPipelineGraphState["preset"]>,
+  revision: Annotation<TimingSignalPipelineGraphState["revision"]>,
   presetConfig: Annotation<TimingSignalPipelineGraphState["presetConfig"]>,
   targets: Annotation<TimingSignalPipelineGraphState["targets"]>,
   signalSnapshots: Annotation<
@@ -67,24 +82,24 @@ export class TimingSignalPipelineLangGraph extends BaseWorkflowLangGraph<
 
   constructor(deps: {
     timingDataClient: PythonTimingDataClient;
-    analysisService: TimingAnalysisService;
-    presetRepository: PrismaTimingPresetRepository;
+    analysisService: TimingRuleAnalysisService;
+    revisionRepository: PrismaTimingPresetRevisionRepository;
     signalSnapshotRepository: PrismaTimingSignalSnapshotRepository;
     analysisCardRepository: PrismaTimingAnalysisCardRepository;
-    kronosForecastWorkflowService?: KronosForecastWorkflowService;
   }) {
     const nodeExecutors: Record<TimingSignalPipelineNodeKey, NodeExecutor> = {
       load_targets: async (state) => {
-        const preset = state.timingInput.presetId
-          ? await deps.presetRepository.getByIdForUser(
-              state.userId,
-              state.timingInput.presetId,
-            )
-          : null;
+        const revision = await deps.revisionRepository.getRevision(
+          state.userId,
+          state.timingInput.revisionId,
+        );
+        if (!revision || revision.status !== "PUBLISHED") {
+          throw new Error("择时运行必须引用已发布策略修订。");
+        }
 
         return {
-          preset: preset ?? undefined,
-          presetConfig: resolveTimingPresetConfig(preset?.config),
+          revision,
+          presetConfig: revision.config,
           targets: [
             {
               stockCode: state.timingInput.stockCode,
@@ -93,56 +108,35 @@ export class TimingSignalPipelineLangGraph extends BaseWorkflowLangGraph<
         };
       },
       fetch_signal_snapshots: async (state) => {
-        const snapshot = await deps.timingDataClient.getSignal({
-          stockCode: state.timingInput.stockCode,
+        if (!state.revision) throw new Error("策略修订尚未加载。");
+        const response = await deps.timingDataClient.getEvidenceBatch({
+          stockCodes: [state.timingInput.stockCode],
           asOfDate: state.timingInput.asOfDate,
-          includeBars: true,
+          timeframes: collectTimeframes(state.revision.config),
+          indicatorIds: collectIndicatorIds(state.revision.config),
         });
+        const snapshot = response.items[0];
+        if (!snapshot) throw new Error(response.errors[0]?.message ?? "未返回择时证据。");
 
         return {
           signalSnapshots: [snapshot],
           batchErrors: [],
         };
       },
-      technical_signal_agent: async (state) => ({
-        technicalAssessments: deps.analysisService.buildTechnicalAssessments(
-          state.signalSnapshots,
-          state.presetConfig,
-        ),
-      }),
+      technical_signal_agent: async () => ({ technicalAssessments: [] }),
       timing_synthesis_agent: async (state) => ({
-        cards: deps.analysisService.buildCards({
+        cards: state.revision ? deps.analysisService.buildCards({
           userId: state.userId,
           workflowRunId: state.runId,
           sourceType: "single",
           sourceId: state.timingInput.stockCode,
-          presetId: state.preset?.id,
-          presetConfig: state.presetConfig,
-          signalSnapshots: state.signalSnapshots,
-          technicalAssessments: state.technicalAssessments,
-        }),
+          revision: state.revision,
+          evidence: state.signalSnapshots,
+          marketState: "NEUTRAL",
+        }) : [],
       }),
       kronos_forecast_agent: async (state) => {
-        if (!deps.kronosForecastWorkflowService) {
-          return {
-            cards: state.cards,
-            errors: ["kronos:Kronos 预测服务未配置。"],
-          };
-        }
-
-        const result = await deps.kronosForecastWorkflowService.enrichCards({
-          userId: state.userId,
-          workflowRunId: state.runId,
-          sourceType: "single",
-          sourceId: state.timingInput.stockCode,
-          cards: state.cards,
-          signalSnapshots: state.signalSnapshots,
-        });
-
-        return {
-          cards: result.cards,
-          errors: result.warnings.map((warning) => `kronos:${warning}`),
-        };
+        return { cards: state.cards };
       },
       persist_cards: async (state) => {
         const persistedSignalSnapshots =
@@ -151,6 +145,7 @@ export class TimingSignalPipelineLangGraph extends BaseWorkflowLangGraph<
             workflowRunId: state.runId,
             sourceType: "single",
             sourceId: state.timingInput.stockCode,
+            presetRevisionId: state.revision?.id,
             items: state.signalSnapshots,
           });
 
@@ -207,7 +202,7 @@ export class TimingSignalPipelineLangGraph extends BaseWorkflowLangGraph<
       currentNodeKey: undefined,
       lastCompletedNodeKey: undefined,
       timingInput: params.input as TimingSignalPipelineInput,
-      preset: undefined,
+      revision: undefined,
       presetConfig: undefined,
       targets: [],
       signalSnapshots: [],

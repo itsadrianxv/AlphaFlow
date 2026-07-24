@@ -1,3 +1,4 @@
+import type { EvidenceCitation } from "~/server/domain/evidence-context/types";
 import type { ConfidenceAnalysis } from "~/server/domain/intelligence/confidence";
 import type {
   CompanyEvidence,
@@ -15,13 +16,16 @@ import type {
   TimingFeedbackContext,
   TimingPresetAdjustmentSuggestionRecord,
   TimingPresetConfig,
+  TimingPresetConfigV2,
   TimingPresetRecord,
+  TimingPresetRevisionRecord,
   TimingRecommendationDraft,
   TimingRecommendationRecord,
   TimingReviewCompletionDraft,
   TimingReviewRecord,
   TimingSignalBatchError,
   TimingSignalData,
+  TimingEvidenceData,
   TimingSignalSnapshotRecord,
 } from "~/server/domain/timing/types";
 import type {
@@ -352,6 +356,7 @@ export type IndustryResearchResultDto = {
   credibility: IndustryResearchCredibility[];
   topPicks: IndustryResearchTopPick[];
   competitionSummary: string;
+  evidenceCitations?: EvidenceCitation[];
   fullReportMarkdown?: string;
   confidenceAnalysis?: ConfidenceAnalysis;
   brief?: ResearchBriefV2;
@@ -537,6 +542,7 @@ export type CompanyResearchResultDto = {
   evidence: CompanyEvidenceNote[];
   references: CompanyResearchReferenceItem[];
   verdict: CompanyResearchVerdict;
+  evidenceCitations?: EvidenceCitation[];
   collectionSummary: CompanyResearchCollectionSummary;
   crawler: {
     provider: "tavily" | "firecrawl";
@@ -598,21 +604,24 @@ export type ScreeningInsightPipelineInput = {
 
 export type TimingSignalPipelineInput = {
   stockCode: string;
+  revisionId: string;
+  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
   asOfDate?: string;
-  presetId?: string;
 };
 
 export type WatchlistTimingCardsPipelineInput = {
   watchListId: string;
+  revisionId: string;
+  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
   asOfDate?: string;
-  presetId?: string;
 };
 
 export type WatchlistTimingPipelineInput = {
   watchListId: string;
   portfolioSnapshotId: string;
+  revisionId: string;
+  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
   asOfDate?: string;
-  presetId?: string;
 };
 
 export type ScreeningToTimingPipelineInput = {
@@ -676,6 +685,7 @@ export type ScreeningInsightPipelineEvidenceBundle = {
   factsBundle: Record<string, unknown>;
   evidenceRefs: Record<string, unknown>[];
   evidence: Record<string, unknown> | null;
+  evidenceCitations?: EvidenceCitation[];
 };
 
 export type ScreeningInsightPipelineInsightCard = {
@@ -694,6 +704,7 @@ export type ScreeningInsightPipelineInsightCard = {
   catalysts: Record<string, unknown>[];
   reviewPlan: Record<string, unknown>;
   evidenceRefs: Record<string, unknown>[];
+  evidenceCitations?: EvidenceCitation[];
   confidenceAnalysis?: ConfidenceAnalysis;
   confidenceScore?: number | null;
   confidenceLevel?: ConfidenceAnalysis["level"];
@@ -743,10 +754,10 @@ export type TimingSignalPipelineGraphState = WorkflowGraphState & {
   currentNodeKey?: TimingSignalPipelineNodeKey;
   lastCompletedNodeKey?: TimingSignalPipelineNodeKey;
   timingInput: TimingSignalPipelineInput;
-  preset?: TimingPresetRecord;
-  presetConfig?: TimingPresetConfig;
+  revision?: TimingPresetRevisionRecord;
+  presetConfig?: TimingPresetConfigV2;
   targets: TimingPipelineTarget[];
-  signalSnapshots: TimingSignalData[];
+  signalSnapshots: TimingEvidenceData[];
   technicalAssessments: TechnicalAssessment[];
   cards: TimingCardDraft[];
   persistedSignalSnapshots: TimingSignalSnapshotRecord[];
@@ -758,11 +769,11 @@ export type WatchlistTimingCardsPipelineGraphState = WorkflowGraphState & {
   currentNodeKey?: WatchlistTimingCardsPipelineNodeKey;
   lastCompletedNodeKey?: WatchlistTimingCardsPipelineNodeKey;
   timingInput: WatchlistTimingCardsPipelineInput;
-  preset?: TimingPresetRecord;
-  presetConfig?: TimingPresetConfig;
+  revision?: TimingPresetRevisionRecord;
+  presetConfig?: TimingPresetConfigV2;
   watchlist?: TimingWatchlistContext;
   targets: TimingPipelineTarget[];
-  signalSnapshots: TimingSignalData[];
+  signalSnapshots: TimingEvidenceData[];
   technicalAssessments: TechnicalAssessment[];
   cards: TimingCardDraft[];
   persistedSignalSnapshots: TimingSignalSnapshotRecord[];
@@ -774,12 +785,12 @@ export type WatchlistTimingPipelineGraphState = WorkflowGraphState & {
   currentNodeKey?: WatchlistTimingPipelineNodeKey;
   lastCompletedNodeKey?: WatchlistTimingPipelineNodeKey;
   timingInput: WatchlistTimingPipelineInput;
-  preset?: TimingPresetRecord;
-  presetConfig?: TimingPresetConfig;
+  revision?: TimingPresetRevisionRecord;
+  presetConfig?: TimingPresetConfigV2;
   watchlist?: TimingWatchlistContext;
   portfolioSnapshot?: PortfolioSnapshotRecord;
   targets: TimingPipelineTarget[];
-  signalSnapshots: TimingSignalData[];
+  signalSnapshots: TimingEvidenceData[];
   technicalAssessments: TechnicalAssessment[];
   cards: TimingCardDraft[];
   marketContextSnapshot?: MarketContextSnapshot;

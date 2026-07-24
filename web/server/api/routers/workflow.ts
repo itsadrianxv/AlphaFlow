@@ -68,34 +68,30 @@ function mapWorkflowError(error: unknown): TRPCError {
   });
 }
 
-async function assertTimingPresetExists(params: {
+async function assertPublishedTimingRevision(params: {
   db: typeof import("~/server/db").db;
   userId: string;
-  presetId?: string;
+  revisionId: string;
 }) {
-  if (!params.presetId) {
-    return null;
-  }
-
-  const preset = await params.db.timingPreset.findFirst({
+  const revision = await params.db.timingPresetRevision.findFirst({
     where: {
-      id: params.presetId,
+      id: params.revisionId,
       userId: params.userId,
+      status: "PUBLISHED",
     },
     select: {
       id: true,
-      name: true,
     },
   });
 
-  if (!preset) {
+  if (!revision) {
     throw new TRPCError({
       code: "NOT_FOUND",
-      message: "Timing preset 不存在",
+      message: "已发布择时策略修订不存在",
     });
   }
 
-  return preset;
+  return revision;
 }
 
 const startIndustryResearchInput = z.object({
@@ -199,7 +195,10 @@ const startTimingSignalPipelineInput = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  presetId: z.string().cuid().optional(),
+  revisionId: z.string().cuid(),
+  analysisDateMode: z
+    .enum(["LATEST_COMPLETE", "CURRENT_PARTIAL", "EXPLICIT"])
+    .default("LATEST_COMPLETE"),
   targetRef: z
     .object({
       type: z.enum([
@@ -223,7 +222,10 @@ const startWatchlistTimingCardsPipelineInput = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  presetId: z.string().cuid().optional(),
+  revisionId: z.string().cuid(),
+  analysisDateMode: z
+    .enum(["LATEST_COMPLETE", "CURRENT_PARTIAL", "EXPLICIT"])
+    .default("LATEST_COMPLETE"),
   targetRef: z
     .object({
       type: z.enum([
@@ -250,7 +252,10 @@ const startWatchlistTimingPipelineInput = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
-  presetId: z.string().cuid().optional(),
+  revisionId: z.string().cuid(),
+  analysisDateMode: z
+    .enum(["LATEST_COMPLETE", "CURRENT_PARTIAL", "EXPLICIT"])
+    .default("LATEST_COMPLETE"),
   targetRef: z
     .object({
       type: z.enum([
@@ -420,10 +425,10 @@ export const workflowRouter = createTRPCRouter({
     .input(startTimingSignalPipelineInput)
     .mutation(async ({ ctx, input }) => {
       try {
-        await assertTimingPresetExists({
+        await assertPublishedTimingRevision({
           db: ctx.db,
           userId: ctx.session.user.id,
-          presetId: input.presetId,
+          revisionId: input.revisionId,
         });
 
         const repository = new PrismaWorkflowRunRepository(ctx.db);
@@ -434,7 +439,8 @@ export const workflowRouter = createTRPCRouter({
           stockCode: input.stockCode,
           targetRef: input.targetRef,
           asOfDate: input.asOfDate,
-          presetId: input.presetId,
+          revisionId: input.revisionId,
+          analysisDateMode: input.analysisDateMode,
           templateVersion: input.templateVersion,
           idempotencyKey: input.idempotencyKey,
         });
@@ -458,10 +464,10 @@ export const workflowRouter = createTRPCRouter({
               name: true,
             },
           }),
-          assertTimingPresetExists({
+          assertPublishedTimingRevision({
             db: ctx.db,
             userId: ctx.session.user.id,
-            presetId: input.presetId,
+            revisionId: input.revisionId,
           }),
         ]);
 
@@ -480,7 +486,8 @@ export const workflowRouter = createTRPCRouter({
           watchListId: input.watchListId,
           targetRef: input.targetRef,
           asOfDate: input.asOfDate,
-          presetId: input.presetId,
+          revisionId: input.revisionId,
+          analysisDateMode: input.analysisDateMode,
           watchListName: watchList.name,
           templateVersion: input.templateVersion,
           idempotencyKey: input.idempotencyKey,
@@ -519,10 +526,10 @@ export const workflowRouter = createTRPCRouter({
               name: true,
             },
           }),
-          assertTimingPresetExists({
+          assertPublishedTimingRevision({
             db: ctx.db,
             userId: ctx.session.user.id,
-            presetId: input.presetId,
+            revisionId: input.revisionId,
           }),
         ]);
 
@@ -549,7 +556,8 @@ export const workflowRouter = createTRPCRouter({
           portfolioSnapshotId: input.portfolioSnapshotId,
           targetRef: input.targetRef,
           asOfDate: input.asOfDate,
-          presetId: input.presetId,
+          revisionId: input.revisionId,
+          analysisDateMode: input.analysisDateMode,
           watchListName: watchList.name,
           portfolioSnapshotName: portfolioSnapshot.name,
           templateVersion: input.templateVersion,

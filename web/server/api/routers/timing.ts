@@ -4,17 +4,29 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { MarketRegimeService } from "~/server/application/timing/market-regime-service";
 import { applyTimingPresetPatch } from "~/server/application/timing/timing-feedback-service";
 import { TimingReportService } from "~/server/application/timing/timing-report-service";
-import { createTimingPresetConfigV2, validateTimingPresetConfigV2 } from "~/server/domain/timing/strategy-v2";
-import type { TimingPresetConfigV2 } from "~/server/domain/timing/types";
+import {
+  evaluateTimingBacktestQuality,
+  simulateTimingBacktestExecution,
+  summarizeTimingBacktestPerformance,
+} from "~/server/domain/timing/services/timing-backtest-policy";
+import {
+  createTimingPresetConfigV2,
+  validateTimingPresetConfigV2,
+} from "~/server/domain/timing/strategy-v2";
+import type {
+  TimingPresetConfigV2,
+  TimingTimeframe,
+} from "~/server/domain/timing/types";
+import { PrismaWatchListRepository } from "~/server/infrastructure/screening/prisma-watch-list-repository";
 import { PrismaPortfolioSnapshotRepository } from "~/server/infrastructure/timing/prisma-portfolio-snapshot-repository";
 import { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
+import { PrismaTimingBacktestRepository } from "~/server/infrastructure/timing/prisma-timing-backtest-repository";
+import { PrismaTimingExecutionRecordRepository } from "~/server/infrastructure/timing/prisma-timing-execution-record-repository";
 import { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
 import { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
 import { PrismaTimingPresetAdjustmentSuggestionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-adjustment-suggestion-repository";
 import { PrismaTimingPresetRepository } from "~/server/infrastructure/timing/prisma-timing-preset-repository";
 import { PrismaTimingPresetRevisionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-revision-repository";
-import { PrismaTimingBacktestRepository } from "~/server/infrastructure/timing/prisma-timing-backtest-repository";
-import { PrismaTimingExecutionRecordRepository } from "~/server/infrastructure/timing/prisma-timing-execution-record-repository";
 import { PrismaTimingRecommendationRepository } from "~/server/infrastructure/timing/prisma-timing-recommendation-repository";
 import { PrismaTimingReviewRecordRepository } from "~/server/infrastructure/timing/prisma-timing-review-record-repository";
 import { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
@@ -216,7 +228,9 @@ const timingPresetConfigV2Input = z.custom<TimingPresetConfigV2>(
       return false;
     }
     try {
-      return validateTimingPresetConfigV2(value as TimingPresetConfigV2).length === 0;
+      return (
+        validateTimingPresetConfigV2(value as TimingPresetConfigV2).length === 0
+      );
     } catch {
       return false;
     }
@@ -247,6 +261,52 @@ const updateTimingStrategyDraftInput = z.object({
 
 const revisionIdInput = z.object({ revisionId: z.string().cuid() });
 
+const timingRunPreflightInput = z.object({
+  revisionId: z.string().cuid(),
+  watchListId: z.string().uuid(),
+  portfolioSnapshotId: z.string().cuid().optional(),
+  analysisDateMode: z
+    .enum(["LATEST_COMPLETE", "CURRENT_PARTIAL", "EXPLICIT"])
+    .default("LATEST_COMPLETE"),
+  asOfDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
+const runTimingBacktestInput = z.object({
+  revisionId: z.string().cuid(),
+  watchListId: z.string().uuid(),
+});
+
+function collectTimingIndicatorIds(config: TimingPresetConfigV2) {
+  return [
+    ...new Set(
+      config.ruleGroups.flatMap((group) =>
+        group.rules
+          .filter((rule) => rule.enabled)
+          .map((rule) => rule.indicatorId),
+      ),
+    ),
+  ];
+}
+
+function collectTimingTimeframes(config: TimingPresetConfigV2) {
+  return [
+    ...new Set(
+      [
+        ...config.timeframePlan.contextTimeframes,
+        config.timeframePlan.decisionTimeframe,
+        config.timeframePlan.executionTimeframe,
+        config.timeframePlan.fallbackExecutionTimeframe,
+        ...config.ruleGroups.flatMap((group) =>
+          group.rules.map((rule) => rule.timeframe),
+        ),
+      ].filter((item): item is TimingTimeframe => Boolean(item)),
+    ),
+  ];
+}
+
 const createTimingExecutionRecordInput = z
   .object({
     revisionId: z.string().cuid(),
@@ -269,6 +329,115 @@ export const timingRouter = createTRPCRouter({
       ctx.session.user.id,
     );
   }),
+
+  getTimingRunPreflight: protectedProcedure
+    .input(timingRunPreflightInput)
+    .query(async ({ ctx, input }) => {
+      const [revision, watchList, portfolio] = await Promise.all([
+        new PrismaTimingPresetRevisionRepository(ctx.db).getRevision(
+          ctx.session.user.id,
+          input.revisionId,
+        ),
+        new PrismaWatchListRepository(ctx.db).findById(input.watchListId),
+        input.portfolioSnapshotId
+          ? new PrismaPortfolioSnapshotRepository(ctx.db).getByIdForUser(
+              ctx.session.user.id,
+              input.portfolioSnapshotId,
+            )
+          : Promise.resolve(null),
+      ]);
+      if (!revision || revision.status !== "PUBLISHED") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "数据预检必须引用已发布策略修订",
+        });
+      }
+      if (!watchList || watchList.userId !== ctx.session.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "自选股列表不存在" });
+      }
+      if (input.portfolioSnapshotId && !portfolio) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "组合快照不存在" });
+      }
+
+      const targets = new Map(
+        watchList.stocks.map((stock) => [
+          stock.stockCode.value,
+          { stockCode: stock.stockCode.value, stockName: stock.stockName },
+        ]),
+      );
+      for (const position of portfolio?.positions ?? []) {
+        targets.set(position.stockCode, {
+          stockCode: position.stockCode,
+          stockName: position.stockName,
+        });
+      }
+      const response = targets.size
+        ? await new PythonTimingDataClient().getEvidenceBatch({
+            stockCodes: [...targets.keys()],
+            asOfDate: input.asOfDate,
+            timeframes: collectTimingTimeframes(revision.config),
+            indicatorIds: collectTimingIndicatorIds(revision.config),
+          })
+        : { items: [], errors: [] };
+      const primaryRules = revision.config.ruleGroups
+        .filter((group) => group.role === "PRIMARY")
+        .flatMap((group) => group.rules.filter((rule) => rule.enabled));
+      const vetoRules = revision.config.ruleGroups
+        .filter((group) => group.role === "VETO")
+        .flatMap((group) => group.rules.filter((rule) => rule.enabled));
+      const items = response.items.map((evidence) => {
+        const find = (indicatorId: string, timeframe: TimingTimeframe) =>
+          evidence.features.find(
+            (feature) =>
+              feature.indicatorId === indicatorId &&
+              feature.timeframe === timeframe,
+          );
+        const missingPrimary = primaryRules
+          .filter(
+            (rule) =>
+              find(rule.indicatorId, rule.timeframe)?.status !== "AVAILABLE",
+          )
+          .map((rule) => rule.name);
+        const unresolvedVetos = vetoRules
+          .filter(
+            (rule) =>
+              find(rule.indicatorId, rule.timeframe)?.status !== "AVAILABLE",
+          )
+          .map((rule) => rule.name);
+        return {
+          stockCode: evidence.stockCode,
+          stockName: evidence.stockName,
+          asOfDate: evidence.asOfDate,
+          primaryComplete: missingPrimary.length === 0,
+          vetoRiskResolved: unresolvedVetos.length === 0,
+          missingPrimary,
+          unresolvedVetos,
+          warnings: evidence.warnings,
+          dataManifest: evidence.dataManifest,
+          inputHash: evidence.inputHash,
+        };
+      });
+      const returnedCodes = new Set(items.map((item) => item.stockCode));
+      const missingTargets = [...targets.values()]
+        .filter((target) => !returnedCodes.has(target.stockCode))
+        .map((target) => target.stockCode);
+      const complete =
+        missingTargets.length === 0 &&
+        response.errors.length === 0 &&
+        items.every((item) => item.primaryComplete && item.vetoRiskResolved);
+
+      return {
+        revisionId: revision.id,
+        configHash: revision.configHash,
+        analysisDateMode: input.analysisDateMode,
+        analysisDate: items.map((item) => item.asOfDate).sort()[0] ?? null,
+        complete,
+        canRun: complete || input.analysisDateMode === "CURRENT_PARTIAL",
+        items,
+        missingTargets,
+        errors: response.errors,
+      };
+    }),
 
   createTimingStrategy: protectedProcedure
     .input(createTimingStrategyInput)
@@ -329,6 +498,221 @@ export const timingRouter = createTRPCRouter({
       );
     }),
 
+  runTimingBacktest: protectedProcedure
+    .input(runTimingBacktestInput)
+    .mutation(async ({ ctx, input }) => {
+      const revisionRepository = new PrismaTimingPresetRevisionRepository(
+        ctx.db,
+      );
+      const revision = await revisionRepository.getRevision(
+        ctx.session.user.id,
+        input.revisionId,
+      );
+      const watchList = await new PrismaWatchListRepository(ctx.db).findById(
+        input.watchListId,
+      );
+      if (!revision) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "策略修订不存在" });
+      }
+      if (!watchList || watchList.userId !== ctx.session.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "自选股列表不存在" });
+      }
+      if (revision.status !== "DRAFT" && revision.status !== "VALIDATING") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "仅草稿或验证中的修订可发起发布前回放",
+        });
+      }
+
+      if (revision.status === "DRAFT") {
+        await revisionRepository.markValidating(
+          ctx.session.user.id,
+          revision.id,
+        );
+      }
+      const repository = new PrismaTimingBacktestRepository(ctx.db);
+      const run = await repository.create({
+        userId: ctx.session.user.id,
+        presetRevisionId: revision.id,
+        watchListId: input.watchListId,
+        configHash: revision.configHash,
+        stockCodes: watchList.stocks.map((stock) => stock.stockCode.value),
+        config: revision.config,
+      });
+
+      try {
+        const cards = await ctx.db.timingAnalysisCard.findMany({
+          where: {
+            userId: ctx.session.user.id,
+            presetRevisionId: revision.id,
+            watchListId: input.watchListId,
+          },
+          include: { signalSnapshot: true },
+          orderBy: { createdAt: "desc" },
+          take: 500,
+        });
+        const audits = cards
+          .map((card) => ({
+            card,
+            audit: card.decisionAudit as
+              | import("~/server/domain/timing/types").TimingDecisionAudit
+              | null,
+          }))
+          .filter(
+            (
+              item,
+            ): item is typeof item & {
+              audit: import("~/server/domain/timing/types").TimingDecisionAudit;
+            } => Boolean(item.audit),
+          );
+        const dates = audits
+          .map((item) => item.card.signalSnapshot.asOfDate)
+          .sort((left, right) => left.getTime() - right.getTime());
+        const coveredMonths =
+          dates.length > 1
+            ? Math.floor(
+                ((dates.at(-1)?.getTime() ?? 0) - (dates[0]?.getTime() ?? 0)) /
+                  (30.4375 * 24 * 60 * 60 * 1000),
+              )
+            : 0;
+        const stockCount = new Set(audits.map((item) => item.card.stockCode))
+          .size;
+        const primaryEvaluations = audits.flatMap((item) =>
+          item.audit.ruleEvaluations.filter((rule) => rule.role === "PRIMARY"),
+        );
+        const primaryCompletenessPct = primaryEvaluations.length
+          ? (primaryEvaluations.filter(
+              (rule) => rule.status === "PASSED" || rule.status === "FAILED",
+            ).length /
+              primaryEvaluations.length) *
+            100
+          : 0;
+        const noLookaheadPassed = audits.every((item) => {
+          const signalDate = item.card.signalSnapshot.asOfDate
+            .toISOString()
+            .slice(0, 10);
+          return item.audit.ruleEvaluations.every(
+            (rule) => !rule.asOfDate || rule.asOfDate <= signalDate,
+          );
+        });
+        const triggered = audits.filter(
+          (item) =>
+            item.audit.status === "TRIGGERED" &&
+            item.audit.finalAction &&
+            ["PROBE", "ENTER", "ADD", "TRIM", "EXIT"].includes(
+              item.audit.finalAction,
+            ),
+        );
+        const dataClient = new PythonTimingDataClient();
+        const maxReviewDays = Math.max(
+          ...revision.config.reviewTradingDays,
+          20,
+        );
+        const events = [];
+        const results = [];
+        for (const item of triggered) {
+          const signalDate = item.card.signalSnapshot.asOfDate
+            .toISOString()
+            .slice(0, 10);
+          const end = new Date(item.card.signalSnapshot.asOfDate);
+          end.setUTCDate(
+            end.getUTCDate() + Math.ceil(maxReviewDays * 1.7) + 10,
+          );
+          const bars = await dataClient.getBars({
+            stockCode: item.card.stockCode,
+            start: signalDate,
+            end: end.toISOString().slice(0, 10),
+          });
+          const futureBars = bars.bars.filter(
+            (bar) => bar.tradeDate > signalDate,
+          );
+          const next = futureBars[0];
+          const exit =
+            futureBars[Math.min(maxReviewDays - 1, futureBars.length - 1)];
+          if (!next || !exit || !item.audit.finalAction) {
+            events.push({
+              cardId: item.card.id,
+              inputHash: item.card.signalSnapshot.inputHash,
+              decisionAudit: item.audit,
+              warning: "缺少次日或退出日行情，事件未模拟成交。",
+            });
+            continue;
+          }
+          const result = simulateTimingBacktestExecution(
+            {
+              action: item.audit.finalAction,
+              signalDate,
+              nextTradingDay: {
+                tradeDate: next.tradeDate,
+                open: next.open,
+              },
+              exitBar: {
+                tradeDate: exit.tradeDate,
+                close: exit.close,
+                high: Math.max(
+                  ...futureBars.slice(0, maxReviewDays).map((bar) => bar.high),
+                ),
+                low: Math.min(
+                  ...futureBars.slice(0, maxReviewDays).map((bar) => bar.low),
+                ),
+              },
+            },
+            revision.config.backtestPolicy,
+          );
+          results.push(result);
+          events.push({
+            cardId: item.card.id,
+            stockCode: item.card.stockCode,
+            inputHash: item.card.signalSnapshot.inputHash,
+            dataManifest: item.card.signalSnapshot.dataManifest,
+            decisionAudit: item.audit,
+            signalDate,
+            nextTradingDay: next,
+            exitBar: exit,
+            result,
+          });
+        }
+        const quality = evaluateTimingBacktestQuality({
+          config: revision.config,
+          coveredMonths,
+          stockCount,
+          triggeredEvents: triggered.length,
+          primaryCompletenessPct,
+          noLookaheadPassed,
+        });
+        const warnings = [
+          "回放基于当前自选股冻结成分，属于样本内验证并存在幸存偏差。",
+          "冻结事件缺少竞价VWAP时使用下一交易日开盘价成交。",
+          "基准行情尚未纳入冻结事件时，超额收益以0基准降级计算。",
+          ...(cards.length === 500
+            ? [
+                "冻结卡片超过500条，本次仅回放最近500条，质量门禁结果不应视为完整样本。",
+              ]
+            : []),
+        ];
+        return repository.complete({
+          id: run.id,
+          quality:
+            cards.length === 500
+              ? {
+                  ...quality,
+                  gatePassed: false,
+                  failures: [...quality.failures, "样本被截断。"],
+                }
+              : quality,
+          performance: summarizeTimingBacktestPerformance(results),
+          events,
+          warnings,
+        });
+      } catch (error) {
+        await repository.fail(
+          run.id,
+          error instanceof Error ? error.message : "回放执行失败",
+        );
+        throw error;
+      }
+    }),
+
   publishTimingStrategyRevision: protectedProcedure
     .input(revisionIdInput)
     .mutation(async ({ ctx, input }) => {
@@ -383,14 +767,16 @@ export const timingRouter = createTRPCRouter({
           where: { id: input.analysisCardId, userId: ctx.session.user.id },
           select: { id: true },
         });
-        if (!card) throw new TRPCError({ code: "NOT_FOUND", message: "择时卡片不存在" });
+        if (!card)
+          throw new TRPCError({ code: "NOT_FOUND", message: "择时卡片不存在" });
       }
       if (input.recommendationId) {
         const recommendation = await ctx.db.timingRecommendation.findFirst({
           where: { id: input.recommendationId, userId: ctx.session.user.id },
           select: { id: true },
         });
-        if (!recommendation) throw new TRPCError({ code: "NOT_FOUND", message: "组合建议不存在" });
+        if (!recommendation)
+          throw new TRPCError({ code: "NOT_FOUND", message: "组合建议不存在" });
       }
       return new PrismaTimingExecutionRecordRepository(ctx.db).create({
         userId: ctx.session.user.id,

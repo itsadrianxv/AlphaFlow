@@ -292,7 +292,38 @@ export type TimingFeatureEvidence = {
   status: "AVAILABLE" | "MISSING" | "STALE" | "OBSERVATION_ONLY";
   rawValue?: number | string | boolean | null;
   normalizedValue?: number | string | boolean | null;
+  inputValues?: Record<string, unknown>;
   warnings?: string[];
+};
+
+export type TimingDataManifestItem = {
+  dataset: string;
+  source: string;
+  timeframe?: TimingTimeframe | null;
+  dataDate?: string | null;
+  fetchedAt: string;
+  completeness: "COMPLETE" | "PARTIAL" | "MISSING" | "OBSERVATION_ONLY";
+  degradationReason?: string | null;
+  contentHash: string;
+  rowCount: number;
+};
+
+export type TimingEvidenceData = {
+  stockCode: string;
+  stockName: string;
+  asOfDate: string;
+  featureVersion: string;
+  features: TimingFeatureEvidence[];
+  barsByTimeframe: TimingBarsByTimeframe;
+  sourceRows: Record<string, Array<Record<string, unknown>>>;
+  dataManifest: TimingDataManifestItem[];
+  warnings: string[];
+  inputHash: string;
+};
+
+export type TimingEvidenceBatchData = {
+  items: TimingEvidenceData[];
+  errors: TimingSignalBatchError[];
 };
 
 export type TimingRuleEvaluation = {
@@ -625,6 +656,10 @@ export type TimingCardReasoning = {
   signalContext: TimingSignalReasoningContext;
   actionRationale: string;
   indicators: TimingIndicators;
+  decisionAudit?: TimingDecisionAudit;
+  dataManifest?: TimingDataManifestItem[];
+  featureEvidence?: TimingFeatureEvidence[];
+  inputHash?: string;
   kronosForecast?: TimingKronosForecastSummary;
   kronosForecasts?: Partial<
     Record<TimingTimeframe, TimingKronosForecastSummary>
@@ -648,6 +683,11 @@ export type TimingSignalSnapshotRecord = {
   barsByTimeframe?: TimingBarsByTimeframe;
   indicators: TimingIndicators;
   signalContext: TimingSignalContext;
+  presetRevisionId?: string | null;
+  featureEvidence?: TimingFeatureEvidence[];
+  dataManifest?: TimingDataManifestItem[];
+  featureVersion?: string | null;
+  inputHash?: string | null;
   createdAt: Date;
 };
 
@@ -657,6 +697,7 @@ export type TimingAnalysisCardRecord = {
   workflowRunId?: string | null;
   watchListId?: string | null;
   presetId?: string | null;
+  presetRevisionId?: string | null;
   stockCode: string;
   stockName: string;
   asOfDate?: string;
@@ -672,6 +713,8 @@ export type TimingAnalysisCardRecord = {
   invalidationNotes: string[];
   riskFlags: TimingRiskFlag[];
   reasoning: TimingCardReasoning;
+  decisionStatus?: TimingDecisionStatus | null;
+  decisionAudit?: TimingDecisionAudit | null;
   createdAt: Date;
   updatedAt: Date;
   signalSnapshot?: TimingSignalSnapshotRecord;
@@ -682,6 +725,7 @@ export type TimingCardDraft = {
   workflowRunId?: string;
   watchListId?: string;
   presetId?: string;
+  presetRevisionId?: string;
   stockCode: string;
   stockName: string;
   asOfDate: string;
@@ -696,6 +740,8 @@ export type TimingCardDraft = {
   invalidationNotes: string[];
   riskFlags: TimingRiskFlag[];
   reasoning: TimingCardReasoning;
+  decisionStatus?: TimingDecisionStatus;
+  decisionAudit?: TimingDecisionAudit;
 };
 
 export type PortfolioPosition = {
@@ -901,6 +947,10 @@ export type TimingRecommendationReasoning = {
   feedbackContext: TimingFeedbackContext;
   riskPlan: PortfolioRiskPlan;
   actionRationale: string;
+  decisionAudit?: TimingDecisionAudit;
+  dataManifest?: TimingDataManifestItem[];
+  featureEvidence?: TimingFeatureEvidence[];
+  inputHash?: string;
   kronosForecast?: TimingKronosForecastSummary;
   kronosWarnings?: string[];
   triggerConditions?: TimingExecutionCondition[];
@@ -915,6 +965,7 @@ export type TimingRecommendationRecord = {
   portfolioSnapshotId: string;
   watchListId: string;
   presetId?: string | null;
+  presetRevisionId?: string | null;
   stockCode: string;
   stockName: string;
   action: TimingAction;
@@ -926,6 +977,8 @@ export type TimingRecommendationRecord = {
   marketState: TimingMarketState;
   marketTransition: TimingMarketTransition;
   riskFlags: TimingRiskFlag[];
+  decisionStatus?: TimingDecisionStatus | null;
+  decisionAudit?: TimingDecisionAudit | null;
   reasoning: TimingRecommendationReasoning;
   createdAt: Date;
   updatedAt: Date;
@@ -937,6 +990,7 @@ export type TimingRecommendationDraft = {
   portfolioSnapshotId: string;
   watchListId: string;
   presetId?: string;
+  presetRevisionId?: string;
   stockCode: string;
   stockName: string;
   action: TimingAction;
@@ -948,6 +1002,8 @@ export type TimingRecommendationDraft = {
   marketState: TimingMarketState;
   marketTransition: TimingMarketTransition;
   riskFlags: TimingRiskFlag[];
+  decisionStatus?: TimingDecisionStatus;
+  decisionAudit?: TimingDecisionAudit;
   reasoning: TimingRecommendationReasoning;
 };
 
@@ -1006,6 +1062,7 @@ export type TimingReviewRecord = {
   stockName: string;
   sourceAsOfDate: string;
   reviewHorizon: TimingReviewHorizon;
+  reviewTradingDays: number;
   scheduledAt: Date;
   completedAt?: Date | null;
   expectedAction: TimingAction;
@@ -1028,6 +1085,7 @@ export type TimingReviewDraft = {
   stockName: string;
   sourceAsOfDate: string;
   reviewHorizon: TimingReviewHorizon;
+  reviewTradingDays: number;
   scheduledAt: Date;
   expectedAction: TimingAction;
 };

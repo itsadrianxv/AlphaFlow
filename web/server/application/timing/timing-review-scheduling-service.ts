@@ -25,6 +25,19 @@ function scheduleAtFromSourceDate(
   return result;
 }
 
+function legacyHorizon(tradingDays: number): TimingReviewHorizon {
+  if (tradingDays <= 5) return "T5";
+  if (tradingDays <= 10) return "T10";
+  return "T20";
+}
+
+function scheduleAtForTradingDays(sourceAsOfDate: string, tradingDays: number) {
+  const calendarDays = Math.max(1, Math.ceil((tradingDays * 7) / 5));
+  const base = new Date(`${sourceAsOfDate}T00:00:00.000Z`);
+  base.setUTCDate(base.getUTCDate() + calendarDays);
+  return base;
+}
+
 export type TimingReviewSchedulingServiceDependencies = {
   reviewRecordRepository: PrismaTimingReviewRecordRepository;
   reminderSchedulingService: ReminderSchedulingService;
@@ -64,6 +77,7 @@ export class TimingReviewSchedulingService {
           stockName: card.stockName,
           sourceAsOfDate,
           reviewHorizon: horizon,
+          reviewTradingDays: Number(horizon.slice(1)),
           scheduledAt: scheduleAtFromSourceDate(sourceAsOfDate, horizon),
           expectedAction: card.actionBias,
         });
@@ -93,10 +107,17 @@ export class TimingReviewSchedulingService {
     recommendations: TimingRecommendationRecord[];
     sourceAsOfDateByStockCode: Map<string, string>;
     presetConfig?: TimingPresetConfig;
+    reviewTradingDays?: number[];
   }) {
-    const horizons =
-      resolveTimingPresetConfig(params.presetConfig).reviewSchedule?.horizons ??
-      [];
+    const tradingDays =
+      params.reviewTradingDays !== undefined
+        ? [...new Set(params.reviewTradingDays)].filter(
+            (day) => Number.isInteger(day) && day >= 1 && day <= 120,
+          )
+        : (
+            resolveTimingPresetConfig(params.presetConfig).reviewSchedule
+              ?.horizons ?? []
+          ).map((horizon) => Number(horizon.slice(1)));
 
     const drafts: TimingReviewDraft[] = [];
     for (const recommendation of params.recommendations) {
@@ -108,15 +129,16 @@ export class TimingReviewSchedulingService {
         continue;
       }
 
-      for (const horizon of horizons) {
+      for (const days of tradingDays) {
         drafts.push({
           userId: recommendation.userId,
           recommendationId: recommendation.id,
           stockCode: recommendation.stockCode,
           stockName: recommendation.stockName,
           sourceAsOfDate,
-          reviewHorizon: horizon,
-          scheduledAt: scheduleAtFromSourceDate(sourceAsOfDate, horizon),
+          reviewHorizon: legacyHorizon(days),
+          reviewTradingDays: days,
+          scheduledAt: scheduleAtForTradingDays(sourceAsOfDate, days),
           expectedAction: recommendation.action,
         });
       }

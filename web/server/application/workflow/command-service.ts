@@ -66,7 +66,8 @@ export type StartTimingSignalPipelineCommand = {
   stockCode: string;
   targetRef?: { type: string; id: string };
   asOfDate?: string;
-  presetId?: string;
+  revisionId: string;
+  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
   templateVersion?: number;
   idempotencyKey?: string;
 };
@@ -76,7 +77,8 @@ export type StartWatchlistTimingCardsPipelineCommand = {
   watchListId: string;
   targetRef?: { type: string; id: string };
   asOfDate?: string;
-  presetId?: string;
+  revisionId: string;
+  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
   watchListName?: string;
   templateVersion?: number;
   idempotencyKey?: string;
@@ -88,7 +90,8 @@ export type StartWatchlistTimingPipelineCommand = {
   portfolioSnapshotId: string;
   targetRef?: { type: string; id: string };
   asOfDate?: string;
-  presetId?: string;
+  revisionId: string;
+  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
   watchListName?: string;
   portfolioSnapshotName?: string;
   templateVersion?: number;
@@ -268,11 +271,12 @@ export class WorkflowCommandService {
         stockCode: command.stockCode,
         targetRef: command.targetRef,
         asOfDate: command.asOfDate,
-        presetId: command.presetId,
+        revisionId: command.revisionId,
+        analysisDateMode: command.analysisDateMode,
       },
       idempotencyKey:
         command.idempotencyKey ??
-        `timing-signal:${command.userId}:${command.stockCode}:${command.asOfDate ?? "latest"}${command.presetId ? `:${command.presetId}` : ""}`,
+        `timing-signal:${command.userId}:${command.stockCode}:${command.analysisDateMode}:${command.asOfDate ?? "latest"}:${command.revisionId}`,
     });
   }
 
@@ -290,11 +294,12 @@ export class WorkflowCommandService {
         watchListId: command.watchListId,
         targetRef: command.targetRef,
         asOfDate: command.asOfDate,
-        presetId: command.presetId,
+        revisionId: command.revisionId,
+        analysisDateMode: command.analysisDateMode,
       },
       idempotencyKey:
         command.idempotencyKey ??
-        `watchlist-timing-cards:${command.userId}:${command.watchListId}:${command.asOfDate ?? "latest"}${command.presetId ? `:${command.presetId}` : ""}`,
+        `watchlist-timing-cards:${command.userId}:${command.watchListId}:${command.analysisDateMode}:${command.asOfDate ?? "latest"}:${command.revisionId}`,
     });
   }
 
@@ -314,11 +319,12 @@ export class WorkflowCommandService {
         targetRef: command.targetRef,
         portfolioSnapshotId: command.portfolioSnapshotId,
         asOfDate: command.asOfDate,
-        presetId: command.presetId,
+        revisionId: command.revisionId,
+        analysisDateMode: command.analysisDateMode,
       },
       idempotencyKey:
         command.idempotencyKey ??
-        `watchlist-timing:${command.userId}:${command.watchListId}:${command.portfolioSnapshotId}:${command.asOfDate ?? "latest"}${command.presetId ? `:${command.presetId}` : ""}`,
+        `watchlist-timing:${command.userId}:${command.watchListId}:${command.portfolioSnapshotId}:${command.analysisDateMode}:${command.asOfDate ?? "latest"}:${command.revisionId}`,
     });
   }
 

@@ -1,6 +1,6 @@
 ﻿import { Annotation, StateGraph } from "@langchain/langgraph";
-import type { TimingAnalysisService } from "~/server/application/timing/timing-analysis-service";
-import { resolveTimingPresetConfig } from "~/server/domain/timing/preset";
+import type { TimingRuleAnalysisService } from "~/server/application/timing/timing-rule-analysis-service";
+import type { TimingPresetConfigV2, TimingTimeframe } from "~/server/domain/timing/types";
 import type {
   WatchlistTimingCardsPipelineGraphState,
   WatchlistTimingCardsPipelineInput,
@@ -14,7 +14,7 @@ import {
 } from "~/server/domain/workflow/types";
 import type { PrismaWatchListRepository } from "~/server/infrastructure/screening/prisma-watch-list-repository";
 import type { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
-import type { PrismaTimingPresetRepository } from "~/server/infrastructure/timing/prisma-timing-preset-repository";
+import type { PrismaTimingPresetRevisionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-revision-repository";
 import type { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
 import type { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
 import type { WorkflowGraphBuildInitialStateParams } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
@@ -25,6 +25,22 @@ import {
   addWorkflowNodes,
 } from "~/server/infrastructure/workflow/langgraph/workflow-graph-builder";
 
+function collectIndicatorIds(config: TimingPresetConfigV2) {
+  return [...new Set(config.ruleGroups.flatMap((group) =>
+    group.rules.filter((rule) => rule.enabled).map((rule) => rule.indicatorId),
+  ))];
+}
+
+function collectTimeframes(config: TimingPresetConfigV2) {
+  return [...new Set([
+    ...config.timeframePlan.contextTimeframes,
+    config.timeframePlan.decisionTimeframe,
+    config.timeframePlan.executionTimeframe,
+    config.timeframePlan.fallbackExecutionTimeframe,
+    ...config.ruleGroups.flatMap((group) => group.rules.map((rule) => rule.timeframe)),
+  ].filter((item): item is TimingTimeframe => Boolean(item)))];
+}
+
 const WorkflowState = Annotation.Root({
   runId: Annotation<string>,
   userId: Annotation<string>,
@@ -33,7 +49,7 @@ const WorkflowState = Annotation.Root({
   resumeFromNodeKey: Annotation<WorkflowNodeKey | undefined>,
   currentNodeKey: Annotation<WatchlistTimingCardsPipelineNodeKey | undefined>,
   timingInput: Annotation<WatchlistTimingCardsPipelineInput>,
-  preset: Annotation<WatchlistTimingCardsPipelineGraphState["preset"]>,
+  revision: Annotation<WatchlistTimingCardsPipelineGraphState["revision"]>,
   presetConfig: Annotation<
     WatchlistTimingCardsPipelineGraphState["presetConfig"]
   >,
@@ -75,8 +91,8 @@ export class WatchlistTimingCardsPipelineLangGraph extends BaseWorkflowLangGraph
   constructor(deps: {
     watchListRepository: PrismaWatchListRepository;
     timingDataClient: PythonTimingDataClient;
-    analysisService: TimingAnalysisService;
-    presetRepository: PrismaTimingPresetRepository;
+    analysisService: TimingRuleAnalysisService;
+    revisionRepository: PrismaTimingPresetRevisionRepository;
     signalSnapshotRepository: PrismaTimingSignalSnapshotRepository;
     analysisCardRepository: PrismaTimingAnalysisCardRepository;
   }) {
@@ -85,23 +101,24 @@ export class WatchlistTimingCardsPipelineLangGraph extends BaseWorkflowLangGraph
       NodeExecutor
     > = {
       load_watchlist_context: async (state) => {
-        const [watchList, preset] = await Promise.all([
+        const [watchList, revision] = await Promise.all([
           deps.watchListRepository.findById(state.timingInput.watchListId),
-          state.timingInput.presetId
-            ? deps.presetRepository.getByIdForUser(
-                state.userId,
-                state.timingInput.presetId,
-              )
-            : Promise.resolve(null),
+          deps.revisionRepository.getRevision(
+            state.userId,
+            state.timingInput.revisionId,
+          ),
         ]);
 
         if (!watchList || watchList.userId !== state.userId) {
           throw new Error("鑷€夎偂鍒楄〃涓嶅瓨鍦ㄦ垨鏃犳潈璁块棶");
         }
+        if (!revision || revision.status !== "PUBLISHED") {
+          throw new Error("择时运行必须引用已发布策略修订。");
+        }
 
         return {
-          preset: preset ?? undefined,
-          presetConfig: resolveTimingPresetConfig(preset?.config),
+          revision,
+          presetConfig: revision.config,
           watchlist: {
             id: watchList.id,
             name: watchList.name,
@@ -121,10 +138,12 @@ export class WatchlistTimingCardsPipelineLangGraph extends BaseWorkflowLangGraph
           };
         }
 
-        const response = await deps.timingDataClient.getSignalsBatch({
+        if (!state.revision) throw new Error("策略修订尚未加载。");
+        const response = await deps.timingDataClient.getEvidenceBatch({
           stockCodes: state.targets.map((target) => target.stockCode),
           asOfDate: state.timingInput.asOfDate,
-          includeBars: true,
+          timeframes: collectTimeframes(state.revision.config),
+          indicatorIds: collectIndicatorIds(state.revision.config),
         });
 
         if (response.items.length === 0 && response.errors.length > 0) {
@@ -138,24 +157,18 @@ export class WatchlistTimingCardsPipelineLangGraph extends BaseWorkflowLangGraph
           batchErrors: response.errors,
         };
       },
-      technical_signal_agent: async (state) => ({
-        technicalAssessments: deps.analysisService.buildTechnicalAssessments(
-          state.signalSnapshots,
-          state.presetConfig,
-        ),
-      }),
+      technical_signal_agent: async () => ({ technicalAssessments: [] }),
       timing_synthesis_agent: async (state) => ({
-        cards: deps.analysisService.buildCards({
+        cards: state.revision ? deps.analysisService.buildCards({
           userId: state.userId,
           workflowRunId: state.runId,
           sourceType: "watchlist",
           sourceId: state.timingInput.watchListId,
           watchListId: state.timingInput.watchListId,
-          presetId: state.preset?.id,
-          presetConfig: state.presetConfig,
-          signalSnapshots: state.signalSnapshots,
-          technicalAssessments: state.technicalAssessments,
-        }),
+          revision: state.revision,
+          evidence: state.signalSnapshots,
+          marketState: "NEUTRAL",
+        }) : [],
       }),
       persist_cards: async (state) => {
         const persistedSignalSnapshots =
@@ -164,6 +177,7 @@ export class WatchlistTimingCardsPipelineLangGraph extends BaseWorkflowLangGraph
             workflowRunId: state.runId,
             sourceType: "watchlist",
             sourceId: state.timingInput.watchListId,
+            presetRevisionId: state.revision?.id,
             items: state.signalSnapshots,
           });
 
@@ -220,7 +234,7 @@ export class WatchlistTimingCardsPipelineLangGraph extends BaseWorkflowLangGraph
       currentNodeKey: undefined,
       lastCompletedNodeKey: undefined,
       timingInput: params.input as WatchlistTimingCardsPipelineInput,
-      preset: undefined,
+      revision: undefined,
       presetConfig: undefined,
       watchlist: undefined,
       targets: [],

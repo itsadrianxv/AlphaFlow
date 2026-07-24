@@ -2,6 +2,7 @@ import { env } from "~/env";
 import type {
   MarketContextSnapshot,
   TimingBarsData,
+  TimingEvidenceBatchData,
   TimingSignalBatchData,
   TimingSignalData,
   TimingTimeframe,
@@ -131,6 +132,22 @@ export class PythonTimingDataClient {
   }) {
     return this.request<TimingSignalBatchData>(
       this.timingPath("/stocks/signals/batch"),
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      },
+    );
+  }
+
+  async getEvidenceBatch(params: {
+    stockCodes: string[];
+    asOfDate?: string;
+    timeframes: TimingTimeframe[];
+    indicatorIds: string[];
+    lookbackDays?: number;
+  }) {
+    return this.request<TimingEvidenceBatchData>(
+      this.timingPath("/stocks/evidence/batch"),
       {
         method: "POST",
         body: JSON.stringify(params),

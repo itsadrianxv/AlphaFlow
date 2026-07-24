@@ -21,6 +21,7 @@ function mapRecord(record: {
   stockName: string;
   sourceAsOfDate: Date;
   reviewHorizon: string;
+  reviewTradingDays: number;
   scheduledAt: Date;
   completedAt: Date | null;
   expectedAction: string;
@@ -41,6 +42,7 @@ function mapRecord(record: {
     stockName: record.stockName,
     sourceAsOfDate: record.sourceAsOfDate.toISOString().slice(0, 10),
     reviewHorizon: record.reviewHorizon as TimingReviewHorizon,
+    reviewTradingDays: record.reviewTradingDays,
     scheduledAt: record.scheduledAt,
     completedAt: record.completedAt,
     expectedAction: record.expectedAction as TimingAction,
@@ -69,6 +71,7 @@ export class PrismaTimingReviewRecordRepository {
             stockName: item.stockName,
             sourceAsOfDate: toDateOnly(item.sourceAsOfDate),
             reviewHorizon: item.reviewHorizon,
+            reviewTradingDays: item.reviewTradingDays,
             scheduledAt: item.scheduledAt,
             expectedAction: item.expectedAction,
           },

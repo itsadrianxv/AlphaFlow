@@ -7,18 +7,15 @@ import { IndustryResearchWorkflowService } from "~/server/application/intelligen
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
-import { KronosForecastWorkflowService } from "~/server/application/timing/kronos-forecast-workflow-service";
 import { MarketRegimeService } from "~/server/application/timing/market-regime-service";
 import { PositionContextService } from "~/server/application/timing/position-context-service";
-import { TimingAnalysisService } from "~/server/application/timing/timing-analysis-service";
 import { TimingFeedbackService } from "~/server/application/timing/timing-feedback-service";
 import { TimingReviewSchedulingService } from "~/server/application/timing/timing-review-scheduling-service";
-import { WatchlistPortfolioManagerService } from "~/server/application/timing/watchlist-portfolio-manager-service";
+import { TimingRuleAnalysisService } from "~/server/application/timing/timing-rule-analysis-service";
+import { WatchlistPortfolioManagerV2Service } from "~/server/application/timing/watchlist-portfolio-manager-v2-service";
 import { WatchlistRiskManagerService } from "~/server/application/timing/watchlist-risk-manager-service";
 import { WorkflowExecutionService } from "~/server/application/workflow/execution-service";
 import { db } from "~/server/db";
-import { TimingActionPolicy } from "~/server/domain/timing/services/timing-action-policy";
-import { TimingConfidencePolicy } from "~/server/domain/timing/services/timing-confidence-policy";
 import { TimingReviewPolicy } from "~/server/domain/timing/services/timing-review-policy";
 import { AgentRuntimeClient } from "~/server/infrastructure/agent-runtime/agent-runtime-client";
 import { PrismaAgentConversationRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-conversation-repository";
@@ -29,14 +26,13 @@ import { PrismaResearchReminderRepository } from "~/server/infrastructure/intell
 import { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
 import { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
 import { PrismaWatchListRepository } from "~/server/infrastructure/screening/prisma-watch-list-repository";
-import { KronosForecastClient } from "~/server/infrastructure/timing/kronos-forecast-client";
 import { PrismaPortfolioSnapshotRepository } from "~/server/infrastructure/timing/prisma-portfolio-snapshot-repository";
 import { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
 import { PrismaTimingFeedbackObservationRepository } from "~/server/infrastructure/timing/prisma-timing-feedback-observation-repository";
-import { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
 import { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
 import { PrismaTimingPresetAdjustmentSuggestionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-adjustment-suggestion-repository";
 import { PrismaTimingPresetRepository } from "~/server/infrastructure/timing/prisma-timing-preset-repository";
+import { PrismaTimingPresetRevisionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-revision-repository";
 import { PrismaTimingRecommendationRepository } from "~/server/infrastructure/timing/prisma-timing-recommendation-repository";
 import { PrismaTimingReviewRecordRepository } from "~/server/infrastructure/timing/prisma-timing-review-record-repository";
 import { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
@@ -96,6 +92,9 @@ const portfolioSnapshotRepository = new PrismaPortfolioSnapshotRepository(db);
 const timingMarketContextSnapshotRepository =
   new PrismaTimingMarketContextSnapshotRepository(db);
 const timingPresetRepository = new PrismaTimingPresetRepository(db);
+const timingPresetRevisionRepository = new PrismaTimingPresetRevisionRepository(
+  db,
+);
 const timingFeedbackObservationRepository =
   new PrismaTimingFeedbackObservationRepository(db);
 const timingPresetAdjustmentSuggestionRepository =
@@ -108,29 +107,20 @@ const timingAnalysisCardRepository = new PrismaTimingAnalysisCardRepository(db);
 const timingRecommendationRepository = new PrismaTimingRecommendationRepository(
   db,
 );
-const kronosForecastSnapshotRepository =
-  new PrismaTimingKronosForecastSnapshotRepository(db);
 const reminderSchedulingService = new ReminderSchedulingService({
   reminderRepository,
 });
-const timingAnalysisService = new TimingAnalysisService({
-  confidencePolicy: new TimingConfidencePolicy(),
-  actionPolicy: new TimingActionPolicy(),
-});
+const timingRuleAnalysisService = new TimingRuleAnalysisService();
 const marketRegimeService = new MarketRegimeService();
 const watchlistRiskManagerService = new WatchlistRiskManagerService();
 const timingFeedbackService = new TimingFeedbackService({
   observationRepository: timingFeedbackObservationRepository,
   suggestionRepository: timingPresetAdjustmentSuggestionRepository,
 });
-const watchlistPortfolioManagerService = new WatchlistPortfolioManagerService({
-  positionContextService: new PositionContextService(),
-});
+const watchlistPortfolioManagerService = new WatchlistPortfolioManagerV2Service(
+  new PositionContextService(),
+);
 const pythonTimingDataClient = new PythonTimingDataClient();
-const kronosForecastWorkflowService = new KronosForecastWorkflowService({
-  client: new KronosForecastClient(),
-  snapshotRepository: kronosForecastSnapshotRepository,
-});
 const timingReviewSchedulingService = new TimingReviewSchedulingService({
   reviewRecordRepository: timingReviewRecordRepository,
   reminderSchedulingService,
@@ -146,17 +136,16 @@ const executionService = new WorkflowExecutionService({
     new CompanyResearchContractLangGraph(companyResearchWorkflowService),
     new TimingSignalPipelineLangGraph({
       timingDataClient: pythonTimingDataClient,
-      analysisService: timingAnalysisService,
-      presetRepository: timingPresetRepository,
+      analysisService: timingRuleAnalysisService,
+      revisionRepository: timingPresetRevisionRepository,
       signalSnapshotRepository: timingSignalSnapshotRepository,
       analysisCardRepository: timingAnalysisCardRepository,
-      kronosForecastWorkflowService,
     }),
     new WatchlistTimingCardsPipelineLangGraph({
       watchListRepository,
       timingDataClient: pythonTimingDataClient,
-      analysisService: timingAnalysisService,
-      presetRepository: timingPresetRepository,
+      analysisService: timingRuleAnalysisService,
+      revisionRepository: timingPresetRevisionRepository,
       signalSnapshotRepository: timingSignalSnapshotRepository,
       analysisCardRepository: timingAnalysisCardRepository,
     }),
@@ -164,16 +153,14 @@ const executionService = new WorkflowExecutionService({
       watchListRepository,
       portfolioSnapshotRepository,
       timingDataClient: pythonTimingDataClient,
-      analysisService: timingAnalysisService,
-      presetRepository: timingPresetRepository,
+      analysisService: timingRuleAnalysisService,
+      revisionRepository: timingPresetRevisionRepository,
       marketContextSnapshotRepository: timingMarketContextSnapshotRepository,
       marketRegimeService,
-      feedbackService: timingFeedbackService,
       riskManagerService: watchlistRiskManagerService,
       portfolioManagerService: watchlistPortfolioManagerService,
       recommendationRepository: timingRecommendationRepository,
       reviewSchedulingService: timingReviewSchedulingService,
-      kronosForecastWorkflowService,
     }),
     new TimingReviewLoopLangGraph({
       timingDataClient: pythonTimingDataClient,

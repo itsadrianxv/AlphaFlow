@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   type EvidenceCitation,
@@ -17,6 +18,9 @@ import type {
 const toJson = (value: unknown): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
 
+const evidenceHash = (value: unknown) =>
+  createHash("sha256").update(JSON.stringify(value)).digest("hex");
+
 function mapSignalSnapshot(record: {
   id: string;
   userId: string;
@@ -32,6 +36,11 @@ function mapSignalSnapshot(record: {
   barsByTimeframe: unknown;
   indicators: unknown;
   signalContext: unknown;
+  presetRevisionId: string | null;
+  featureEvidence: unknown;
+  dataManifest: unknown;
+  featureVersion: string | null;
+  inputHash: string | null;
   createdAt: Date;
 }): TimingSignalSnapshotRecord {
   return {
@@ -51,6 +60,13 @@ function mapSignalSnapshot(record: {
     indicators: record.indicators as TimingSignalSnapshotRecord["indicators"],
     signalContext:
       record.signalContext as TimingSignalSnapshotRecord["signalContext"],
+    presetRevisionId: record.presetRevisionId,
+    featureEvidence:
+      record.featureEvidence as TimingSignalSnapshotRecord["featureEvidence"],
+    dataManifest:
+      record.dataManifest as TimingSignalSnapshotRecord["dataManifest"],
+    featureVersion: record.featureVersion,
+    inputHash: record.inputHash,
     createdAt: record.createdAt,
   };
 }
@@ -61,6 +77,7 @@ function mapCard(record: {
   workflowRunId: string | null;
   watchListId: string | null;
   presetId: string | null;
+  presetRevisionId: string | null;
   stockCode: string;
   stockName: string;
   sourceType: string;
@@ -75,6 +92,8 @@ function mapCard(record: {
   invalidationNotes: string[];
   riskFlags: string[];
   reasoning: unknown;
+  decisionStatus: string | null;
+  decisionAudit: unknown;
   createdAt: Date;
   updatedAt: Date;
   signalSnapshot?: {
@@ -92,6 +111,11 @@ function mapCard(record: {
     barsByTimeframe: unknown;
     indicators: unknown;
     signalContext: unknown;
+    presetRevisionId: string | null;
+    featureEvidence: unknown;
+    dataManifest: unknown;
+    featureVersion: string | null;
+    inputHash: string | null;
     createdAt: Date;
   } | null;
 }): TimingAnalysisCardRecord {
@@ -101,6 +125,7 @@ function mapCard(record: {
     workflowRunId: record.workflowRunId,
     watchListId: record.watchListId,
     presetId: record.presetId,
+    presetRevisionId: record.presetRevisionId,
     stockCode: record.stockCode,
     stockName: record.stockName,
     sourceType: record.sourceType as TimingSourceType,
@@ -117,6 +142,10 @@ function mapCard(record: {
     invalidationNotes: record.invalidationNotes,
     riskFlags: record.riskFlags as TimingRiskFlag[],
     reasoning: record.reasoning as TimingCardReasoning,
+    decisionStatus:
+      record.decisionStatus as TimingAnalysisCardRecord["decisionStatus"],
+    decisionAudit:
+      record.decisionAudit as TimingAnalysisCardRecord["decisionAudit"],
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
     signalSnapshot: record.signalSnapshot
@@ -145,6 +174,7 @@ export class PrismaTimingAnalysisCardRepository {
               workflowRunId: item.workflowRunId,
               watchListId: item.watchListId,
               presetId: item.presetId,
+              presetRevisionId: item.presetRevisionId,
               stockCode: item.stockCode,
               stockName: item.stockName,
               sourceType: item.sourceType,
@@ -162,6 +192,10 @@ export class PrismaTimingAnalysisCardRepository {
                 ...item.reasoning,
                 evidenceCitations: context.citations,
               }),
+              decisionStatus: item.decisionStatus,
+              decisionAudit: item.decisionAudit
+                ? toJson(item.decisionAudit)
+                : undefined,
             },
             include: {
               signalSnapshot: true,
@@ -237,8 +271,10 @@ export class PrismaTimingAnalysisCardRepository {
 function buildTimingEvidenceContext(
   item: TimingCardDraft & { signalSnapshotId: string },
 ) {
-  const signalContext = item.reasoning.signalContext;
-  const indicators = item.reasoning.indicators;
+  const signalContext =
+    item.reasoning.decisionAudit ?? item.reasoning.signalContext ?? {};
+  const indicators =
+    item.reasoning.featureEvidence ?? item.reasoning.indicators ?? [];
   const contextId = randomUUID();
   const blockId = randomUUID();
   const summaryItemId = randomUUID();
@@ -286,8 +322,10 @@ function buildTimingEvidenceContext(
                   user: { connect: { id: item.userId } },
                   itemKey: "signal_summary",
                   status: "available",
-                  extractedFact: signalContext.summary,
-                  snippet: signalContext.explanation,
+                  extractedFact: item.summary,
+                  snippet: item.decisionAudit
+                    ? `确定性规则状态：${item.decisionAudit.status}`
+                    : item.summary,
                   valueJson: toJson(signalContext),
                   rawValueJson: toJson(sanitizeEvidenceRawValue(signalContext)),
                   sourceType: "timing_signal_snapshot",
@@ -298,6 +336,12 @@ function buildTimingEvidenceContext(
                   warnings: [],
                   limitations: [],
                   metadataJson: toJson({ derived: true }),
+                  recordKind: "derived",
+                  lineageId: summaryItemId,
+                  derivedFromItemIds: [],
+                  algorithmVersion: "timing-signal-v1",
+                  parametersJson: toJson({ timeframe: "DAILY" }),
+                  contentHash: evidenceHash(signalContext),
                 },
                 {
                   id: indicatorsItemId,
@@ -316,6 +360,12 @@ function buildTimingEvidenceContext(
                   warnings: [],
                   limitations: [],
                   metadataJson: toJson({ derived: true }),
+                  recordKind: "derived",
+                  lineageId: indicatorsItemId,
+                  derivedFromItemIds: [],
+                  algorithmVersion: "timing-indicators-v1",
+                  parametersJson: toJson({ timeframe: "DAILY" }),
+                  contentHash: evidenceHash(indicators),
                 },
               ],
             },

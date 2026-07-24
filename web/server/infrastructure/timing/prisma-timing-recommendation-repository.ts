@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import type {
+  TimingDecisionAudit,
   TimingRecommendationDraft,
   TimingRecommendationReasoning,
   TimingRecommendationRecord,
@@ -16,6 +17,7 @@ function mapRecord(record: {
   portfolioSnapshotId: string;
   watchListId: string;
   presetId: string | null;
+  presetRevisionId: string | null;
   stockCode: string;
   stockName: string;
   action: string;
@@ -27,6 +29,8 @@ function mapRecord(record: {
   marketState: string;
   marketTransition: string;
   riskFlags: string[];
+  decisionStatus: string | null;
+  decisionAudit: unknown;
   reasoning: unknown;
   createdAt: Date;
   updatedAt: Date;
@@ -38,6 +42,7 @@ function mapRecord(record: {
     portfolioSnapshotId: record.portfolioSnapshotId,
     watchListId: record.watchListId,
     presetId: record.presetId,
+    presetRevisionId: record.presetRevisionId,
     stockCode: record.stockCode,
     stockName: record.stockName,
     action: record.action as TimingRecommendationRecord["action"],
@@ -51,6 +56,9 @@ function mapRecord(record: {
     marketTransition:
       record.marketTransition as TimingRecommendationRecord["marketTransition"],
     riskFlags: record.riskFlags as TimingRiskFlag[],
+    decisionStatus:
+      record.decisionStatus as TimingRecommendationRecord["decisionStatus"],
+    decisionAudit: record.decisionAudit as TimingDecisionAudit | null,
     reasoning: record.reasoning as TimingRecommendationReasoning,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -70,6 +78,7 @@ export class PrismaTimingRecommendationRepository {
             portfolioSnapshotId: item.portfolioSnapshotId,
             watchListId: item.watchListId,
             presetId: item.presetId,
+            presetRevisionId: item.presetRevisionId,
             stockCode: item.stockCode,
             stockName: item.stockName,
             action: item.action,
@@ -81,6 +90,10 @@ export class PrismaTimingRecommendationRepository {
             marketState: item.marketState,
             marketTransition: item.marketTransition,
             riskFlags: item.riskFlags,
+            decisionStatus: item.decisionStatus,
+            decisionAudit: item.decisionAudit
+              ? toJson(item.decisionAudit)
+              : undefined,
             reasoning: toJson(item.reasoning),
           },
         }),

@@ -1,13 +1,14 @@
 import { Annotation, StateGraph } from "@langchain/langgraph";
-import type { KronosForecastWorkflowService } from "~/server/application/timing/kronos-forecast-workflow-service";
 import type { MarketRegimeService } from "~/server/application/timing/market-regime-service";
-import type { TimingAnalysisService } from "~/server/application/timing/timing-analysis-service";
-import type { TimingFeedbackService } from "~/server/application/timing/timing-feedback-service";
 import type { TimingReviewSchedulingService } from "~/server/application/timing/timing-review-scheduling-service";
-import type { WatchlistPortfolioManagerService } from "~/server/application/timing/watchlist-portfolio-manager-service";
+import type { TimingRuleAnalysisService } from "~/server/application/timing/timing-rule-analysis-service";
+import type { WatchlistPortfolioManagerV2Service } from "~/server/application/timing/watchlist-portfolio-manager-v2-service";
 import type { WatchlistRiskManagerService } from "~/server/application/timing/watchlist-risk-manager-service";
-import { resolveTimingPresetConfig } from "~/server/domain/timing/preset";
-import type { MarketContextAnalysis } from "~/server/domain/timing/types";
+import type {
+  MarketContextAnalysis,
+  TimingPresetConfigV2,
+  TimingTimeframe,
+} from "~/server/domain/timing/types";
 import {
   isWorkflowDomainError,
   WORKFLOW_ERROR_CODES,
@@ -26,7 +27,7 @@ import {
 import type { PrismaWatchListRepository } from "~/server/infrastructure/screening/prisma-watch-list-repository";
 import type { PrismaPortfolioSnapshotRepository } from "~/server/infrastructure/timing/prisma-portfolio-snapshot-repository";
 import type { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
-import type { PrismaTimingPresetRepository } from "~/server/infrastructure/timing/prisma-timing-preset-repository";
+import type { PrismaTimingPresetRevisionRepository } from "~/server/infrastructure/timing/prisma-timing-preset-revision-repository";
 import type { PrismaTimingRecommendationRepository } from "~/server/infrastructure/timing/prisma-timing-recommendation-repository";
 import type { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
 import type { WorkflowGraphBuildInitialStateParams } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
@@ -45,7 +46,7 @@ const WorkflowState = Annotation.Root({
   resumeFromNodeKey: Annotation<WorkflowNodeKey | undefined>,
   currentNodeKey: Annotation<WatchlistTimingPipelineNodeKey | undefined>,
   timingInput: Annotation<WatchlistTimingPipelineInput>,
-  preset: Annotation<WatchlistTimingPipelineGraphState["preset"]>,
+  revision: Annotation<WatchlistTimingPipelineGraphState["revision"]>,
   presetConfig: Annotation<WatchlistTimingPipelineGraphState["presetConfig"]>,
   watchlist: Annotation<WatchlistTimingPipelineGraphState["watchlist"]>,
   portfolioSnapshot: Annotation<
@@ -92,6 +93,34 @@ const WorkflowState = Annotation.Root({
 type NodeExecutor = (
   state: WatchlistTimingPipelineGraphState,
 ) => Promise<Partial<WatchlistTimingPipelineGraphState>>;
+
+function collectIndicatorIds(config: TimingPresetConfigV2) {
+  return [
+    ...new Set(
+      config.ruleGroups.flatMap((group) =>
+        group.rules
+          .filter((rule) => rule.enabled)
+          .map((rule) => rule.indicatorId),
+      ),
+    ),
+  ];
+}
+
+function collectTimeframes(config: TimingPresetConfigV2) {
+  return [
+    ...new Set(
+      [
+        ...config.timeframePlan.contextTimeframes,
+        config.timeframePlan.decisionTimeframe,
+        config.timeframePlan.executionTimeframe,
+        config.timeframePlan.fallbackExecutionTimeframe,
+        ...config.ruleGroups.flatMap((group) =>
+          group.rules.map((rule) => rule.timeframe),
+        ),
+      ].filter((item): item is TimingTimeframe => Boolean(item)),
+    ),
+  ];
+}
 
 function resolveFallbackMarketContextAsOfDate(
   state: WatchlistTimingPipelineGraphState,
@@ -182,32 +211,28 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
     watchListRepository: PrismaWatchListRepository;
     portfolioSnapshotRepository: PrismaPortfolioSnapshotRepository;
     timingDataClient: PythonTimingDataClient;
-    analysisService: TimingAnalysisService;
-    presetRepository: PrismaTimingPresetRepository;
+    analysisService: TimingRuleAnalysisService;
+    revisionRepository: PrismaTimingPresetRevisionRepository;
     marketContextSnapshotRepository: PrismaTimingMarketContextSnapshotRepository;
     marketRegimeService: MarketRegimeService;
-    feedbackService: TimingFeedbackService;
     riskManagerService: WatchlistRiskManagerService;
-    portfolioManagerService: WatchlistPortfolioManagerService;
+    portfolioManagerService: WatchlistPortfolioManagerV2Service;
     recommendationRepository: PrismaTimingRecommendationRepository;
     reviewSchedulingService: TimingReviewSchedulingService;
-    kronosForecastWorkflowService?: KronosForecastWorkflowService;
   }) {
     const nodeExecutors: Record<WatchlistTimingPipelineNodeKey, NodeExecutor> =
       {
         load_watchlist_context: async (state) => {
-          const [watchList, portfolioSnapshot, preset] = await Promise.all([
+          const [watchList, portfolioSnapshot, revision] = await Promise.all([
             deps.watchListRepository.findById(state.timingInput.watchListId),
             deps.portfolioSnapshotRepository.getByIdForUser(
               state.userId,
               state.timingInput.portfolioSnapshotId,
             ),
-            state.timingInput.presetId
-              ? deps.presetRepository.getByIdForUser(
-                  state.userId,
-                  state.timingInput.presetId,
-                )
-              : Promise.resolve(null),
+            deps.revisionRepository.getRevision(
+              state.userId,
+              state.timingInput.revisionId,
+            ),
           ]);
 
           if (!watchList || watchList.userId !== state.userId) {
@@ -217,20 +242,36 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
           if (!portfolioSnapshot) {
             throw new Error("Portfolio snapshot not found or access denied");
           }
+          if (!revision || revision.status !== "PUBLISHED") {
+            throw new Error("择时运行必须引用已发布策略修订。");
+          }
+
+          const targets = new Map(
+            watchList.stocks.map((stock) => [
+              stock.stockCode.value,
+              {
+                stockCode: stock.stockCode.value,
+                stockName: stock.stockName,
+              },
+            ]),
+          );
+          for (const position of portfolioSnapshot.positions) {
+            targets.set(position.stockCode, {
+              stockCode: position.stockCode,
+              stockName: position.stockName,
+            });
+          }
 
           return {
-            preset: preset ?? undefined,
-            presetConfig: resolveTimingPresetConfig(preset?.config),
+            revision,
+            presetConfig: revision.config,
             watchlist: {
               id: watchList.id,
               name: watchList.name,
               stockCount: watchList.stocks.length,
             },
             portfolioSnapshot,
-            targets: watchList.stocks.map((stock) => ({
-              stockCode: stock.stockCode.value,
-              stockName: stock.stockName,
-            })),
+            targets: [...targets.values()],
           };
         },
         fetch_signal_snapshots_batch: async (state) => {
@@ -241,10 +282,12 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
             };
           }
 
-          const response = await deps.timingDataClient.getSignalsBatch({
+          if (!state.revision) throw new Error("策略修订尚未加载。");
+          const response = await deps.timingDataClient.getEvidenceBatch({
             stockCodes: state.targets.map((target) => target.stockCode),
             asOfDate: state.timingInput.asOfDate,
-            includeBars: true,
+            timeframes: collectTimeframes(state.revision.config),
+            indicatorIds: collectIndicatorIds(state.revision.config),
           });
 
           if (response.items.length === 0 && response.errors.length > 0) {
@@ -258,60 +301,46 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
             batchErrors: response.errors,
           };
         },
-        technical_signal_agent: async (state) => ({
-          technicalAssessments: deps.analysisService.buildTechnicalAssessments(
-            state.signalSnapshots,
-            state.presetConfig,
-          ),
-        }),
+        technical_signal_agent: async () => ({ technicalAssessments: [] }),
         timing_synthesis_agent: async (state) => ({
-          cards: deps.analysisService.buildCards({
-            userId: state.userId,
-            workflowRunId: state.runId,
-            sourceType: "watchlist",
-            sourceId: state.timingInput.watchListId,
-            watchListId: state.timingInput.watchListId,
-            presetId: state.preset?.id,
-            presetConfig: state.presetConfig,
-            signalSnapshots: state.signalSnapshots,
-            technicalAssessments: state.technicalAssessments,
-            hasPortfolioContext: true,
-          }),
+          cards: state.revision
+            ? deps.analysisService.buildCards({
+                userId: state.userId,
+                workflowRunId: state.runId,
+                sourceType: "watchlist",
+                sourceId: state.timingInput.watchListId,
+                watchListId: state.timingInput.watchListId,
+                revision: state.revision,
+                evidence: state.signalSnapshots,
+                marketState: "NEUTRAL",
+                positionCodes: new Set(
+                  state.portfolioSnapshot?.positions.map(
+                    (item) => item.stockCode,
+                  ),
+                ),
+              })
+            : [],
         }),
-        kronos_forecast_agent: async (state) => {
-          if (!deps.kronosForecastWorkflowService) {
-            return {
-              kronosForecasts: [],
-              cards: state.cards.map((card) => ({
-                ...card,
-                reasoning: {
-                  ...card.reasoning,
-                  kronosWarnings: [
-                    ...new Set([
-                      ...(card.reasoning.kronosWarnings ?? []),
-                      "Kronos 预测暂不可用，辅助权重按 0 处理。",
-                    ]),
-                  ],
-                },
-              })),
-            };
-          }
-
-          const result = await deps.kronosForecastWorkflowService.enrichCards({
-            userId: state.userId,
-            workflowRunId: state.runId,
-            sourceType: "watchlist",
-            sourceId: state.timingInput.watchListId,
-            cards: state.cards,
-            signalSnapshots: state.signalSnapshots,
-          });
-
-          return {
-            cards: result.cards,
-            errors: result.warnings.map((warning) => `kronos:${warning}`),
-          };
-        },
+        kronos_forecast_agent: async (state) => ({ cards: state.cards }),
         market_regime_agent: async (state) => {
+          const buildCards = (marketState: MarketContextAnalysis["state"]) =>
+            state.revision
+              ? deps.analysisService.buildCards({
+                  userId: state.userId,
+                  workflowRunId: state.runId,
+                  sourceType: "watchlist",
+                  sourceId: state.timingInput.watchListId,
+                  watchListId: state.timingInput.watchListId,
+                  revision: state.revision,
+                  evidence: state.signalSnapshots,
+                  marketState,
+                  positionCodes: new Set(
+                    state.portfolioSnapshot?.positions.map(
+                      (item) => item.stockCode,
+                    ),
+                  ),
+                })
+              : [];
           if (state.timingInput.asOfDate) {
             const existing =
               await deps.marketContextSnapshotRepository.getByAsOfDate(
@@ -321,6 +350,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
               return {
                 marketContextSnapshot: existing.snapshot,
                 marketContextAnalysis: existing.analysis,
+                cards: buildCards(existing.analysis.state),
               };
             }
           } else {
@@ -330,6 +360,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
               return {
                 marketContextSnapshot: latest.snapshot,
                 marketContextAnalysis: latest.analysis,
+                cards: buildCards(latest.analysis.state),
               };
             }
           }
@@ -356,6 +387,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
             return {
               marketContextSnapshot,
               marketContextAnalysis,
+              cards: buildCards(marketContextAnalysis.state),
             };
           } catch (error) {
             if (
@@ -373,6 +405,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
             return {
               marketContextSnapshot: fallbackAnalysis.snapshot,
               marketContextAnalysis: fallbackAnalysis,
+              cards: buildCards(fallbackAnalysis.state),
               errors: [
                 `market_regime_fallback:${fallbackAnalysis.snapshot.asOfDate}:${error.message}`,
               ],
@@ -402,29 +435,16 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
             throw new Error("Recommendation inputs are incomplete");
           }
 
-          const feedbackContext = await deps.feedbackService.buildContext({
-            userId: state.userId,
-            presetId: state.preset?.id,
-          });
-
           return {
-            feedbackContext,
-            recommendations: deps.portfolioManagerService
-              .buildRecommendations({
-                userId: state.userId,
-                workflowRunId: state.runId,
-                watchListId: state.watchlist.id,
-                portfolioSnapshot: state.portfolioSnapshot,
-                timingCards: state.cards,
-                riskPlan: state.riskPlan,
-                marketContextAnalysis: state.marketContextAnalysis,
-                presetConfig: state.presetConfig,
-                feedbackContext,
-              })
-              .map((recommendation) => ({
-                ...recommendation,
-                presetId: state.preset?.id,
-              })),
+            recommendations: deps.portfolioManagerService.buildRecommendations({
+              userId: state.userId,
+              workflowRunId: state.runId,
+              watchListId: state.watchlist.id,
+              portfolioSnapshot: state.portfolioSnapshot,
+              timingCards: state.cards,
+              riskPlan: state.riskPlan,
+              marketContextAnalysis: state.marketContextAnalysis,
+            }),
           };
         },
         persist_recommendations: async (state) => {
@@ -441,7 +461,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
                   snapshot.asOfDate,
                 ]),
               ),
-              presetConfig: state.presetConfig,
+              reviewTradingDays: state.revision?.config.reviewTradingDays ?? [],
             });
 
           return {
@@ -484,7 +504,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
       currentNodeKey: undefined,
       lastCompletedNodeKey: undefined,
       timingInput: params.input as WatchlistTimingPipelineInput,
-      preset: undefined,
+      revision: undefined,
       presetConfig: undefined,
       watchlist: undefined,
       portfolioSnapshot: undefined,

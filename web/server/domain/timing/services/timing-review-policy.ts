@@ -57,6 +57,7 @@ function buildVerdict(params: {
 function buildSummary(params: {
   stockName: string;
   reviewHorizon: TimingReviewRecord["reviewHorizon"];
+  reviewTradingDays: number;
   expectedAction: TimingAction;
   actualReturnPct: number;
   maxFavorableExcursionPct: number;
@@ -70,7 +71,7 @@ function buildSummary(params: {
         ? "验证失败"
         : "表现一般";
 
-  return `${params.stockName} 在 ${params.reviewHorizon} 观察窗内 ${verdictText}，预期动作为 ${params.expectedAction}，区间收益 ${round(params.actualReturnPct)}%，最大顺行 ${round(params.maxFavorableExcursionPct)}%，最大逆行 ${round(params.maxAdverseExcursionPct)}%。`;
+  return `${params.stockName} 在 ${params.reviewTradingDays} 个交易日观察窗内 ${verdictText}，预期动作为 ${params.expectedAction}，区间收益 ${round(params.actualReturnPct)}%，最大顺行 ${round(params.maxFavorableExcursionPct)}%，最大逆行 ${round(params.maxAdverseExcursionPct)}%。`;
 }
 
 export class TimingReviewPolicy {
@@ -83,18 +84,22 @@ export class TimingReviewPolicy {
       throw new Error(`缺少 ${params.reviewRecord.stockCode} 的复盘行情数据`);
     }
 
-    const entry = params.bars[0];
+    const reviewBars = params.bars.slice(
+      0,
+      Math.max(2, params.reviewRecord.reviewTradingDays + 1),
+    );
+    const entry = reviewBars[0];
     if (!entry) {
       throw new Error(`缺少 ${params.reviewRecord.stockCode} 的复盘起点数据`);
     }
 
-    const last = params.bars[params.bars.length - 1] ?? entry;
+    const last = reviewBars[reviewBars.length - 1] ?? entry;
     const actualReturnPct = round(pct(last.close, entry.close));
     const maxFavorableExcursionPct = round(
-      Math.max(...params.bars.map((bar) => pct(bar.high, entry.close))),
+      Math.max(...reviewBars.map((bar) => pct(bar.high, entry.close))),
     );
     const maxAdverseExcursionPct = round(
-      Math.min(...params.bars.map((bar) => pct(bar.low, entry.close))),
+      Math.min(...reviewBars.map((bar) => pct(bar.low, entry.close))),
     );
     const verdict = buildVerdict({
       expectedAction: params.reviewRecord.expectedAction,
@@ -111,6 +116,7 @@ export class TimingReviewPolicy {
       reviewSummary: buildSummary({
         stockName: params.reviewRecord.stockName,
         reviewHorizon: params.reviewRecord.reviewHorizon,
+        reviewTradingDays: params.reviewRecord.reviewTradingDays,
         expectedAction: params.reviewRecord.expectedAction,
         actualReturnPct,
         maxFavorableExcursionPct,
