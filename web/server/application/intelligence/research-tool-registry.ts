@@ -243,6 +243,22 @@ export class ResearchToolRegistry {
     });
   }
 
+  async getCompanyNews(params: {
+    stockCode: string;
+    days?: number;
+    limit?: number;
+    runtimeConfig: ResearchRuntimeConfig;
+  }): Promise<ThemeNewsItem[]> {
+    if (params.runtimeConfig.toolProviders.themeNews !== "python") {
+      return [];
+    }
+    return this.pythonIntelligenceDataClient.getCompanyNews({
+      stockCode: params.stockCode,
+      days: params.days,
+      limit: params.limit,
+    });
+  }
+
   async getCandidateScreening(params: {
     theme: string;
     limit?: number;

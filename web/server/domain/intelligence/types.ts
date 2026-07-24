@@ -7,6 +7,9 @@ export type ThemeNewsItem = {
   sentiment: "positive" | "neutral" | "negative";
   relevanceScore: number;
   relatedStocks: string[];
+  scopeTags: Array<"macro" | "theme" | "industry" | "company">;
+  eventType: string;
+  matchReason: string;
 };
 
 export type CompanyEvidence = {

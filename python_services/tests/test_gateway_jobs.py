@@ -312,13 +312,13 @@ def test_refresh_concepts_endpoint_returns_queued_and_triggers_background_task()
 
 def test_admin_metrics_endpoint_returns_gateway_snapshot() -> None:
     with patch(
-        "app.providers.tushare.client.TushareProviderClient.get_theme_news",
+        "app.gateway.intelligence_gateway.MinishareNewsProvider.get_news",
         return_value=[
             {
                 "id": "ai-1",
                 "title": "AI 算力需求提升",
                 "summary": "产业链景气度持续改善。",
-                "source": "tushare:news",
+                "source": "minishare:news",
                 "publishedAt": "2026-03-08T08:00:00+00:00",
                 "sentiment": "positive",
                 "relevanceScore": 0.92,

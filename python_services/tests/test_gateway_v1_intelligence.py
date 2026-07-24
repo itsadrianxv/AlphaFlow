@@ -97,8 +97,12 @@ def test_get_v1_stock_evidence_batch_fetches_stocks_concurrently():
     assert max_active_calls >= 2
 
 
-def test_intelligence_gateway_returns_disabled_news_warning():
-    response = client.get("/api/v1/intelligence/themes/AI/news")
+def test_intelligence_gateway_uses_minishare_news_provider():
+    with patch(
+        "app.gateway.intelligence_gateway.MinishareNewsProvider.get_news",
+        return_value=[],
+    ):
+        response = client.get("/api/v1/intelligence/themes/AI/news")
 
     assert response.status_code == 200
     payload = response.json()
@@ -106,10 +110,8 @@ def test_intelligence_gateway_returns_disabled_news_warning():
     assert payload["meta"]["isStale"] is False
     assert payload["data"]["theme"] == "AI"
     assert payload["data"]["newsItems"] == []
-    assert any(
-        warning["code"] == "news_provider_disabled"
-        for warning in payload["meta"]["warnings"]
-    )
+    assert payload["meta"]["provider"] == "minishare"
+    assert payload["meta"]["warnings"] == []
 
 
 def test_v1_theme_concepts_returns_stale_cache_when_provider_fails():

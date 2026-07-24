@@ -92,6 +92,9 @@ def to_theme_news_item(raw: dict) -> ThemeNewsItem:
         sentiment=str(raw.get("sentiment") or "neutral").strip(),
         relevanceScore=float(raw.get("relevanceScore") or 0),
         relatedStocks=list(raw.get("relatedStocks") or []),
+        scopeTags=list(raw.get("scopeTags") or []),
+        eventType=str(raw.get("eventType") or "其他").strip() or "其他",
+        matchReason=str(raw.get("matchReason") or "").strip(),
     )
 
 

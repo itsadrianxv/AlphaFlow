@@ -9,6 +9,7 @@ from app.contracts.intelligence import (
     StockEvidenceBatchResponse,
     StockEvidenceResponse,
     StockResearchPackResponse,
+    ScopedNewsResponse,
     ThemeConceptsResponse,
     ThemeNewsResponse,
 )
@@ -39,6 +40,26 @@ async def get_theme_news(
         days=days,
         limit=limit,
     )
+
+
+@router.get("/news/macro", response_model=ScopedNewsResponse)
+async def get_macro_news(request: Request, days: int = Query(7, ge=1, le=30), limit: int = Query(20, ge=1, le=50)):
+    return intelligence_gateway.get_macro_news(request_id=request.state.request_id, days=days, limit=limit)
+
+
+@router.get("/industries/{industry}/news", response_model=ScopedNewsResponse)
+async def get_industry_news(request: Request, industry: str, days: int = Query(7, ge=1, le=30), limit: int = Query(20, ge=1, le=50)):
+    normalized_industry = industry.strip()
+    if not normalized_industry:
+        raise GatewayError(code="invalid_industry", message="行业不能为空", status_code=400)
+    return intelligence_gateway.get_industry_news(request_id=request.state.request_id, industry=normalized_industry, days=days, limit=limit)
+
+
+@router.get("/stocks/{stock_code}/news", response_model=ScopedNewsResponse)
+async def get_company_news(request: Request, stock_code: str, days: int = Query(7, ge=1, le=30), limit: int = Query(20, ge=1, le=50)):
+    if not is_valid_stock_code(stock_code):
+        raise GatewayError(code="invalid_stock_code", message=f"无效的股票代码格式: {stock_code}", status_code=400)
+    return intelligence_gateway.get_company_news(request_id=request.state.request_id, stock_code=stock_code, days=days, limit=limit)
 
 
 @router.get("/themes/{theme}/concepts", response_model=ThemeConceptsResponse)

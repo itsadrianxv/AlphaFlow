@@ -19,10 +19,19 @@ class ThemeNewsItem(BaseModel):
     sentiment: str
     relevanceScore: float
     relatedStocks: list[str] = Field(default_factory=list)
+    scopeTags: list[Literal["macro", "theme", "industry", "company"]] = Field(default_factory=list)
+    eventType: str = "其他"
+    matchReason: str = ""
 
 
 class ThemeNewsData(BaseModel):
     theme: str
+    newsItems: list[ThemeNewsItem]
+
+
+class ScopedNewsData(BaseModel):
+    scope: Literal["macro", "industry", "company"]
+    target: str
     newsItems: list[ThemeNewsItem]
 
 
@@ -194,6 +203,10 @@ class ConfidenceCheckBatchResponse(BaseModel):
 
 
 class ThemeNewsResponse(GatewayResponse[ThemeNewsData]):
+    pass
+
+
+class ScopedNewsResponse(GatewayResponse[ScopedNewsData]):
     pass
 
 

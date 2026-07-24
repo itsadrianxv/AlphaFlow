@@ -22,6 +22,12 @@ type ThemeNewsGatewayData = {
   newsItems: ThemeNewsItem[];
 };
 
+type ScopedNewsGatewayData = {
+  scope: "macro" | "industry" | "company";
+  target: string;
+  newsItems: ThemeNewsItem[];
+};
+
 type ThemeCandidatesGatewayData = {
   theme: string;
   candidates: IntelligenceCandidateItem[];
@@ -133,6 +139,30 @@ export class PythonIntelligenceDataClient {
       ),
     );
 
+    return payload.newsItems;
+  }
+
+  async getMacroNews(params?: { days?: number; limit?: number }): Promise<ThemeNewsItem[]> {
+    const search = new URLSearchParams({ days: String(params?.days ?? 7), limit: String(params?.limit ?? 20) });
+    const payload = await this.request<ScopedNewsGatewayData>(
+      this.intelligencePath(`/news/macro?${search.toString()}`),
+    );
+    return payload.newsItems;
+  }
+
+  async getIndustryNews(params: { industry: string; days?: number; limit?: number }): Promise<ThemeNewsItem[]> {
+    const search = new URLSearchParams({ days: String(params.days ?? 7), limit: String(params.limit ?? 20) });
+    const payload = await this.request<ScopedNewsGatewayData>(
+      this.intelligencePath(`/industries/${encodeURIComponent(params.industry)}/news?${search.toString()}`),
+    );
+    return payload.newsItems;
+  }
+
+  async getCompanyNews(params: { stockCode: string; days?: number; limit?: number }): Promise<ThemeNewsItem[]> {
+    const search = new URLSearchParams({ days: String(params.days ?? 7), limit: String(params.limit ?? 20) });
+    const payload = await this.request<ScopedNewsGatewayData>(
+      this.intelligencePath(`/stocks/${encodeURIComponent(params.stockCode)}/news?${search.toString()}`),
+    );
     return payload.newsItems;
   }
 

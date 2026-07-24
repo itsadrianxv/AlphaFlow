@@ -211,9 +211,6 @@ class TushareProviderClient:
             :normalized_limit
         ]
 
-    def get_theme_news(self, theme: str, days: int, limit: int) -> list[dict]:
-        return []
-
     def get_theme_concepts(
         self,
         theme: str,

@@ -513,6 +513,59 @@ export class CompanyResearchWorkflowService {
         };
       }
 
+      if (params.unit.capability === "news_search" && companyBrief.stockCode) {
+        const news = await this.researchToolRegistry.getCompanyNews({
+          stockCode: companyBrief.stockCode,
+          days: 30,
+          limit: params.runtimeConfig.maxEvidencePerUnit,
+          runtimeConfig: params.runtimeConfig,
+        });
+        const evidence = news.map((item) => ({
+          referenceId: item.id,
+          title: item.title,
+          sourceName: item.source,
+          sourceType: "news" as const,
+          sourceTier: "third_party" as const,
+          collectorKey: "news_sources" as const,
+          isFirstParty: false,
+          snippet: item.summary,
+          extractedFact: `${item.eventType}：${item.matchReason}`,
+          relevance: "Minishare 标准化新闻事件，用于验证近期催化与风险。",
+          publishedAt: item.publishedAt,
+        }));
+        return {
+          collectorKey: "news_sources",
+          evidence,
+          notes: [`Collected ${evidence.length} Minishare news items.`],
+          queries: [],
+          configured: true,
+          groundedSources,
+          researchNote: buildNote({
+            unit: params.unit,
+            summary: `Collected ${evidence.length} Minishare news items.`,
+            keyFacts: evidence.slice(0, 3).map((item) => item.extractedFact),
+            missingInfo: evidence.length > 0 ? [] : ["No relevant Minishare company news returned."],
+            evidenceReferenceIds: evidence.map((item) => item.referenceId),
+            sourceUrls: [],
+          }),
+          run: {
+            unitId: params.unit.id,
+            title: params.unit.title,
+            capability: params.unit.capability,
+            status: "completed",
+            attempt: 1,
+            repairCount: 0,
+            validationErrors: [],
+            qualityFlags: evidence.length > 0 ? [] : ["no_company_news"],
+            startedAt,
+            completedAt: new Date().toISOString(),
+            notes: [`Collected ${evidence.length} Minishare news items.`],
+            sourceUrls: [],
+            evidenceCount: evidence.length,
+          },
+        };
+      }
+
       const collectorKey = resolveCollectorKeyForCapability(
         params.unit.capability,
       );

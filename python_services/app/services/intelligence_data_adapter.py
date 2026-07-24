@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.gateway.intelligence_gateway import intelligence_gateway
 from app.providers.tushare.client import TushareProviderClient
 from app.services.zhipu_search_client import ZhipuSearchClient
 
@@ -12,14 +13,12 @@ _ZHIPU_CLIENT = ZhipuSearchClient()
 class IntelligenceDataAdapter:
     """Adapter used by legacy routers and tests.
 
-    Runtime data access is TuShare-only. Theme news is intentionally disabled by
-    default because TuShare news requires a separate permission outside normal
-    points-based market data access.
+    Market and company evidence access remains TuShare-backed; news uses Minishare.
     """
 
     @staticmethod
     def get_theme_news(theme: str, days: int = 7, limit: int = 20) -> list[dict]:
-        return _CLIENT.get_theme_news(theme=theme, days=days, limit=limit)
+        return intelligence_gateway.get_theme_news(request_id="legacy-news", theme=theme, days=days, limit=limit).data.newsItems
 
     @staticmethod
     def get_candidates(theme: str, limit: int = 6) -> list[dict]:
@@ -32,7 +31,7 @@ class IntelligenceDataAdapter:
 
     @staticmethod
     def get_theme_news_strict(theme: str, days: int = 7, limit: int = 20) -> list[dict]:
-        return _CLIENT.get_theme_news(theme=theme, days=days, limit=limit)
+        return IntelligenceDataAdapter.get_theme_news(theme=theme, days=days, limit=limit)
 
     @staticmethod
     def get_candidates_strict(theme: str, limit: int = 6) -> list[dict]:

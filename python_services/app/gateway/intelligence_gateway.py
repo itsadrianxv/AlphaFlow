@@ -13,6 +13,8 @@ from app.contracts.intelligence import (
     StockEvidenceResponse,
     StockResearchPackData,
     StockResearchPackResponse,
+    ScopedNewsData,
+    ScopedNewsResponse,
     ThemeConceptsData,
     ThemeConceptsResponse,
     ThemeNewsData,
@@ -30,6 +32,7 @@ from app.providers.mappers import (
     to_theme_news_item,
 )
 from app.providers.tushare.client import TushareProviderClient
+from app.providers.minishare.news import MinishareNewsProvider, NewsQuery
 from app.services.zhipu_search_client import ZhipuSearchClient
 
 
@@ -37,9 +40,11 @@ class IntelligenceGateway:
     def __init__(
         self,
         provider_client: TushareProviderClient | None = None,
+        news_provider: MinishareNewsProvider | None = None,
         zhipu_client: ZhipuSearchClient | None = None,
     ) -> None:
         self._provider_client = provider_client or TushareProviderClient()
+        self._news_provider = news_provider or MinishareNewsProvider()
         self._zhipu_client = zhipu_client or ZhipuSearchClient()
         self._retry_policy = RetryPolicy(max_attempts=1)
         self._cache = gateway_cache
@@ -54,23 +59,9 @@ class IntelligenceGateway:
     ) -> ThemeNewsResponse:
         started_at = time.perf_counter()
         metrics_recorder.record_theme_request(dataset="theme_news", theme=theme)
-        result = execute_cached(
-            dataset="theme_news",
-            provider=self._provider_client.provider_name,
-            params={"theme": theme, "days": days, "limit": limit},
-            fetcher=lambda: [
-                to_theme_news_item(item)
-                for item in self._provider_client.get_theme_news(
-                    theme=theme,
-                    days=days,
-                    limit=limit,
-                )
-            ],
-            cache_policy=get_cache_policy("theme_news"),
-            retry_policy=self._retry_policy,
-            cache=self._cache,
+        result = self._get_news_result(
+            query=NewsQuery(scope="theme", target=theme, days=days, limit=limit, terms=(theme,)),
             force_refresh=force_refresh,
-            allow_stale=False,
         )
 
         return ThemeNewsResponse(
@@ -80,16 +71,47 @@ class IntelligenceGateway:
                 started_at=started_at,
                 cache_hit=result.cache_hit,
                 is_stale=result.is_stale,
-                warnings=[
-                    *result.warnings,
-                    GatewayWarning(
-                        code="news_provider_disabled",
-                        message="TuShare news requires separate permission and is disabled by default.",
-                    ),
-                ],
+                warnings=result.warnings,
                 as_of=result.as_of,
             ),
             data=ThemeNewsData(theme=theme, newsItems=result.data),
+        )
+
+    def get_macro_news(self, request_id: str, days: int, limit: int, force_refresh: bool = False) -> ScopedNewsResponse:
+        return self._get_scoped_news(request_id, NewsQuery(scope="macro", target="宏观", days=days, limit=limit), force_refresh)
+
+    def get_industry_news(self, request_id: str, industry: str, days: int, limit: int, force_refresh: bool = False) -> ScopedNewsResponse:
+        return self._get_scoped_news(request_id, NewsQuery(scope="industry", target=industry, days=days, limit=limit, terms=(industry,)), force_refresh)
+
+    def get_company_news(self, request_id: str, stock_code: str, days: int, limit: int, force_refresh: bool = False) -> ScopedNewsResponse:
+        snapshot = self._provider_client.get_stock_snapshot(stock_code)
+        company_name = str(snapshot.get("name") or snapshot.get("stockName") or stock_code).strip()
+        return self._get_scoped_news(
+            request_id,
+            NewsQuery(scope="company", target=company_name, days=days, limit=limit, terms=(company_name, stock_code), related_stocks=(stock_code,)),
+            force_refresh,
+        )
+
+    def _get_scoped_news(self, request_id: str, query: NewsQuery, force_refresh: bool) -> ScopedNewsResponse:
+        started_at = time.perf_counter()
+        result = self._get_news_result(query=query, force_refresh=force_refresh)
+        return ScopedNewsResponse(
+            meta=build_meta(request_id=request_id, provider=result.provider, started_at=started_at, cache_hit=result.cache_hit, is_stale=result.is_stale, warnings=result.warnings, as_of=result.as_of),
+            data=ScopedNewsData(scope=query.scope, target=query.target, newsItems=result.data),
+        )
+
+    def _get_news_result(self, *, query: NewsQuery, force_refresh: bool):
+        metrics_recorder.record_theme_request(dataset=f"{query.scope}_news", theme=query.target)
+        return execute_cached(
+            dataset=f"{query.scope}_news",
+            provider=self._news_provider.provider_name,
+            params={"scope": query.scope, "target": query.target, "days": query.days, "limit": query.limit, "terms": list(query.terms), "stocks": list(query.related_stocks)},
+            fetcher=lambda: [to_theme_news_item(item) for item in self._news_provider.get_news(query)],
+            cache_policy=get_cache_policy("theme_news"),
+            retry_policy=self._retry_policy,
+            cache=self._cache,
+            force_refresh=force_refresh,
+            allow_stale=False,
         )
 
     def get_theme_concepts(

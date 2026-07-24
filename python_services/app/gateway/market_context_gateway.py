@@ -130,12 +130,18 @@ class MarketContextGateway:
         regime = self._build_regime_summary(macro_snapshot)
         flow = self._build_flow_summary(flow_snapshot)
         status = self._resolve_status(availability)
+        macro_news = self._intelligence_gateway.get_macro_news(
+            request_id="market-context:macro:news",
+            days=7,
+            limit=5,
+        ).data.newsItems
 
         return MarketContextSnapshot(
             asOf=max(as_of_candidates),
             status=status,
             regime=regime,
             flow=flow,
+            macroNews=macro_news,
             hotThemes=hot_themes,
             downstreamHints=self._build_downstream_hints(
                 hot_themes=hot_themes,

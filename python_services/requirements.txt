@@ -8,6 +8,10 @@ pydantic==2.10.5
 # Financial data source
 tushare>=1.4.21
 
+# Minishare news feed. The package is published on its dedicated simple index.
+--extra-index-url https://minidoc.pages.dev/simple/
+minishare==0.1009.0
+
 # HTTP client (for potential external API calls)
 httpx==0.26.0
 

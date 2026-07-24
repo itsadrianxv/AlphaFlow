@@ -86,6 +86,9 @@ export const hotThemeNewsItemSchema = z.object({
   sentiment: z.string().min(1),
   relevanceScore: z.number(),
   relatedStocks: z.array(z.string()).default([]),
+  scopeTags: z.array(z.enum(["macro", "theme", "industry", "company"])).default([]),
+  eventType: z.string().default("其他"),
+  matchReason: z.string().default(""),
 });
 
 export const hotThemeContextSchema = z.object({
@@ -102,6 +105,7 @@ export const marketContextSnapshotSchema = z.object({
   status: marketContextStatusSchema,
   regime: marketRegimeSummarySchema,
   flow: marketFlowSummarySchema,
+  macroNews: z.array(hotThemeNewsItemSchema).default([]),
   hotThemes: z.array(hotThemeContextSchema).default([]),
   downstreamHints: z.object({
     workflows: marketContextSectionHintSchema,

@@ -30,6 +30,9 @@ class ThemeNewsItem(BaseModel):
     sentiment: str
     relevanceScore: float
     relatedStocks: list[str]
+    scopeTags: list[str] = Field(default_factory=list)
+    eventType: str = "其他"
+    matchReason: str = ""
 
 
 class CandidateStock(BaseModel):

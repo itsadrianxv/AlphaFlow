@@ -36,6 +36,7 @@ cp docker/.env.example docker/.env
 - `ZHIPU_API_KEY`
 - `TUSHARE_TOKEN`
 - `TUSHARE_API_URL`（默认 `https://api.tushare.pro`；使用代理时可配置为 `https://teajoin.com`）
+- `MINISHARE_TOKEN`（新闻短讯/快讯；只配置在 `docker/.env`，不得提交）
 - `REFCHECKER_*`
 - `AGENT_RUNTIME_MODEL_*`
 
@@ -95,6 +96,8 @@ docker compose --env-file docker/.env -f docker/docker-compose.yml exec -T pytho
 ```bash
 docker compose --env-file docker/.env -f docker/docker-compose.yml config
 ```
+
+Minishare 新闻在 Python 网关内使用 DeepSeek 做事件分类、情绪与相关度重排；因此还需要配置 `DEEPSEEK_API_KEY`。新闻 Token、Minishare 响应或重排调用异常时，新闻接口会明确报错，不会静默返回空数据。
 
 `web` 容器启动时会依次执行：
 

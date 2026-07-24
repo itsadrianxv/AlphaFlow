@@ -15,7 +15,7 @@ def test_get_theme_news_success():
             "id": "news-1",
             "title": "AI板块景气快照",
             "summary": "板块涨跌幅2.1%",
-            "source": "tushare:news",
+            "source": "minishare:news",
             "publishedAt": "2026-01-01T00:00:00+00:00",
             "sentiment": "positive",
             "relevanceScore": 0.82,

@@ -64,6 +64,7 @@ class MarketContextSnapshot(BaseModel):
     status: Literal["complete", "partial", "unavailable"]
     regime: MarketRegimeSummary
     flow: MarketFlowSummary
+    macroNews: list[ThemeNewsItem] = Field(default_factory=list)
     hotThemes: list[HotThemeContext] = Field(default_factory=list)
     downstreamHints: MarketContextDownstreamHints
     availability: MarketContextAvailability
