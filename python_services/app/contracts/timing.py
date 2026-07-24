@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -144,6 +144,69 @@ class TimingSignalBatchRequest(BaseModel):
     includeBars: bool = False
 
 
+TimingEvidenceStatus = Literal[
+    "AVAILABLE",
+    "MISSING",
+    "STALE",
+    "OBSERVATION_ONLY",
+]
+
+
+class TimingFeatureEvidence(BaseModel):
+    indicatorId: str
+    timeframe: TimingTimeframe
+    value: float | str | bool | None
+    previousValue: float | str | bool | None = None
+    consecutiveBars: int | None = Field(default=None, ge=0)
+    asOfDate: str
+    source: str
+    status: TimingEvidenceStatus
+    rawValue: float | str | bool | None = None
+    normalizedValue: float | str | bool | None = None
+    inputValues: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class TimingDataManifestItem(BaseModel):
+    dataset: str
+    source: str
+    timeframe: TimingTimeframe | None = None
+    dataDate: str | None = None
+    fetchedAt: str
+    completeness: Literal["COMPLETE", "PARTIAL", "MISSING", "OBSERVATION_ONLY"]
+    degradationReason: str | None = None
+    contentHash: str
+    rowCount: int = Field(..., ge=0)
+
+
+class TimingEvidenceData(BaseModel):
+    stockCode: str
+    stockName: str
+    asOfDate: str
+    featureVersion: str
+    features: list[TimingFeatureEvidence] = Field(default_factory=list)
+    barsByTimeframe: dict[TimingTimeframe, list[TimingBar]] = Field(default_factory=dict)
+    sourceRows: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+    dataManifest: list[TimingDataManifestItem] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    inputHash: str
+
+
+class TimingEvidenceBatchData(BaseModel):
+    items: list[TimingEvidenceData] = Field(default_factory=list)
+    errors: list[BatchItemError] = Field(default_factory=list)
+
+
+class TimingEvidenceBatchRequest(BaseModel):
+    stockCodes: list[str] = Field(..., min_length=1, max_length=100)
+    asOfDate: str | None = None
+    timeframes: list[TimingTimeframe] = Field(
+        default_factory=lambda: ["MONTHLY", "WEEKLY", "DAILY", "MINUTE_60"]
+    )
+    indicatorIds: list[str] = Field(default_factory=list, max_length=100)
+    lookbackDays: int = Field(default=365, ge=120, le=900)
+
+
 class MarketIndexSnapshot(BaseModel):
     code: str
     name: str
@@ -232,6 +295,10 @@ class TimingSignalResponse(GatewayResponse[TimingSignalData]):
 
 
 class TimingSignalBatchResponse(GatewayResponse[TimingSignalBatchData]):
+    pass
+
+
+class TimingEvidenceBatchResponse(GatewayResponse[TimingEvidenceBatchData]):
     pass
 
 

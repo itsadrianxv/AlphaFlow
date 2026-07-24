@@ -42,6 +42,7 @@ def _sample_bars(stock_code: str = "600519") -> list[DailyBar]:
 class FakeDataProvider:
     fail_codes: set[str] | None = None
     snapshot_rows: list[MarketSnapshotRow] | None = None
+    raw_frames: dict[str, object] | None = None
 
     provider_name = "tushare"
 
@@ -71,6 +72,12 @@ class FakeDataProvider:
     def get_market_snapshot(self, as_of_date: str | None = None) -> list[MarketSnapshotRow]:
         del as_of_date
         return self.snapshot_rows or []
+
+    def get_raw_frame(self, dataset: str, **_params):
+        import pandas as pd
+
+        frame = (self.raw_frames or {}).get(dataset)
+        return frame.copy() if isinstance(frame, pd.DataFrame) else pd.DataFrame()
 
 
 @pytest.fixture
@@ -149,6 +156,61 @@ def test_get_timing_signal_batch_reports_partial_errors(install_gateway) -> None
     assert len(payload["data"]["errors"]) == 1
     assert payload["data"]["errors"][0]["stockCode"] == "000001"
     assert any(warning["code"] == "partial_results" for warning in payload["meta"]["warnings"])
+
+
+def test_get_timing_evidence_batch_returns_normalized_audit_inputs(install_gateway) -> None:
+    import pandas as pd
+
+    trade_date = "20260706"
+    install_gateway(FakeDataProvider(raw_frames={
+        "stk_factor_pro": pd.DataFrame({
+            "ts_code": ["600519.SH"], "trade_date": [trade_date],
+            "close": [47.9], "close_qfq": [23.95], "dmi_adx_qfq": [28.0],
+            "rsi_qfq_12": [55.0], "macd_qfq": [0.8], "volume_ratio": [1.6],
+        }),
+        "cyq_perf": pd.DataFrame({
+            "ts_code": ["600519.SH"], "trade_date": [trade_date],
+            "cost_15pct": [40.0], "cost_50pct": [44.0], "weight_avg": [45.0],
+            "winner_rate": [8.0],
+        }),
+        "stk_nineturn": pd.DataFrame({
+            "ts_code": ["600519.SH"], "trade_date": [trade_date],
+            "freq": ["daily"], "down_count": [8.0],
+        }),
+        "stk_auction_o": pd.DataFrame({
+            "ts_code": ["600519.SH"], "trade_date": [trade_date],
+            "close": [48.0], "vwap": [47.8], "open": [47.5], "high": [48.0],
+            "low": [47.5], "vol": [1000.0], "amount": [47800.0],
+        }),
+    }))
+
+    response = client.post("/api/v1/timing/stocks/evidence/batch", json={
+        "stockCodes": ["600519"],
+        "asOfDate": "2026-07-06",
+        "timeframes": ["DAILY", "WEEKLY"],
+        "indicatorIds": [
+            "trend.close_above_ema20", "trend.adx", "chip.close_above_weighted_cost",
+            "reversal.nine_down_count", "auction.close_above_vwap",
+        ],
+    })
+
+    assert response.status_code == 200
+    assert response.json()["data"]["items"], response.json()["data"]["errors"]
+    item = response.json()["data"]["items"][0]
+    features = {feature["indicatorId"]: feature for feature in item["features"]}
+    assert features["trend.adx"]["value"] == 28.0
+    assert features["trend.close_above_ema20"]["asOfDate"] == "2026-07-03"
+    assert features["reversal.nine_down_count"]["value"] == 8.0
+    assert features["auction.close_above_vwap"]["warnings"]
+    assert features["chip.close_above_weighted_cost"]["normalizedValue"] == 22.5
+    assert len(item["inputHash"]) == 64
+    assert {entry["dataset"] for entry in item["dataManifest"]} >= {
+        "bars", "stk_factor_pro", "cyq_perf", "stk_nineturn", "stk_auction_o",
+    }
+    weekly_manifest = next(
+        entry for entry in item["dataManifest"] if entry.get("timeframe") == "WEEKLY"
+    )
+    assert weekly_manifest["completeness"] == "OBSERVATION_ONLY"
 
 
 def test_get_timing_bars_rejects_invalid_timeframe() -> None:

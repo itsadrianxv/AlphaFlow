@@ -21,6 +21,8 @@ from app.contracts.timing import (
     TimingBar,
     TimingBarsData,
     TimingBarsResponse,
+    TimingEvidenceBatchData,
+    TimingEvidenceBatchResponse,
     TimingSignalBatchData,
     TimingSignalBatchResponse,
     TimingSignalData,
@@ -40,6 +42,7 @@ from app.gateway.common import GatewayError, build_meta, execute_cached, gateway
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
 from app.services.timing_indicators import timing_indicators_service
+from app.services.timing_evidence import timing_evidence_service
 
 SIGNAL_BENCHMARK_CODES = ["510300", "510500", "159915"]
 MARKET_INDEX_CODES = [
@@ -212,6 +215,141 @@ class TimingGateway:
                 else datetime.now(UTC).isoformat(),
             ),
             data=TimingSignalBatchData(items=items, errors=errors),
+        )
+
+    def get_evidence_batch(
+        self,
+        *,
+        request_id: str,
+        stock_codes: list[str],
+        as_of_date: str | None,
+        timeframes: list[TimingTimeframe],
+        indicator_ids: list[str],
+        lookback_days: int,
+    ) -> TimingEvidenceBatchResponse:
+        started_at = time.perf_counter()
+        items = []
+        errors: list[BatchItemError] = []
+        warnings: list[GatewayWarning] = []
+        resolved_request_date = as_of_date or datetime.now(UTC).strftime("%Y-%m-%d")
+        benchmark_histories = self._load_signal_benchmark_histories(
+            as_of_date=resolved_request_date,
+            lookback_days=lookback_days,
+        )
+
+        for stock_code in stock_codes:
+            try:
+                items.append(self._build_evidence_data(
+                    stock_code=stock_code,
+                    as_of_date=resolved_request_date,
+                    timeframes=timeframes,
+                    indicator_ids=indicator_ids,
+                    lookback_days=lookback_days,
+                    benchmark_history=benchmark_histories.get("510300"),
+                ))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(BatchItemError(
+                    stockCode=stock_code,
+                    code=str(getattr(exc, "code", "evidence_fetch_failed")),
+                    message=str(exc),
+                ))
+
+        if errors:
+            warnings.append(GatewayWarning(
+                code="partial_results",
+                message="批量择时证据存在部分失败，详情见 data.errors",
+            ))
+        return TimingEvidenceBatchResponse(
+            meta=build_meta(
+                request_id=request_id,
+                provider=self._signal_data_provider.provider_name,
+                started_at=started_at,
+                cache_hit=False,
+                is_stale=False,
+                warnings=warnings,
+                as_of=max((item.asOfDate for item in items), default=resolved_request_date),
+            ),
+            data=TimingEvidenceBatchData(items=items, errors=errors),
+        )
+
+    def _build_evidence_data(
+        self,
+        *,
+        stock_code: str,
+        as_of_date: str,
+        timeframes: list[TimingTimeframe],
+        indicator_ids: list[str],
+        lookback_days: int,
+        benchmark_history: pd.DataFrame | None,
+    ):
+        profile = self._signal_data_provider.get_stock_profile(stock_code)
+        histories: dict[str, pd.DataFrame] = {}
+        for timeframe in dict.fromkeys(timeframes):
+            try:
+                if timeframe.startswith("MINUTE_"):
+                    start_date = self._resolve_intraday_start(start=None, end=as_of_date)
+                    end_date = self._normalize_intraday_end(as_of_date)
+                    adjust = ""
+                else:
+                    start_date = self._resolve_start_date(
+                        start=None,
+                        end=as_of_date,
+                        lookback_days=self._timeframe_lookback_days(timeframe, lookback_days * 2),
+                    )
+                    end_date = as_of_date
+                    adjust = "qfq"
+                histories[timeframe] = self._get_stock_bars(
+                    self._signal_data_provider,
+                    stock_code=stock_code,
+                    start_date=start_date,
+                    end_date=end_date,
+                    adjust=adjust,
+                    timeframe=timeframe,
+                )
+            except GatewayError:
+                histories[timeframe] = pd.DataFrame()
+
+        if "DAILY" not in histories or histories["DAILY"].empty:
+            raise GatewayError(
+                code="daily_bars_required",
+                message=f"{stock_code} 缺少日线，无法构建择时证据",
+                status_code=422,
+                provider=self._signal_data_provider.provider_name,
+            )
+
+        start_date = self._resolve_start_date(start=None, end=as_of_date, lookback_days=lookback_days * 2)
+        end_date = as_of_date.replace("-", "")
+        special_frames: dict[str, pd.DataFrame] = {}
+        special_errors: dict[str, str] = {}
+        for dataset in ("stk_factor_pro", "cyq_perf", "stk_nineturn", "stk_auction_o"):
+            params = {
+                "ts_code": profile.tsCode,
+                "start_date": start_date,
+                "end_date": end_date,
+            }
+            if dataset == "stk_nineturn":
+                params["freq"] = "daily"
+            try:
+                special_frames[dataset] = self._get_raw_frame(
+                    self._signal_data_provider, dataset, **params,
+                )
+                if special_frames[dataset].empty:
+                    special_errors[dataset] = "接口返回空数据"
+            except Exception as exc:  # noqa: BLE001
+                special_errors[dataset] = str(exc)
+
+        latest_daily = timing_indicators_service.normalize_history(histories["DAILY"]).iloc[-1]
+        tradable = bool(float(latest_daily["volume"]) > 0)
+        return timing_evidence_service.build(
+            stock_code=stock_code,
+            stock_name=profile.stockName,
+            as_of_date=as_of_date,
+            histories=histories,
+            special_frames=special_frames,
+            special_errors=special_errors,
+            indicator_ids=indicator_ids,
+            benchmark_history=benchmark_history,
+            tradable=tradable,
         )
 
     def get_market_context(

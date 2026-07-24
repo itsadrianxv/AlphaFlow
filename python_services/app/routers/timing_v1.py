@@ -7,6 +7,8 @@ from fastapi import APIRouter, Query, Request
 from app.contracts.timing import (
     MarketContextSnapshotResponse,
     TimingBarsResponse,
+    TimingEvidenceBatchRequest,
+    TimingEvidenceBatchResponse,
     TimingSignalBatchRequest,
     TimingSignalBatchResponse,
     TimingSignalResponse,
@@ -126,6 +128,29 @@ async def get_stock_signal_batch(
         as_of_date=body.asOfDate,
         lookback_days=body.lookbackDays,
         include_bars=body.includeBars,
+    )
+
+
+@router.post("/stocks/evidence/batch", response_model=TimingEvidenceBatchResponse)
+async def get_stock_evidence_batch(
+    request: Request,
+    body: TimingEvidenceBatchRequest,
+):
+    invalid_codes = [code for code in body.stockCodes if not is_valid_stock_code(code)]
+    if invalid_codes:
+        raise GatewayError(
+            code="invalid_stock_code",
+            message=f"无效的股票代码格式: {', '.join(invalid_codes)}",
+            status_code=400,
+            provider="gateway",
+        )
+    return timing_gateway.get_evidence_batch(
+        request_id=request.state.request_id,
+        stock_codes=body.stockCodes,
+        as_of_date=body.asOfDate,
+        timeframes=body.timeframes,
+        indicator_ids=body.indicatorIds,
+        lookback_days=body.lookbackDays,
     )
 
 
