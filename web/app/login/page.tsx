@@ -67,6 +67,7 @@ export default async function LoginPage(props: {
   searchParams: Promise<{
     callbackUrl?: string;
     error?: string;
+    reason?: string;
     redirectTo?: string;
   }>;
 }) {
@@ -75,8 +76,9 @@ export default async function LoginPage(props: {
     searchParams.callbackUrl ?? searchParams.redirectTo,
   );
   const session = await auth();
+  const sessionExpired = searchParams.reason === "session-expired";
 
-  if (session?.user) {
+  if (session?.user && !sessionExpired) {
     redirect(redirectTo);
   }
 
