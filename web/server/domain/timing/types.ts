@@ -9,13 +9,41 @@ export const TIMING_SOURCE_TYPES = [
 export const TIMING_ACTIONS = [
   "WATCH",
   "PROBE",
+  "ENTER",
   "ADD",
   "HOLD",
   "TRIM",
   "EXIT",
 ] as const;
 
-export const STAGE_ONE_TIMING_ACTIONS = ["WATCH", "PROBE", "ADD"] as const;
+export const STAGE_ONE_TIMING_ACTIONS = [
+  "WATCH",
+  "PROBE",
+  "ENTER",
+] as const;
+
+export const TIMING_SETUP_TYPES = [
+  "TREND_CONTINUATION",
+  "BREAKOUT",
+  "PULLBACK",
+  "OVERSOLD_REVERSAL",
+] as const;
+
+export const TIMING_HORIZON_TEMPLATES = [
+  "SHORT_SWING",
+  "SWING",
+  "MEDIUM_TERM",
+] as const;
+
+export const TIMING_RULE_ROLES = ["PRIMARY", "CONFIRMATION", "VETO"] as const;
+
+export const TIMING_DECISION_STATUSES = [
+  "DATA_INCOMPLETE",
+  "NOT_READY",
+  "FORMING",
+  "TRIGGERED",
+  "INVALIDATED",
+] as const;
 
 export const TIMING_RISK_FLAGS = [
   "HIGH_VOLATILITY",
@@ -106,6 +134,10 @@ export const TIMING_PRESET_ADJUSTMENT_KINDS = [
 export type TimingSourceType = (typeof TIMING_SOURCE_TYPES)[number];
 export type TimingAction = (typeof TIMING_ACTIONS)[number];
 export type StageOneTimingAction = (typeof STAGE_ONE_TIMING_ACTIONS)[number];
+export type TimingSetupType = (typeof TIMING_SETUP_TYPES)[number];
+export type TimingHorizonTemplate = (typeof TIMING_HORIZON_TEMPLATES)[number];
+export type TimingRuleRole = (typeof TIMING_RULE_ROLES)[number];
+export type TimingDecisionStatus = (typeof TIMING_DECISION_STATUSES)[number];
 export type TimingRiskFlag = (typeof TIMING_RISK_FLAGS)[number];
 export type TimingMarketState = (typeof TIMING_MARKET_STATES)[number];
 export type TimingMarketTransition = (typeof TIMING_MARKET_TRANSITIONS)[number];
@@ -179,6 +211,128 @@ export type TimingPresetConfig = {
   reviewSchedule?: {
     horizons?: TimingReviewHorizon[];
   };
+};
+
+export type TimingRuleOperator =
+  | ">="
+  | ">"
+  | "<="
+  | "<"
+  | "=="
+  | "crosses_above"
+  | "crosses_below";
+
+export type TimingRuleDefinition = {
+  id: string;
+  name: string;
+  indicatorId: string;
+  role: TimingRuleRole;
+  timeframe: TimingTimeframe;
+  operator: TimingRuleOperator;
+  threshold: number | string | boolean;
+  confirmationBars: number;
+  required: boolean;
+  vetoSeverity?: "WARNING" | "CRITICAL";
+  explanation: string;
+  enabled: boolean;
+};
+
+export type TimingRuleGroupConfig = {
+  role: TimingRuleRole;
+  minSatisfied: number;
+  rules: TimingRuleDefinition[];
+};
+
+export type TimingTimeframePlan = {
+  template: TimingHorizonTemplate;
+  contextTimeframes: TimingTimeframe[];
+  decisionTimeframe: TimingTimeframe;
+  executionTimeframe: TimingTimeframe;
+  fallbackExecutionTimeframe?: TimingTimeframe;
+};
+
+export type TimingPresetConfigV2 = {
+  schemaVersion: 2;
+  setup: TimingSetupType;
+  riskProfile: "BALANCED";
+  timeframePlan: TimingTimeframePlan;
+  ruleGroups: TimingRuleGroupConfig[];
+  marketGate: {
+    neutralEntryAction: "PROBE";
+    neutralAddAction: "HOLD";
+    riskOffBlockedActions: Array<"PROBE" | "ENTER" | "ADD">;
+  };
+  dataPolicy: {
+    asOfMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL";
+    primaryMissing: "NO_DECISION";
+    confirmationMissing: "KEEP_FORMING";
+    vetoMissing: "BLOCK_NEW_EXPOSURE";
+    unfinishedHigherTimeframe: "OBSERVATION_ONLY";
+  };
+  reviewTradingDays: number[];
+  backtestPolicy: {
+    minimumMonths: number;
+    minimumStocks: number;
+    minimumTriggeredEvents: number;
+    minimumPrimaryCompletenessPct: number;
+    slippageBps: number;
+    commissionBps: number;
+    sellTaxBps: number;
+  };
+};
+
+export type TimingFeatureEvidence = {
+  indicatorId: string;
+  timeframe: TimingTimeframe;
+  value: number | string | boolean | null;
+  previousValue?: number | string | boolean | null;
+  consecutiveBars?: number;
+  asOfDate: string;
+  source: string;
+  status: "AVAILABLE" | "MISSING" | "STALE" | "OBSERVATION_ONLY";
+  rawValue?: number | string | boolean | null;
+  normalizedValue?: number | string | boolean | null;
+  warnings?: string[];
+};
+
+export type TimingRuleEvaluation = {
+  ruleId: string;
+  ruleName: string;
+  role: TimingRuleRole;
+  indicatorId: string;
+  timeframe: TimingTimeframe;
+  operator: TimingRuleOperator;
+  threshold: TimingRuleDefinition["threshold"];
+  actual: TimingFeatureEvidence["value"];
+  asOfDate?: string;
+  source?: string;
+  status: "PASSED" | "FAILED" | "MISSING" | "STALE" | "OBSERVATION_ONLY";
+  required: boolean;
+  vetoSeverity?: TimingRuleDefinition["vetoSeverity"];
+  explanation: string;
+};
+
+export type TimingDecisionAudit = {
+  schemaVersion: 2;
+  strategyRevisionId?: string;
+  configHash?: string;
+  engineVersion: string;
+  featureVersion: string;
+  setup: TimingSetupType;
+  status: TimingDecisionStatus;
+  ruleEvaluations: TimingRuleEvaluation[];
+  groupResults: Array<{
+    role: TimingRuleRole;
+    passed: number;
+    required: number;
+    minSatisfied: number;
+    satisfied: boolean;
+    missing: number;
+  }>;
+  riskUnresolved: boolean;
+  potentialAction: TimingAction | null;
+  finalAction: TimingAction | null;
+  gateTrace: string[];
 };
 
 export type TimingBar = {

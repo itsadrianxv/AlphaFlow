@@ -60,7 +60,7 @@ export class TimingActionPolicy {
       params.confidence >= (thresholds?.addConfidence ?? 74) &&
       params.signalStrength >= (thresholds?.addSignalStrength ?? 68)
     ) {
-      return "ADD";
+      return "ENTER";
     }
 
     if (

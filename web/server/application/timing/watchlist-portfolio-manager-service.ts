@@ -560,6 +560,7 @@ export class WatchlistPortfolioManagerService {
     const actionScore: Record<TimingAction, number> = {
       WATCH: 20,
       PROBE: 55,
+      ENTER: 72,
       ADD: 72,
       HOLD: 46,
       TRIM: 78,

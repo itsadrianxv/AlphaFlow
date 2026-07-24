@@ -14,7 +14,12 @@ function pct(change: number, base: number) {
 }
 
 function isBullishAction(action: TimingAction) {
-  return action === "ADD" || action === "PROBE" || action === "HOLD";
+  return (
+    action === "ENTER" ||
+    action === "ADD" ||
+    action === "PROBE" ||
+    action === "HOLD"
+  );
 }
 
 function buildVerdict(params: {

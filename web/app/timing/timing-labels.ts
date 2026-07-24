@@ -15,6 +15,7 @@ import type {
 const timingActionLabelMap: Record<TimingAction, string> = {
   WATCH: "观望",
   PROBE: "试仓",
+  ENTER: "建仓",
   ADD: "加仓",
   HOLD: "持有",
   TRIM: "减仓",
