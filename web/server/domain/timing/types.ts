@@ -335,6 +335,64 @@ export type TimingDecisionAudit = {
   gateTrace: string[];
 };
 
+export type TimingPresetRevisionStatus =
+  | "DRAFT"
+  | "VALIDATING"
+  | "PUBLISHED"
+  | "ARCHIVED";
+
+export type TimingPresetRevisionRecord = {
+  id: string;
+  presetId: string;
+  userId: string;
+  revisionNumber: number;
+  status: TimingPresetRevisionStatus;
+  config: TimingPresetConfigV2;
+  configHash: string;
+  engineVersion: string;
+  featureVersion: string;
+  publishedAt?: Date | null;
+  archivedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type TimingStrategyRecord = {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string | null;
+  activeRevisionId?: string | null;
+  activeRevision?: TimingPresetRevisionRecord | null;
+  revisions: TimingPresetRevisionRecord[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type TimingBacktestQualityMetrics = {
+  coveredMonths: number;
+  stockCount: number;
+  triggeredEvents: number;
+  primaryCompletenessPct: number;
+  noLookaheadPassed: boolean;
+  gatePassed: boolean;
+  failures: string[];
+};
+
+export type TimingBacktestPerformanceMetrics = {
+  completedTrades: number;
+  hitRatePct: number;
+  averageReturnPct: number;
+  averageExcessReturnPct: number;
+  maxFavorableExcursionPct: number;
+  maxAdverseExcursionPct: number;
+};
+
+export type TimingExecutionRecordDecision =
+  | "ACCEPTED"
+  | "REJECTED"
+  | "SKIPPED";
+
 export type TimingBar = {
   tradeDate: string;
   open: number;

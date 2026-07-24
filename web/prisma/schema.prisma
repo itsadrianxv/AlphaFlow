@@ -74,6 +74,9 @@ model User {
     timingRecommendations             TimingRecommendation[]
     timingReviewRecords               TimingReviewRecord[]
     timingPresets                     TimingPreset[]
+    timingPresetRevisions             TimingPresetRevision[]
+    timingBacktestRuns                TimingBacktestRun[]
+    timingExecutionRecords            TimingExecutionRecord[]
     timingFeedbackObservations        TimingFeedbackObservation[]
     timingPresetAdjustmentSuggestions TimingPresetAdjustmentSuggestion[]
     workflowRuns                      WorkflowRun[]
@@ -444,16 +447,24 @@ model TimingSignalSnapshot {
     barsByTimeframe Json?
     indicators   Json
     signalContext Json
+    presetRevisionId String?
+    featureEvidence Json?
+    dataManifest Json?
+    featureVersion String?
+    inputHash String?
     createdAt    DateTime  @default(now())
 
     user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
     workflowRun  WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+    presetRevision TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
     analysisCards TimingAnalysisCard[]
 
     @@index([userId, createdAt])
     @@index([workflowRunId])
     @@index([userId, stockCode, asOfDate])
     @@index([sourceType, sourceId])
+    @@index([presetRevisionId])
+    @@index([inputHash])
 }
 
 model TimingAnalysisCard {
@@ -462,6 +473,7 @@ model TimingAnalysisCard {
     workflowRunId     String?
     watchListId       String?
     presetId          String?
+    presetRevisionId  String?
     stockCode         String
     stockName         String
     sourceType        String
@@ -476,6 +488,8 @@ model TimingAnalysisCard {
     invalidationNotes String[]
     riskFlags         String[]
     reasoning         Json
+    decisionStatus    String?
+    decisionAudit     Json?
     createdAt         DateTime  @default(now())
     updatedAt         DateTime  @updatedAt
 
@@ -483,13 +497,16 @@ model TimingAnalysisCard {
     workflowRun      WorkflowRun?         @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
     watchList        WatchList?           @relation(fields: [watchListId], references: [id], onDelete: SetNull)
     preset           TimingPreset?        @relation(fields: [presetId], references: [id], onDelete: SetNull)
+    presetRevision   TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
     signalSnapshot   TimingSignalSnapshot @relation(fields: [signalSnapshotId], references: [id], onDelete: Cascade)
     reviewRecords    TimingReviewRecord[]
+    executionRecords TimingExecutionRecord[]
 
     @@index([userId, createdAt])
     @@index([workflowRunId])
     @@index([watchListId, createdAt])
     @@index([presetId])
+    @@index([presetRevisionId])
     @@index([signalSnapshotId])
     @@index([userId, stockCode, createdAt])
     @@index([sourceType, sourceId])
@@ -521,6 +538,7 @@ model TimingRecommendation {
     portfolioSnapshotId String
     watchListId         String
     presetId            String?
+    presetRevisionId    String?
     stockCode           String
     stockName           String
     action              String
@@ -533,6 +551,8 @@ model TimingRecommendation {
     marketTransition    String
     riskFlags           String[]
     reasoning           Json
+    decisionStatus      String?
+    decisionAudit       Json?
     createdAt           DateTime @default(now())
     updatedAt           DateTime @updatedAt
 
@@ -541,14 +561,17 @@ model TimingRecommendation {
     portfolioSnapshot PortfolioSnapshot @relation(fields: [portfolioSnapshotId], references: [id], onDelete: Cascade)
     watchList         WatchList         @relation(fields: [watchListId], references: [id], onDelete: Cascade)
     preset            TimingPreset?     @relation(fields: [presetId], references: [id], onDelete: SetNull)
+    presetRevision    TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
     reviewRecords     TimingReviewRecord[]
     feedbackObservations TimingFeedbackObservation[]
+    executionRecords  TimingExecutionRecord[]
 
     @@index([userId, createdAt])
     @@index([workflowRunId])
     @@index([portfolioSnapshotId, createdAt])
     @@index([watchListId, createdAt])
     @@index([presetId])
+    @@index([presetRevisionId])
     @@index([userId, stockCode, createdAt])
 }
 
@@ -567,14 +590,19 @@ model TimingReviewRecord {
     stockName                 String
     sourceAsOfDate            DateTime
     reviewHorizon             TimingReviewHorizon
+    reviewTradingDays         Int                  @default(5)
     scheduledAt               DateTime
     completedAt               DateTime?
     expectedAction            String
     actualReturnPct           Float?
+    benchmarkReturnPct        Float?
+    excessReturnPct           Float?
     maxFavorableExcursionPct  Float?
     maxAdverseExcursionPct    Float?
     verdict                   String?
     reviewSummary             String?
+    invalidationTriggered     Boolean?
+    executionDeviationPct     Float?
     createdAt                 DateTime             @default(now())
     updatedAt                 DateTime             @updatedAt
 
@@ -596,6 +624,7 @@ model TimingPreset {
     name                  String
     description           String?
     config                Json
+    activeRevisionId      String?
     createdAt             DateTime               @default(now())
     updatedAt             DateTime               @updatedAt
 
@@ -604,9 +633,94 @@ model TimingPreset {
     timingRecommendations TimingRecommendation[]
     feedbackObservations  TimingFeedbackObservation[]
     adjustmentSuggestions TimingPresetAdjustmentSuggestion[]
+    revisions             TimingPresetRevision[] @relation("TimingPresetRevisions")
+    activeRevision        TimingPresetRevision?  @relation("ActiveTimingPresetRevision", fields: [activeRevisionId], references: [id], onDelete: SetNull)
 
     @@index([userId, updatedAt])
+    @@unique([activeRevisionId])
     @@unique([userId, name])
+}
+
+model TimingPresetRevision {
+    id                String   @id @default(cuid())
+    presetId          String
+    userId            String
+    revisionNumber    Int
+    status            String   @default("DRAFT")
+    config            Json
+    configHash        String
+    engineVersion     String
+    featureVersion    String
+    publishedAt       DateTime?
+    archivedAt        DateTime?
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @updatedAt
+
+    user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    preset            TimingPreset            @relation("TimingPresetRevisions", fields: [presetId], references: [id], onDelete: Cascade)
+    activeForPreset   TimingPreset?            @relation("ActiveTimingPresetRevision")
+    signalSnapshots   TimingSignalSnapshot[]
+    analysisCards     TimingAnalysisCard[]
+    recommendations   TimingRecommendation[]
+    backtestRuns      TimingBacktestRun[]
+    executionRecords  TimingExecutionRecord[]
+
+    @@unique([presetId, revisionNumber])
+    @@index([presetId, configHash])
+    @@index([userId, status, updatedAt])
+}
+
+model TimingBacktestRun {
+    id                         String   @id @default(cuid())
+    userId                     String
+    presetRevisionId           String
+    watchListId                String
+    status                     String   @default("PENDING")
+    configHash                 String
+    universeSnapshot           Json
+    executionAssumptions       Json
+    qualityMetrics             Json?
+    performanceMetrics         Json?
+    eventSnapshot              Json?
+    warnings                   String[] @default([])
+    errorMessage               String?
+    startedAt                  DateTime?
+    completedAt                DateTime?
+    createdAt                  DateTime @default(now())
+    updatedAt                  DateTime @updatedAt
+
+    user                       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+    presetRevision             TimingPresetRevision @relation(fields: [presetRevisionId], references: [id], onDelete: Cascade)
+
+    @@index([userId, createdAt])
+    @@index([presetRevisionId, status, createdAt])
+    @@index([watchListId, createdAt])
+}
+
+model TimingExecutionRecord {
+    id                  String   @id @default(cuid())
+    userId              String
+    presetRevisionId    String
+    analysisCardId      String?
+    recommendationId    String?
+    decision            String
+    executedAt          DateTime?
+    price               Float?
+    quantity            Float?
+    fees                Float?
+    notes               String?
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+
+    user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+    presetRevision      TimingPresetRevision  @relation(fields: [presetRevisionId], references: [id], onDelete: Cascade)
+    analysisCard        TimingAnalysisCard?   @relation(fields: [analysisCardId], references: [id], onDelete: SetNull)
+    recommendation      TimingRecommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
+
+    @@index([userId, createdAt])
+    @@index([presetRevisionId, createdAt])
+    @@index([analysisCardId])
+    @@index([recommendationId])
 }
 
 model TimingMarketContextSnapshot {
