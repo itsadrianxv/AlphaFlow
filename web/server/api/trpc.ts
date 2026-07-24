@@ -120,10 +120,24 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  */
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
-  .use(({ ctx, next }) => {
+  .use(async ({ ctx, next }) => {
     if (!ctx.session?.user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
+
+    // JWT 会话可能在 User 记录被删除或数据库重置后继续存在，先确认用户仍然有效，
+    // 避免下游写入带来外键约束异常。
+    const user = await ctx.db.user.findUnique({
+      where: { id: ctx.session.user.id },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "登录状态已失效，请重新登录",
+      });
+    }
+
     return next({
       ctx: {
         // infers the `session` as non-nullable
