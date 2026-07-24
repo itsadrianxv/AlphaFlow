@@ -131,6 +131,14 @@ class FakeConceptProvider:
         return [{"conceptName": concept_name, "stockCode": "603019", "stockName": "中科曙光"}]
 
 
+class FakeHotThemeProvider:
+    def __init__(self, themes: list[str]) -> None:
+        self.themes = themes
+
+    def get_hot_concept_themes(self, limit: int) -> list[str]:
+        return self.themes[:limit]
+
+
 def setup_function() -> None:
     gateway_cache.clear()
     metrics_recorder.clear()
@@ -178,26 +186,22 @@ def test_refresh_universe_job_warms_snapshot_cache() -> None:
     assert metrics["observations"]["batch_success_ratio"][0]["avg"] == 1.0
 
 
-def test_prewarm_hot_themes_uses_recorded_hot_themes() -> None:
-    metrics_recorder.record_theme_request(dataset="theme_news", theme="算力")
-    metrics_recorder.record_theme_request(dataset="theme_candidates", theme="算力")
-    metrics_recorder.record_theme_request(dataset="theme_news", theme="AI")
-
+def test_prewarm_hot_themes_uses_live_ths_hot_themes() -> None:
     fake_market_gateway = FakeMarketGateway()
     fake_intelligence_gateway = FakeIntelligenceGateway()
     summary = PrewarmHotThemesJob(
         market_data_gateway=fake_market_gateway,
         intelligence_data_gateway=fake_intelligence_gateway,
-        recorder=metrics_recorder,
+        theme_provider=FakeHotThemeProvider(["算力概念", "AI 概念"]),
     ).run(max_themes=1, evidence_per_theme=1)
 
     assert summary.job == "prewarm-hot-themes"
-    assert summary.stats["themes"] == ["算力"]
-    assert fake_market_gateway.requested_themes == ["算力"]
-    assert fake_intelligence_gateway.news_themes == ["算力"]
-    assert fake_intelligence_gateway.concept_themes == ["算力"]
-    assert fake_intelligence_gateway.evidence_calls == [("600519", "算力")]
-    assert fake_intelligence_gateway.research_pack_calls == [("600519", "算力")]
+    assert summary.stats["themes"] == ["算力概念"]
+    assert fake_market_gateway.requested_themes == ["算力概念"]
+    assert fake_intelligence_gateway.news_themes == ["算力概念"]
+    assert fake_intelligence_gateway.concept_themes == ["算力概念"]
+    assert fake_intelligence_gateway.evidence_calls == [("600519", "算力概念")]
+    assert fake_intelligence_gateway.research_pack_calls == [("600519", "算力概念")]
     assert summary.stats["warmedResearchPacks"] == 1
 
 
@@ -208,7 +212,7 @@ def test_prewarm_hot_themes_skips_when_no_themes_are_available() -> None:
     summary = PrewarmHotThemesJob(
         market_data_gateway=fake_market_gateway,
         intelligence_data_gateway=fake_intelligence_gateway,
-        recorder=metrics_recorder,
+        theme_provider=FakeHotThemeProvider([]),
     ).run(max_themes=5, evidence_per_theme=1)
 
     assert summary.job == "prewarm-hot-themes"
@@ -232,7 +236,7 @@ def test_prewarm_hot_themes_prefers_explicit_themes() -> None:
     summary = PrewarmHotThemesJob(
         market_data_gateway=fake_market_gateway,
         intelligence_data_gateway=fake_intelligence_gateway,
-        recorder=metrics_recorder,
+        theme_provider=FakeHotThemeProvider(["算力概念"]),
     ).run(themes=["  机器人  ", "AI"], max_themes=1, evidence_per_theme=1)
 
     assert summary.stats["themes"] == ["机器人"]
@@ -311,32 +315,9 @@ def test_refresh_concepts_endpoint_returns_queued_and_triggers_background_task()
 
 
 def test_admin_metrics_endpoint_returns_gateway_snapshot() -> None:
-    with patch(
-        "app.gateway.intelligence_gateway.MinishareNewsProvider.get_news",
-        return_value=[
-            {
-                "id": "ai-1",
-                "title": "AI 算力需求提升",
-                "summary": "产业链景气度持续改善。",
-                "source": "minishare:news",
-                "publishedAt": "2026-03-08T08:00:00+00:00",
-                "sentiment": "positive",
-                "relevanceScore": 0.92,
-                "relatedStocks": ["603019"],
-            }
-        ],
-    ):
-        response = client.get("/api/v1/intelligence/themes/AI/news")
-
-    assert response.status_code == 200
-
     metrics_response = client.get("/api/admin/metrics")
     assert metrics_response.status_code == 200
 
     payload = metrics_response.json()
-    assert "provider_request_latency_ms" in payload["observations"]
-    assert any(
-        item["labels"].get("theme") == "AI"
-        for item in payload["counters"]["theme_request_count"]
-    )
+    assert "theme_request_count" not in payload["counters"]
 

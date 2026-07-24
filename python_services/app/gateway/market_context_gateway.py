@@ -17,18 +17,10 @@ from app.contracts.market_context import (
 )
 from app.data_providers import get_default_data_provider
 from app.data_providers.contracts import DataProvider, HsgtFlowSnapshot, MacroSnapshot
-from app.gateway.common import build_meta, execute_cached, gateway_cache, iso_now
+from app.gateway.common import build_meta, iso_now
 from app.gateway.intelligence_gateway import IntelligenceGateway, intelligence_gateway
 from app.gateway.market_gateway import MarketGateway, market_gateway
-from app.infrastructure.metrics.recorder import MetricsRecorder, metrics_recorder
-from app.policies.cache_policy import get_cache_policy
-from app.policies.retry_policy import RetryPolicy
-
-
-def _average(values: list[float]) -> float | None:
-    if not values:
-        return None
-    return sum(values) / len(values)
+from app.providers.tushare.client import TushareProviderClient
 
 
 class MarketContextGateway:
@@ -39,14 +31,12 @@ class MarketContextGateway:
         macro_provider: DataProvider | None = None,
         intelligence_data_gateway: IntelligenceGateway | None = None,
         market_data_gateway: MarketGateway | None = None,
-        recorder: MetricsRecorder | None = None,
+        theme_provider: TushareProviderClient | None = None,
     ) -> None:
         self._macro_provider = macro_provider or get_default_data_provider()
         self._intelligence_gateway = intelligence_data_gateway or intelligence_gateway
         self._market_gateway = market_data_gateway or market_gateway
-        self._recorder = recorder or metrics_recorder
-        self._retry_policy = RetryPolicy(max_attempts=1)
-        self._cache = gateway_cache
+        self._theme_provider = theme_provider or TushareProviderClient()
 
     def get_snapshot(
         self,
@@ -54,33 +44,23 @@ class MarketContextGateway:
         force_refresh: bool = False,
     ) -> MarketContextSnapshotResponse:
         started_at = time.perf_counter()
-        selected_themes = self._select_themes(limit=3)
-        result = execute_cached(
-            dataset="market_context_snapshot",
-            provider=self.provider_name,
-            params={"themes": selected_themes},
-            fetcher=lambda: self._build_snapshot(selected_themes),
-            cache_policy=get_cache_policy("market_context_snapshot"),
-            retry_policy=self._retry_policy,
-            cache=self._cache,
-            force_refresh=force_refresh,
-            allow_stale=True,
-        )
+        # 热点概念板块必须是当次实时 TuShare 结果，禁止快照或过期缓存回退。
+        snapshot = self._build_snapshot()
 
         return MarketContextSnapshotResponse(
             meta=build_meta(
                 request_id=request_id,
-                provider=result.provider,
+                provider=self.provider_name,
                 started_at=started_at,
-                cache_hit=result.cache_hit,
-                is_stale=result.is_stale,
-                warnings=result.warnings,
-                as_of=result.as_of,
+                cache_hit=False,
+                is_stale=False,
+                warnings=[],
+                as_of=snapshot.asOf,
             ),
-            data=result.data,
+            data=snapshot,
         )
 
-    def _build_snapshot(self, themes: list[str]) -> MarketContextSnapshot:
+    def _build_snapshot(self) -> MarketContextSnapshot:
         availability = MarketContextAvailability(
             regime=MarketContextAvailabilityEntry(available=True),
             flow=MarketContextAvailabilityEntry(available=True),
@@ -110,17 +90,13 @@ class MarketContextGateway:
             )
 
         hot_themes: list[HotThemeContext] = []
-        if themes:
-            try:
-                hot_themes = [
-                    self._build_hot_theme(theme=theme, rank=index)
-                    for index, theme in enumerate(themes)
-                ]
-            except Exception as exc:  # noqa: BLE001
-                availability.hotThemes = MarketContextAvailabilityEntry(
-                    available=False,
-                    warning=f"theme aggregation unavailable: {exc}",
-                )
+        try:
+            hot_themes = self._build_hot_themes()
+        except Exception as exc:  # noqa: BLE001
+            availability.hotThemes = MarketContextAvailabilityEntry(
+                available=False,
+                warning=f"THS hot concept boards unavailable: {exc}",
+            )
         if not hot_themes:
             availability.hotThemes = MarketContextAvailabilityEntry(
                 available=False,
@@ -130,11 +106,12 @@ class MarketContextGateway:
         regime = self._build_regime_summary(macro_snapshot)
         flow = self._build_flow_summary(flow_snapshot)
         status = self._resolve_status(availability)
-        macro_news = self._intelligence_gateway.get_macro_news(
-            request_id="market-context:macro:news",
-            days=7,
-            limit=5,
-        ).data.newsItems
+        try:
+            macro_news = self._intelligence_gateway.get_macro_news(
+                request_id="market-context:macro:news", days=7, limit=5
+            ).data.newsItems
+        except Exception:  # noqa: BLE001
+            macro_news = []
 
         return MarketContextSnapshot(
             asOf=max(as_of_candidates),
@@ -151,60 +128,19 @@ class MarketContextGateway:
             availability=availability,
         )
 
-    def _build_hot_theme(self, theme: str, rank: int) -> HotThemeContext:
-        news_response = self._intelligence_gateway.get_theme_news(
-            request_id=f"market-context:{theme}:news",
-            theme=theme,
-            days=7,
-            limit=5,
-        )
-        concepts_response = self._intelligence_gateway.get_theme_concepts(
-            request_id=f"market-context:{theme}:concepts",
-            theme=theme,
-            limit=5,
-        )
-        candidates_response = self._market_gateway.get_theme_candidates(
-            request_id=f"market-context:{theme}:candidates",
-            theme=theme,
-            limit=6,
-        )
-
-        news_items = news_response.data.newsItems
-        concept_matches = concepts_response.data.conceptMatches
-        candidate_stocks = candidates_response.data.candidates
-
-        ranking_score = max(45, 100 - rank * 14)
-        candidate_score = _average([candidate.heat for candidate in candidate_stocks]) or 50
-        sentiment_bonus = {"positive": 8, "neutral": 0, "negative": -8}
-        news_score = _average(
-            [
-                item.relevanceScore * 100 + sentiment_bonus.get(item.sentiment, 0)
-                for item in news_items
-            ]
-        ) or 50
-        heat_score = max(
-            0,
-            min(
-                100,
-                round(ranking_score * 0.35 + news_score * 0.35 + candidate_score * 0.30, 2),
-            ),
-        )
-
-        why_hot_parts = []
-        if news_items:
-            why_hot_parts.append(news_items[0].title)
-        if candidate_stocks:
-            why_hot_parts.append(f"候选股热度均值约 {candidate_score:.0f}")
-        why_hot = "；".join(why_hot_parts[:2]) or f"{theme} 是近期高频主题。"
-
-        return HotThemeContext(
-            theme=theme,
-            heatScore=heat_score,
-            whyHot=why_hot,
-            conceptMatches=concept_matches,
-            candidateStocks=candidate_stocks,
-            topNews=news_items,
-        )
+    def _build_hot_themes(self) -> list[HotThemeContext]:
+        boards = self._theme_provider.get_hot_concept_boards(limit=5)
+        result: list[HotThemeContext] = []
+        for board in boards:
+            try:
+                news_items = self._intelligence_gateway.get_theme_news(
+                    request_id=f"market-context:{board['theme']}:news",
+                    theme=board["theme"], days=7, limit=5,
+                ).data.newsItems
+            except Exception:  # noqa: BLE001
+                news_items = []
+            result.append(HotThemeContext(**board, topNews=news_items))
+        return result
 
     def _build_regime_summary(self, macro_snapshot: MacroSnapshot | None) -> MarketRegimeSummary:
         if not macro_snapshot:
@@ -344,9 +280,5 @@ class MarketContextGateway:
         if any(values):
             return "partial"
         return "unavailable"
-
-    def _select_themes(self, limit: int) -> list[str]:
-        return self._recorder.top_themes(limit=limit)[:limit]
-
 
 market_context_gateway = MarketContextGateway()

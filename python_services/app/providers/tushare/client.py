@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 import hashlib
 import re
 from typing import Any
@@ -169,47 +169,13 @@ class TushareProviderClient:
         limit: int,
         concept_hints: list[dict] | None = None,
     ) -> list[dict]:
-        normalized_limit = max(1, min(limit, 30))
-        concepts = self._select_concepts(theme=theme, limit=3, concept_hints=concept_hints)
-        candidates_by_code: dict[str, dict[str, Any]] = {}
-        snapshot_map = self._load_snapshot_map(allow_empty=True)
-
-        for concept in concepts:
-            members = self.get_concept_constituents(
-                concept["conceptName"],
-                concept_code=concept.get("conceptCode"),
-            )
-            concept_heat = _safe_float(concept.get("changePercent")) or 0.0
-            for member in members:
-                stock_code = _normalize_stock_code(member.get("stockCode"))
-                if not stock_code:
-                    continue
-                snapshot = snapshot_map.get(stock_code, {})
-                heat = _score_candidate_heat(
-                    concept_heat=55.0 + concept_heat * 2,
-                    change_pct=_safe_float(snapshot.get("changePercent")),
-                    turnover=_safe_float(snapshot.get("turnoverRate")),
-                    pe_ratio=_safe_float(snapshot.get("pe")),
-                )
-                item = {
-                    "stockCode": stock_code,
-                    "stockName": member.get("stockName") or snapshot.get("name") or stock_code,
-                    "reason": _build_candidate_reason(
-                        concept["conceptName"],
-                        _safe_float(snapshot.get("changePercent")),
-                        _safe_float(snapshot.get("turnoverRate")),
-                        _safe_float(snapshot.get("pe")),
-                    ),
-                    "heat": heat,
-                    "concept": concept["conceptName"],
-                }
-                existing = candidates_by_code.get(stock_code)
-                if not existing or item["heat"] > existing["heat"]:
-                    candidates_by_code[stock_code] = item
-
-        return sorted(candidates_by_code.values(), key=lambda item: item["heat"], reverse=True)[
-            :normalized_limit
-        ]
+        normalized_theme = theme.strip()
+        if not normalized_theme:
+            return []
+        for board in self.get_hot_concept_boards(limit=5):
+            if _normalize_text(board["theme"]) == _normalize_text(normalized_theme):
+                return list(board["candidateStocks"][: max(1, min(limit, 10))])
+        return []
 
     def get_theme_concepts(
         self,
@@ -217,24 +183,18 @@ class TushareProviderClient:
         limit: int,
         concept_hints: list[dict] | None = None,
     ) -> dict:
-        concepts = self._select_concepts(theme=theme, limit=limit, concept_hints=concept_hints)
+        concepts = self._select_concepts(theme=theme, limit=limit)
         return {
             "theme": theme.strip(),
-            "matchedBy": (
-                "whitelist"
-                if _RULES_REGISTRY.get_rules(theme).get("whitelist")
-                else "zhipu"
-                if any(item.get("matchedBy") == "zhipu" for item in concepts)
-                else "auto"
-            ),
+            "matchedBy": "ths_index",
             "concepts": [
                 {
                     "name": item["conceptName"],
                     "code": item.get("conceptCode") or None,
                     "aliases": [],
                     "confidence": item.get("confidence", 0.62),
-                    "reason": item.get("reason") or f"TuShare THS 概念与主题“{theme}”文本匹配",
-                    "source": item.get("source") or "tushare:ths_index",
+                    "reason": item.get("reason") or f"TuShare THS 概念板块与主题“{theme}”名称匹配",
+                    "source": "tushare:ths_index",
                 }
                 for item in concepts
             ],
@@ -344,31 +304,25 @@ class TushareProviderClient:
         }
 
     def get_concept_catalog(self) -> list[dict]:
-        cached = self._concept_catalog_cache
-        now = pd.Timestamp.utcnow().timestamp()
-        if cached is not None and now - cached[0] <= 86_400:
-            return list(cached[1])
-
-        frame = self._raw_frame("index_classify", src=_SW_INDUSTRY_SOURCE)
+        frame = self._raw_frame("ths_index", exchange="A", type="N")
         items: list[dict[str, Any]] = []
         for _, row in frame.iterrows():
-            concept_name = _pick_text(row, ["industry_name", "name", "概念名称", "板块名称"])
-            concept_code = _pick_text(row, ["index_code", "ts_code", "code", "板块代码"])
+            concept_name = _pick_text(row, ["name", "概念名称", "板块名称"])
+            concept_code = _pick_text(row, ["ts_code", "code", "板块代码"])
             if not concept_name or not concept_code:
                 continue
             items.append(
                 {
                     "conceptName": concept_name,
                     "conceptCode": concept_code,
-                    "conceptLevel": _pick_text(row, ["level"]) or _infer_sw_level(concept_code),
+                    "conceptLevel": "N",
                     "leadingStock": None,
                     "changePercent": None,
                     "upCount": None,
                     "downCount": None,
-                    "source": f"tushare:index_classify:{_SW_INDUSTRY_SOURCE}",
+                    "source": "tushare:ths_index",
                 }
             )
-        self._concept_catalog_cache = (now, items)
         return list(items)
 
     def get_concept_constituents(
@@ -379,34 +333,177 @@ class TushareProviderClient:
         resolved_code = concept_code or self._resolve_concept_code(concept_name)
         if not resolved_code:
             return []
-        industry_item = self._resolve_industry_item(concept_name, resolved_code)
-        params = _industry_member_params(
-            resolved_code,
-            industry_item.get("conceptLevel") if industry_item else None,
-        )
-        frame = self._raw_frame("index_member_all", is_new="Y", **params)
-        snapshot_map = self._load_snapshot_map(allow_empty=True)
+        frame = self._raw_frame("ths_member", ts_code=resolved_code)
         items: list[dict[str, Any]] = []
         for _, row in frame.iterrows():
             stock_code = _normalize_stock_code(
-                _pick_text(row, ["ts_code", "code", "con_code", "股票代码"])
+                _pick_text(row, ["con_code", "code", "ts_code", "股票代码"])
             )
             if not stock_code:
                 continue
-            snapshot = snapshot_map.get(stock_code, {})
             items.append(
                 {
                     "conceptName": concept_name,
                     "stockCode": stock_code,
-                    "stockName": _pick_text(row, ["name", "stock_name", "con_name", "股票名称"])
-                    or snapshot.get("name")
-                    or stock_code,
-                    "latestPrice": snapshot.get("close"),
-                    "changePercent": snapshot.get("changePercent"),
-                    "turnoverRate": snapshot.get("turnoverRate"),
+                    "stockName": _pick_text(row, ["con_name", "name", "stock_name", "股票名称"]) or stock_code,
+                    "latestPrice": None,
+                    "changePercent": None,
+                    "turnoverRate": None,
                 }
             )
         return items
+
+    def get_hot_concept_themes(self, limit: int = 5) -> list[str]:
+        return [item["theme"] for item in self.get_hot_concept_boards(limit=limit)]
+
+    def get_hot_concept_boards(self, limit: int = 5) -> list[dict[str, Any]]:
+        """Build the real-time THS concept-board snapshot without cache fallback."""
+        normalized_limit = max(1, min(limit, 200))
+        catalog = {item["conceptCode"]: item for item in self.get_concept_catalog()}
+        hot_frame = self._raw_frame("ths_hot", market="概念板块", is_new="Y")
+        if hot_frame.empty:
+            return []
+        hot_rows = [row for _, row in hot_frame.iterrows()]
+        hot_rows.sort(key=lambda row: int(_safe_float(row.get("rank")) or 10**9))
+        selected = [
+            row for row in hot_rows
+            if _pick_text(row, ["ts_code"]) in catalog
+        ][:normalized_limit]
+        if not selected:
+            return []
+
+        trade_date = _pick_text(selected[0], ["trade_date"])
+        if not trade_date:
+            raise DataUnavailableError("THS hot list has no trade date", provider=self.provider_name)
+        limit_rows = self._load_limit_rows(trade_date)
+        boards = [self._build_hot_board(row, catalog[_pick_text(row, ["ts_code"])], limit_rows) for row in selected]
+        self._assign_board_heat_scores(boards)
+        return boards
+
+    def _load_limit_rows(self, trade_date: str) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for limit_type in ("涨停池", "连板池", "冲刺涨停", "炸板池", "跌停池"):
+            frame = self._raw_frame(
+                "limit_list_ths", trade_date=trade_date, limit_type=limit_type
+            )
+            for _, row in frame.iterrows():
+                stock_code = _normalize_stock_code(_pick_text(row, ["ts_code"]))
+                if stock_code:
+                    rows.append(
+                        {
+                            "stockCode": stock_code,
+                            "stockName": _pick_text(row, ["name"]) or stock_code,
+                            "limitType": _pick_text(row, ["limit_type"]) or limit_type,
+                            "limitTag": _pick_text(row, ["tag"]),
+                            "limitStatus": _pick_text(row, ["status"]),
+                            "limitReason": _pick_text(row, ["lu_desc"]),
+                            "limitOrder": _safe_float(row.get("limit_order")),
+                            "limitAmount": _safe_float(row.get("limit_amount")),
+                            "turnoverRate": _safe_float(row.get("turnover_rate")),
+                        }
+                    )
+        return rows
+
+    def _build_hot_board(
+        self,
+        hot_row: pd.Series,
+        catalog_item: dict[str, Any],
+        limit_rows: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        board_code = catalog_item["conceptCode"]
+        trade_date = _pick_text(hot_row, ["trade_date"])
+        end_date = datetime.strptime(trade_date, "%Y%m%d")
+        start_date = (end_date - timedelta(days=10)).strftime("%Y%m%d")
+        daily_frame = self._raw_frame(
+            "ths_daily", ts_code=board_code, start_date=start_date, end_date=trade_date
+        )
+        if daily_frame.empty:
+            raise DataUnavailableError(
+                f"THS daily data unavailable for {board_code}", provider=self.provider_name
+            )
+        daily_frame = daily_frame.sort_values("trade_date")
+        latest = daily_frame.iloc[-1]
+        five_day = daily_frame.tail(5)
+        five_day_return = 1.0
+        for value in five_day.get("pct_change", []):
+            five_day_return *= 1 + ((_safe_float(value) or 0.0) / 100)
+
+        members = self.get_concept_constituents(catalog_item["conceptName"], board_code)
+        member_codes = {item["stockCode"] for item in members}
+        board_limit_rows = [item for item in limit_rows if item["stockCode"] in member_codes]
+        limit_counts = {
+            "limitUpCount": sum(item["limitType"] == "涨停池" for item in board_limit_rows),
+            "continuationCount": sum(item["limitType"] == "连板池" for item in board_limit_rows),
+            "rushLimitCount": sum(item["limitType"] == "冲刺涨停" for item in board_limit_rows),
+            "brokenLimitCount": sum(item["limitType"] == "炸板池" for item in board_limit_rows),
+            "limitDownCount": sum(item["limitType"] == "跌停池" for item in board_limit_rows),
+        }
+        candidates = [
+            self._build_limit_candidate(item, catalog_item["conceptName"], int(_safe_float(hot_row.get("rank")) or 0))
+            for item in board_limit_rows
+        ]
+        return {
+            "theme": catalog_item["conceptName"],
+            "conceptMatches": [{
+                "name": catalog_item["conceptName"], "code": board_code, "aliases": [],
+                "confidence": 1.0, "reason": "TuShare THS 概念热榜命中", "source": "tushare:ths_hot",
+            }],
+            "candidateStocks": sorted(candidates, key=lambda item: item["heat"], reverse=True)[:10],
+            "marketEvidence": {
+                "boardCode": board_code, "tradeDate": trade_date, "rankTime": _pick_text(hot_row, ["rank_time"]) or None,
+                "rank": int(_safe_float(hot_row.get("rank")) or 1), "hot": _safe_float(hot_row.get("hot")),
+                "pctChange": _safe_float(hot_row.get("pct_change")), "currentPrice": _safe_float(hot_row.get("current_price")),
+                "rankReason": _pick_text(hot_row, ["rank_reason"]) or None, "constituentCount": len(members),
+                "latestPctChange": _safe_float(latest.get("pct_change")), "fiveDayPctChange": round((five_day_return - 1) * 100, 2),
+                "latestTurnoverRate": _safe_float(latest.get("turnover_rate")), **limit_counts,
+            },
+        }
+
+    def _build_limit_candidate(self, item: dict[str, Any], concept: str, board_rank: int) -> dict[str, Any]:
+        category_scores = {"连板池": 100.0, "涨停池": 85.0, "冲刺涨停": 65.0, "炸板池": 25.0, "跌停池": 0.0}
+        order_score = min(15.0, max(0.0, (item["limitOrder"] or 0.0) / 10_000_000 * 15))
+        turnover_score = min(10.0, max(0.0, (item["turnoverRate"] or 0.0) / 30 * 10))
+        tag_bonus = min(10.0, _extract_board_days(item["limitTag"]) * 2.0)
+        board_score = max(0.0, 10.0 - max(board_rank - 1, 0) * 1.5)
+        heat = round(min(100.0, category_scores.get(item["limitType"], 0.0) * 0.55 + order_score + turnover_score + tag_bonus + board_score), 2)
+        reason = "，".join(part for part in [
+            f"{item['limitType']} {item['limitTag']}".strip(), item["limitStatus"], item["limitReason"],
+        ] if part)
+        return {**item, "concept": concept, "boardRank": board_rank, "heat": heat, "reason": reason or f"{concept} 成分股上榜 {item['limitType']}"}
+
+    def _assign_board_heat_scores(self, boards: list[dict[str, Any]]) -> None:
+        def normalized(values: list[float | None], value: float | None) -> float:
+            numeric = [item for item in values if item is not None]
+            if not numeric or value is None or max(numeric) == min(numeric):
+                return 50.0
+            return (value - min(numeric)) / (max(numeric) - min(numeric)) * 100
+
+        evidence = [item["marketEvidence"] for item in boards]
+        hot_values = [item["hot"] for item in evidence]
+        rank_values = [float(item["rank"]) for item in evidence]
+        change_values = [item["pctChange"] for item in evidence]
+        five_day_values = [item["fiveDayPctChange"] for item in evidence]
+        limit_values = [
+            float(item["limitUpCount"] + item["continuationCount"] + item["rushLimitCount"] - item["brokenLimitCount"] - item["limitDownCount"])
+            for item in evidence
+        ]
+        for board in boards:
+            item = board["marketEvidence"]
+            rank_score = 100 - normalized(rank_values, float(item["rank"]))
+            limit_value = float(item["limitUpCount"] + item["continuationCount"] + item["rushLimitCount"] - item["brokenLimitCount"] - item["limitDownCount"])
+            board["heatScore"] = round(
+                normalized(hot_values, item["hot"]) * 0.35 + rank_score * 0.20
+                + normalized(change_values, item["pctChange"]) * 0.15
+                + normalized(five_day_values, item["fiveDayPctChange"]) * 0.15
+                + normalized(limit_values, limit_value) * 0.15,
+                2,
+            )
+            board["whyHot"] = (
+                f"THS 概念板块热榜第 {item['rank']} 名，热度 {item['hot'] or 0:.0f}；"
+                f"当日涨跌幅 {item['latestPctChange'] or 0:.2f}%，5 日累计 {item['fiveDayPctChange'] or 0:.2f}%；"
+                f"涨停/连板/冲刺 {item['limitUpCount']}/{item['continuationCount']}/{item['rushLimitCount']}，"
+                f"炸板/跌停 {item['brokenLimitCount']}/{item['limitDownCount']}。"
+            )
 
     def get_concept_rules(self, theme: str) -> dict:
         return _RULES_REGISTRY.get_rules(theme)
@@ -549,43 +646,17 @@ class TushareProviderClient:
         concept_hints: list[dict] | None = None,
     ) -> list[dict[str, Any]]:
         normalized_limit = max(1, min(limit, 20))
-        catalog = self.get_concept_catalog()
-        rules = _RULES_REGISTRY.get_rules(theme)
-        whitelist = [
-            str(item).strip()
-            for item in rules.get("whitelist", [])
-            if str(item).strip()
-        ]
-        blacklist = [
-            _normalize_text(item)
-            for item in rules.get("blacklist", [])
-            if str(item).strip()
-        ]
-        if whitelist:
-            selected = [
-                self._enrich_concept_match(item, theme, 0.9, "whitelist")
-                for item in catalog
-                if any(_normalize_text(wanted) in _normalize_text(item.get("conceptName")) for wanted in whitelist)
-            ]
-            if not selected:
-                selected = self._select_sw_hint_concepts(theme, catalog)
-        else:
-            selected = [
-                self._enrich_concept_match(item, theme, _concept_match_confidence(theme, item), "auto")
-                for item in catalog
-            ]
-            selected = [item for item in selected if item["confidence"] >= 0.55]
-            if not selected:
-                selected = self._select_sw_hint_concepts(theme, catalog)
-            if not selected and concept_hints:
-                selected = self._select_hint_concepts(theme, catalog, concept_hints)
-
-        if blacklist:
-            selected = [
-                item
-                for item in selected
-                if _normalize_text(item.get("conceptName")) not in blacklist
-            ]
+        theme_key = _normalize_text(theme)
+        selected = []
+        for item in self.get_concept_catalog():
+            concept_key = _normalize_text(item.get("conceptName"))
+            if not theme_key or not concept_key or (theme_key not in concept_key and concept_key not in theme_key):
+                continue
+            enriched = dict(item)
+            enriched["confidence"] = 1.0 if theme_key == concept_key else 0.8
+            enriched["reason"] = f"TuShare THS 概念板块名称匹配主题“{theme.strip()}”"
+            enriched["source"] = "tushare:ths_index"
+            selected.append(enriched)
         return sorted(selected, key=lambda item: item["confidence"], reverse=True)[:normalized_limit]
 
     def _select_hint_concepts(
@@ -807,6 +878,11 @@ def _pct_change(latest: float | None, previous: float | None) -> float | None:
     if latest is None or previous in {None, 0}:
         return None
     return round((latest / previous - 1) * 100, 4)
+
+
+def _extract_board_days(tag: str | None) -> int:
+    matched = re.search(r"(\d+)天\d+板", str(tag or ""))
+    return int(matched.group(1)) if matched else 0
 
 
 def _normalize_text(value: Any) -> str:

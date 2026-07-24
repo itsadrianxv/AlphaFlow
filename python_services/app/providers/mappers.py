@@ -79,6 +79,14 @@ def to_theme_candidate(raw: dict) -> ThemeCandidate:
         concept=str(raw.get("concept") or "").strip(),
         reason=str(raw.get("reason") or "").strip(),
         heat=float(raw.get("heat") or 0),
+        limitType=str(raw.get("limitType") or "").strip() or None,
+        limitTag=str(raw.get("limitTag") or "").strip() or None,
+        limitStatus=str(raw.get("limitStatus") or "").strip() or None,
+        limitReason=str(raw.get("limitReason") or "").strip() or None,
+        limitOrder=raw.get("limitOrder"),
+        limitAmount=raw.get("limitAmount"),
+        turnoverRate=raw.get("turnoverRate"),
+        boardRank=raw.get("boardRank"),
     )
 
 

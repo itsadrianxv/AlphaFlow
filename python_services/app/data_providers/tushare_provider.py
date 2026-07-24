@@ -63,9 +63,10 @@ RAW_DATASET_FIELDS: dict[str, str] = {
     "index_classify": "index_code,industry_name,level,industry_code,is_pub,parent_code,src",
     "index_member_all": "l1_code,l1_name,l2_code,l2_name,l3_code,l3_name,ts_code,name,in_date,out_date,is_new",
     "ths_index": "ts_code,name,count,exchange,list_date,type",
-    "ths_member": "ts_code,code,name,weight,in_date,out_date,is_new",
+    "ths_member": "ts_code,con_code,con_name,weight,in_date,out_date,is_new",
     "ths_daily": "ts_code,trade_date,close,open,high,low,pre_close,avg_price,change,pct_change,vol,turnover_rate,total_mv,float_mv",
-    "ths_hot": "trade_date,ts_code,ts_name,rank,pct_change,current_price,concept,rank_reason,hot,rank_time,market,type",
+    "ths_hot": "trade_date,data_type,ts_code,ts_name,rank,pct_change,current_price,concept,rank_reason,hot,rank_time",
+    "limit_list_ths": "trade_date,ts_code,name,price,pct_chg,open_num,lu_desc,limit_type,tag,status,first_lu_time,last_lu_time,first_ld_time,last_ld_time,limit_order,limit_amount,turnover_rate,free_float,lu_limit_order,limit_up_suc_rate,turnover,rise_rate,sum_float,market_type",
     "moneyflow": "ts_code,trade_date,buy_sm_vol,buy_sm_amount,sell_sm_vol,sell_sm_amount,buy_md_vol,buy_md_amount,sell_md_vol,sell_md_amount,buy_lg_vol,buy_lg_amount,sell_lg_vol,sell_lg_amount,buy_elg_vol,buy_elg_amount,sell_elg_vol,sell_elg_amount,net_mf_vol,net_mf_amount",
     "margin": "trade_date,exchange_id,rzye,rzmre,rzche,rqye,rqmcl,rqyl,rqchl,rzrqye",
     "margin_detail": "trade_date,ts_code,rzye,rqye,rzmre,rqyl,rzche,rqmcl,rqchl,rzrqye",
@@ -795,7 +796,7 @@ class TushareProvider:
             if request.get("indexCode"):
                 params["ts_code"] = request.get("indexCode")
             if request.get("stockCode"):
-                params["code"] = request.get("stockCode")
+                params["con_code"] = request.get("stockCode")
             return params
 
         if dataset == "ths_hot":
@@ -803,8 +804,23 @@ class TushareProvider:
                 params["trade_date"] = trade_date
             if request.get("market"):
                 params["market"] = request.get("market")
-            if request.get("marketType"):
-                params["type"] = request.get("marketType")
+            if request.get("isNew"):
+                params["is_new"] = request.get("isNew")
+            return params
+
+        if dataset == "limit_list_ths":
+            if trade_date:
+                params["trade_date"] = trade_date
+            if request.get("stockCode"):
+                params["ts_code"] = request.get("stockCode")
+            if request.get("limitType"):
+                params["limit_type"] = request.get("limitType")
+            if request.get("market"):
+                params["market"] = request.get("market")
+            if start_date:
+                params["start_date"] = start_date
+            if end_date:
+                params["end_date"] = end_date
             return params
 
         if dataset in {"index_classify", "index_member_all"}:

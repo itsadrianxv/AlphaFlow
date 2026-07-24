@@ -38,6 +38,14 @@ class ThemeCandidate(BaseModel):
     concept: str
     reason: str
     heat: float = Field(..., ge=0, le=100)
+    limitType: str | None = None
+    limitTag: str | None = None
+    limitStatus: str | None = None
+    limitReason: str | None = None
+    limitOrder: float | None = None
+    limitAmount: float | None = None
+    turnoverRate: float | None = None
+    boardRank: int | None = None
 
 
 class IndicatorHistoryPoint(BaseModel):

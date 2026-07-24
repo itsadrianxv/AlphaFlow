@@ -86,7 +86,7 @@ export function MarketContextSection(props: {
     section === "home"
       ? snapshot.downstreamHints.workflows
       : snapshot.downstreamHints[section];
-  const hotThemes = snapshot.hotThemes.slice(0, 3);
+  const hotThemes = snapshot.hotThemes.slice(0, 5);
   const matchedThemes = findMatchingHotThemes(hotThemes, currentStockCodes);
   const statusLabel =
     snapshot.status === "complete"
@@ -132,15 +132,16 @@ export function MarketContextSection(props: {
             {hotThemes.map((theme) => (
               <div
                 key={theme.theme}
-                className="rounded-[14px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4"
+                className="rounded-lg border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)] p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-xs tracking-[0.08em] text-[var(--app-text-subtle)]">
-                      热门主题
-                    </div>
-                    <div className="mt-2 text-lg leading-7 text-[var(--app-text-strong)]">
+                    <div className="text-lg leading-7 text-[var(--app-text-strong)]">
                       {theme.theme}
+                    </div>
+                    <div className="mt-1 text-xs text-[var(--app-text-subtle)]">
+                      THS 热榜第 {theme.marketEvidence.rank} 名 ·{" "}
+                      {theme.marketEvidence.boardCode}
                     </div>
                   </div>
                   <StatusPill
@@ -151,6 +152,16 @@ export function MarketContextSection(props: {
                 <p className="mt-3 text-sm leading-6 text-[var(--app-text-muted)]">
                   {theme.whyHot}
                 </p>
+                <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs leading-5 text-[var(--app-text-subtle)]">
+                  <span>成分股 {theme.marketEvidence.constituentCount}</span>
+                  <span>
+                    换手{" "}
+                    {theme.marketEvidence.latestTurnoverRate?.toFixed(2) ?? "-"}
+                    %
+                  </span>
+                  <span>连板 {theme.marketEvidence.continuationCount}</span>
+                  <span>涨停 {theme.marketEvidence.limitUpCount}</span>
+                </div>
                 <div className="mt-3 text-xs leading-5 text-[var(--app-text-subtle)]">
                   候选股：
                   {theme.candidateStocks.length > 0

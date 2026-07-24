@@ -1,15 +1,6 @@
 import pandas as pd
-import pytest
 
-import app.providers.tushare.client as tushare_client_module
 from app.providers.tushare.client import TushareProviderClient
-from app.services.theme_concept_rules_registry import ThemeConceptRulesRegistry
-
-
-@pytest.fixture(autouse=True)
-def isolate_theme_rules(tmp_path, monkeypatch):
-    registry = ThemeConceptRulesRegistry(file_path=str(tmp_path / "theme_concept_rules.json"))
-    monkeypatch.setattr(tushare_client_module, "_RULES_REGISTRY", registry)
 
 
 class FakeTushareRawProvider:
@@ -20,121 +11,68 @@ class FakeTushareRawProvider:
 
     def get_raw_frame(self, dataset: str, **params: str) -> pd.DataFrame:
         self.calls.append((dataset, params))
-        if dataset.startswith("ths_"):
-            raise AssertionError(f"{dataset} should not be called in 2000-credit mode")
-        if dataset == "index_classify":
+        if dataset == "ths_index":
             return pd.DataFrame(
                 [
-                    {
-                        "index_code": "801750.SI",
-                        "industry_name": "计算机",
-                        "level": "L1",
-                        "src": "SW2021",
-                    },
-                    {
-                        "index_code": "851041.SI",
-                        "industry_name": "软件开发",
-                        "level": "L3",
-                        "src": "SW2021",
-                    },
-                    {
-                        "index_code": "850711.SI",
-                        "industry_name": "机床工具",
-                        "level": "L3",
-                        "src": "SW2021",
-                    },
+                    {"ts_code": "885001.TI", "name": "算力概念", "count": 2, "exchange": "A", "type": "N"},
+                    {"ts_code": "885002.TI", "name": "机器人概念", "count": 1, "exchange": "A", "type": "N"},
                 ]
             )
-        if dataset == "index_member_all":
+        if dataset == "ths_hot":
             return pd.DataFrame(
                 [
-                    {
-                        "l3_code": "851041.SI",
-                        "l3_name": "软件开发",
-                        "ts_code": "603019.SH",
-                        "name": "中科曙光",
-                        "is_new": "Y",
-                    }
+                    {"trade_date": "20260724", "ts_code": "885002.TI", "ts_name": "机器人概念", "rank": 2, "pct_change": 3.0, "current_price": 1200, "hot": 80, "rank_time": "2026-07-24 14:00:00", "rank_reason": "机器人加速"},
+                    {"trade_date": "20260724", "ts_code": "885001.TI", "ts_name": "算力概念", "rank": 1, "pct_change": 5.0, "current_price": 1300, "hot": 100, "rank_time": "2026-07-24 14:00:00", "rank_reason": "算力走强"},
                 ]
             )
+        if dataset == "ths_daily":
+            return pd.DataFrame(
+                [
+                    {"trade_date": f"202607{day:02d}", "pct_change": 1.0, "turnover_rate": 4.0}
+                    for day in range(20, 25)
+                ]
+            )
+        if dataset == "ths_member":
+            code = params["ts_code"]
+            return pd.DataFrame(
+                [{"ts_code": code, "con_code": "603019.SH" if code == "885001.TI" else "300024.SZ", "con_name": "中科曙光" if code == "885001.TI" else "机器人"}]
+            )
+        if dataset == "limit_list_ths":
+            limit_type = params["limit_type"]
+            if limit_type == "连板池":
+                return pd.DataFrame([{"ts_code": "603019.SH", "name": "中科曙光", "limit_type": limit_type, "tag": "3天2板", "status": "换手板", "lu_desc": "算力", "limit_order": 20_000_000, "limit_amount": 30_000_000, "turnover_rate": 12.0}])
+            if limit_type == "炸板池":
+                return pd.DataFrame([{"ts_code": "300024.SZ", "name": "机器人", "limit_type": limit_type, "tag": "首板", "status": "炸板", "lu_desc": "机器人", "limit_order": 0, "limit_amount": 0, "turnover_rate": 8.0}])
+            return pd.DataFrame()
         return pd.DataFrame()
 
-    def get_market_snapshot(self):
-        return []
 
-
-class FakeZhipuClient:
-    def __init__(self, concepts: list[dict]) -> None:
-        self.concepts = concepts
-
-    def search_theme_concepts(self, theme: str, limit: int) -> list[dict]:
-        return self.concepts[:limit]
-
-
-def test_theme_concepts_use_sw_industries_without_calling_ths() -> None:
+def test_hot_concept_boards_call_all_ths_special_topic_apis() -> None:
     provider = FakeTushareRawProvider()
     client = TushareProviderClient(provider=provider)
 
-    result = client.get_theme_concepts(theme="AI", limit=3)
+    boards = client.get_hot_concept_boards(limit=5)
 
-    called_datasets = [dataset for dataset, _params in provider.calls]
-    assert "ths_index" not in called_datasets
-    assert result["concepts"]
-    assert result["concepts"][0]["source"].startswith("tushare:index_classify")
-
-
-def test_concept_constituents_use_index_member_all_without_calling_ths_member() -> None:
-    provider = FakeTushareRawProvider()
-    client = TushareProviderClient(provider=provider)
-
-    members = client.get_concept_constituents("软件开发", concept_code="851041.SI")
-
-    assert members == [
-        {
-            "conceptName": "软件开发",
-            "stockCode": "603019",
-            "stockName": "中科曙光",
-            "latestPrice": None,
-            "changePercent": None,
-            "turnoverRate": None,
-        }
-    ]
-    assert ("ths_member", {"ts_code": "851041.SI"}) not in provider.calls
-    assert any(
-        dataset == "index_member_all"
-        and params == {"is_new": "Y", "l3_code": "851041.SI"}
-        for dataset, params in provider.calls
-    )
+    assert [board["theme"] for board in boards] == ["算力概念", "机器人概念"]
+    assert boards[0]["candidateStocks"][0]["stockCode"] == "603019"
+    assert boards[0]["candidateStocks"][0]["limitType"] == "连板池"
+    assert boards[1]["marketEvidence"]["brokenLimitCount"] == 1
+    datasets = [dataset for dataset, _ in provider.calls]
+    assert "ths_index" in datasets
+    assert "ths_hot" in datasets
+    assert datasets.count("ths_daily") == 2
+    assert datasets.count("ths_member") == 2
+    assert datasets.count("limit_list_ths") == 5
 
 
-def test_theme_candidates_do_not_fallback_to_unrelated_market_hot_stocks() -> None:
-    provider = FakeTushareRawProvider()
-    client = TushareProviderClient(provider=provider)
+def test_theme_interfaces_only_return_current_ths_hot_concept_boards() -> None:
+    client = TushareProviderClient(provider=FakeTushareRawProvider())
 
-    candidates = client.get_theme_candidates(theme="完全未知主题", limit=6)
+    concepts = client.get_theme_concepts(theme="算力", limit=5)
+    candidates = client.get_theme_candidates(theme="算力概念", limit=10)
+    unknown = client.get_theme_candidates(theme="未知主题", limit=10)
 
-    assert candidates == []
-    assert any(dataset == "index_classify" for dataset, _params in provider.calls)
-    assert all(dataset != "ths_member" for dataset, _params in provider.calls)
-
-
-def test_theme_candidates_use_web_search_concept_hints_after_tushare_match_misses() -> None:
-    provider = FakeTushareRawProvider()
-    client = TushareProviderClient(provider=provider)
-
-    candidates = client.get_theme_candidates(
-        theme="国产办公软件替代",
-        limit=6,
-        concept_hints=[
-            {
-                "name": "软件开发",
-                "aliases": ["基础软件"],
-                "confidence": 0.86,
-                "reason": "Web Search 指向软件开发板块",
-            }
-        ],
-    )
-
-    assert candidates
+    assert concepts["matchedBy"] == "ths_index"
+    assert concepts["concepts"][0]["code"] == "885001.TI"
     assert candidates[0]["stockCode"] == "603019"
-    assert candidates[0]["concept"] == "软件开发"
+    assert unknown == []

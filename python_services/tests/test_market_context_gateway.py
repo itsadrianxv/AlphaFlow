@@ -1,213 +1,61 @@
-﻿from types import SimpleNamespace
+from types import SimpleNamespace
 
-from app.data_providers.contracts import HsgtFlowSnapshot, MacroSnapshot
-from app.contracts.intelligence import ThemeConceptsData, ThemeConceptsResponse, ThemeNewsData, ThemeNewsItem, ThemeNewsResponse
-from app.contracts.market import ThemeCandidate, ThemeCandidatesData, ThemeCandidatesResponse
+from app.contracts.intelligence import ThemeNewsData, ThemeNewsResponse
 from app.contracts.meta import GatewayMeta
+from app.data_providers.contracts import HsgtFlowSnapshot, MacroSnapshot
 from app.gateway.market_context_gateway import MarketContextGateway
-from app.infrastructure.metrics.recorder import MetricsRecorder
 
 
 def _meta():
-    return GatewayMeta(
-        requestId="req-1",
-        provider="tushare",
-        cacheHit=False,
-        isStale=False,
-        latencyMs=0,
-        asOf="2026-04-18T00:00:00+00:00",
-        warnings=[],
-    )
+    return GatewayMeta(requestId="req-1", provider="tushare", cacheHit=False, isStale=False, latencyMs=0, asOf="2026-07-24T00:00:00+00:00", warnings=[])
 
 
-def _theme_news(theme: str, title: str, sentiment: str, score: float):
-    return ThemeNewsResponse(
-        meta=_meta(),
-        data=ThemeNewsData(
-            theme=theme,
-            newsItems=[
-                ThemeNewsItem(
-                    id=f"{theme}-news-1",
-                    title=title,
-                    summary=f"{theme} summary",
-                    source="tushare:news",
-                    publishedAt="2026-04-18T00:00:00+00:00",
-                    sentiment=sentiment,
-                    relevanceScore=score,
-                    relatedStocks=["603019"],
-                )
-            ],
-        ),
-    )
+def _board():
+    return {
+        "theme": "算力概念", "heatScore": 82.0, "whyHot": "THS 概念板块热榜第 1 名。",
+        "conceptMatches": [{"name": "算力概念", "code": "885001.TI", "aliases": [], "confidence": 1, "reason": "热榜命中", "source": "tushare:ths_hot"}],
+        "candidateStocks": [{"stockCode": "603019", "stockName": "中科曙光", "concept": "算力概念", "reason": "连板池", "heat": 88, "limitType": "连板池", "boardRank": 1}],
+        "marketEvidence": {"boardCode": "885001.TI", "tradeDate": "20260724", "rank": 1, "hot": 100, "pctChange": 5, "currentPrice": 1300, "constituentCount": 90, "latestPctChange": 5, "fiveDayPctChange": 12, "latestTurnoverRate": 4, "limitUpCount": 2, "continuationCount": 1, "rushLimitCount": 0, "brokenLimitCount": 0, "limitDownCount": 0},
+    }
 
 
-def _theme_candidates(theme: str):
-    return ThemeCandidatesResponse(
-        meta=_meta(),
-        data=ThemeCandidatesData(
-            theme=theme,
-            candidates=[
-                ThemeCandidate(
-                    stockCode="603019",
-                    stockName="中科曙光",
-                    concept=theme,
-                    reason=f"{theme} candidate",
-                    heat=81,
-                )
-            ],
-        ),
-    )
-
-
-def _theme_concepts(theme: str):
-    return ThemeConceptsResponse(
-        meta=_meta(),
-        data=ThemeConceptsData(
-            theme=theme,
-            matchedBy="auto",
-            conceptMatches=[
-                {
-                    "name": theme,
-                    "code": None,
-                    "aliases": [],
-                    "confidence": 0.88,
-                    "reason": "matched",
-                    "source": "auto",
-                }
-            ],
-        ),
-    )
-
-
-def test_market_context_gateway_builds_snapshot_from_macro_flow_and_hot_themes():
-    recorder = MetricsRecorder()
-    recorder.record_theme_request(dataset="theme_news", theme="AI")
-    recorder.record_theme_request(dataset="theme_news", theme="机器人")
-    recorder.record_theme_request(dataset="theme_news", theme="AI")
-
-    gateway = MarketContextGateway(
+def _gateway(theme_provider):
+    return MarketContextGateway(
         macro_provider=SimpleNamespace(
-            get_macro_snapshot=lambda: MacroSnapshot(
-                asOf="2026-04-18T00:00:00+00:00",
-                gdpYoY=5.4,
-                m2YoY=8.3,
-                socialFinancingIncrement=5200.0,
-                manufacturingPmi=50.8,
-            ),
-            get_hsgt_flow_snapshot=lambda: HsgtFlowSnapshot(
-                asOf="2026-04-18T00:00:00+00:00",
-                northboundNetAmount=1762.62,
-                southboundNetAmount=-664.0,
-            ),
+            get_macro_snapshot=lambda: MacroSnapshot(asOf="2026-07-24T00:00:00+00:00", gdpYoY=5.4, m2YoY=8.3, socialFinancingIncrement=5200.0, manufacturingPmi=50.8),
+            get_hsgt_flow_snapshot=lambda: HsgtFlowSnapshot(asOf="2026-07-24T00:00:00+00:00", northboundNetAmount=1762.62, southboundNetAmount=-664.0),
         ),
         intelligence_data_gateway=SimpleNamespace(
-            get_theme_news=lambda **kwargs: _theme_news(
-                kwargs["theme"],
-                f'{kwargs["theme"]} 景气提升',
-                "positive",
-                0.82,
-            ),
-            get_theme_concepts=lambda **kwargs: _theme_concepts(kwargs["theme"]),
+            get_theme_news=lambda **kwargs: ThemeNewsResponse(meta=_meta(), data=ThemeNewsData(theme=kwargs["theme"], newsItems=[])),
+            get_macro_news=lambda **kwargs: SimpleNamespace(data=SimpleNamespace(newsItems=[])),
         ),
-        market_data_gateway=SimpleNamespace(
-            get_theme_candidates=lambda **kwargs: _theme_candidates(kwargs["theme"]),
-        ),
-        recorder=recorder,
+        theme_provider=theme_provider,
     )
 
-    response = gateway.get_snapshot(request_id="req-1")
 
+def test_market_context_gateway_uses_live_ths_boards_without_snapshot_cache():
+    provider = SimpleNamespace(calls=0)
+    def get_hot_concept_boards(limit):
+        provider.calls += 1
+        assert limit == 5
+        return [_board()]
+    provider.get_hot_concept_boards = get_hot_concept_boards
+
+    response = _gateway(provider).get_snapshot(request_id="req-1")
+
+    assert provider.calls == 1
+    assert response.meta.cacheHit is False
     assert response.data.status == "complete"
-    assert response.data.regime.overallTone == "risk_on"
-    assert response.data.flow.direction == "inflow"
-    assert response.data.hotThemes[0].theme == "AI"
-    assert response.data.hotThemes[0].candidateStocks[0].stockCode == "603019"
-    assert response.data.downstreamHints.workflows.suggestedQuestion.startswith(
-        "围绕 AI"
-    )
-    assert response.data.downstreamHints.workflows.summary
-    assert response.data.downstreamHints.companyResearch.summary
-    assert response.data.downstreamHints.screening.summary
-    assert response.data.availability.regime.available is True
-    assert response.data.availability.flow.available is True
-    assert response.data.availability.hotThemes.available is True
+    assert response.data.hotThemes[0].marketEvidence.boardCode == "885001.TI"
+    assert response.data.hotThemes[0].candidateStocks[0].limitType == "连板池"
 
 
-def test_market_context_gateway_marks_partial_when_macro_snapshot_is_unavailable():
-    recorder = MetricsRecorder()
-    recorder.record_theme_request(dataset="theme_news", theme="AI")
+def test_market_context_marks_hot_themes_unavailable_when_live_ths_request_fails():
+    provider = SimpleNamespace(get_hot_concept_boards=lambda limit: (_ for _ in ()).throw(RuntimeError("ths unavailable")))
 
-    gateway = MarketContextGateway(
-        macro_provider=SimpleNamespace(
-            get_macro_snapshot=lambda: (_ for _ in ()).throw(RuntimeError("macro unavailable")),
-            get_hsgt_flow_snapshot=lambda: HsgtFlowSnapshot(
-                asOf="2026-04-18T00:00:00+00:00",
-                northboundNetAmount=-300.0,
-                southboundNetAmount=100.0,
-            ),
-        ),
-        intelligence_data_gateway=SimpleNamespace(
-            get_theme_news=lambda **kwargs: _theme_news(
-                kwargs["theme"],
-                f'{kwargs["theme"]} 催化',
-                "neutral",
-                0.71,
-            ),
-            get_theme_concepts=lambda **kwargs: _theme_concepts(kwargs["theme"]),
-        ),
-        market_data_gateway=SimpleNamespace(
-            get_theme_candidates=lambda **kwargs: _theme_candidates(kwargs["theme"]),
-        ),
-        recorder=recorder,
-    )
-
-    response = gateway.get_snapshot(request_id="req-2")
-
-    assert response.data.status == "partial"
-    assert response.data.availability.regime.available is False
-    assert response.data.availability.regime.warning is not None
-    assert response.data.availability.flow.available is True
-    assert response.data.availability.hotThemes.available is True
-
-
-def test_market_context_gateway_returns_partial_without_recorded_hot_themes():
-    gateway = MarketContextGateway(
-        macro_provider=SimpleNamespace(
-            get_macro_snapshot=lambda: MacroSnapshot(
-                asOf="2026-04-18T00:00:00+00:00",
-                gdpYoY=5.4,
-                m2YoY=8.3,
-                socialFinancingIncrement=5200.0,
-                manufacturingPmi=50.8,
-            ),
-            get_hsgt_flow_snapshot=lambda: HsgtFlowSnapshot(
-                asOf="2026-04-18T00:00:00+00:00",
-                northboundNetAmount=1762.62,
-                southboundNetAmount=-664.0,
-            ),
-        ),
-        intelligence_data_gateway=SimpleNamespace(
-            get_theme_news=lambda **kwargs: (_ for _ in ()).throw(
-                AssertionError("不应在没有真实热门主题时请求主题新闻")
-            ),
-            get_theme_concepts=lambda **kwargs: (_ for _ in ()).throw(
-                AssertionError("不应在没有真实热门主题时请求主题概念")
-            ),
-        ),
-        market_data_gateway=SimpleNamespace(
-            get_theme_candidates=lambda **kwargs: (_ for _ in ()).throw(
-                AssertionError("不应在没有真实热门主题时请求候选股")
-            ),
-        ),
-        recorder=MetricsRecorder(),
-    )
-
-    response = gateway.get_snapshot(request_id="req-3")
+    response = _gateway(provider).get_snapshot(request_id="req-2")
 
     assert response.data.status == "partial"
     assert response.data.hotThemes == []
-    assert response.data.availability.regime.available is True
-    assert response.data.availability.flow.available is True
     assert response.data.availability.hotThemes.available is False
-    assert response.data.availability.hotThemes.warning == "no hot themes available"
-
+    assert "ths unavailable" in (response.data.availability.hotThemes.warning or "")

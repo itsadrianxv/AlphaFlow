@@ -75,6 +75,34 @@ export const hotThemeCandidateStockSchema = z.object({
   concept: z.string().min(1),
   reason: z.string().min(1),
   heat: z.number().min(0).max(100),
+  limitType: z.string().nullable().optional(),
+  limitTag: z.string().nullable().optional(),
+  limitStatus: z.string().nullable().optional(),
+  limitReason: z.string().nullable().optional(),
+  limitOrder: z.number().nullable().optional(),
+  limitAmount: z.number().nullable().optional(),
+  turnoverRate: z.number().nullable().optional(),
+  boardRank: z.number().int().positive().nullable().optional(),
+});
+
+export const hotThemeMarketEvidenceSchema = z.object({
+  boardCode: z.string().min(1),
+  tradeDate: z.string().min(1),
+  rankTime: z.string().nullable().optional(),
+  rank: z.number().int().positive(),
+  hot: z.number().nullable().optional(),
+  pctChange: z.number().nullable().optional(),
+  currentPrice: z.number().nullable().optional(),
+  rankReason: z.string().nullable().optional(),
+  constituentCount: z.number().int().nonnegative(),
+  latestPctChange: z.number().nullable().optional(),
+  fiveDayPctChange: z.number().nullable().optional(),
+  latestTurnoverRate: z.number().nullable().optional(),
+  limitUpCount: z.number().int().nonnegative(),
+  continuationCount: z.number().int().nonnegative(),
+  rushLimitCount: z.number().int().nonnegative(),
+  brokenLimitCount: z.number().int().nonnegative(),
+  limitDownCount: z.number().int().nonnegative(),
 });
 
 export const hotThemeNewsItemSchema = z.object({
@@ -95,6 +123,7 @@ export const hotThemeContextSchema = z.object({
   theme: z.string().min(1),
   heatScore: z.number().min(0).max(100),
   whyHot: z.string().min(1),
+  marketEvidence: hotThemeMarketEvidenceSchema,
   conceptMatches: z.array(hotThemeConceptMatchSchema).default([]),
   candidateStocks: z.array(hotThemeCandidateStockSchema).default([]),
   topNews: z.array(hotThemeNewsItemSchema).default([]),

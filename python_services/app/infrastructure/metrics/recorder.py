@@ -133,26 +133,6 @@ class MetricsRecorder:
             labels["theme"] = theme
         self.increment("concept_match_source_distribution", labels=labels)
 
-    def record_theme_request(self, dataset: str, theme: str) -> None:
-        self.increment(
-            "theme_request_count",
-            labels={"dataset": dataset, "theme": theme},
-        )
-
-    def top_themes(self, limit: int = 5) -> list[str]:
-        with self._lock:
-            raw_series = dict(self._counter_store.get("theme_request_count", {}))
-
-        ranking: dict[str, float] = defaultdict(float)
-        for label_key, value in raw_series.items():
-            labels = dict(label_key)
-            theme = labels.get("theme", "").strip()
-            if theme:
-                ranking[theme] += value
-
-        ordered = sorted(ranking.items(), key=lambda item: (-item[1], item[0]))
-        return [theme for theme, _ in ordered[:limit]]
-
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             counter_store = {
@@ -194,4 +174,3 @@ class MetricsRecorder:
 
 
 metrics_recorder = MetricsRecorder()
-

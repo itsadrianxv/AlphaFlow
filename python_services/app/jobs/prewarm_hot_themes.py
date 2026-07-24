@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from app.gateway.intelligence_gateway import IntelligenceGateway, intelligence_gateway
 from app.gateway.market_gateway import MarketGateway, market_gateway
-from app.infrastructure.metrics.recorder import MetricsRecorder, metrics_recorder
 from app.jobs.common import build_job_summary, iso_now
+from app.providers.tushare.client import TushareProviderClient
 
 _DEFAULT_NEWS_DAYS = 7
 _DEFAULT_NEWS_LIMIT = 20
@@ -17,11 +17,11 @@ class PrewarmHotThemesJob:
         self,
         market_data_gateway: MarketGateway | None = None,
         intelligence_data_gateway: IntelligenceGateway | None = None,
-        recorder: MetricsRecorder | None = None,
+        theme_provider: TushareProviderClient | None = None,
     ) -> None:
         self._market_gateway = market_data_gateway or market_gateway
         self._intelligence_gateway = intelligence_data_gateway or intelligence_gateway
-        self._recorder = recorder or metrics_recorder
+        self._theme_provider = theme_provider or TushareProviderClient()
 
     def run(
         self,
@@ -99,8 +99,4 @@ class PrewarmHotThemesJob:
         if normalized_input:
             return normalized_input[:max_themes]
 
-        ranked_themes = self._recorder.top_themes(limit=max_themes)
-        if ranked_themes:
-            return ranked_themes
-
-        return []
+        return self._theme_provider.get_hot_concept_themes(limit=max_themes)

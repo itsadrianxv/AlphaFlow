@@ -54,9 +54,30 @@ class HotThemeContext(BaseModel):
     theme: str
     heatScore: float = Field(..., ge=0, le=100)
     whyHot: str
+    marketEvidence: "HotThemeMarketEvidence"
     conceptMatches: list[ConceptMatchItem] = Field(default_factory=list)
     candidateStocks: list[ThemeCandidate] = Field(default_factory=list)
     topNews: list[ThemeNewsItem] = Field(default_factory=list)
+
+
+class HotThemeMarketEvidence(BaseModel):
+    boardCode: str
+    tradeDate: str
+    rankTime: str | None = None
+    rank: int = Field(..., ge=1)
+    hot: float | None = None
+    pctChange: float | None = None
+    currentPrice: float | None = None
+    rankReason: str | None = None
+    constituentCount: int = Field(..., ge=0)
+    latestPctChange: float | None = None
+    fiveDayPctChange: float | None = None
+    latestTurnoverRate: float | None = None
+    limitUpCount: int = Field(..., ge=0)
+    continuationCount: int = Field(..., ge=0)
+    rushLimitCount: int = Field(..., ge=0)
+    brokenLimitCount: int = Field(..., ge=0)
+    limitDownCount: int = Field(..., ge=0)
 
 
 class MarketContextSnapshot(BaseModel):
