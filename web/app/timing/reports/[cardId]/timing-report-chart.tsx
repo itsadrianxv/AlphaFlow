@@ -9,6 +9,7 @@ import type {
   TimingChartLevels,
   TimingChartLinePoint,
   TimingKronosForecast,
+  TimingTimeframe,
 } from "~/server/domain/timing/types";
 
 type MovingAverageVisibility = {
@@ -22,6 +23,7 @@ const MISSING_DATA = "-" as const;
 type MissingData = typeof MISSING_DATA;
 
 export type TimingReportChartInput = {
+  timeframe?: TimingTimeframe;
   bars: Pick<
     TimingBar,
     "tradeDate" | "open" | "high" | "low" | "close" | "volume"
@@ -101,6 +103,23 @@ function buildHorizontalLine(
   };
 }
 
+const timeframeLabels: Record<TimingTimeframe, string> = {
+  DAILY: "日线",
+  WEEKLY: "周线",
+  MONTHLY: "月线",
+  MINUTE_60: "60分",
+  MINUTE_30: "30分",
+  MINUTE_15: "15分",
+  MINUTE_1: "1分",
+};
+
+function timeframeUnit(timeframe: TimingTimeframe) {
+  if (timeframe === "DAILY") return "日";
+  if (timeframe === "WEEKLY") return "周";
+  if (timeframe === "MONTHLY") return "月";
+  return "分";
+}
+
 function missingValues(length: number) {
   return Array.from({ length }, () => MISSING_DATA);
 }
@@ -139,6 +158,8 @@ function buildHistoricalPriceAxisBounds(input: TimingReportChartInput) {
 }
 
 export function buildTimingReportChartOption(input: TimingReportChartInput) {
+  const timeframe = input.timeframe ?? "DAILY";
+  const unit = timeframeUnit(timeframe);
   const dates = input.bars.map((bar) => bar.tradeDate);
   const forecastDates =
     input.forecast?.points.map((point) => point.tradeDate) ?? [];
@@ -271,13 +292,13 @@ export function buildTimingReportChartOption(input: TimingReportChartInput) {
         ]
       : []),
     buildHorizontalLine(
-      "60日高点",
+      `60${unit}高点`,
       input.chartLevels.recentHigh60d,
       allDates.length,
       "rgba(255, 197, 61, 0.78)",
     ),
     buildHorizontalLine(
-      "20日低点",
+      `20${unit}低点`,
       input.chartLevels.recentLow20d,
       allDates.length,
       "rgba(255, 32, 71, 0.76)",
@@ -502,8 +523,18 @@ export function TimingReportChart(props: {
   bars: TimingBar[];
   chartLevels: TimingChartLevels;
   forecast?: TimingReportChartInput["forecast"];
+  timeframe?: TimingTimeframe;
+  onTimeframeChange?: (timeframe: TimingTimeframe) => void;
+  seriesLoading?: boolean;
 }) {
-  const { bars, chartLevels, forecast } = props;
+  const {
+    bars,
+    chartLevels,
+    forecast,
+    timeframe = "DAILY",
+    onTimeframeChange,
+    seriesLoading = false,
+  } = props;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [showBollinger, setShowBollinger] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
@@ -556,6 +587,7 @@ export function TimingReportChart(props: {
           showVolume,
           showMovingAverages,
           forecast,
+          timeframe,
         },
       });
     }
@@ -570,6 +602,7 @@ export function TimingReportChart(props: {
     bars,
     chartLevels,
     forecast,
+    timeframe,
     showBollinger,
     showMovingAverages,
     showVolume,
@@ -577,6 +610,38 @@ export function TimingReportChart(props: {
 
   return (
     <div className="grid gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center border-b border-[var(--app-border-soft)]">
+          {(
+            [
+              "DAILY",
+              "WEEKLY",
+              "MONTHLY",
+              "MINUTE_60",
+              "MINUTE_30",
+              "MINUTE_15",
+              "MINUTE_1",
+            ] as const
+          ).map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onTimeframeChange?.(item)}
+              className={`border-b-2 px-3 py-2 text-sm transition-colors ${
+                timeframe === item
+                  ? "border-[var(--app-accent)] text-[var(--app-text)]"
+                  : "border-transparent text-[var(--app-text-muted)] hover:text-[var(--app-text)]"
+              }`}
+            >
+              {timeframeLabels[item]}
+            </button>
+          ))}
+        </div>
+        {seriesLoading ? (
+          <span className="text-xs text-[var(--app-text-muted)]">加载中</span>
+        ) : null}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -618,11 +683,13 @@ export function TimingReportChart(props: {
 
       <div className="flex flex-wrap gap-2">
         <StatusPill
-          label={`60日高点 ${chartLevels.recentHigh60d.toFixed(2)}`}
+          label={`60${timeframeUnit(timeframe)}高点 ${chartLevels.recentHigh60d.toFixed(2)}`}
         />
-        <StatusPill label={`20日低点 ${chartLevels.recentLow20d.toFixed(2)}`} />
         <StatusPill
-          label={`20日均量 ${Math.round(chartLevels.avgVolume20)}`}
+          label={`20${timeframeUnit(timeframe)}低点 ${chartLevels.recentLow20d.toFixed(2)}`}
+        />
+        <StatusPill
+          label={`20${timeframeUnit(timeframe)}均量 ${Math.round(chartLevels.avgVolume20)}`}
           tone="info"
         />
         <StatusPill
@@ -632,7 +699,7 @@ export function TimingReportChart(props: {
         <StatusPill
           label={
             forecast
-              ? `Kronos 预测 · ${formatKronosModelLabel(forecast.modelName)} · ${forecast.predictionLength}日`
+              ? `Kronos 预测 · ${formatKronosModelLabel(forecast.modelName)} · ${forecast.predictionLength}${timeframeUnit(timeframe)}`
               : "Kronos 预测不可用"
           }
           tone={forecast ? "info" : "warning"}

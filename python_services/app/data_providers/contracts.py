@@ -3,9 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 import pandas as pd
+
+
+Timeframe = Literal[
+    "DAILY",
+    "WEEKLY",
+    "MONTHLY",
+    "MINUTE_60",
+    "MINUTE_30",
+    "MINUTE_15",
+    "MINUTE_1",
+]
 
 
 @dataclass(frozen=True)
@@ -101,6 +112,16 @@ class DataProvider(Protocol):
         adjust: str = "qfq",
     ) -> list[DailyBar]:
         """返回个股日线行情。"""
+
+    def get_bars(
+        self,
+        stock_code: str,
+        timeframe: Timeframe = "DAILY",
+        start_date: str | None = None,
+        end_date: str | None = None,
+        adjust: str = "qfq",
+    ) -> list[DailyBar]:
+        """返回指定周期的个股行情。"""
 
     def get_market_snapshot(self, as_of_date: str | None = None) -> list[MarketSnapshotRow]:
         """返回指定日期附近的全市场行情快照。"""

@@ -19,10 +19,18 @@ router = APIRouter(prefix="/api/v1/timing")
 
 def _validate_timeframe(timeframe: str) -> str:
     normalized = timeframe.strip().upper()
-    if normalized != "DAILY":
+    if normalized not in {
+        "DAILY",
+        "WEEKLY",
+        "MONTHLY",
+        "MINUTE_60",
+        "MINUTE_30",
+        "MINUTE_15",
+        "MINUTE_1",
+    }:
         raise GatewayError(
             code="invalid_timeframe",
-            message="timing v1 仅支持 DAILY 时间框架",
+            message="timing v1 仅支持 DAILY、WEEKLY、MONTHLY、MINUTE_60、MINUTE_30、MINUTE_15、MINUTE_1 时间框架",
             status_code=400,
             provider="gateway",
         )

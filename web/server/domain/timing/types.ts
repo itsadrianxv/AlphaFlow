@@ -1,3 +1,5 @@
+import type { EvidenceCitation } from "~/server/domain/evidence-context/types";
+
 export const TIMING_SOURCE_TYPES = [
   "single",
   "watchlist",
@@ -113,7 +115,14 @@ export type TimingMarketVolatilityTrend =
   (typeof TIMING_MARKET_VOLATILITY_TRENDS)[number];
 export type TimingSignalEngineKey = (typeof TIMING_SIGNAL_ENGINE_KEYS)[number];
 export type TimingDirection = "bullish" | "neutral" | "bearish";
-export type TimingTimeframe = "DAILY";
+export type TimingTimeframe =
+  | "DAILY"
+  | "WEEKLY"
+  | "MONTHLY"
+  | "MINUTE_60"
+  | "MINUTE_30"
+  | "MINUTE_15"
+  | "MINUTE_1";
 export type TimingFactorStatus = "positive" | "neutral" | "negative";
 export type TimingReviewHorizon = "T5" | "T10" | "T20";
 export type TimingReviewVerdict = "SUCCESS" | "MIXED" | "FAILURE";
@@ -204,10 +213,12 @@ export type TimingKronosForecastPoint = {
 
 export type TimingKronosForecast = {
   stockCode: string;
+  timeframe: TimingTimeframe;
   asOfDate: string;
   modelName: string;
   modelVersion: string;
-  lookbackDays: number;
+  lookbackDays?: number;
+  lookbackBars: number;
   predictionLength: number;
   device: string;
   points: TimingKronosForecastPoint[];
@@ -288,6 +299,10 @@ export type TimingBarsData = {
   bars: TimingBar[];
 };
 
+export type TimingBarsByTimeframe = Partial<
+  Record<TimingTimeframe, TimingBar[]>
+>;
+
 export type TimingChartLinePoint = {
   tradeDate: string;
   value: number;
@@ -310,6 +325,7 @@ export type TimingSignalData = {
   asOfDate: string;
   barsCount: number;
   bars?: TimingBar[];
+  barsByTimeframe?: TimingBarsByTimeframe;
   indicators: TimingIndicators;
   signalContext: TimingSignalContext;
 };
@@ -398,7 +414,11 @@ export type TimingCardReasoning = {
   actionRationale: string;
   indicators: TimingIndicators;
   kronosForecast?: TimingKronosForecastSummary;
+  kronosForecasts?: Partial<
+    Record<TimingTimeframe, TimingKronosForecastSummary>
+  >;
   kronosWarnings?: string[];
+  evidenceCitations?: EvidenceCitation[];
 };
 
 export type TimingSignalSnapshotRecord = {
@@ -413,6 +433,7 @@ export type TimingSignalSnapshotRecord = {
   timeframe: TimingTimeframe;
   barsCount: number;
   bars?: TimingBar[];
+  barsByTimeframe?: TimingBarsByTimeframe;
   indicators: TimingIndicators;
   signalContext: TimingSignalContext;
   createdAt: Date;
@@ -672,6 +693,7 @@ export type TimingRecommendationReasoning = {
   kronosWarnings?: string[];
   triggerConditions?: TimingExecutionCondition[];
   invalidationConditions?: TimingExecutionCondition[];
+  evidenceCitations?: EvidenceCitation[];
 };
 
 export type TimingRecommendationRecord = {
@@ -902,6 +924,17 @@ export type TimingReportPayload = {
   executionPlan: TimingExecutionPlan;
   reviewTimeline: TimingReviewRecord[];
   kronosForecast?: TimingKronosForecast;
+};
+
+export type TimingReportSeriesPayload = {
+  stockCode: string;
+  stockName: string;
+  timeframe: TimingTimeframe;
+  adjust: string;
+  bars: TimingBar[];
+  chartLevels: TimingChartLevels;
+  kronosForecast?: TimingKronosForecast;
+  warnings: string[];
 };
 
 export type TimingMarketRegime = TimingMarketState;

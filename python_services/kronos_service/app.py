@@ -43,9 +43,14 @@ def create_app(forecaster=None) -> FastAPI:
     @app.post("/api/v1/kronos/forecast", response_model=KronosForecastResponse)
     async def forecast(body: KronosForecastRequest):
         try:
-            bars = normalize_bars(body.bars, effective_forecaster.max_context)
+            bars = normalize_bars(
+                body.bars,
+                effective_forecaster.max_context,
+                body.timeframe,
+            )
             return effective_forecaster.forecast(
                 stock_code=body.stockCode,
+                timeframe=body.timeframe,
                 bars=bars,
                 prediction_length=body.predictionLength,
             )
@@ -66,13 +71,19 @@ def create_app(forecaster=None) -> FastAPI:
                 normalized_items.append(
                     (
                         item.stockCode,
-                        normalize_bars(item.bars, effective_forecaster.max_context),
+                        item.timeframe,
+                        normalize_bars(
+                            item.bars,
+                            effective_forecaster.max_context,
+                            item.timeframe,
+                        ),
                     )
                 )
             except KronosForecastError as error:
                 errors.append(
                     KronosBatchItemError(
                         stockCode=item.stockCode,
+                        timeframe=item.timeframe,
                         code=error.code,
                         message=error.message,
                     )
@@ -91,21 +102,23 @@ def create_app(forecaster=None) -> FastAPI:
                 errors.extend(
                     KronosBatchItemError(
                         stockCode=stock_code,
+                        timeframe=timeframe,
                         code=error.code,
                         message=error.message,
                     )
-                    for stock_code, _bars in normalized_items
+                    for stock_code, timeframe, _bars in normalized_items
                 )
                 return KronosForecastBatchResponse(
                     items=[],
                     errors=errors,
                 )
 
-        for stock_code, bars in normalized_items:
+        for stock_code, timeframe, bars in normalized_items:
             try:
                 items.append(
                     effective_forecaster.forecast(
                         stock_code=stock_code,
+                        timeframe=timeframe,
                         bars=bars,
                         prediction_length=body.predictionLength,
                     )
@@ -114,6 +127,7 @@ def create_app(forecaster=None) -> FastAPI:
                 errors.append(
                     KronosBatchItemError(
                         stockCode=stock_code,
+                        timeframe=timeframe,
                         code=error.code,
                         message=error.message,
                     )

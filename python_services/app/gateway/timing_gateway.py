@@ -25,9 +25,10 @@ from app.contracts.timing import (
     TimingSignalBatchResponse,
     TimingSignalData,
     TimingSignalResponse,
+    TimingTimeframe,
 )
 from app.data_providers import get_default_data_provider
-from app.data_providers.contracts import DataProvider, DailyBar, MarketSnapshotRow, StockProfile
+from app.data_providers.contracts import DataProvider, DailyBar, MarketSnapshotRow, StockProfile, Timeframe
 from app.data_providers.errors import (
     DataProviderConfigurationError,
     DataProviderError,
@@ -255,38 +256,71 @@ class TimingGateway:
         adjust: str,
     ) -> TimingBarsData:
         stock = self._get_stock_snapshot(self._signal_data_provider, stock_code)
-        resolved_start = (
-            self._resolve_start_date(
-                start=start,
-                end=end,
-                lookback_days=timing_indicators_service.minimum_lookback_days * 2,
+        normalized_timeframe = timeframe.strip().upper()
+        if normalized_timeframe not in {
+            "DAILY",
+            "WEEKLY",
+            "MONTHLY",
+            "MINUTE_60",
+            "MINUTE_30",
+            "MINUTE_15",
+            "MINUTE_1",
+        }:
+            raise GatewayError(
+                code="invalid_timeframe",
+                message=f"不支持的行情周期: {timeframe}",
+                status_code=400,
+                provider="timing",
             )
-            if start is None
-            else self._resolve_start_date(start=start, end=end, lookback_days=0)
-        )
+        is_intraday = normalized_timeframe.startswith("MINUTE_")
+        if is_intraday:
+            resolved_start = self._resolve_intraday_start(start=start, end=end)
+            resolved_end = self._normalize_intraday_end(end)
+            effective_adjust = "none"
+        else:
+            resolved_start = (
+                self._resolve_start_date(
+                    start=start,
+                    end=end,
+                    lookback_days=self._timeframe_lookback_days(
+                        normalized_timeframe,
+                        timing_indicators_service.minimum_lookback_days * 2,
+                    ),
+                )
+                if start is None
+                else self._resolve_start_date(start=start, end=end, lookback_days=0)
+            )
+            resolved_end = end
+            effective_adjust = adjust
         try:
             history = self._get_stock_bars(
                 self._signal_data_provider,
                 stock_code=stock_code,
                 start_date=resolved_start,
-                end_date=end,
-                adjust=adjust,
+                end_date=resolved_end,
+                adjust=effective_adjust,
+                timeframe=normalized_timeframe,
             )
         except GatewayError as error:
-            if error.code != "bars_not_found" or start is not None:
+            if error.code != "bars_not_found" or start is not None or is_intraday:
                 raise
             history = self._get_stock_bars(
                 self._signal_data_provider,
                 stock_code=stock_code,
                 start_date=None,
-                end_date=end,
-                adjust=adjust,
+                end_date=resolved_end,
+                adjust=effective_adjust,
+                timeframe=normalized_timeframe,
             )
 
         normalized = timing_indicators_service.normalize_history(history)
         bars = [
             TimingBar(
-                tradeDate=row.trade_date.strftime("%Y-%m-%d"),
+                tradeDate=(
+                    row.trade_date.strftime("%Y-%m-%d %H:%M:%S")
+                    if normalized_timeframe.startswith("MINUTE_")
+                    else row.trade_date.strftime("%Y-%m-%d")
+                ),
                 open=round(float(row.open), 4),
                 high=round(float(row.high), 4),
                 low=round(float(row.low), 4),
@@ -303,8 +337,8 @@ class TimingGateway:
         return TimingBarsData(
             stockCode=stock_code,
             stockName=str(stock.get("name") or stock.get("stockName") or stock_code),
-            timeframe=timeframe,
-            adjust=adjust,
+            timeframe=normalized_timeframe,
+            adjust=effective_adjust,
             bars=bars,
         )
 
@@ -358,6 +392,7 @@ class TimingGateway:
         benchmark_histories: dict[str, pd.DataFrame] | None = None,
     ) -> TimingSignalData:
         stock_snapshot = stock or self._get_stock_snapshot(self._signal_data_provider, stock_code)
+        histories: dict[str, pd.DataFrame] = {}
         history = self._get_stock_bars(
             self._signal_data_provider,
             stock_code=stock_code,
@@ -368,7 +403,49 @@ class TimingGateway:
             ),
             end_date=as_of_date,
             adjust="qfq",
+            timeframe="DAILY",
         )
+        histories["DAILY"] = history
+        timeframe_warnings: dict[str, str] = {}
+        for timeframe in (
+            "WEEKLY",
+            "MONTHLY",
+            *( ("MINUTE_60", "MINUTE_30", "MINUTE_15", "MINUTE_1") if include_bars else () ),
+        ):
+            try:
+                if timeframe.startswith("MINUTE_"):
+                    minute_start = self._resolve_intraday_start(
+                        start=None,
+                        end=as_of_date,
+                    )
+                    minute_end = self._normalize_intraday_end(as_of_date)
+                    histories[timeframe] = self._get_stock_bars(
+                        self._signal_data_provider,
+                        stock_code=stock_code,
+                        start_date=minute_start,
+                        end_date=minute_end,
+                        adjust="",
+                        timeframe=timeframe,
+                    )
+                    continue
+
+                histories[timeframe] = self._get_stock_bars(
+                    self._signal_data_provider,
+                    stock_code=stock_code,
+                    start_date=self._resolve_start_date(
+                        start=None,
+                        end=as_of_date,
+                        lookback_days=self._timeframe_lookback_days(
+                            timeframe,
+                            lookback_days * 2,
+                        ),
+                    ),
+                    end_date=as_of_date,
+                    adjust="qfq",
+                    timeframe=timeframe,
+                )
+            except GatewayError as error:
+                timeframe_warnings[timeframe] = str(error)
 
         effective_benchmark_histories = (
             benchmark_histories
@@ -378,6 +455,11 @@ class TimingGateway:
                 lookback_days=lookback_days,
             )
         )
+
+        normalized_bar_histories = {
+            key: timing_indicators_service.normalize_history(frame)
+            for key, frame in histories.items()
+        }
 
         return timing_indicators_service.build_signal(
             stock_code=stock_code,
@@ -390,6 +472,13 @@ class TimingGateway:
             benchmark_histories=effective_benchmark_histories,
             as_of_date=as_of_date,
             include_bars=include_bars,
+            timeframe_histories={
+                key: value
+                for key, value in histories.items()
+                if key in {"DAILY", "WEEKLY", "MONTHLY"}
+            },
+            timeframe_warnings=timeframe_warnings,
+            bar_histories=normalized_bar_histories,
         )
 
     def _build_market_context(
@@ -934,24 +1023,71 @@ class TimingGateway:
         start_date: str | None,
         end_date: str | None,
         adjust: str,
+        timeframe: Timeframe = "DAILY",
     ) -> pd.DataFrame:
         try:
-            bars = provider.get_daily_bars(
-                stock_code=stock_code,
-                start_date=start_date,
-                end_date=end_date,
-                adjust=adjust,
-            )
+            if hasattr(provider, "get_bars"):
+                bars = provider.get_bars(
+                    stock_code=stock_code,
+                    timeframe=timeframe,
+                    start_date=start_date,
+                    end_date=end_date,
+                    adjust=adjust,
+                )
+            else:
+                bars = provider.get_daily_bars(
+                    stock_code=stock_code,
+                    start_date=start_date,
+                    end_date=end_date,
+                    adjust=adjust,
+                )
         except DataProviderError as exc:
             raise self._to_gateway_error(exc, dataset="bars") from exc
         if not bars:
             raise GatewayError(
                 code="bars_not_found",
-                message=f"Daily bars not found for {stock_code}",
+                message=f"{timeframe} bars not found for {stock_code}",
                 status_code=404,
                 provider=provider.provider_name,
             )
         return self._daily_bars_to_timing_frame(bars)
+
+    def _timeframe_lookback_days(self, timeframe: str, bars: int) -> int:
+        multiplier = {"DAILY": 1, "WEEKLY": 7, "MONTHLY": 31}.get(timeframe, 1)
+        return bars * multiplier
+
+    def _resolve_intraday_start(self, *, start: str | None, end: str | None) -> str:
+        if start:
+            return self._normalize_intraday_start(start)
+        base_text = end or datetime.now(UTC).strftime("%Y-%m-%d")
+        base = pd.Timestamp(base_text).normalize() - pd.Timedelta(days=30)
+        return f"{base.strftime('%Y-%m-%d')} 09:00:00"
+
+    def _normalize_intraday_start(self, value: str) -> str:
+        parsed = pd.Timestamp(value)
+        if pd.isna(parsed):
+            raise GatewayError(
+                code="invalid_start_date",
+                message=f"无效的分钟行情开始时间: {value}",
+                status_code=400,
+                provider="gateway",
+            )
+        return parsed.strftime("%Y-%m-%d %H:%M:%S")
+
+    def _normalize_intraday_end(self, value: str | None) -> str:
+        if value is None:
+            return datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+        parsed = pd.Timestamp(value)
+        if pd.isna(parsed):
+            raise GatewayError(
+                code="invalid_end_date",
+                message=f"无效的分钟行情结束时间: {value}",
+                status_code=400,
+                provider="gateway",
+            )
+        if parsed.hour == 0 and parsed.minute == 0 and parsed.second == 0:
+            parsed = parsed.replace(hour=15)
+        return parsed.strftime("%Y-%m-%d %H:%M:%S")
 
     def _get_benchmark_bars(
         self,

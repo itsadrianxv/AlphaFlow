@@ -4,6 +4,7 @@ import type {
   TimingBarsData,
   TimingSignalBatchData,
   TimingSignalData,
+  TimingTimeframe,
 } from "~/server/domain/timing/types";
 import {
   WORKFLOW_ERROR_CODES,
@@ -79,7 +80,7 @@ export class PythonTimingDataClient {
     stockCode: string;
     start?: string;
     end?: string;
-    timeframe?: "DAILY";
+    timeframe?: TimingTimeframe;
     adjust?: string;
   }) {
     const search = new URLSearchParams();

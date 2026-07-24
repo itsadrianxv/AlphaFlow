@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from kronos_service.app import create_app
-from kronos_service.service import KronosForecastError
+from kronos_service.service import KronosForecastError, future_period_dates
 
 
 def build_bars(count: int) -> list[dict[str, float | str]]:
@@ -49,7 +49,7 @@ class FakeForecaster:
             "defaultPredictionLength": self.default_prediction_length,
         }
 
-    def forecast(self, *, stock_code, bars, prediction_length):
+    def forecast(self, *, stock_code, timeframe="DAILY", bars, prediction_length):
         self.seen_lookback_days.append(len(bars))
         if stock_code == "000000":
             raise KronosForecastError(
@@ -73,10 +73,12 @@ class FakeForecaster:
         ]
         return {
             "stockCode": stock_code,
+            "timeframe": timeframe,
             "asOfDate": last.tradeDate,
             "modelName": self.model_name,
             "modelVersion": self.model_version,
             "lookbackDays": len(bars),
+            "lookbackBars": len(bars),
             "predictionLength": prediction_length,
             "device": self.device,
             "points": points,
@@ -146,7 +148,7 @@ def test_forecast_truncates_lookback_to_max_context(client_and_forecaster):
     assert response.status_code == 200
     payload = response.json()
     assert payload["stockCode"] == "600519"
-    assert payload["lookbackDays"] == 512
+    assert payload["lookbackBars"] == 512
     assert len(payload["points"]) == 5
     assert forecaster.seen_lookback_days == [512]
 
@@ -171,7 +173,25 @@ def test_batch_returns_item_level_error(client_and_forecaster):
     assert payload["errors"] == [
         {
             "stockCode": "000000",
+            "timeframe": "DAILY",
             "code": "mock_failed",
             "message": "mock forecast failed",
         }
     ]
+
+
+def test_future_period_dates_follow_selected_timeframe():
+    assert future_period_dates("2026-07-06", 2, "WEEKLY") == [
+        "2026-07-10",
+        "2026-07-17",
+    ]
+    assert future_period_dates("2026-07-06", 2, "MONTHLY") == [
+        "2026-07-31",
+        "2026-08-31",
+    ]
+    minute_dates = future_period_dates(
+        "2026-07-24 11:30:00",
+        2,
+        "MINUTE_30",
+    )
+    assert minute_dates == ["2026-07-24 13:00:00", "2026-07-24 13:30:00"]

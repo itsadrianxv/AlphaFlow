@@ -21,6 +21,9 @@ class FakeProClient:
     daily_basic_frames: dict[str, pd.DataFrame]
     index_daily_frames: dict[str, pd.DataFrame]
     stk_limit_frames: dict[str, pd.DataFrame] | None = None
+    weekly_frames: dict[str, pd.DataFrame] | None = None
+    monthly_frames: dict[str, pd.DataFrame] | None = None
+    minute_frames: dict[str, pd.DataFrame] | None = None
 
     def stock_basic(self, **_kwargs):
         return self.stock_basic_frame.copy()
@@ -42,6 +45,15 @@ class FakeProClient:
     def stk_limit(self, **kwargs):
         frames = self.stk_limit_frames or {}
         return frames.get(kwargs.get("trade_date"), pd.DataFrame()).copy()
+
+    def weekly(self, **kwargs):
+        return (self.weekly_frames or {}).get(kwargs["ts_code"], pd.DataFrame()).copy()
+
+    def monthly(self, **kwargs):
+        return (self.monthly_frames or {}).get(kwargs["ts_code"], pd.DataFrame()).copy()
+
+    def stk_mins(self, **kwargs):
+        return (self.minute_frames or {}).get(kwargs["freq"], pd.DataFrame()).copy()
 
 
 def test_tushare_provider_maps_profile_and_qfq_bars(monkeypatch):
@@ -137,6 +149,97 @@ def test_tushare_provider_resolves_index_benchmarks(monkeypatch):
 
     assert bars[0].stockCode == "510300"
     assert bars[0].close == 4020.0
+
+
+def test_tushare_provider_reads_weekly_and_monthly_bars(monkeypatch):
+    frame = pd.DataFrame(
+        {
+            "trade_date": ["20250131", "20241231"],
+            "open": [10.0, 9.0],
+            "high": [11.0, 10.0],
+            "low": [9.5, 8.5],
+            "close": [10.5, 9.5],
+            "vol": [1000.0, 900.0],
+            "amount": [10000.0, 9000.0],
+        }
+    )
+    fake_client = FakeProClient(
+        stock_basic_frame=pd.DataFrame(
+            {
+                "ts_code": ["600519.SH"],
+                "symbol": ["600519"],
+                "name": ["Moutai"],
+                "industry": ["Liquor"],
+            }
+        ),
+        daily_frames={},
+        adj_factor_frames={
+            "600519.SH": pd.DataFrame(
+                {"trade_date": ["20241231", "20250131"], "adj_factor": [1.0, 1.0]}
+            )
+        },
+        daily_basic_frames={},
+        index_daily_frames={},
+        weekly_frames={"600519.SH": frame},
+        monthly_frames={"600519.SH": frame},
+    )
+    monkeypatch.setenv("TUSHARE_TOKEN", "token-1")
+    monkeypatch.setattr(tushare_module, "_create_tushare_client", lambda _token: fake_client)
+
+    provider = TushareProvider()
+
+    assert [bar.tradeDate for bar in provider.get_bars("600519", "WEEKLY")] == [
+        "2024-12-31",
+        "2025-01-31",
+    ]
+    assert [bar.tradeDate for bar in provider.get_bars("600519", "MONTHLY")] == [
+        "2024-12-31",
+        "2025-01-31",
+    ]
+
+
+def test_tushare_provider_reads_minute_bars_with_timestamp(monkeypatch):
+    minute_frame = pd.DataFrame(
+        {
+            "trade_time": ["2025-01-02 09:31:00", "2025-01-02 09:30:00"],
+            "open": [10.1, 10.0],
+            "high": [10.2, 10.1],
+            "low": [10.0, 9.9],
+            "close": [10.15, 10.05],
+            "vol": [100.0, 90.0],
+            "amount": [1015.0, 904.5],
+        }
+    )
+    fake_client = FakeProClient(
+        stock_basic_frame=pd.DataFrame(
+            {
+                "ts_code": ["600519.SH"],
+                "symbol": ["600519"],
+                "name": ["Moutai"],
+                "industry": ["Liquor"],
+            }
+        ),
+        daily_frames={},
+        adj_factor_frames={},
+        daily_basic_frames={},
+        index_daily_frames={},
+        minute_frames={"1min": minute_frame},
+    )
+    monkeypatch.setenv("TUSHARE_TOKEN", "token-1")
+    monkeypatch.setattr(tushare_module, "_create_tushare_client", lambda _token: fake_client)
+
+    bars = TushareProvider().get_bars(
+        "600519",
+        "MINUTE_1",
+        start_date="2025-01-02 09:30:00",
+        end_date="2025-01-02 10:00:00",
+        adjust="qfq",
+    )
+
+    assert [bar.tradeDate for bar in bars] == [
+        "2025-01-02 09:30:00",
+        "2025-01-02 09:31:00",
+    ]
 
 
 def test_tushare_provider_builds_market_snapshot(monkeypatch):

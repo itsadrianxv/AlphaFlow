@@ -19,6 +19,7 @@ from app.data_providers.contracts import (
     MacroSnapshot,
     MarketSnapshotRow,
     StockProfile,
+    Timeframe,
 )
 from app.data_providers.errors import (
     DataProviderConfigurationError,
@@ -253,7 +254,6 @@ class TushareProvider:
                     break
         return matches
 
-    def get_daily_bars(
     def is_a_share_trading_day(self, trading_date: date) -> bool:
         date_text = trading_date.strftime("%Y%m%d")
         frame = self._ensure_frame(
@@ -294,21 +294,58 @@ class TushareProvider:
             )
         return sorted(records, key=lambda item: item["stockCode"])
 
+    def get_daily_bars(
         self,
         stock_code: str,
         start_date: str | None = None,
         end_date: str | None = None,
         adjust: str = "qfq",
     ) -> list[DailyBar]:
+        return self.get_bars(
+            stock_code=stock_code,
+            timeframe="DAILY",
+            start_date=start_date,
+            end_date=end_date,
+            adjust=adjust,
+        )
+
+    def get_bars(
+        self,
+        stock_code: str,
+        timeframe: Timeframe = "DAILY",
+        start_date: str | None = None,
+        end_date: str | None = None,
+        adjust: str = "qfq",
+    ) -> list[DailyBar]:
         normalized_code = self._normalize_stock_code_or_raise(stock_code)
+        normalized_timeframe = str(timeframe).strip().upper()
+        if normalized_timeframe not in {
+            "DAILY",
+            "WEEKLY",
+            "MONTHLY",
+            "MINUTE_60",
+            "MINUTE_30",
+            "MINUTE_15",
+            "MINUTE_1",
+        }:
+            raise UnsupportedDatasetError(
+                f"Unsupported bar timeframe: {timeframe}",
+                provider=self.provider_name,
+            )
         normalized_adjust = adjust.strip().lower()
-        if normalized_code in INDEX_BENCHMARK_TS_CODES:
+        if normalized_code in INDEX_BENCHMARK_TS_CODES and normalized_timeframe == "DAILY":
             frame = self._load_index_daily_frame(
                 INDEX_BENCHMARK_TS_CODES[normalized_code],
                 start_date=start_date,
                 end_date=end_date,
             )
             return self._frame_to_daily_bars(frame, normalized_code)
+
+        if normalized_code in INDEX_BENCHMARK_TS_CODES:
+            raise UnsupportedDatasetError(
+                f"Unsupported timeframe for index proxy: {normalized_timeframe}",
+                provider=self.provider_name,
+            )
 
         if normalized_adjust not in {"", "qfq", "hfq"}:
             raise UnsupportedDatasetError(
@@ -317,19 +354,55 @@ class TushareProvider:
             )
 
         ts_code = self.get_stock_profile(normalized_code).tsCode
-        daily_frame = self._load_daily_frame(ts_code, start_date=start_date, end_date=end_date)
-        if daily_frame.empty:
-            raise DataUnavailableError(
-                f"Daily bars not found for {normalized_code}",
-                provider=self.provider_name,
+        if normalized_timeframe.startswith("MINUTE_"):
+            minute_freq = {
+                "MINUTE_60": "60min",
+                "MINUTE_30": "30min",
+                "MINUTE_15": "15min",
+                "MINUTE_1": "1min",
+            }[normalized_timeframe]
+            minute_frame = self._load_minute_frame(
+                ts_code,
+                freq=minute_freq,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            if minute_frame.empty:
+                raise DataUnavailableError(
+                    f"{normalized_timeframe} bars not found for {normalized_code}",
+                    provider=self.provider_name,
+                )
+            return self._frame_to_daily_bars(
+                minute_frame,
+                normalized_code,
+                intraday=True,
             )
 
-        daily_basic_frame = self._load_daily_basic_frame(
+        dataset = {
+            "DAILY": "daily",
+            "WEEKLY": "weekly",
+            "MONTHLY": "monthly",
+        }[normalized_timeframe]
+        period_frame = self._load_period_frame(
+            dataset,
             ts_code,
             start_date=start_date,
             end_date=end_date,
         )
-        merged = daily_frame.merge(daily_basic_frame, on="trade_date", how="left")
+        if period_frame.empty:
+            raise DataUnavailableError(
+                f"{normalized_timeframe} bars not found for {normalized_code}",
+                provider=self.provider_name,
+            )
+
+        merged = period_frame
+        if normalized_timeframe == "DAILY":
+            daily_basic_frame = self._load_daily_basic_frame(
+                ts_code,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            merged = merged.merge(daily_basic_frame, on="trade_date", how="left")
 
         if normalized_adjust:
             factor_frame = self._load_adj_factor_frame(
@@ -943,6 +1016,39 @@ class TushareProvider:
             fields="trade_date,open,high,low,close,vol,amount",
         )
 
+    def _load_period_frame(
+        self,
+        dataset: str,
+        ts_code: str,
+        *,
+        start_date: str | None,
+        end_date: str | None,
+    ) -> pd.DataFrame:
+        return self._load_cached_frame(
+            dataset,
+            ts_code=ts_code,
+            start_date=start_date,
+            end_date=end_date,
+            fields="trade_date,open,high,low,close,vol,amount",
+        )
+
+    def _load_minute_frame(
+        self,
+        ts_code: str,
+        *,
+        freq: str,
+        start_date: str | None,
+        end_date: str | None,
+    ) -> pd.DataFrame:
+        return self._load_cached_frame(
+            "stk_mins",
+            ts_code=ts_code,
+            freq=freq,
+            start_date=start_date,
+            end_date=end_date,
+            fields="ts_code,trade_time,open,close,high,low,vol,amount",
+        )
+
     def _load_daily_basic_frame(
         self,
         ts_code: str,
@@ -994,7 +1100,9 @@ class TushareProvider:
 
     def _load_cached_frame(self, dataset: str, **params: str | None) -> pd.DataFrame:
         normalized_params = {
-            key: self._normalize_ymd(value) if key.endswith("date") and value else value
+            key: self._normalize_market_datetime(value)
+            if key.endswith("date") and value
+            else value
             for key, value in params.items()
             if value is not None
         }
@@ -1061,16 +1169,27 @@ class TushareProvider:
             return None
         return total_liab / total_assets
 
-    def _frame_to_daily_bars(self, frame: pd.DataFrame, stock_code: str) -> list[DailyBar]:
+    def _frame_to_daily_bars(
+        self,
+        frame: pd.DataFrame,
+        stock_code: str,
+        *,
+        intraday: bool = False,
+    ) -> list[DailyBar]:
         if frame.empty:
             return []
 
         bars: list[DailyBar] = []
-        for _, row in frame.sort_values("trade_date").iterrows():
+        sort_column = "trade_time" if intraday else "trade_date"
+        for _, row in frame.sort_values(sort_column).iterrows():
             bars.append(
                 DailyBar(
                     stockCode=stock_code,
-                    tradeDate=self._format_ymd(row.get("trade_date")),
+                    tradeDate=(
+                        self._format_trade_time(row.get("trade_time"))
+                        if intraday
+                        else self._format_ymd(row.get("trade_date"))
+                    ),
                     open=self._safe_float(row.get("open")),
                     high=self._safe_float(row.get("high")),
                     low=self._safe_float(row.get("low")),
@@ -1112,6 +1231,9 @@ class TushareProvider:
         if "trade_date" in normalized.columns:
             normalized["trade_date"] = normalized["trade_date"].astype(str)
             normalized = normalized.sort_values("trade_date")
+        if "trade_time" in normalized.columns:
+            normalized["trade_time"] = normalized["trade_time"].astype(str)
+            normalized = normalized.sort_values("trade_time")
         if "end_date" in normalized.columns:
             normalized["end_date"] = normalized["end_date"].astype(str)
             normalized = normalized.sort_values("end_date")
@@ -1179,6 +1301,18 @@ class TushareProvider:
 
     def _normalize_ymd(self, raw_date: str) -> str:
         return raw_date.replace("-", "")
+
+    def _normalize_market_datetime(self, raw_date: str) -> str:
+        text = str(raw_date or "").strip().replace("T", " ")
+        return text if ":" in text else self._normalize_ymd(text)
+
+    def _format_trade_time(self, raw_time: Any) -> str:
+        if isinstance(raw_time, (datetime, pd.Timestamp)):
+            return raw_time.strftime("%Y-%m-%d %H:%M:%S")
+        parsed = pd.to_datetime(raw_time, errors="coerce")
+        if pd.isna(parsed):
+            return str(raw_time or "")
+        return parsed.strftime("%Y-%m-%d %H:%M:%S")
 
     def _format_ymd(self, raw_date: Any) -> str:
         text = str(raw_date or "").replace("-", "").strip()

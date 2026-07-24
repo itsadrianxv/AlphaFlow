@@ -3,13 +3,14 @@ import type {
   TimingKronosForecast,
   TimingKronosForecastSummary,
   TimingSourceType,
+  TimingTimeframe,
 } from "~/server/domain/timing/types";
 
 const toJson = (value: unknown): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
 
 function toDateOnly(value: string) {
-  return new Date(`${value}T00:00:00.000Z`);
+  return new Date(`${value.slice(0, 10)}T00:00:00.000Z`);
 }
 
 export type TimingKronosForecastSnapshotRecord = {
@@ -18,6 +19,7 @@ export type TimingKronosForecastSnapshotRecord = {
   workflowRunId?: string | null;
   stockCode: string;
   stockName: string;
+  timeframe: TimingTimeframe;
   asOfDate: string;
   sourceType: TimingSourceType;
   sourceId: string;
@@ -38,6 +40,7 @@ function mapRecord(record: {
   workflowRunId: string | null;
   stockCode: string;
   stockName: string;
+  timeframe: string;
   asOfDate: Date;
   sourceType: string;
   sourceId: string;
@@ -57,6 +60,7 @@ function mapRecord(record: {
     workflowRunId: record.workflowRunId,
     stockCode: record.stockCode,
     stockName: record.stockName,
+    timeframe: record.timeframe as TimingTimeframe,
     asOfDate: record.asOfDate.toISOString().slice(0, 10),
     sourceType: record.sourceType as TimingSourceType,
     sourceId: record.sourceId,
@@ -79,6 +83,7 @@ type KronosForecastDelegate = {
     workflowRunId: string | null;
     stockCode: string;
     stockName: string;
+    timeframe: string;
     asOfDate: Date;
     sourceType: string;
     sourceId: string;
@@ -100,6 +105,7 @@ type KronosForecastDelegate = {
     workflowRunId: string | null;
     stockCode: string;
     stockName: string;
+    timeframe: string;
     asOfDate: Date;
     sourceType: string;
     sourceId: string;
@@ -120,6 +126,7 @@ type KronosForecastDelegate = {
       workflowRunId: string | null;
       stockCode: string;
       stockName: string;
+      timeframe: string;
       asOfDate: Date;
       sourceType: string;
       sourceId: string;
@@ -152,6 +159,7 @@ export class PrismaTimingKronosForecastSnapshotRepository {
     workflowRunId?: string;
     stockCode: string;
     stockName: string;
+    timeframe?: TimingTimeframe;
     sourceType: TimingSourceType;
     sourceId: string;
     inputBarsHash: string;
@@ -160,26 +168,30 @@ export class PrismaTimingKronosForecastSnapshotRepository {
     const asOfDate = toDateOnly(params.forecast.asOfDate);
     const record = await this.snapshots.upsert({
       where: {
-        userId_stockCode_asOfDate_modelName_predictionLength_inputBarsHash: {
-          userId: params.userId,
-          stockCode: params.stockCode,
-          asOfDate,
-          modelName: params.forecast.modelName,
-          predictionLength: params.forecast.predictionLength,
-          inputBarsHash: params.inputBarsHash,
-        },
+        userId_stockCode_asOfDate_timeframe_modelName_predictionLength_inputBarsHash:
+          {
+            userId: params.userId,
+            stockCode: params.stockCode,
+            asOfDate,
+            timeframe: params.forecast.timeframe,
+            modelName: params.forecast.modelName,
+            predictionLength: params.forecast.predictionLength,
+            inputBarsHash: params.inputBarsHash,
+          },
       },
       create: {
         userId: params.userId,
         workflowRunId: params.workflowRunId,
         stockCode: params.stockCode,
         stockName: params.stockName,
+        timeframe: params.forecast.timeframe,
         asOfDate,
         sourceType: params.sourceType,
         sourceId: params.sourceId,
         modelName: params.forecast.modelName,
         modelVersion: params.forecast.modelVersion,
-        lookbackDays: params.forecast.lookbackDays,
+        lookbackDays:
+          params.forecast.lookbackDays ?? params.forecast.lookbackBars,
         predictionLength: params.forecast.predictionLength,
         inputBarsHash: params.inputBarsHash,
         forecastJson: toJson(params.forecast),
@@ -191,8 +203,10 @@ export class PrismaTimingKronosForecastSnapshotRepository {
         sourceType: params.sourceType,
         sourceId: params.sourceId,
         stockName: params.stockName,
+        timeframe: params.forecast.timeframe,
         modelVersion: params.forecast.modelVersion,
-        lookbackDays: params.forecast.lookbackDays,
+        lookbackDays:
+          params.forecast.lookbackDays ?? params.forecast.lookbackBars,
         forecastJson: toJson(params.forecast),
         summaryJson: toJson(params.forecast.summary),
         warnings: params.forecast.warnings,
@@ -206,12 +220,14 @@ export class PrismaTimingKronosForecastSnapshotRepository {
     userId: string;
     stockCode: string;
     asOfDate: string;
+    timeframe?: TimingTimeframe;
   }) {
     const record = await this.snapshots.findFirst({
       where: {
         userId: params.userId,
         stockCode: params.stockCode,
         asOfDate: toDateOnly(params.asOfDate),
+        ...(params.timeframe ? { timeframe: params.timeframe } : {}),
       },
       orderBy: {
         createdAt: "desc",

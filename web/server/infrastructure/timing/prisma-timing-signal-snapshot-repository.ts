@@ -25,6 +25,7 @@ function mapRecord(record: {
   timeframe: string;
   barsCount: number;
   bars: unknown;
+  barsByTimeframe: unknown;
   indicators: unknown;
   signalContext: unknown;
   createdAt: Date;
@@ -41,6 +42,8 @@ function mapRecord(record: {
     timeframe: record.timeframe as "DAILY",
     barsCount: record.barsCount,
     bars: (record.bars as TimingBar[] | null | undefined) ?? undefined,
+    barsByTimeframe:
+      record.barsByTimeframe as TimingSignalSnapshotRecord["barsByTimeframe"],
     indicators: record.indicators as TimingSignalData["indicators"],
     signalContext: record.signalContext as TimingSignalData["signalContext"],
     createdAt: record.createdAt,
@@ -71,6 +74,9 @@ export class PrismaTimingSignalSnapshotRepository {
             timeframe: "DAILY",
             barsCount: item.barsCount,
             bars: item.bars ? toJson(item.bars) : undefined,
+            barsByTimeframe: item.barsByTimeframe
+              ? toJson(item.barsByTimeframe)
+              : undefined,
             indicators: toJson(item.indicators),
             signalContext: toJson(item.signalContext),
           },

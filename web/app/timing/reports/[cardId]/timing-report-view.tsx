@@ -1,5 +1,6 @@
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, { useState } from "react";
+import { EvidenceContextCitations } from "~/app/_components/evidence-context-citations";
 import { EmptyState, Panel, StatusPill } from "~/app/_components/ui";
 import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
@@ -19,7 +20,9 @@ import {
 } from "~/app/timing/timing-labels";
 import type {
   TimingReportPayload,
+  TimingReportSeriesPayload,
   TimingSignalEngineKey,
+  TimingTimeframe,
 } from "~/server/domain/timing/types";
 
 const actionToneMap: Record<
@@ -115,8 +118,14 @@ function formatDataStatus(value: "COMPLETE" | "FALLBACK") {
   return value === "COMPLETE" ? "完整" : "降级";
 }
 
-function SummaryTab(props: { report: TimingReportPayload }) {
-  const { report } = props;
+function SummaryTab(props: {
+  report: TimingReportPayload;
+  series?: TimingReportSeriesPayload;
+  timeframe: TimingTimeframe;
+  onTimeframeChange: (timeframe: TimingTimeframe) => void;
+  seriesLoading: boolean;
+}) {
+  const { report, series, timeframe, onTimeframeChange, seriesLoading } = props;
   const signalContext = report.card.reasoning.signalContext;
   const signalSnapshot = report.card.signalSnapshot;
   const asOfDate = report.card.asOfDate ?? signalSnapshot?.asOfDate ?? "-";
@@ -139,6 +148,12 @@ function SummaryTab(props: { report: TimingReportPayload }) {
             综合择时评分 {signalContext.compositeScore.toFixed(1)} / ±100，
             置信度 {report.card.confidence} / 100
           </p>
+          <div className="text-sm text-[var(--app-text-muted)]">
+            依据{" "}
+            <EvidenceContextCitations
+              citations={report.card.reasoning.evidenceCitations}
+            />
+          </div>
           <p>{modelPredictionText}</p>
           <p className="max-w-5xl text-[var(--app-text-muted)]">
             择时评分由多周期一致性、相对强弱、波动率分位、流动性结构、突破失败率、缺口与放量质量六个角度加权计算。
@@ -148,25 +163,37 @@ function SummaryTab(props: { report: TimingReportPayload }) {
 
       <Panel title="价格结构">
         <TimingReportChart
-          bars={report.bars}
-          chartLevels={report.chartLevels}
-          forecast={report.kronosForecast}
+          bars={series?.bars ?? report.bars}
+          chartLevels={series?.chartLevels ?? report.chartLevels}
+          forecast={series?.kronosForecast ?? report.kronosForecast}
+          timeframe={timeframe}
+          onTimeframeChange={onTimeframeChange}
+          seriesLoading={seriesLoading}
         />
       </Panel>
     </div>
   );
 }
 
-function EvidenceTab(props: { report: TimingReportPayload }) {
-  const { report } = props;
+function EvidenceTab(props: {
+  report: TimingReportPayload;
+  series?: TimingReportSeriesPayload;
+  timeframe: TimingTimeframe;
+  onTimeframeChange: (timeframe: TimingTimeframe) => void;
+  seriesLoading: boolean;
+}) {
+  const { report, series, timeframe, onTimeframeChange, seriesLoading } = props;
 
   return (
     <div className="grid gap-6">
       <Panel title="价格结构">
         <TimingReportChart
-          bars={report.bars}
-          chartLevels={report.chartLevels}
-          forecast={report.kronosForecast}
+          bars={series?.bars ?? report.bars}
+          chartLevels={series?.chartLevels ?? report.chartLevels}
+          forecast={series?.kronosForecast ?? report.kronosForecast}
+          timeframe={timeframe}
+          onTimeframeChange={onTimeframeChange}
+          seriesLoading={seriesLoading}
         />
       </Panel>
 
@@ -538,6 +565,10 @@ function MetricBlock(props: { label: string; value: string }) {
 
 export function TimingReportPanels(props: {
   report: TimingReportPayload;
+  series?: TimingReportSeriesPayload;
+  timeframe?: TimingTimeframe;
+  onTimeframeChange?: (timeframe: TimingTimeframe) => void;
+  seriesLoading?: boolean;
   activeTabId?: TimingReportStageId;
   onTabChange?: (tabId: TimingReportStageId) => void;
 }) {
@@ -550,8 +581,24 @@ export function TimingReportPanels(props: {
       activeTabId={activeTabId}
       onChange={(tabId) => props.onTabChange?.(tabId as TimingReportStageId)}
       panels={{
-        summary: <SummaryTab report={props.report} />,
-        evidence: <EvidenceTab report={props.report} />,
+        summary: (
+          <SummaryTab
+            report={props.report}
+            series={props.series}
+            timeframe={props.timeframe ?? "DAILY"}
+            onTimeframeChange={props.onTimeframeChange ?? (() => undefined)}
+            seriesLoading={props.seriesLoading ?? false}
+          />
+        ),
+        evidence: (
+          <EvidenceTab
+            report={props.report}
+            series={props.series}
+            timeframe={props.timeframe ?? "DAILY"}
+            onTimeframeChange={props.onTimeframeChange ?? (() => undefined)}
+            seriesLoading={props.seriesLoading ?? false}
+          />
+        ),
         execution: <ExecutionTab report={props.report} />,
         review: <ReviewTab report={props.report} />,
       }}
@@ -559,7 +606,13 @@ export function TimingReportPanels(props: {
   );
 }
 
-export function TimingReportView(props: { report: TimingReportPayload }) {
+export function TimingReportView(props: {
+  report: TimingReportPayload;
+  series?: TimingReportSeriesPayload;
+  timeframe?: TimingTimeframe;
+  onTimeframeChange?: (timeframe: TimingTimeframe) => void;
+  seriesLoading?: boolean;
+}) {
   const [activeTabId, setActiveTabId] =
     useState<TimingReportStageId>("summary");
 
@@ -567,6 +620,10 @@ export function TimingReportView(props: { report: TimingReportPayload }) {
     <div className="grid gap-6">
       <TimingReportPanels
         report={props.report}
+        series={props.series}
+        timeframe={props.timeframe}
+        onTimeframeChange={props.onTimeframeChange}
+        seriesLoading={props.seriesLoading}
         activeTabId={activeTabId}
         onTabChange={setActiveTabId}
       />

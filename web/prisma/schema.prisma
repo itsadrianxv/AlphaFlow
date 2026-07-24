@@ -84,6 +84,8 @@ model User {
     researchNotes                     ResearchNote[]
     financialSnapshots                FinancialSnapshot[]
     researchArtifacts                 ResearchArtifact[]
+    evidenceContexts                  EvidenceContext[]
+    evidenceContextItems              EvidenceContextItem[]
 }
 
 model VerificationToken {
@@ -314,6 +316,84 @@ model ResearchArtifact {
     @@index([userId, artifactType, updatedAt])
 }
 
+model EvidenceContext {
+    id          String   @id @default(cuid())
+    userId      String
+    workflowRunId String?
+    schemaVersion String @default("1.0")
+    subjectType String
+    subjectId   String
+    subjectLabel String?
+    phase       String?
+    metadataJson Json
+    createdAt   DateTime @default(now())
+
+    user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+    workflowRun WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+    blocks     EvidenceContextBlock[]
+    items      EvidenceContextItem[]
+
+    @@index([userId, subjectType, subjectId, createdAt])
+    @@index([workflowRunId, createdAt])
+}
+
+model EvidenceContextBlock {
+    id            String   @id @default(cuid())
+    contextId     String
+    blockKey      String
+    status        String
+    sourceType    String?
+    sourceId      String?
+    sourceName    String?
+    sourceUrl     String?
+    observedAt    DateTime?
+    fetchedAt     DateTime?
+    warnings      String[] @default([])
+    limitations   String[] @default([])
+    metadataJson  Json
+    createdAt     DateTime @default(now())
+
+    context       EvidenceContext @relation(fields: [contextId], references: [id], onDelete: Cascade)
+    items         EvidenceContextItem[]
+
+    @@unique([contextId, blockKey])
+    @@index([blockKey, createdAt])
+}
+
+model EvidenceContextItem {
+    id            String   @id @default(cuid())
+    contextId     String
+    blockId       String
+    userId        String
+    itemKey       String
+    status        String
+    extractedFact String?
+    snippet       String?
+    valueJson     Json?
+    rawValueJson  Json?
+    sourceType    String
+    sourceId      String?
+    sourceName    String?
+    sourceUrl     String?
+    publishedAt   DateTime?
+    observedAt    DateTime?
+    fetchedAt     DateTime?
+    fallbackFrom  String?
+    missingReason String?
+    warnings      String[] @default([])
+    limitations   String[] @default([])
+    metadataJson  Json
+    createdAt     DateTime @default(now())
+
+    context       EvidenceContext @relation(fields: [contextId], references: [id], onDelete: Cascade)
+    block         EvidenceContextBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+    user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([blockId, itemKey])
+    @@index([userId, contextId, createdAt])
+    @@index([sourceType, sourceId])
+}
+
 enum ResearchReminderType {
     REVIEW
 }
@@ -361,6 +441,7 @@ model TimingSignalSnapshot {
     timeframe    String    @default("DAILY")
     barsCount    Int
     bars         Json?
+    barsByTimeframe Json?
     indicators   Json
     signalContext Json
     createdAt    DateTime  @default(now())
@@ -694,6 +775,7 @@ model WorkflowRun {
     agentArtifacts          AgentArtifact[]
     agentConversationMessages AgentConversationMessage[]
     legacyAgentConversation AgentConversation? @relation("LegacyAgentConversationRun")
+    evidenceContexts        EvidenceContext[]
 
     @@index([templateId])
     @@index([userId, createdAt])
@@ -707,6 +789,7 @@ model TimingKronosForecastSnapshot {
     workflowRunId    String?
     stockCode        String
     stockName        String
+    timeframe        String   @default("DAILY")
     asOfDate         DateTime
     sourceType       String
     sourceId         String
@@ -723,10 +806,10 @@ model TimingKronosForecastSnapshot {
     user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
     workflowRun WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
 
-    @@index([userId, stockCode, asOfDate])
+    @@index([userId, stockCode, asOfDate, timeframe])
     @@index([workflowRunId])
     @@index([sourceType, sourceId])
-    @@unique([userId, stockCode, asOfDate, modelName, predictionLength, inputBarsHash])
+    @@unique([userId, stockCode, asOfDate, timeframe, modelName, predictionLength, inputBarsHash])
 }
 
 model WorkflowNodeRun {

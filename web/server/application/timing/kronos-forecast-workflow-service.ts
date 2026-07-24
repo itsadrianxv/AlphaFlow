@@ -6,11 +6,30 @@ import type {
   TimingKronosForecast,
   TimingSignalData,
   TimingSourceType,
+  TimingTimeframe,
 } from "~/server/domain/timing/types";
 import type { KronosForecastClient } from "~/server/infrastructure/timing/kronos-forecast-client";
 import type { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
 
 const KRONOS_MISSING_WARNING = "Kronos 预测暂不可用，辅助权重按 0 处理。";
+const KRONOS_TIMEFRAMES: TimingTimeframe[] = [
+  "DAILY",
+  "WEEKLY",
+  "MONTHLY",
+  "MINUTE_60",
+  "MINUTE_30",
+  "MINUTE_15",
+  "MINUTE_1",
+];
+const KRONOS_PREDICTION_LENGTHS: Record<TimingTimeframe, number> = {
+  DAILY: 60,
+  WEEKLY: 12,
+  MONTHLY: 6,
+  MINUTE_60: 60,
+  MINUTE_30: 60,
+  MINUTE_15: 60,
+  MINUTE_1: 60,
+};
 
 const directionLabelMap = {
   bullish: "偏多",
@@ -125,13 +144,37 @@ export class KronosForecastWorkflowService {
     }
 
     try {
-      const response = await this.deps.client.forecastBatch({
-        items: snapshotsWithBars.map((snapshot) => ({
-          stockCode: snapshot.stockCode,
-          bars: snapshot.bars ?? [],
-        })),
-        predictionLength: params.predictionLength,
-      });
+      const responses = await Promise.all(
+        KRONOS_TIMEFRAMES.map(async (timeframe) => {
+          const items = snapshotsWithBars
+            .map((snapshot) => ({
+              stockCode: snapshot.stockCode,
+              timeframe,
+              bars:
+                snapshot.barsByTimeframe?.[timeframe] ??
+                (timeframe === "DAILY" ? (snapshot.bars ?? []) : []),
+            }))
+            .filter((item) => item.bars.length >= 120);
+          if (items.length === 0) {
+            return { items: [], errors: [] };
+          }
+          const uniformLength = Math.min(
+            ...items.map((item) => item.bars.length),
+          );
+          return this.deps.client.forecastBatch({
+            items: items.map((item) => ({
+              ...item,
+              bars: item.bars.slice(-uniformLength),
+            })),
+            predictionLength:
+              params.predictionLength ?? KRONOS_PREDICTION_LENGTHS[timeframe],
+          });
+        }),
+      );
+      const response = {
+        items: responses.flatMap((item) => item.items),
+        errors: responses.flatMap((item) => item.errors),
+      };
 
       const snapshotByCode = new Map(
         params.signalSnapshots.map((snapshot) => [
@@ -139,7 +182,7 @@ export class KronosForecastWorkflowService {
           snapshot,
         ]),
       );
-      const forecastByCode = new Map<string, TimingKronosForecast>();
+      const forecastByKey = new Map<string, TimingKronosForecast>();
       const warnings = response.errors.map(
         (error) => `${error.stockCode}:${error.code}:${error.message}`,
       );
@@ -162,15 +205,34 @@ export class KronosForecastWorkflowService {
             inputBarsHash: hashBars(bars),
             forecast,
           });
-          forecastByCode.set(forecast.stockCode, persisted.forecast);
+          forecastByKey.set(
+            `${forecast.stockCode}:${forecast.timeframe}`,
+            persisted.forecast,
+          );
         }),
       );
 
       return {
         cards: params.cards.map((card) => {
-          const forecast = forecastByCode.get(card.stockCode);
+          const forecasts = Object.fromEntries(
+            KRONOS_TIMEFRAMES.flatMap((timeframe) => {
+              const forecast = forecastByKey.get(
+                `${card.stockCode}:${timeframe}`,
+              );
+              return forecast ? [[timeframe, forecast.summary]] : [];
+            }),
+          ) as Partial<
+            Record<TimingTimeframe, TimingKronosForecast["summary"]>
+          >;
+          const forecast = forecastByKey.get(`${card.stockCode}:DAILY`);
           if (!forecast) {
-            return this.attachMissingWarning(card);
+            return {
+              ...this.attachMissingWarning(card),
+              reasoning: {
+                ...this.attachMissingWarning(card).reasoning,
+                kronosForecasts: forecasts,
+              },
+            };
           }
           const kronosConditions = buildKronosConditions(forecast);
           return {
@@ -202,6 +264,7 @@ export class KronosForecastWorkflowService {
                 ],
               },
               kronosForecast: forecast.summary,
+              kronosForecasts: forecasts,
               kronosWarnings: forecast.warnings,
               actionRationale: `${card.reasoning.actionRationale} Kronos 预测：${formatDirectionLabel(forecast.summary.direction)}，预期收益 ${forecast.summary.expectedReturnPct.toFixed(2)}%，最大回撤 ${forecast.summary.maxDrawdownPct.toFixed(2)}%。`,
             },

@@ -2,10 +2,12 @@ import { env } from "~/env";
 import type {
   TimingBar,
   TimingKronosForecast,
+  TimingTimeframe,
 } from "~/server/domain/timing/types";
 
 export type KronosForecastBatchError = {
   stockCode: string;
+  timeframe: TimingTimeframe;
   code: string;
   message: string;
 };
@@ -41,7 +43,11 @@ export class KronosForecastClient {
   }
 
   async forecastBatch(params: {
-    items: Array<{ stockCode: string; bars: TimingBar[] }>;
+    items: Array<{
+      stockCode: string;
+      timeframe: TimingTimeframe;
+      bars: TimingBar[];
+    }>;
     predictionLength?: number;
   }): Promise<KronosForecastBatchResult> {
     if (!this.enabled) {
@@ -49,6 +55,7 @@ export class KronosForecastClient {
         items: [],
         errors: params.items.map((item) => ({
           stockCode: item.stockCode,
+          timeframe: item.timeframe,
           code: "kronos_disabled",
           message: "Kronos 预测已禁用。",
         })),
@@ -74,6 +81,7 @@ export class KronosForecastClient {
 
   async forecast(params: {
     stockCode: string;
+    timeframe: TimingTimeframe;
     bars: TimingBar[];
     predictionLength?: number;
   }): Promise<TimingKronosForecast> {
@@ -81,6 +89,7 @@ export class KronosForecastClient {
       method: "POST",
       body: JSON.stringify({
         stockCode: params.stockCode,
+        timeframe: params.timeframe,
         bars: params.bars,
         predictionLength:
           params.predictionLength ?? this.defaultPredictionLength,

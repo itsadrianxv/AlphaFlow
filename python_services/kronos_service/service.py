@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 
-from kronos_service.contracts import KronosBar
+from kronos_service.contracts import KronosBar, KronosTimeframe
 
 MIN_LOOKBACK_DAYS = 120
 
@@ -62,11 +62,15 @@ def resolve_device(device: str) -> str:
         return "cpu"
 
 
-def normalize_bars(bars: list[KronosBar], max_context: int) -> list[KronosBar]:
+def normalize_bars(
+    bars: list[KronosBar],
+    max_context: int,
+    timeframe: KronosTimeframe = "DAILY",
+) -> list[KronosBar]:
     if len(bars) < MIN_LOOKBACK_DAYS:
         raise KronosForecastError(
             code="insufficient_history",
-            message=f"Kronos forecast requires at least {MIN_LOOKBACK_DAYS} daily bars",
+            message=f"Kronos forecast requires at least {MIN_LOOKBACK_DAYS} {timeframe.lower()} bars",
         )
     return bars[-max_context:]
 
@@ -80,6 +84,59 @@ def future_business_dates(as_of_date: str, prediction_length: int) -> list[str]:
         if current.weekday() < 5:
             result.append(current.isoformat())
     return result
+
+
+def future_period_dates(
+    as_of_date: str,
+    prediction_length: int,
+    timeframe: KronosTimeframe,
+) -> list[str]:
+    if timeframe == "DAILY":
+        return future_business_dates(as_of_date, prediction_length)
+
+    if timeframe.startswith("MINUTE_"):
+        interval_minutes = {
+            "MINUTE_60": 60,
+            "MINUTE_30": 30,
+            "MINUTE_15": 15,
+            "MINUTE_1": 1,
+        }[timeframe]
+        current = pd.Timestamp(as_of_date) + pd.Timedelta(minutes=interval_minutes)
+        dates: list[pd.Timestamp] = []
+        while len(dates) < prediction_length:
+            if current.weekday() >= 5:
+                current = (current + pd.Timedelta(days=7 - current.weekday())).replace(
+                    hour=9,
+                    minute=30,
+                    second=0,
+                )
+                continue
+            if current.time() < pd.Timestamp("09:30").time():
+                current = current.replace(hour=9, minute=30, second=0)
+            elif current.time() > pd.Timestamp("11:30").time() and current.time() < pd.Timestamp("13:00").time():
+                current = current.replace(hour=13, minute=0, second=0)
+            elif current.time() > pd.Timestamp("15:00").time():
+                current = (current + pd.Timedelta(days=1)).replace(
+                    hour=9,
+                    minute=30,
+                    second=0,
+                )
+                continue
+            dates.append(current)
+            current = current + pd.Timedelta(minutes=interval_minutes)
+        return [item.strftime("%Y-%m-%d %H:%M:%S") for item in dates]
+
+    current = pd.Timestamp(as_of_date)
+    dates: list[pd.Timestamp] = []
+    offset = (
+        pd.offsets.Week(weekday=4)
+        if timeframe == "WEEKLY"
+        else pd.offsets.BMonthEnd()
+    )
+    while len(dates) < prediction_length:
+        current = current + offset
+        dates.append(current)
+    return [item.strftime("%Y-%m-%d") for item in dates]
 
 
 def bars_to_frame(bars: list[KronosBar]) -> pd.DataFrame:
@@ -179,19 +236,19 @@ class KronosModelForecaster:
         self,
         *,
         stock_code: str,
+        timeframe: KronosTimeframe = "DAILY",
         bars: list[KronosBar],
         prediction_length: int | None,
     ) -> dict[str, Any]:
-        normalized = normalize_bars(bars, self.max_context)
-        effective_prediction_length = (
-            prediction_length or self.default_prediction_length
-        )
+        normalized = normalize_bars(bars, self.max_context, timeframe)
+        effective_prediction_length = prediction_length or self._default_prediction_length(timeframe)
         predictor = self._load_predictor()
         x_df = bars_to_frame(normalized)
         x_timestamp = pd.Series(pd.to_datetime([bar.tradeDate for bar in normalized]))
-        y_dates = future_business_dates(
+        y_dates = future_period_dates(
             normalized[-1].tradeDate,
             effective_prediction_length,
+            timeframe,
         )
         y_timestamp = pd.Series(pd.to_datetime(y_dates))
 
@@ -209,6 +266,7 @@ class KronosModelForecaster:
 
         return self._format_response(
             stock_code=stock_code,
+            timeframe=timeframe,
             bars=normalized,
             prediction_length=effective_prediction_length,
             pred_df=pred_df,
@@ -218,35 +276,35 @@ class KronosModelForecaster:
     def forecast_batch(
         self,
         *,
-        items: list[tuple[str, list[KronosBar]]],
+        items: list[tuple[str, KronosTimeframe, list[KronosBar]]],
         prediction_length: int | None,
     ) -> list[dict[str, Any]]:
         if not items:
             return []
 
         normalized_items = [
-            (stock_code, normalize_bars(bars, self.max_context))
-            for stock_code, bars in items
+            (stock_code, timeframe, normalize_bars(bars, self.max_context, timeframe))
+            for stock_code, timeframe, bars in items
         ]
-        lengths = {len(bars) for _stock_code, bars in normalized_items}
+        lengths = {len(bars) for _stock_code, _timeframe, bars in normalized_items}
         if len(lengths) > 1:
             raise KronosForecastError(
                 code="batch_lookback_mismatch",
                 message="batch forecast requires a uniform lookback length",
             )
 
-        effective_prediction_length = (
-            prediction_length or self.default_prediction_length
+        effective_prediction_length = prediction_length or self._default_prediction_length(
+            normalized_items[0][1]
         )
         predictor = self._load_predictor()
-        df_list = [bars_to_frame(bars) for _stock_code, bars in normalized_items]
+        df_list = [bars_to_frame(bars) for _stock_code, _timeframe, bars in normalized_items]
         x_timestamp_list = [
             pd.Series(pd.to_datetime([bar.tradeDate for bar in bars]))
-            for _stock_code, bars in normalized_items
+            for _stock_code, _timeframe, bars in normalized_items
         ]
         y_date_list = [
-            future_business_dates(bars[-1].tradeDate, effective_prediction_length)
-            for _stock_code, bars in normalized_items
+            future_period_dates(bars[-1].tradeDate, effective_prediction_length, timeframe)
+            for _stock_code, timeframe, bars in normalized_items
         ]
         y_timestamp_list = [
             pd.Series(pd.to_datetime(dates)) for dates in y_date_list
@@ -264,12 +322,13 @@ class KronosModelForecaster:
         )
 
         responses: list[dict[str, Any]] = []
-        for index, (stock_code, bars) in enumerate(normalized_items):
+        for index, (stock_code, timeframe, bars) in enumerate(normalized_items):
             pred_df = pred_df_list[index].reset_index(drop=True)
             pred_df["tradeDate"] = y_date_list[index]
             responses.append(
                 self._format_response(
                     stock_code=stock_code,
+                    timeframe=timeframe,
                     bars=bars,
                     prediction_length=effective_prediction_length,
                     pred_df=pred_df,
@@ -278,10 +337,22 @@ class KronosModelForecaster:
             )
         return responses
 
+    def _default_prediction_length(self, timeframe: KronosTimeframe) -> int:
+        return {
+            "DAILY": self.default_prediction_length,
+            "WEEKLY": 12,
+            "MONTHLY": 6,
+            "MINUTE_60": 60,
+            "MINUTE_30": 60,
+            "MINUTE_15": 60,
+            "MINUTE_1": 60,
+        }[timeframe]
+
     def _format_response(
         self,
         *,
         stock_code: str,
+        timeframe: KronosTimeframe,
         bars: list[KronosBar],
         prediction_length: int,
         pred_df: pd.DataFrame,
@@ -303,10 +374,12 @@ class KronosModelForecaster:
 
         return {
             "stockCode": stock_code,
+            "timeframe": timeframe,
             "asOfDate": bars[-1].tradeDate,
             "modelName": self.model_name,
             "modelVersion": self.model_version,
             "lookbackDays": len(bars),
+            "lookbackBars": len(bars),
             "predictionLength": prediction_length,
             "device": self.device,
             "points": points,

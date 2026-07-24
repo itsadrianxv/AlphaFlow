@@ -76,6 +76,19 @@ const getTimingReportInput = z.object({
   cardId: z.string().cuid(),
 });
 
+const getTimingSeriesInput = z.object({
+  cardId: z.string().cuid(),
+  timeframe: z.enum([
+    "DAILY",
+    "WEEKLY",
+    "MONTHLY",
+    "MINUTE_60",
+    "MINUTE_30",
+    "MINUTE_15",
+    "MINUTE_1",
+  ]),
+});
+
 const updatePortfolioSnapshotInput = z
   .object({
     id: z.string().cuid(),
@@ -254,6 +267,39 @@ export const timingRouter = createTRPCRouter({
       }
 
       return report;
+    }),
+
+  getTimingSeries: protectedProcedure
+    .input(getTimingSeriesInput)
+    .query(async ({ ctx, input }) => {
+      const service = new TimingReportService({
+        analysisCardRepository: new PrismaTimingAnalysisCardRepository(ctx.db),
+        signalSnapshotRepository: new PrismaTimingSignalSnapshotRepository(
+          ctx.db,
+        ),
+        reviewRecordRepository: new PrismaTimingReviewRecordRepository(ctx.db),
+        recommendationRepository: new PrismaTimingRecommendationRepository(
+          ctx.db,
+        ),
+        marketContextSnapshotRepository:
+          new PrismaTimingMarketContextSnapshotRepository(ctx.db),
+        kronosForecastSnapshotRepository:
+          new PrismaTimingKronosForecastSnapshotRepository(ctx.db),
+        timingDataClient: new PythonTimingDataClient(),
+        marketRegimeService: new MarketRegimeService(),
+      });
+      const series = await service.getTimingSeries({
+        userId: ctx.session.user.id,
+        cardId: input.cardId,
+        timeframe: input.timeframe,
+      });
+      if (!series) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Timing series not found",
+        });
+      }
+      return series;
     }),
 
   createPortfolioSnapshot: protectedProcedure

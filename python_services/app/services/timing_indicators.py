@@ -45,6 +45,9 @@ class TimingIndicatorsService:
         benchmark_histories: dict[str, pd.DataFrame] | None = None,
         as_of_date: str | None = None,
         include_bars: bool = False,
+        timeframe_histories: dict[str, pd.DataFrame] | None = None,
+        timeframe_warnings: dict[str, str] | None = None,
+        bar_histories: dict[str, pd.DataFrame] | None = None,
     ) -> TimingSignalData:
         normalized = self.normalize_history(history)
         effective = self.slice_as_of(normalized, as_of_date)
@@ -94,11 +97,31 @@ class TimingIndicatorsService:
             else self._round_float(latest["turnover_rate"]),
         )
 
+        normalized_timeframes: dict[str, pd.DataFrame] = {"DAILY": enriched}
+        for timeframe, frame in (timeframe_histories or {}).items():
+            if timeframe == "DAILY":
+                continue
+            try:
+                sliced = self.slice_as_of(self.normalize_history(frame), as_of_date)
+                if len(sliced.index) >= 60:
+                    normalized_timeframes[timeframe] = self.calculate_indicators(sliced)
+            except (GatewayError, KeyError, ValueError):
+                continue
+
         signal_context = self.build_signal_context(
             stock_history=enriched,
             benchmark_histories=benchmark_histories or {},
             as_of_date=as_of_date,
+            timeframe_histories=normalized_timeframes,
+            timeframe_warnings=timeframe_warnings or {},
         )
+
+        bars_by_timeframe = None
+        if include_bars:
+            bars_by_timeframe = {
+                timeframe: self.build_bars(frame)
+                for timeframe, frame in (bar_histories or normalized_timeframes).items()
+            }
 
         return TimingSignalData(
             stockCode=stock_code,
@@ -106,6 +129,7 @@ class TimingIndicatorsService:
             asOfDate=latest["trade_date"].strftime("%Y-%m-%d"),
             barsCount=len(effective.index),
             bars=self.build_bars(effective) if include_bars else None,
+            barsByTimeframe=bars_by_timeframe,
             indicators=indicators,
             signalContext=signal_context,
         )
@@ -113,7 +137,11 @@ class TimingIndicatorsService:
     def build_bars(self, history: pd.DataFrame) -> list[TimingBar]:
         return [
             TimingBar(
-                tradeDate=row.trade_date.strftime("%Y-%m-%d"),
+                tradeDate=(
+                    row.trade_date.strftime("%Y-%m-%d %H:%M:%S")
+                    if isinstance(row.trade_date, (datetime, pd.Timestamp))
+                    else row.trade_date.strftime("%Y-%m-%d")
+                ),
                 open=self._round_float(row.open),
                 high=self._round_float(row.high),
                 low=self._round_float(row.low),
@@ -163,7 +191,15 @@ class TimingIndicatorsService:
             )
 
         frame = renamed.copy()
-        frame["trade_date"] = pd.to_datetime(frame["trade_date"]).dt.date
+        parsed_dates = pd.to_datetime(frame["trade_date"])
+        has_intraday_time = bool(
+            (
+                (parsed_dates.dt.hour != 0)
+                | (parsed_dates.dt.minute != 0)
+                | (parsed_dates.dt.second != 0)
+            ).any()
+        )
+        frame["trade_date"] = parsed_dates if has_intraday_time else parsed_dates.dt.date
         for column in [
             "open",
             "high",
@@ -212,7 +248,12 @@ class TimingIndicatorsService:
                 provider="gateway",
             ) from exc
 
-        filtered = history[history["trade_date"] <= target_date].reset_index(drop=True)
+        comparison_target = (
+            pd.Timestamp(target_date).replace(hour=23, minute=59, second=59)
+            if pd.api.types.is_datetime64_any_dtype(history["trade_date"])
+            else target_date
+        )
+        filtered = history[history["trade_date"] <= comparison_target].reset_index(drop=True)
         if filtered.empty:
             raise GatewayError(
                 code="bars_not_found",
@@ -292,6 +333,8 @@ class TimingIndicatorsService:
         stock_history: pd.DataFrame,
         benchmark_histories: dict[str, pd.DataFrame],
         as_of_date: str | None,
+        timeframe_histories: dict[str, pd.DataFrame] | None = None,
+        timeframe_warnings: dict[str, str] | None = None,
     ) -> TimingSignalContext:
         normalized_benchmarks: dict[str, pd.DataFrame] = {}
         for code, frame in benchmark_histories.items():
@@ -301,7 +344,11 @@ class TimingIndicatorsService:
                 normalized_benchmarks[code] = self.calculate_indicators(sliced)
 
         engines = [
-            self._build_multi_timeframe_alignment(stock_history),
+            self._build_multi_timeframe_alignment(
+                stock_history,
+                timeframe_histories=timeframe_histories or {"DAILY": stock_history},
+                timeframe_warnings=timeframe_warnings or {},
+            ),
             self._build_relative_strength(stock_history, normalized_benchmarks),
             self._build_volatility_percentile(stock_history),
             self._build_liquidity_structure(stock_history),
@@ -339,34 +386,76 @@ class TimingIndicatorsService:
     def _build_multi_timeframe_alignment(
         self,
         history: pd.DataFrame,
+        *,
+        timeframe_histories: dict[str, pd.DataFrame],
+        timeframe_warnings: dict[str, str],
     ) -> TimingSignalEngineResult:
-        latest = history.iloc[-1]
-        previous = history.iloc[-6] if len(history.index) >= 6 else history.iloc[0]
+        timeframe_weights = {"DAILY": 0.5, "WEEKLY": 0.3, "MONTHLY": 0.2}
+        scores: dict[str, float] = {}
+        directions: dict[str, str] = {}
+        metrics: dict[str, float | str | bool | None] = {}
+        warnings: list[str] = []
+        weighted_score = 0.0
+        available_weight = 0.0
 
-        bullish_checks = [
-            latest["close"] > latest["ema5"],
-            latest["ema5"] > latest["ema20"],
-            latest["ema20"] > latest["ema60"],
-            latest["ema60"] > latest["ema120"],
-            latest["ema20"] > previous["ema20"],
-            latest["ema60"] > previous["ema60"],
-            latest["return_20d"] > 0,
-        ]
-        bearish_checks = [
-            latest["close"] < latest["ema5"],
-            latest["ema5"] < latest["ema20"],
-            latest["ema20"] < latest["ema60"],
-            latest["ema60"] < latest["ema120"],
-            latest["ema20"] < previous["ema20"],
-            latest["ema60"] < previous["ema60"],
-            latest["return_20d"] < 0,
-        ]
+        for timeframe, frame in timeframe_histories.items():
+            if len(frame.index) < 60:
+                warnings.append(f"{timeframe} 历史数据不足，未参与多周期评分。")
+                continue
+            latest = frame.iloc[-1]
+            previous = frame.iloc[-6] if len(frame.index) >= 6 else frame.iloc[0]
+            bullish_checks = [
+                latest["close"] > latest["ema5"],
+                latest["ema5"] > latest["ema20"],
+                latest["ema20"] > latest["ema60"],
+                latest["ema60"] > latest["ema120"],
+                latest["ema20"] > previous["ema20"],
+                latest["ema60"] > previous["ema60"],
+                latest["return_20d"] > 0,
+            ]
+            bearish_checks = [
+                latest["close"] < latest["ema5"],
+                latest["ema5"] < latest["ema20"],
+                latest["ema20"] < latest["ema60"],
+                latest["ema60"] < latest["ema120"],
+                latest["ema20"] < previous["ema20"],
+                latest["ema60"] < previous["ema60"],
+                latest["return_20d"] < 0,
+            ]
+            balance = sum(1 for value in bullish_checks if value) - sum(
+                1 for value in bearish_checks if value
+            )
+            timeframe_score = self._clamp(
+                (balance / len(bullish_checks)) * 100,
+                -100,
+                100,
+            )
+            scores[timeframe] = timeframe_score
+            directions[timeframe] = self._direction_from_score(timeframe_score)
+            weight = timeframe_weights.get(timeframe, 0.0)
+            weighted_score += timeframe_score * weight
+            available_weight += weight
+            metrics[f"{timeframe.lower()}Score"] = self._round_float(timeframe_score)
+            metrics[f"{timeframe.lower()}Close"] = self._round_float(latest["close"])
+            metrics[f"{timeframe.lower()}Direction"] = directions[timeframe]
 
-        balance = sum(1 for value in bullish_checks if value) - sum(
-            1 for value in bearish_checks if value
+        if timeframe_warnings:
+            warnings.extend(
+                f"{timeframe} 数据不可用：{message}"
+                for timeframe, message in timeframe_warnings.items()
+            )
+
+        daily = timeframe_histories.get("DAILY", history).iloc[-1]
+        score = self._clamp(
+            weighted_score / max(available_weight, 0.0001),
+            -100,
+            100,
         )
-        score = self._clamp((balance / len(bullish_checks)) * 100, -100, 100)
-        confidence = self._clamp(abs(balance) / len(bullish_checks), 0.35, 1)
+        confidence = self._clamp(
+            (abs(score) / 100) * min(1.0, available_weight / 0.5),
+            0.35,
+            1,
+        )
         direction = self._direction_from_score(score)
 
         return TimingSignalEngineResult(
@@ -376,18 +465,20 @@ class TimingIndicatorsService:
             score=self._round_float(score),
             confidence=self._round_probability(confidence),
             weight=ENGINE_WEIGHTS["multiTimeframeAlignment"],
-            detail="观察 5/20/60/120 日均线结构、斜率与中期收益率是否同步。",
+            detail="按日线、周线、月线的 5/20/60/120 根均线结构和中期收益率计算一致性。",
             metrics={
-                "close": self._round_float(latest["close"]),
-                "ema5": self._round_float(latest["ema5"]),
-                "ema20": self._round_float(latest["ema20"]),
-                "ema60": self._round_float(latest["ema60"]),
-                "ema120": self._round_float(latest["ema120"]),
-                "return20d": self._round_float(latest["return_20d"] * 100),
-                "bullishChecks": sum(1 for value in bullish_checks if value),
-                "bearishChecks": sum(1 for value in bearish_checks if value),
+                **metrics,
+                "close": self._round_float(daily["close"]),
+                "ema5": self._round_float(daily["ema5"]),
+                "ema20": self._round_float(daily["ema20"]),
+                "ema60": self._round_float(daily["ema60"]),
+                "ema120": self._round_float(daily["ema120"]),
+                "availableTimeframes": len(scores),
+                "dailyWeight": 0.5 if "DAILY" in scores else 0.0,
+                "weeklyWeight": 0.3 if "WEEKLY" in scores else 0.0,
+                "monthlyWeight": 0.2 if "MONTHLY" in scores else 0.0,
             },
-            warnings=[],
+            warnings=warnings,
         )
 
     def _build_relative_strength(

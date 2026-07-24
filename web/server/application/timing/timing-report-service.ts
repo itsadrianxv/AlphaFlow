@@ -8,8 +8,10 @@ import type {
   TimingChartLinePoint,
   TimingReportEvidence,
   TimingReportPayload,
+  TimingReportSeriesPayload,
   TimingSignalEngineKey,
   TimingSignalEngineResult,
+  TimingTimeframe,
 } from "~/server/domain/timing/types";
 import type { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
 import type { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
@@ -135,7 +137,7 @@ function buildFallbackMarketContext(params: {
     regimeConfidence: params.card.confidence,
     persistenceDays: 0,
     summary:
-      "市场环境快照暂不可用，当前报告先使用降级市场上下文占位展示，不阻塞择时报告详情加载。",
+      "市场环境快照暂不可用，当前报告先使用降级宏观分析占位展示，不阻塞择时报告详情加载。",
     constraints: [
       `未找到 ${params.asOfDate} 的市场环境快照，详情页未再同步请求实时 market context。`,
       "市场广度、波动与领涨代理数据恢复后，可由后续任务重新生成完整市场环境快照。",
@@ -296,6 +298,7 @@ export class TimingReportService {
         userId: params.userId,
         stockCode: card.stockCode,
         asOfDate,
+        timeframe: "DAILY",
       }) ?? Promise.resolve(null),
       card.workflowRunId && card.watchListId
         ? (this.deps.recommendationRepository?.listForUser({
@@ -333,6 +336,60 @@ export class TimingReportService {
       }),
       reviewTimeline,
       kronosForecast: kronosForecastSnapshot?.forecast,
+    };
+  }
+
+  async getTimingSeries(params: {
+    userId: string;
+    cardId: string;
+    timeframe: TimingTimeframe;
+  }): Promise<TimingReportSeriesPayload | null> {
+    const card = await this.deps.analysisCardRepository.getByIdForUser(
+      params.userId,
+      params.cardId,
+    );
+    if (!card) {
+      return null;
+    }
+
+    const asOfDate = card.asOfDate ?? card.signalSnapshot?.asOfDate;
+    if (!asOfDate) {
+      return null;
+    }
+
+    const frozenBars = card.signalSnapshot?.barsByTimeframe?.[params.timeframe];
+    const dailyBars = card.signalSnapshot?.bars;
+    const barsResponse =
+      (frozenBars?.length ?? 0) > 0 ||
+      (params.timeframe === "DAILY" && (dailyBars?.length ?? 0) > 0)
+        ? null
+        : await this.deps.timingDataClient.getBars({
+            stockCode: card.stockCode,
+            end: asOfDate,
+            timeframe: params.timeframe,
+          });
+    const bars =
+      frozenBars ??
+      (params.timeframe === "DAILY" ? dailyBars : undefined) ??
+      barsResponse?.bars ??
+      [];
+    const snapshot =
+      (await this.deps.kronosForecastSnapshotRepository?.getLatestForStock({
+        userId: params.userId,
+        stockCode: card.stockCode,
+        asOfDate,
+        timeframe: params.timeframe,
+      })) ?? null;
+
+    return {
+      stockCode: card.stockCode,
+      stockName: card.stockName,
+      timeframe: params.timeframe,
+      adjust: params.timeframe.startsWith("MINUTE_") ? "none" : "qfq",
+      bars,
+      chartLevels: computeChartLevels(bars),
+      kronosForecast: snapshot?.forecast,
+      warnings: [...(barsResponse ? [] : []), ...(snapshot?.warnings ?? [])],
     };
   }
 }

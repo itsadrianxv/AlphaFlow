@@ -10,6 +10,15 @@ from app.contracts.common import BatchItemError
 from app.contracts.meta import GatewayResponse
 
 TimingDirection = Literal["bullish", "neutral", "bearish"]
+TimingTimeframe = Literal[
+    "DAILY",
+    "WEEKLY",
+    "MONTHLY",
+    "MINUTE_60",
+    "MINUTE_30",
+    "MINUTE_15",
+    "MINUTE_1",
+]
 SignalEngineKey = Literal[
     "multiTimeframeAlignment",
     "relativeStrength",
@@ -118,6 +127,7 @@ class TimingSignalData(BaseModel):
     asOfDate: str
     barsCount: int = Field(..., ge=1)
     bars: list[TimingBar] | None = None
+    barsByTimeframe: dict[TimingTimeframe, list[TimingBar]] | None = None
     indicators: TimingIndicators
     signalContext: TimingSignalContext
 

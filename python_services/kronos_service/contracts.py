@@ -6,6 +6,15 @@ from pydantic import BaseModel, Field, field_validator
 
 
 Direction = Literal["bullish", "neutral", "bearish"]
+KronosTimeframe = Literal[
+    "DAILY",
+    "WEEKLY",
+    "MONTHLY",
+    "MINUTE_60",
+    "MINUTE_30",
+    "MINUTE_15",
+    "MINUTE_1",
+]
 
 
 class KronosBar(BaseModel):
@@ -39,12 +48,14 @@ class KronosForecastPoint(BaseModel):
 
 class KronosForecastRequest(BaseModel):
     stockCode: str
+    timeframe: KronosTimeframe = "DAILY"
     bars: list[KronosBar] = Field(..., min_length=1)
     predictionLength: int | None = Field(default=None, ge=1, le=240)
 
 
 class KronosForecastBatchItem(BaseModel):
     stockCode: str
+    timeframe: KronosTimeframe = "DAILY"
     bars: list[KronosBar] = Field(..., min_length=1)
 
 
@@ -63,10 +74,12 @@ class KronosForecastBatchRequest(BaseModel):
 
 class KronosForecastResponse(BaseModel):
     stockCode: str
+    timeframe: KronosTimeframe = "DAILY"
     asOfDate: str
     modelName: str
     modelVersion: str
     lookbackDays: int
+    lookbackBars: int | None = None
     predictionLength: int
     device: str
     points: list[KronosForecastPoint]
@@ -76,6 +89,7 @@ class KronosForecastResponse(BaseModel):
 
 class KronosBatchItemError(BaseModel):
     stockCode: str
+    timeframe: KronosTimeframe = "DAILY"
     code: str
     message: str
 

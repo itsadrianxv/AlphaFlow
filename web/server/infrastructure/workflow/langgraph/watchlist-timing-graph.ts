@@ -244,6 +244,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
           const response = await deps.timingDataClient.getSignalsBatch({
             stockCodes: state.targets.map((target) => target.stockCode),
             asOfDate: state.timingInput.asOfDate,
+            includeBars: true,
           });
 
           if (response.items.length === 0 && response.errors.length > 0) {

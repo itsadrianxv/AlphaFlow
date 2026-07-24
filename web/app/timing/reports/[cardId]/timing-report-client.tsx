@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import {
   EmptyState,
@@ -10,6 +11,7 @@ import {
 } from "~/app/_components/ui";
 import { buildTimingReportHistoryItems } from "~/app/_components/workspace-history";
 import { TimingReportView } from "~/app/timing/reports/[cardId]/timing-report-view";
+import type { TimingTimeframe } from "~/server/domain/timing/types";
 import { api } from "~/trpc/react";
 
 export function TimingReportClient(props: { cardId: string }) {
@@ -27,6 +29,14 @@ export function TimingReportClient(props: { cardId: string }) {
     },
   );
   const report = reportQuery.data;
+  const [timeframe, setTimeframe] = useState<TimingTimeframe>("DAILY");
+  const seriesQuery = api.timing.getTimingSeries.useQuery(
+    { cardId, timeframe },
+    {
+      enabled: Boolean(report && timeframe !== "DAILY"),
+      refetchOnWindowFocus: false,
+    },
+  );
   const historyItems = buildTimingReportHistoryItems(
     report
       ? [
@@ -80,7 +90,13 @@ export function TimingReportClient(props: { cardId: string }) {
             stockName: report.card.stockName,
           }}
         >
-          <TimingReportView report={report} />
+          <TimingReportView
+            report={report}
+            timeframe={timeframe}
+            series={timeframe === "DAILY" ? undefined : seriesQuery.data}
+            seriesLoading={timeframe !== "DAILY" && seriesQuery.isLoading}
+            onTimeframeChange={setTimeframe}
+          />
         </HighlightToNote>
       ) : null}
     </WorkspaceShell>

@@ -154,7 +154,7 @@ def test_get_timing_signal_batch_reports_partial_errors(install_gateway) -> None
 def test_get_timing_bars_rejects_invalid_timeframe() -> None:
     response = client.get(
         "/api/v1/timing/stocks/600519/bars",
-        params={"timeframe": "WEEKLY"},
+        params={"timeframe": "INTRADAY"},
     )
 
     assert response.status_code == 400
