@@ -35,6 +35,7 @@ cp docker/.env.example docker/.env
 - `TAVILY_API_KEY`
 - `ZHIPU_API_KEY`
 - `TUSHARE_TOKEN`
+- `TUSHARE_API_URL`（默认 `https://api.tushare.pro`；使用代理时可配置为 `https://teajoin.com`）
 - `REFCHECKER_*`
 - `AGENT_RUNTIME_MODEL_*`
 

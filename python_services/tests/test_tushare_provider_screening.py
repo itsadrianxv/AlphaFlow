@@ -169,3 +169,11 @@ def test_tushare_provider_requires_token(monkeypatch):
 
     with pytest.raises(DataProviderConfigurationError, match="TUSHARE_TOKEN"):
         TushareProvider().get_stock_universe()
+
+
+def test_tushare_client_uses_configured_api_url(monkeypatch):
+    monkeypatch.setenv("TUSHARE_API_URL", "https://teajoin.com/")
+
+    client = tushare_module._create_tushare_client("token-1")
+
+    assert client._DataApi__http_url == "https://teajoin.com"

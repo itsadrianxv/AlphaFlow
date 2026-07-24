@@ -32,6 +32,7 @@ _FRAME_CACHE_TTL_SECONDS = 3_600
 _DAILY_BASIC_CACHE_TTL_SECONDS = 21_600
 _MARKET_SNAPSHOT_CACHE_TTL_SECONDS = 3_600
 _MARKET_SNAPSHOT_LOOKBACK_DAYS = 10
+_DEFAULT_TUSHARE_API_URL = "https://api.tushare.pro"
 
 INDEX_BENCHMARK_TS_CODES = {
     "510300": "000300.SH",
@@ -185,7 +186,13 @@ def _create_tushare_client(token: str):
 
     import tushare as ts  # pragma: no cover - runtime dependency
 
-    return ts.pro_api(token)
+    client = ts.pro_api(token)
+    api_url = os.getenv("TUSHARE_API_URL", _DEFAULT_TUSHARE_API_URL).strip()
+    if not api_url:
+        api_url = _DEFAULT_TUSHARE_API_URL
+
+    client._DataApi__http_url = api_url.rstrip("/")
+    return client
 
 
 def _now_timestamp() -> float:
