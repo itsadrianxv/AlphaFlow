@@ -17,22 +17,82 @@ type TreeMapDatum = {
   children?: TreeMapDatum[];
 };
 
+type TreeMapLabelLayoutParams = {
+  rect?: { width: number; height: number };
+  text?: string;
+};
+
 const HEATMAP_COLORS = {
   dark: {
-    negative: ["#385b3d", "#2d733d", "#219653"],
-    neutral: "#3a3d40",
-    positive: ["#8d4058", "#bb4e70", "#df6688"],
+    negative: ["#4c6551", "#47765a", "#3a8960"],
+    neutral: "#44484a",
+    positive: ["#805261", "#9a5e70", "#b66b80"],
     text: "#f4f5f6",
     border: "#151719",
   },
   light: {
-    negative: ["#c7dfc8", "#8fc798", "#4f9a60"],
-    neutral: "#d4d8dc",
-    positive: ["#f2c7d3", "#e895ad", "#c9587b"],
+    negative: ["#d1ddd1", "#acc9b1", "#83ad8b"],
+    neutral: "#daddde",
+    positive: ["#e6d0d6", "#d8aab7", "#c57f92"],
     text: "#18201a",
     border: "#ffffff",
   },
 } as const;
+
+const MIN_LABEL_FONT_SIZE = 11;
+const MAX_LABEL_FONT_SIZE = 18;
+
+function getTextUnits(value: string) {
+  return Array.from(value).reduce(
+    (total, character) =>
+      total + ((character.codePointAt(0) ?? 0) > 0xff ? 1 : 0.58),
+    0,
+  );
+}
+
+function layoutTreeMapLabel(params: TreeMapLabelLayoutParams) {
+  const width = Math.max(0, (params.rect?.width ?? 0) - 10);
+  const height = Math.max(0, (params.rect?.height ?? 0) - 8);
+  const lines = (params.text ?? "").split("\n");
+  const widestLine = Math.max(...lines.map(getTextUnits), 1);
+  const fontSize = Math.floor(
+    Math.min(
+      MAX_LABEL_FONT_SIZE,
+      width / widestLine,
+      height / (lines.length * 1.35),
+    ),
+  );
+
+  if (fontSize < MIN_LABEL_FONT_SIZE) {
+    return { fontSize: 0, lineHeight: 0, width: 0, height: 0 };
+  }
+  return {
+    fontSize,
+    lineHeight: Math.round(fontSize * 1.25),
+    width,
+    height,
+  };
+}
+
+function getUniqueConcepts(concepts: MarketHeatmapSnapshot["concepts"]) {
+  const conceptCodes = new Set<string>();
+  const conceptNames = new Set<string>();
+  return concepts.filter((concept) => {
+    const conceptName = concept.conceptName
+      .trim()
+      .replace(/\s+/g, "")
+      .toLocaleLowerCase("zh-CN");
+    if (
+      conceptCodes.has(concept.conceptCode) ||
+      conceptNames.has(conceptName)
+    ) {
+      return false;
+    }
+    conceptCodes.add(concept.conceptCode);
+    conceptNames.add(conceptName);
+    return true;
+  });
+}
 
 export function getHeatmapColor(
   changePercent: number | null | undefined,
@@ -56,21 +116,23 @@ export function buildMarketHeatmapOption(
   theme: ThemeMode,
 ) {
   const colors = HEATMAP_COLORS[theme];
-  const data: TreeMapDatum[] = snapshot.concepts.map((concept) => ({
-    name: concept.conceptName,
-    value: concept.marketCap,
-    conceptName: concept.conceptName,
-    changePercent: concept.changePercent,
-    children: concept.stocks.map((stock) => ({
-      name: stock.stockName,
-      stockName: stock.stockName,
-      stockCode: stock.stockCode,
+  const data: TreeMapDatum[] = getUniqueConcepts(snapshot.concepts).map(
+    (concept) => ({
+      name: concept.conceptName,
+      value: concept.marketCap,
       conceptName: concept.conceptName,
-      value: stock.marketCap,
-      changePercent: stock.changePercent,
-      itemStyle: { color: getHeatmapColor(stock.changePercent, theme) },
-    })),
-  }));
+      changePercent: concept.changePercent,
+      children: concept.stocks.map((stock) => ({
+        name: stock.stockName,
+        stockName: stock.stockName,
+        stockCode: stock.stockCode,
+        conceptName: concept.conceptName,
+        value: stock.marketCap,
+        changePercent: stock.changePercent,
+        itemStyle: { color: getHeatmapColor(stock.changePercent, theme) },
+      })),
+    }),
+  );
   return {
     animationDuration: 180,
     tooltip: {
@@ -97,9 +159,6 @@ export function buildMarketHeatmapOption(
         label: {
           show: true,
           color: theme === "dark" ? "#f7f8f9" : "#17191b",
-          fontSize: 12,
-          lineHeight: 16,
-          overflow: "truncate",
           formatter: (params: { data?: TreeMapDatum }) => {
             const item = params.data;
             if (!item?.stockCode || item.value < 1500) return "";
@@ -107,10 +166,10 @@ export function buildMarketHeatmapOption(
               item.changePercent == null
                 ? "--"
                 : `${item.changePercent >= 0 ? "+" : ""}${item.changePercent.toFixed(2)}%`;
-            return `{name|${item.stockName}}\n{change|${change}}`;
+            return `${item.stockName}\n${change}`;
           },
-          rich: { name: { fontWeight: 600 }, change: { fontSize: 11 } },
         },
+        labelLayout: layoutTreeMapLabel,
         upperLabel: {
           show: true,
           height: 26,
@@ -119,6 +178,7 @@ export function buildMarketHeatmapOption(
           fontWeight: 600,
           formatter: (params: { data?: TreeMapDatum }) => {
             const item = params.data;
+            if (!item?.conceptName) return "";
             const change =
               item?.changePercent == null
                 ? "--"
@@ -126,13 +186,13 @@ export function buildMarketHeatmapOption(
             return `${item?.name ?? ""} ${change}`;
           },
         },
-        itemStyle: { borderColor: colors.border, borderWidth: 2, gapWidth: 2 },
+        itemStyle: { borderColor: colors.border, borderWidth: 1, gapWidth: 0 },
         levels: [
           {
             itemStyle: {
               borderColor: colors.border,
-              borderWidth: 4,
-              gapWidth: 4,
+              borderWidth: 1,
+              gapWidth: 1,
             },
           },
         ],
@@ -168,7 +228,10 @@ export function MarketHeatmapClient() {
       query.data
         ? {
             ...query.data,
-            concepts: query.data.concepts.slice(0, expanded ? 15 : 8),
+            concepts: getUniqueConcepts(query.data.concepts).slice(
+              0,
+              expanded ? 15 : 8,
+            ),
           }
         : null,
     [expanded, query.data],

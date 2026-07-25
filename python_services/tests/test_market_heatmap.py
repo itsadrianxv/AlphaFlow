@@ -31,8 +31,10 @@ class FakeHeatmapProvider:
             assert params == {"market": "概念板块", "is_new": "N"}
             return pd.DataFrame(
                 [
-                    {"trade_date": "20260724", "ts_code": "885002.TI", "rank": 2, "hot": 80},
+                    {"trade_date": "20260723", "ts_code": "885001.TI", "rank": 1, "hot": 120},
                     {"trade_date": "20260724", "ts_code": "885001.TI", "rank": 1, "hot": 100},
+                    {"trade_date": "20260724", "ts_code": "885001.TI", "rank": 2, "hot": 90},
+                    {"trade_date": "20260724", "ts_code": "885002.TI", "rank": 3, "hot": 80},
                 ]
             )
         if dataset == "ths_member":
@@ -75,6 +77,8 @@ def test_heatmap_snapshot_sorts_concepts_retains_cross_concept_stocks_and_uses_i
     snapshot = client.get_market_heatmap_snapshot(limit=15, prefer_intraday=True)
 
     assert [item["conceptName"] for item in snapshot["concepts"]] == ["算力", "机器人"]
+    assert snapshot["tradeDate"] == "2026-07-24"
+    assert len({item["conceptCode"] for item in snapshot["concepts"]}) == 2
     assert snapshot["priceSource"] == "rt_min"
     assert snapshot["concepts"][0]["stocks"] == [
         {"stockCode": "000001", "stockName": "平安银行", "marketCap": 10000, "changePercent": 10.0}

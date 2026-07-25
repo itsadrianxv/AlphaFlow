@@ -395,17 +395,45 @@ class TushareProviderClient:
         if hot_frame.empty:
             raise DataUnavailableError("THS concept hot list is unavailable", provider=self.provider_name)
 
-        hot_rows = sorted(
-            (row for _, row in hot_frame.iterrows() if _pick_text(row, ["ts_code"]) in catalog),
-            key=lambda row: int(_safe_float(row.get("rank")) or 10**9),
-        )[:normalized_limit]
+        ranked_rows = [
+            row
+            for _, row in hot_frame.iterrows()
+            if _pick_text(row, ["ts_code"]) in catalog
+        ]
+        hot_dates = [
+            _format_ymd(_pick_text(row, ["trade_date"]))
+            for row in ranked_rows
+            if _format_ymd(_pick_text(row, ["trade_date"]))
+        ]
+        latest_hot_date = max(hot_dates, default="")
+        if latest_hot_date:
+            ranked_rows = [
+                row
+                for row in ranked_rows
+                if _format_ymd(_pick_text(row, ["trade_date"])) == latest_hot_date
+            ]
+
+        hot_rows: list[pd.Series] = []
+        seen_concept_codes: set[str] = set()
+        seen_concept_names: set[str] = set()
+        for row in sorted(
+            ranked_rows,
+            key=lambda item: int(_safe_float(item.get("rank")) or 10**9),
+        ):
+            concept_code = _pick_text(row, ["ts_code"])
+            concept_name = _normalize_text(catalog[concept_code]["conceptName"])
+            if concept_code in seen_concept_codes or concept_name in seen_concept_names:
+                continue
+            seen_concept_codes.add(concept_code)
+            seen_concept_names.add(concept_name)
+            hot_rows.append(row)
         if not hot_rows:
             raise DataUnavailableError("THS concept hot list has no recognized concepts", provider=self.provider_name)
 
         market_rows = self._provider.get_market_snapshot()
         market_by_code = {row.stockCode: row for row in market_rows if row.marketCap is not None}
         market_cap_as_of = max((row.tradeDate for row in market_rows), default="")
-        trade_date = _format_ymd(_pick_text(hot_rows[0], ["trade_date"])) or market_cap_as_of
+        trade_date = latest_hot_date or _format_ymd(_pick_text(hot_rows[0], ["trade_date"])) or market_cap_as_of
         intraday_change_map = self._load_intraday_change_map() if prefer_intraday else {}
         concepts: list[dict[str, Any]] = []
         for hot_row in hot_rows:
@@ -449,6 +477,8 @@ class TushareProviderClient:
                     "stocks": stocks,
                 }
             )
+            if len(concepts) == normalized_limit:
+                break
         if not concepts:
             raise DataUnavailableError("No listed A-share constituents in heatmap snapshot", provider=self.provider_name)
         return {

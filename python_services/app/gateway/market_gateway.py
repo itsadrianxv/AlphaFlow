@@ -291,7 +291,7 @@ class MarketGateway:
         result = execute_cached(
             dataset="market_heatmap_snapshot",
             provider=self._provider_client.provider_name,
-            params={"conceptLimit": 15},
+            params={"conceptLimit": 15, "snapshotVersion": 2},
             fetcher=lambda: MarketHeatmapData(
                 **self._provider_client.get_market_heatmap_snapshot(
                     limit=15,
