@@ -4,6 +4,7 @@ import {
   indicatorCatalogItemSchema,
   indicatorCategorySchema,
   searchStockResultSchema,
+  stockMentionSchema,
   workspaceQuerySchema,
   workspaceResultSchema,
 } from "~/contracts/screening";
@@ -145,6 +146,17 @@ export class PythonScreeningWorkbenchClient {
       `/stocks/search?${params.toString()}`,
       undefined,
       z.array(searchStockResultSchema),
+    );
+  }
+
+  async resolveStockMentions(text: string) {
+    return this.fetchJson(
+      "/stocks/mentions",
+      {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      },
+      z.array(stockMentionSchema),
     );
   }
 

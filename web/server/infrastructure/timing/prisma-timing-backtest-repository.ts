@@ -15,10 +15,11 @@ export class PrismaTimingBacktestRepository {
   async create(params: {
     userId: string;
     presetRevisionId: string;
-    watchListId: string;
+    watchListId?: string;
     configHash: string;
     stockCodes: string[];
     config: TimingPresetConfigV2;
+    universeCapturedAt?: string;
   }) {
     return this.prisma.timingBacktestRun.create({
       data: {
@@ -29,8 +30,10 @@ export class PrismaTimingBacktestRepository {
         configHash: params.configHash,
         universeSnapshot: toJson({
           stockCodes: params.stockCodes,
-          capturedAt: new Date().toISOString(),
-          warning: "仅当前自选股样本，存在样本内验证和幸存偏差。",
+          capturedAt: params.universeCapturedAt ?? new Date().toISOString(),
+          generationDate: new Date().toISOString(),
+          warning:
+            "目标不足时由筛选股票池确定性补足；股票代码和生成日期已冻结。",
         }),
         executionAssumptions: toJson(params.config.backtestPolicy),
         startedAt: new Date(),

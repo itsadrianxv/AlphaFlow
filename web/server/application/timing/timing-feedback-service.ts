@@ -249,7 +249,7 @@ export class TimingFeedbackService {
         presetId: params.presetId,
         kind: "CONTEXT_WEIGHT",
         status: "PENDING",
-        title: "市场上下文权重调整建议",
+        title: "宏观分析权重调整建议",
         summary: `${bestState} 环境样本相对全样本更${direction > 0 ? "有效" : "失效"}，建议调整 marketContext 权重。`,
         patch: {
           contextWeights: {

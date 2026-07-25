@@ -3,6 +3,7 @@ import type {
   MarketContextSnapshot,
   TimingBarsData,
   TimingEvidenceBatchData,
+  TimingEvidenceHistoryData,
   TimingSignalBatchData,
   TimingSignalData,
   TimingTimeframe,
@@ -148,6 +149,24 @@ export class PythonTimingDataClient {
   }) {
     return this.request<TimingEvidenceBatchData>(
       this.timingPath("/stocks/evidence/batch"),
+      {
+        method: "POST",
+        body: JSON.stringify(params),
+      },
+    );
+  }
+
+  async getEvidenceHistory(params: {
+    stockCodes: string[];
+    startDate: string;
+    endDate: string;
+    timeframes: TimingTimeframe[];
+    indicatorIds: string[];
+    lookbackDays?: number;
+    sampleEveryTradingDays?: number;
+  }) {
+    return this.request<TimingEvidenceHistoryData>(
+      this.timingPath("/stocks/evidence/history"),
       {
         method: "POST",
         body: JSON.stringify(params),

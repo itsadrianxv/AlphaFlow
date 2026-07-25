@@ -2,7 +2,12 @@ import { z } from "zod";
 import type { EvidenceCitation } from "~/server/domain/evidence-context/types";
 import type { ThemeNewsItem } from "~/server/domain/intelligence/types";
 
-export const impactMappingModeSchema = z.enum(["radar", "deep_dive", "trace"]);
+export const impactMappingModeSchema = z.enum([
+  "radar",
+  "overview",
+  "deep_dive",
+  "trace",
+]);
 
 export const impactMappingInputSchema = z
   .object({
@@ -17,7 +22,11 @@ export const impactMappingInputSchema = z
     traceMaxEvents: z.number().int().min(1).max(30).default(30),
   })
   .superRefine((value, context) => {
-    if (value.mode !== "radar" && (!value.eventId || !value.baseRunId)) {
+    if (
+      value.mode !== "radar" &&
+      value.mode !== "overview" &&
+      (!value.eventId || !value.baseRunId)
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: "deep_dive 和 trace 必须提供 eventId 与 baseRunId",
@@ -48,8 +57,14 @@ export type ImpactContext = {
     stockCode: string;
     companyName: string;
     aliases: string[];
+    priority?: number;
   }>;
-  industries: Array<{ id?: string; name: string; aliases: string[] }>;
+  industries: Array<{
+    id?: string;
+    name: string;
+    aliases: string[];
+    priority?: number;
+  }>;
   hypotheses: Array<{
     id: string;
     targetType: string;
@@ -84,6 +99,8 @@ export const impactTimelineItemSchema = z.object({
   title: z.string(),
   summary: z.string(),
   eventId: z.string().optional(),
+  url: z.string().url().optional(),
+  source: z.string().optional(),
   evidenceItemIds: z.array(z.string()),
   kind: z.literal("observed"),
 });
@@ -97,6 +114,7 @@ export const impactScenarioSchema = z.object({
   invalidationConditions: z.array(z.string()).min(1),
   affectedTargets: z.array(z.string()).min(1),
   rationale: z.string(),
+  evidenceItemIds: z.array(z.string()).default([]),
   basis: z.enum(["inference", "assumption"]),
 });
 
@@ -109,6 +127,12 @@ export type ImpactRadarEvent = {
   impactEdges: ImpactEdge[];
   portfolioHits: string[];
   importanceScore: number;
+  analysis?: {
+    timeline: ImpactTimelineItem[];
+    scenarios: ImpactScenario[];
+    traceState?: ImpactMappingResult["traceState"];
+    warnings: string[];
+  };
 };
 
 export type ImpactMappingResult = {
@@ -129,4 +153,5 @@ export type ImpactMappingResult = {
     eventCount: number;
     canContinue: boolean;
   };
+  featuredEventIds?: string[];
 };

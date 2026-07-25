@@ -9,7 +9,30 @@ export type ThemeNewsItem = {
   relatedStocks: string[];
   scopeTags: Array<"macro" | "theme" | "industry" | "company">;
   eventType: string;
+  eventRelation?: "same_event" | "prior_signal" | "follow_up";
   matchReason: string;
+  content?: string;
+  url?: string;
+  sourceKind?: "fast" | "major" | "cctv";
+  sourceRefs?: Array<{
+    sourceItemId: string;
+    sourceKind: "fast" | "major" | "cctv";
+    sourceName: string;
+    url?: string;
+    publishedAt: string;
+    contentHash: string;
+  }>;
+  attributions?: Array<{
+    targetType: string;
+    targetId?: string;
+    targetName: string;
+    relation: string;
+    confidence: number;
+    reason: string;
+    evidenceQuote: string;
+  }>;
+  analysisStatus?: "complete" | "partial";
+  warnings?: string[];
 };
 
 export type CompanyEvidence = {

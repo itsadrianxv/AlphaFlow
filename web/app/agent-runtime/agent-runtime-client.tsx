@@ -5,7 +5,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { EvidenceContextCitations } from "~/app/_components/evidence-context-citations";
 import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { MarkdownContent } from "~/app/_components/markdown-content";
-import { InlineNotice, StatusPill } from "~/app/_components/ui";
+import {
+  InlineNotice,
+  StatusPill,
+  type WorkspaceHistoryItem,
+  WorkspaceShell,
+} from "~/app/_components/ui";
 import {
   consumePiAgentSelectionDraft,
   PI_AGENT_SELECTION_DRAFT_QUERY,
@@ -18,6 +23,8 @@ type Conversation = NonNullable<
   RouterOutputs["agentRuntime"]["getConversation"]
 >;
 type Message = Conversation["messages"][number];
+type ConversationListItem =
+  RouterOutputs["agentRuntime"]["listConversations"]["items"][number];
 type AgentRuntimeSkill =
   RouterOutputs["agentRuntime"]["listSkills"]["items"][number];
 type WorkflowStreamEvent = {
@@ -83,6 +90,18 @@ function latestRunningRunId(conversation?: Conversation) {
         message.workflowRunId,
     )
     .at(-1)?.workflowRunId;
+}
+
+function buildConversationHistoryItems(
+  conversations: ConversationListItem[],
+): WorkspaceHistoryItem[] {
+  return conversations.map((conversation) => ({
+    id: conversation.id,
+    title: conversation.title?.trim() || "未命名对话",
+    href: `/agent-runtime?conversationId=${encodeURIComponent(
+      conversation.id,
+    )}`,
+  }));
 }
 
 function ChatMessage(props: {
@@ -192,10 +211,13 @@ function StopIcon(props: { className?: string }) {
   );
 }
 
-export function PiAgentComposer() {
+export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
+  const { showConversation = true } = props;
   const router = useRouter();
   const searchParams = useSearchParams();
-  const selectedConversationId = searchParams.get("conversationId") ?? "";
+  const selectedConversationId = showConversation
+    ? (searchParams.get("conversationId") ?? "")
+    : "";
   const utils = api.useUtils();
   const [selectedSkillIds, setSelectedSkillIds] = useState<string[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -257,7 +279,9 @@ export function PiAgentComposer() {
     const nextSearchParams = new URLSearchParams(searchParams.toString());
     nextSearchParams.delete("draft");
     const nextQuery = nextSearchParams.toString();
-    router.replace(nextQuery ? `/?${nextQuery}` : "/");
+    router.replace(
+      nextQuery ? `/agent-runtime?${nextQuery}` : "/agent-runtime",
+    );
   }, [router, searchParams]);
 
   useEffect(() => {
@@ -430,7 +454,7 @@ export function PiAgentComposer() {
           conversationId: result.conversationId,
         }),
       ]);
-      router.push(`/?conversationId=${result.conversationId}`);
+      router.push(`/agent-runtime?conversationId=${result.conversationId}`);
       setActiveRunId(result.runId);
     },
   });
@@ -491,20 +515,20 @@ export function PiAgentComposer() {
   };
 
   const renderComposer = () => (
-    <div className="pi-agent-composer fixed right-0 bottom-0 left-0 z-30 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4">
-      <div className="mx-auto w-full max-w-[820px] px-1 sm:px-4">
-        <div className="mb-3 flex justify-end">
-          {activeGenerationRunId ? (
+    <div className="pi-agent-composer fixed pointer-events-none right-0 bottom-0 left-0 z-30 py-3">
+      <div className="pointer-events-auto mx-auto w-full max-w-[820px] px-1 sm:px-4">
+        {activeGenerationRunId ? (
+          <div className="mb-2 flex justify-end">
             <StatusPill tone="info" label="正在生成" />
-          ) : null}
-        </div>
+          </div>
+        ) : null}
         <div className="relative rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] transition-[border-color,box-shadow,background-color] focus-within:border-[var(--app-accent-strong)] focus-within:bg-[var(--app-bg-elevated)] focus-within:shadow-[0_0_0_3px_var(--app-focus-ring)]">
           <textarea
             ref={promptTextareaRef}
-            className="min-h-[104px] w-full resize-none rounded-[22px] border-0 bg-transparent pt-4 pr-16 pb-16 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
+            className="h-[93px] min-h-0 w-full resize-none overflow-y-auto rounded-[22px] border-0 bg-transparent pt-3 pr-16 pb-12 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder="输入下一条消息"
+            placeholder="询问任何投研问题"
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                 event.preventDefault();
@@ -656,7 +680,7 @@ export function PiAgentComposer() {
         </div>
       </div>
       {sendMutation.error ? (
-        <div className="mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
+        <div className="pointer-events-auto mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
           <InlineNotice
             tone="danger"
             description={sendMutation.error.message}
@@ -664,7 +688,7 @@ export function PiAgentComposer() {
         </div>
       ) : null}
       {skillsQuery.error ? (
-        <div className="mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
+        <div className="pointer-events-auto mx-auto mt-3 w-full max-w-[820px] px-1 sm:px-4">
           <InlineNotice tone="danger" description={skillsQuery.error.message} />
         </div>
       ) : null}
@@ -672,7 +696,7 @@ export function PiAgentComposer() {
   );
   return (
     <>
-      {selectedConversation ? (
+      {showConversation && selectedConversation ? (
         <section className="pi-agent-conversation fixed right-0 bottom-[248px] left-0 z-20 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)]">
           <div className="app-scroll mx-auto max-h-[min(42vh,460px)] w-full max-w-[820px] overflow-y-auto px-4 py-5">
             <div className="grid gap-6">
@@ -683,7 +707,7 @@ export function PiAgentComposer() {
                   liveText={liveMessages[message.id]}
                   lastTargetRef={lastTargetRef}
                   onLastTargetRefChange={setLastTargetRef}
-                  piAgentHref={`/?conversationId=${encodeURIComponent(
+                  piAgentHref={`/agent-runtime?conversationId=${encodeURIComponent(
                     selectedConversationId,
                   )}&draft=selection`}
                 />
@@ -692,12 +716,42 @@ export function PiAgentComposer() {
             </div>
           </div>
         </section>
-      ) : selectedConversationId && conversationQuery.isLoading ? (
+      ) : showConversation &&
+        selectedConversationId &&
+        conversationQuery.isLoading ? (
         <div className="pi-agent-conversation fixed right-0 bottom-[248px] left-0 z-20 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] px-4 py-5 text-center text-sm text-[var(--app-text-muted)]">
           加载中
         </div>
       ) : null}
       {renderComposer()}
     </>
+  );
+}
+
+export function AgentRuntimeClientPage() {
+  const searchParams = useSearchParams();
+  const selectedConversationId = searchParams.get("conversationId") ?? "";
+  const conversationsQuery = api.agentRuntime.listConversations.useQuery({
+    limit: 30,
+  });
+  const historyItems = useMemo(
+    () => buildConversationHistoryItems(conversationsQuery.data?.items ?? []),
+    [conversationsQuery.data?.items],
+  );
+
+  return (
+    <WorkspaceShell
+      section="agentRuntime"
+      title="投研智能体"
+      titleSize="compact"
+      contentWidth="wide"
+      historyHeading="对话历史"
+      historyItems={historyItems}
+      activeHistoryId={selectedConversationId || undefined}
+      historyLoading={conversationsQuery.isLoading}
+      historyEmptyText="暂无对话历史"
+    >
+      <PiAgentComposer />
+    </WorkspaceShell>
   );
 }

@@ -21,6 +21,10 @@ import type { PrismaEvidenceContextRepository } from "~/server/infrastructure/ev
 import type { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
 import type { PythonMarketContextClient } from "~/server/infrastructure/intelligence/python-market-context-client";
 
+const NEWS_DEADLINE_MS = 600_000;
+const TRACE_WINDOW_DAYS = 30;
+const MAX_HISTORICAL_NEWS = 5;
+
 type WebEvidence = {
   id: string;
   title: string;
@@ -30,6 +34,9 @@ type WebEvidence = {
 
 export type ImpactCollectedEvidence = {
   news: ThemeNewsItem[];
+  timelineNews?: ThemeNewsItem[];
+  timelineNewsByEvent?: Record<string, ThemeNewsItem[]>;
+  featuredEventIds?: string[];
   selectedEvent?: ThemeNewsItem;
   web: WebEvidence[];
   warnings: string[];
@@ -52,6 +59,25 @@ const scenarioOutputSchema = z.object({
   warnings: z.array(z.string()).default([]),
 });
 
+function withDeadline<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  label: string,
+) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    operation,
+    new Promise<T>((_, reject) => {
+      timeout = setTimeout(
+        () => reject(new Error(`${label}_timeout_${timeoutMs}ms`)),
+        timeoutMs,
+      );
+    }),
+  ]).finally(() => {
+    if (timeout) clearTimeout(timeout);
+  });
+}
+
 function hash(value: unknown) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
@@ -72,6 +98,16 @@ function asNumber(value: unknown) {
 
 function unique<T>(values: T[]) {
   return [...new Set(values)];
+}
+
+function traceAnchor(event: ThemeNewsItem) {
+  return {
+    title: event.title,
+    summary: event.summary,
+    eventType: event.eventType,
+    relatedStocks: event.relatedStocks,
+    scopeTags: event.scopeTags,
+  };
 }
 
 function parseJson(value: string): unknown {
@@ -105,7 +141,10 @@ function parsePositions(value: unknown) {
     .filter((item) => /^\d{6}$/.test(item.stockCode));
 }
 
-function fallbackScenarios(event: ThemeNewsItem): ImpactScenario[] {
+function fallbackScenarios(
+  event: ThemeNewsItem,
+  evidenceItemIds: string[],
+): ImpactScenario[] {
   return [
     {
       id: randomUUID(),
@@ -117,6 +156,7 @@ function fallbackScenarios(event: ThemeNewsItem): ImpactScenario[] {
       affectedTargets:
         event.relatedStocks.length > 0 ? event.relatedStocks : ["相关行业"],
       rationale: "基于当前事件方向的延续性推演。",
+      evidenceItemIds,
       basis: "assumption",
     },
     {
@@ -129,6 +169,7 @@ function fallbackScenarios(event: ThemeNewsItem): ImpactScenario[] {
       affectedTargets:
         event.relatedStocks.length > 0 ? event.relatedStocks : ["相关行业"],
       rationale: "用于检查当前叙事可能失效的路径。",
+      evidenceItemIds,
       basis: "assumption",
     },
   ];
@@ -173,12 +214,12 @@ export class ImpactMappingService {
         }),
         this.deps.prisma.savedCompany.findMany({
           where: { userId, archivedAt: null },
-          orderBy: { updatedAt: "desc" },
+          orderBy: { createdAt: "desc" },
           take: 100,
         }),
         this.deps.prisma.savedIndustry.findMany({
           where: { userId, archivedAt: null },
-          orderBy: { updatedAt: "desc" },
+          orderBy: { createdAt: "desc" },
           take: 20,
         }),
       ]);
@@ -220,14 +261,59 @@ export class ImpactMappingService {
     }));
     const companyMap = new Map<
       string,
-      { id?: string; stockCode: string; companyName: string; aliases: string[] }
+      {
+        id?: string;
+        stockCode: string;
+        companyName: string;
+        aliases: string[];
+        priority?: number;
+      }
     >();
+    const prioritizedTargets = [
+      ...normalizedWatchLists.flatMap((watchList) =>
+        watchList.stocks.map((stock, index) => ({
+          kind: "company" as const,
+          createdAt: watchLists[0]?.updatedAt ?? new Date(0),
+          index,
+          stock,
+        })),
+      ),
+      ...savedCompanies.map((company, index) => ({
+        kind: "savedCompany" as const,
+        createdAt: company.createdAt,
+        index,
+        company,
+      })),
+      ...savedIndustries.map((industry, index) => ({
+        kind: "industry" as const,
+        createdAt: industry.createdAt,
+        index,
+        industry,
+      })),
+    ].sort(
+      (left, right) =>
+        right.createdAt.getTime() - left.createdAt.getTime() ||
+        left.index - right.index,
+    );
+    const targetPriority = new Map<string, number>();
+    prioritizedTargets.forEach((target, index) => {
+      const key =
+        target.kind === "industry"
+          ? `industry:${target.industry.name}`
+          : target.kind === "savedCompany"
+            ? `company:${target.company.stockCode}`
+            : `company:${target.stock.stockCode}`;
+      if (!targetPriority.has(key)) {
+        targetPriority.set(key, prioritizedTargets.length - index);
+      }
+    });
     for (const company of savedCompanies) {
       companyMap.set(company.stockCode, {
         id: company.id,
         stockCode: company.stockCode,
         companyName: company.companyName,
         aliases: unique([company.companyName, ...company.tags]),
+        priority: targetPriority.get(`company:${company.stockCode}`),
       });
     }
     for (const stock of [
@@ -242,6 +328,8 @@ export class ImpactMappingService {
         aliases: unique(
           [...(current?.aliases ?? []), stock.stockName].filter(Boolean),
         ),
+        priority:
+          targetPriority.get(`company:${stock.stockCode}`) ?? current?.priority,
       });
     }
 
@@ -272,6 +360,7 @@ export class ImpactMappingService {
         id: industry.id,
         name: industry.name,
         aliases: unique([industry.name, ...industry.tags]),
+        priority: targetPriority.get(`industry:${industry.name}`),
       })),
       hypotheses: hypotheses.map((note) => ({
         id: note.id,
@@ -289,20 +378,42 @@ export class ImpactMappingService {
     context: ImpactContext;
   }): Promise<ImpactCollectedEvidence> {
     const { input, context } = params;
-    if (input.mode === "radar") {
+    if (input.mode === "radar" || input.mode === "overview") {
       const request = {
         days: input.days,
         limit: 50,
-        companies: context.companies,
-        industries: context.industries,
+        companies: context.companies.filter(
+          (company) => company.priority !== undefined,
+        ),
+        industries: context.industries.filter(
+          (industry) => industry.priority !== undefined,
+        ),
       };
-      const collected = this.deps.sharedNewsLibraryService
-        ? await this.deps.sharedNewsLibraryService.collectRadar(request)
-        : {
-            news: await this.deps.dataClient.getNewsRadar(request),
-            warnings: [],
-          };
-      return {
+      let collected: { news: ThemeNewsItem[]; warnings: string[] };
+      try {
+        collected = this.deps.sharedNewsLibraryService
+          ? await withDeadline(
+              this.deps.sharedNewsLibraryService.collectRadar(request),
+              NEWS_DEADLINE_MS,
+              "radar_collect",
+            )
+          : {
+              news: await withDeadline(
+                this.deps.dataClient.getNewsRadar(request),
+                NEWS_DEADLINE_MS,
+                "radar_collect",
+              ),
+              warnings: [],
+            };
+      } catch (error) {
+        collected = {
+          news: [],
+          warnings: [
+            `radar_collect_failed:${error instanceof Error ? error.message : String(error)}`,
+          ],
+        };
+      }
+      const result = {
         news: collected.news,
         web: [],
         warnings: [
@@ -310,6 +421,75 @@ export class ImpactMappingService {
           ...collected.news.flatMap((item) => item.warnings ?? []),
         ],
         tracedDays: input.days,
+      } satisfies ImpactCollectedEvidence;
+      if (
+        input.mode === "overview" &&
+        result.news.length === 0 &&
+        result.warnings.some((warning) =>
+          warning.startsWith("radar_collect_failed:"),
+        )
+      ) {
+        throw new Error(result.warnings.join(";"));
+      }
+      if (input.mode !== "overview") return result;
+
+      const featured = [...collected.news]
+        .sort((left, right) => right.relevanceScore - left.relevanceScore)
+        .slice(0, 3);
+      const warnings = [...result.warnings];
+      const timelineNewsByEvent: Record<string, ThemeNewsItem[]> = {};
+      for (const event of featured) {
+        const eventTime = new Date(event.publishedAt).getTime();
+        const batches = await Promise.all(
+          Array.from({ length: 12 }, async (_, index) => {
+            const endAt = new Date(
+              eventTime - index * TRACE_WINDOW_DAYS * 86_400_000,
+            );
+            try {
+              return await withDeadline(
+                this.deps.dataClient.getNewsRadar({
+                  days: TRACE_WINDOW_DAYS,
+                  limit: 30,
+                  endAt: endAt.toISOString(),
+                  companies: context.companies,
+                  industries: context.industries,
+                  includeMacro: false,
+                  traceAnchor: traceAnchor(event),
+                }),
+                NEWS_DEADLINE_MS,
+                "overview_trace_window",
+              );
+            } catch (error) {
+              warnings.push(
+                `overview_trace_window_failed:${error instanceof Error ? error.message : String(error)}`,
+              );
+              return [];
+            }
+          }),
+        );
+        const historical = [
+          ...new Map(
+            batches
+              .flat()
+              .filter(
+                (item) =>
+                  item.id !== event.id &&
+                  new Date(item.publishedAt).getTime() < eventTime,
+              )
+              .map((item) => [item.id, item] as const),
+          ).values(),
+        ]
+          .sort((left, right) =>
+            right.publishedAt.localeCompare(left.publishedAt),
+          )
+          .slice(0, MAX_HISTORICAL_NEWS);
+        timelineNewsByEvent[event.id] = [event, ...historical];
+      }
+      return {
+        ...result,
+        timelineNewsByEvent,
+        featuredEventIds: featured.map((item) => item.id),
+        warnings,
       };
     }
 
@@ -324,27 +504,45 @@ export class ImpactMappingService {
     if (input.mode === "trace") {
       let cursor = new Date(input.traceCursor ?? selectedEvent.publishedAt);
       const windows = Math.ceil(input.traceMaxDays / 30);
+      const maxHistoricalEvents = Math.min(
+        MAX_HISTORICAL_NEWS,
+        Math.max(0, input.traceMaxEvents - 1),
+      );
+      const selectedTime = new Date(selectedEvent.publishedAt).getTime();
+      const seen = new Set(news.map((item) => item.id));
       for (
         let index = 0;
-        index < windows && news.length < input.traceMaxEvents;
+        index < windows && news.length - 1 < maxHistoricalEvents;
         index += 1
       ) {
-        cursor = new Date(cursor.getTime() - 30 * 86_400_000);
         try {
           const batch = await this.deps.dataClient.getNewsRadar({
-            days: 30,
-            limit: Math.min(50, input.traceMaxEvents - news.length),
+            days: TRACE_WINDOW_DAYS,
+            limit: Math.min(30, maxHistoricalEvents - (news.length - 1)),
             endAt: cursor.toISOString(),
             companies: context.companies,
             industries: context.industries,
+            includeMacro: false,
+            traceAnchor: traceAnchor(selectedEvent),
           });
-          news.push(...batch);
-          tracedDays += 30;
+          for (const item of batch) {
+            if (
+              news.length - 1 >= maxHistoricalEvents ||
+              seen.has(item.id) ||
+              new Date(item.publishedAt).getTime() >= selectedTime
+            ) {
+              continue;
+            }
+            seen.add(item.id);
+            news.push(item);
+          }
+          tracedDays += TRACE_WINDOW_DAYS;
         } catch (error) {
           warnings.push(
             `trace_window_failed:${error instanceof Error ? error.message : String(error)}`,
           );
         }
+        cursor = new Date(cursor.getTime() - TRACE_WINDOW_DAYS * 86_400_000);
       }
     }
 
@@ -354,9 +552,12 @@ export class ImpactMappingService {
       );
       return [];
     });
-    const deduped = new Map(news.map((item) => [item.id, item]));
+    const historical = news
+      .filter((item) => item.id !== selectedEvent.id)
+      .sort((left, right) => right.publishedAt.localeCompare(left.publishedAt))
+      .slice(0, MAX_HISTORICAL_NEWS);
     return {
-      news: [...deduped.values()].slice(0, input.traceMaxEvents),
+      news: [selectedEvent, ...historical],
       selectedEvent,
       web,
       warnings,
@@ -371,7 +572,18 @@ export class ImpactMappingService {
   }): Promise<PersistedImpactEvidence> {
     const now = new Date().toISOString();
     const itemIdBySourceId: Record<string, string> = {};
-    const newsItems = params.collected.news.map((news) => {
+    const timelineNews = Object.values(
+      params.collected.timelineNewsByEvent ?? {},
+    ).flat();
+    const uniqueNews = [
+      ...new Map(
+        [...params.collected.news, ...timelineNews].map((news) => [
+          news.id,
+          news,
+        ]),
+      ).values(),
+    ];
+    const newsItems = uniqueNews.map((news) => {
       const id = randomUUID();
       itemIdBySourceId[news.id] = id;
       return {
@@ -517,39 +729,44 @@ export class ImpactMappingService {
       ),
       warnings: ["impact_model_fallback"],
     };
-    const response = await this.deps.evidenceAwareLlmClient.complete({
-      userId: params.userId,
-      workflowRunId: params.runId,
-      purpose: "impact_mapping_edges",
-      policy: "evidence_required",
-      evidenceItemIds: params.persisted.evidenceItemIds,
-      fallbackText: JSON.stringify(fallback),
-      options: { model: "deepseek-chat", maxOutputTokens: 3200 },
-      messages: [
-        {
-          role: "system",
-          content:
-            "你是 Impact Mapping Agent。只输出 JSON。按 primary、secondary、tertiary、macro、portfolio 五层输出影响边；不得把推断写成事实。全球实体可以保留名称，A股必须尽量映射六位代码。",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            event: selected,
-            relationshipEvidence: params.collected.web,
-            companies: params.context.companies,
-            industries: params.context.industries,
-            portfolio: params.context.portfolio,
-            watchLists: params.context.watchLists,
-            hypotheses: params.context.hypotheses,
-            schema: {
-              impactEdges:
-                "id, level, source, target, targetType, stockCode?, relation, direction, strength, confidence, rationale, evidenceItemIds, basis, hypothesisStatus?",
-              warnings: "string[]",
-            },
-          }),
-        },
-      ],
-    });
+    let response: { output: string };
+    try {
+      response = await this.deps.evidenceAwareLlmClient.complete({
+        userId: params.userId,
+        workflowRunId: params.runId,
+        purpose: "impact_mapping_edges",
+        policy: "evidence_required",
+        evidenceItemIds: params.persisted.evidenceItemIds,
+        fallbackText: JSON.stringify(fallback),
+        options: { model: "deepseek-v4-flash", maxOutputTokens: 3200 },
+        messages: [
+          {
+            role: "system",
+            content:
+              "你是 Impact Mapping Agent。只输出 JSON。按 primary、secondary、tertiary、macro、portfolio 五层输出影响边；不得把推断写成事实。全球实体可以保留名称，A股必须尽量映射六位代码。",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              event: selected,
+              relationshipEvidence: params.collected.web,
+              companies: params.context.companies,
+              industries: params.context.industries,
+              portfolio: params.context.portfolio,
+              watchLists: params.context.watchLists,
+              hypotheses: params.context.hypotheses,
+              schema: {
+                impactEdges:
+                  "id, level, source, target, targetType, stockCode?, relation, direction, strength, confidence, rationale, evidenceItemIds, basis, hypothesisStatus?",
+                warnings: "string[]",
+              },
+            }),
+          },
+        ],
+      });
+    } catch {
+      return { edges: fallback.impactEdges, warnings: fallback.warnings };
+    }
     const parsed = impactOutputSchema.safeParse(parseJson(response.output));
     if (!parsed.success) {
       return { edges: fallback.impactEdges, warnings: fallback.warnings };
@@ -568,13 +785,15 @@ export class ImpactMappingService {
     collected: ImpactCollectedEvidence;
     persisted: PersistedImpactEvidence;
   }): ImpactTimelineItem[] {
-    return params.collected.news
+    return (params.collected.timelineNews ?? params.collected.news)
       .map((event) => ({
         id: randomUUID(),
         occurredAt: event.publishedAt,
         title: event.title,
         summary: event.summary,
         eventId: event.id,
+        url: event.url,
+        source: event.source,
         evidenceItemIds: [params.persisted.itemIdBySourceId[event.id]].filter(
           (value): value is string => Boolean(value),
         ),
@@ -594,40 +813,55 @@ export class ImpactMappingService {
     const event = params.collected.selectedEvent ?? params.collected.news[0];
     if (!event) return { scenarios: [], warnings: ["selected_event_missing"] };
     const fallback = {
-      scenarios: fallbackScenarios(event),
+      scenarios: fallbackScenarios(event, params.persisted.evidenceItemIds),
       warnings: ["scenario_model_fallback"],
     };
-    const response = await this.deps.evidenceAwareLlmClient.complete({
-      userId: params.userId,
-      workflowRunId: params.runId,
-      purpose: "impact_mapping_scenarios",
-      policy: "evidence_required",
-      evidenceItemIds: params.persisted.evidenceItemIds,
-      fallbackText: JSON.stringify(fallback),
-      options: { model: "deepseek-chat", maxOutputTokens: 2200 },
-      messages: [
-        {
-          role: "system",
-          content:
-            "基于给定事实生成 2 到 5 条未来分支，只输出 JSON。禁止输出精确概率；每条必须区分推断或假设。",
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            event,
-            impactEdges: params.edges,
-            hypotheses: params.context.hypotheses,
-            schema: {
-              scenarios:
-                "2-5 items: id, name, horizon, triggers[], confirmationSignals[], invalidationConditions[], affectedTargets[], rationale, basis(inference|assumption)",
-              warnings: "string[]",
-            },
-          }),
-        },
-      ],
-    });
+    let response: { output: string };
+    try {
+      response = await this.deps.evidenceAwareLlmClient.complete({
+        userId: params.userId,
+        workflowRunId: params.runId,
+        purpose: "impact_mapping_scenarios",
+        policy: "evidence_required",
+        evidenceItemIds: params.persisted.evidenceItemIds,
+        fallbackText: JSON.stringify(fallback),
+        options: { model: "deepseek-v4-flash", maxOutputTokens: 2200 },
+        messages: [
+          {
+            role: "system",
+            content:
+              "基于给定事实生成 2 到 5 条未来分支，只输出 JSON。禁止输出精确概率；每条必须区分推断或假设。",
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              event,
+              impactEdges: params.edges,
+              hypotheses: params.context.hypotheses,
+              schema: {
+                scenarios:
+                  "2-5 items: id, name, horizon, triggers[], confirmationSignals[], invalidationConditions[], affectedTargets[], rationale, evidenceItemIds[], basis(inference|assumption)",
+                warnings: "string[]",
+              },
+            }),
+          },
+        ],
+      });
+    } catch {
+      return fallback;
+    }
     const parsed = scenarioOutputSchema.safeParse(parseJson(response.output));
-    return parsed.success ? parsed.data : fallback;
+    if (!parsed.success) return fallback;
+    const allowed = new Set(params.persisted.evidenceItemIds);
+    return {
+      ...parsed.data,
+      scenarios: parsed.data.scenarios.map((scenario) => ({
+        ...scenario,
+        evidenceItemIds: scenario.evidenceItemIds.filter((id) =>
+          allowed.has(id),
+        ),
+      })),
+    };
   }
 
   async persistDerived(params: {
@@ -740,6 +974,7 @@ export class ImpactMappingService {
       scenarios: params.scenarios,
       evidenceCitations: params.citations,
       warnings,
+      featuredEventIds: params.collected.featuredEventIds,
       traceState:
         params.input.mode === "trace"
           ? {

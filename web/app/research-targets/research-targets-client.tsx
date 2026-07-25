@@ -2,13 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownContent } from "~/app/_components/markdown-content";
 import { CloseIcon, SearchIcon } from "~/app/_components/sidebar-icons";
 import {
@@ -20,6 +14,7 @@ import {
 } from "~/app/_components/ui";
 import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
+import { companyOverviewHref } from "~/app/company-research/company-overview-link";
 import {
   buildResearchTargetSearchResults,
   type ResearchTargetSearchResult,
@@ -90,6 +85,10 @@ function targetTypeLabel(type: ResearchTargetType | string) {
 
 function serializeRef(ref: ResearchTargetRef) {
   return `${ref.type}:${ref.id}`;
+}
+
+function stockCodeFromTargetLabel(label: string) {
+  return label.match(/\((\d{6})\)/)?.[1];
 }
 
 function parseSerializedRef(
@@ -227,7 +226,10 @@ function ResearchTargetSearchDialog(props: {
           </button>
         </div>
 
-        <div className="min-h-[120px] overflow-y-auto p-2 sm:p-3" aria-live="polite">
+        <div
+          className="min-h-[120px] overflow-y-auto p-2 sm:p-3"
+          aria-live="polite"
+        >
           {loading ? (
             <p className="px-3 py-8 text-center text-sm text-[var(--app-text-muted)]">
               正在加载可搜索内容
@@ -333,11 +335,15 @@ function formatSnapshotValue(value: unknown) {
 function getSnapshotPeriods(snapshot: FinancialSnapshot) {
   const raw = asRecord(snapshot.rawSnapshot);
   return Array.isArray(raw.periods)
-    ? raw.periods.filter((period): period is string => typeof period === "string")
+    ? raw.periods.filter(
+        (period): period is string => typeof period === "string",
+      )
     : [];
 }
 
-function getSnapshotMetricMeta(snapshot: FinancialSnapshot): SnapshotMetricMeta[] {
+function getSnapshotMetricMeta(
+  snapshot: FinancialSnapshot,
+): SnapshotMetricMeta[] {
   const raw = asRecord(snapshot.rawSnapshot);
   const items = Array.isArray(raw.indicatorMeta) ? raw.indicatorMeta : [];
 
@@ -351,7 +357,9 @@ function getSnapshotMetricMeta(snapshot: FinancialSnapshot): SnapshotMetricMeta[
   });
 }
 
-function getSnapshotLatestRows(snapshot: FinancialSnapshot): SnapshotLatestRow[] {
+function getSnapshotLatestRows(
+  snapshot: FinancialSnapshot,
+): SnapshotLatestRow[] {
   const raw = asRecord(snapshot.rawSnapshot);
   const items = Array.isArray(raw.latestSnapshotRows)
     ? raw.latestSnapshotRows
@@ -391,7 +399,10 @@ function FinancialSnapshotBlock(props: { snapshot: FinancialSnapshot }) {
   const rows = getSnapshotLatestRows(snapshot);
   const visibleMetrics = metricMeta.slice(0, 8);
   const visibleRows = rows.slice(0, 12);
-  const hiddenMetricCount = Math.max(metricMeta.length - visibleMetrics.length, 0);
+  const hiddenMetricCount = Math.max(
+    metricMeta.length - visibleMetrics.length,
+    0,
+  );
   const hiddenRowCount = Math.max(rows.length - visibleRows.length, 0);
 
   return (
@@ -404,7 +415,8 @@ function FinancialSnapshotBlock(props: { snapshot: FinancialSnapshot }) {
               .join("、") || "未记录公司"}
           </p>
           <p className="text-xs text-[var(--app-text-muted)]">
-            {formatSnapshotDate(snapshot.createdAt)} · {metricMeta.length} 个指标
+            {formatSnapshotDate(snapshot.createdAt)} · {metricMeta.length}{" "}
+            个指标
             {periods.length > 0 ? ` · ${periods.join("、")}` : ""}
           </p>
         </div>
@@ -470,8 +482,9 @@ function FinancialSnapshotBlock(props: { snapshot: FinancialSnapshot }) {
 
       {hiddenMetricCount > 0 || hiddenRowCount > 0 ? (
         <p className="text-xs text-[var(--app-text-muted)]">
-          已预览前 {visibleMetrics.length} 个指标、前 {visibleRows.length} 家公司；
-          仍保存 {hiddenMetricCount} 个指标、{hiddenRowCount} 家公司在原始快照中。
+          已预览前 {visibleMetrics.length} 个指标、前 {visibleRows.length}{" "}
+          家公司； 仍保存 {hiddenMetricCount} 个指标、{hiddenRowCount}{" "}
+          家公司在原始快照中。
         </p>
       ) : null}
     </div>
@@ -927,6 +940,17 @@ function TargetContentList(props: {
             description={target.description || "暂无说明"}
             actions={
               <div className="flex flex-wrap gap-2">
+                {target.ref.type === "company" &&
+                stockCodeFromTargetLabel(target.label) ? (
+                  <Link
+                    href={companyOverviewHref(
+                      stockCodeFromTargetLabel(target.label) ?? "",
+                    )}
+                    className="app-button app-button-primary"
+                  >
+                    公司概况
+                  </Link>
+                ) : null}
                 {target.ref.type === "watchlist" ? (
                   <>
                     <Link
@@ -1308,6 +1332,9 @@ export function ResearchTargetsClient() {
       historyEmptyText="暂无投研对象"
       actions={
         <>
+          <Link href="/mind-maps" className="app-button">
+            思维导图
+          </Link>
           <button
             type="button"
             className="app-button"

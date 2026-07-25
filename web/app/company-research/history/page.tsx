@@ -1,8 +1,11 @@
 import { Suspense } from "react";
 import { WorkflowHistoryClient } from "~/app/_components/workflow-history-client";
+import { requireAuth } from "~/server/auth/require-auth";
 import { COMPANY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 
-export default function CompanyResearchHistoryPage() {
+export default async function CompanyResearchHistoryPage() {
+  await requireAuth("/company-research/history");
+
   return (
     <Suspense fallback={null}>
       <WorkflowHistoryClient

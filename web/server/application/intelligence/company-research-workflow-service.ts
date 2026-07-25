@@ -1,5 +1,9 @@
 import { v4 as uuidv4 } from "uuid";
 import {
+  type EvidenceContextWriter,
+  writeEvidenceContext,
+} from "~/server/application/evidence-context/evidence-context-writer";
+import {
   type CompanyResearchAgentService,
   normalizeCompanyResearchQuestions,
 } from "~/server/application/intelligence/company-research-agent-service";
@@ -43,6 +47,7 @@ type CompanyResearchWorkflowServiceDependencies = {
   client: DeepSeekClient;
   companyResearchService: CompanyResearchAgentService;
   researchToolRegistry: ResearchToolRegistry;
+  evidenceContextWriter?: EvidenceContextWriter;
 };
 
 type CompanyExecutionSnapshot = {
@@ -306,11 +311,13 @@ export class CompanyResearchWorkflowService {
   private readonly client: DeepSeekClient;
   private readonly companyResearchService: CompanyResearchAgentService;
   private readonly researchToolRegistry: ResearchToolRegistry;
+  private readonly evidenceContextWriter?: EvidenceContextWriter;
 
   constructor(dependencies: CompanyResearchWorkflowServiceDependencies) {
     this.client = dependencies.client;
     this.companyResearchService = dependencies.companyResearchService;
     this.researchToolRegistry = dependencies.researchToolRegistry;
+    this.evidenceContextWriter = dependencies.evidenceContextWriter;
   }
 
   async buildTaskContract(
@@ -1101,6 +1108,47 @@ export class CompanyResearchWorkflowService {
         maxEvidencePerUnit: params.runtimeConfig.maxEvidencePerUnit,
       },
     });
+    const evidenceContext = this.evidenceContextWriter
+      ? await writeEvidenceContext({
+          writer: this.evidenceContextWriter,
+          userId: params.state.userId,
+          workflowRunId: params.state.runId,
+          subject: {
+            subjectType: "company",
+            subjectId: brief.stockCode ?? brief.companyName,
+            label: brief.companyName,
+          },
+          phase: "company_research",
+          metadata: { collectorCount: params.state.evidence?.length ?? 0 },
+          blocks: [
+            {
+              blockKey: "company_research",
+              sourceType: "research_workflow",
+              sourceId: params.state.runId,
+              sourceName: "公司研究工作流",
+              items: (params.state.evidence ?? []).map((item) => ({
+                itemKey: item.referenceId,
+                status: "available" as const,
+                extractedFact: item.extractedFact,
+                snippet: item.snippet,
+                sourceType: item.sourceType,
+                sourceId: item.referenceId,
+                sourceName: item.sourceName,
+                url: item.url,
+                publishedAt: item.publishedAt,
+                observedAt: new Date().toISOString(),
+                fetchedAt: new Date().toISOString(),
+                valueJson: {
+                  title: item.title,
+                  relevance: item.relevance,
+                  sourceTier: item.sourceTier,
+                  isFirstParty: item.isFirstParty,
+                },
+              })),
+            },
+          ],
+        })
+      : undefined;
     const reflection = reflectCompanyResearch({
       taskContract,
       result: report,
@@ -1112,6 +1160,7 @@ export class CompanyResearchWorkflowService {
       contractScore: reflection.contractScore,
       qualityFlags: reflection.qualityFlags,
       missingRequirements: reflection.missingRequirements,
+      evidenceCitations: evidenceContext?.citations,
     };
   }
 }

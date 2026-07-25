@@ -9,6 +9,7 @@ import {
   SectionCard,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { companyOverviewHref } from "~/app/company-research/company-overview-link";
 import {
   buildWatchlistActionLinks,
   type WatchlistSelectedStock,
@@ -243,9 +244,12 @@ export function WatchlistDetailClient({
                           onChange={() => toggleSelected(stock.stockCode)}
                         />
                         <div>
-                          <div className="text-base text-[var(--app-text-strong)]">
+                          <Link
+                            href={companyOverviewHref(stock.stockCode)}
+                            className="text-base text-[var(--app-text-strong)] hover:underline"
+                          >
                             {stock.stockName}
-                          </div>
+                          </Link>
                           <div className="text-sm text-[var(--app-text-muted)]">
                             {stock.stockCode}
                           </div>

@@ -204,7 +204,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
   WatchlistTimingPipelineGraphState,
   WatchlistTimingPipelineNodeKey
 > {
-  readonly templateCode = WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE;
+  readonly templateCode: string;
   readonly templateVersion = 1;
 
   constructor(deps: {
@@ -219,12 +219,15 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
     portfolioManagerService: WatchlistPortfolioManagerV2Service;
     recommendationRepository: PrismaTimingRecommendationRepository;
     reviewSchedulingService: TimingReviewSchedulingService;
+    templateCode?: string;
   }) {
     const nodeExecutors: Record<WatchlistTimingPipelineNodeKey, NodeExecutor> =
       {
         load_watchlist_context: async (state) => {
           const [watchList, portfolioSnapshot, revision] = await Promise.all([
-            deps.watchListRepository.findById(state.timingInput.watchListId),
+            state.timingInput.watchListId
+              ? deps.watchListRepository.findById(state.timingInput.watchListId)
+              : Promise.resolve(null),
             deps.portfolioSnapshotRepository.getByIdForUser(
               state.userId,
               state.timingInput.portfolioSnapshotId,
@@ -235,8 +238,14 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
             ),
           ]);
 
-          if (!watchList || watchList.userId !== state.userId) {
+          if (
+            state.timingInput.watchListId &&
+            (!watchList || watchList.userId !== state.userId)
+          ) {
             throw new Error("Watchlist not found or access denied");
+          }
+          if (!watchList && !state.timingInput.targets?.length) {
+            throw new Error("本次分析至少需要一只股票。");
           }
 
           if (!portfolioSnapshot) {
@@ -247,7 +256,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
           }
 
           const targets = new Map(
-            watchList.stocks.map((stock) => [
+            (watchList?.stocks ?? []).map((stock) => [
               stock.stockCode.value,
               {
                 stockCode: stock.stockCode.value,
@@ -255,6 +264,12 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
               },
             ]),
           );
+          for (const target of state.timingInput.targets ?? []) {
+            targets.set(target.stockCode, {
+              stockCode: target.stockCode,
+              stockName: target.stockName ?? target.stockCode,
+            });
+          }
           for (const position of portfolioSnapshot.positions) {
             targets.set(position.stockCode, {
               stockCode: position.stockCode,
@@ -266,9 +281,9 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
             revision,
             presetConfig: revision.config,
             watchlist: {
-              id: watchList.id,
-              name: watchList.name,
-              stockCount: watchList.stocks.length,
+              id: watchList?.id ?? state.timingInput.sourceWatchListId,
+              name: watchList?.name ?? "本次选择",
+              stockCount: targets.size,
             },
             portfolioSnapshot,
             targets: [...targets.values()],
@@ -308,7 +323,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
                 userId: state.userId,
                 workflowRunId: state.runId,
                 sourceType: "watchlist",
-                sourceId: state.timingInput.watchListId,
+                sourceId: state.timingInput.watchListId ?? state.runId,
                 watchListId: state.timingInput.watchListId,
                 revision: state.revision,
                 evidence: state.signalSnapshots,
@@ -329,7 +344,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
                   userId: state.userId,
                   workflowRunId: state.runId,
                   sourceType: "watchlist",
-                  sourceId: state.timingInput.watchListId,
+                  sourceId: state.timingInput.watchListId ?? state.runId,
                   watchListId: state.timingInput.watchListId,
                   revision: state.revision,
                   evidence: state.signalSnapshots,
@@ -439,7 +454,7 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
             recommendations: deps.portfolioManagerService.buildRecommendations({
               userId: state.userId,
               workflowRunId: state.runId,
-              watchListId: state.watchlist.id,
+              watchListId: state.watchlist.id ?? null,
               portfolioSnapshot: state.portfolioSnapshot,
               timingCards: state.cards,
               riskPlan: state.riskPlan,
@@ -490,6 +505,8 @@ export class WatchlistTimingPipelineLangGraph extends BaseWorkflowLangGraph<
       graph: graphBuilder.compile(),
       nodeOrder: WATCHLIST_TIMING_PIPELINE_NODE_KEYS,
     });
+    this.templateCode =
+      deps.templateCode ?? WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE;
   }
 
   buildInitialState(

@@ -90,6 +90,17 @@ export function TimingIcon(props: IconProps) {
   );
 }
 
+export function ScheduledTasksIcon(props: IconProps) {
+  return (
+    <BaseIcon {...props}>
+      <circle cx="12" cy="12" r="7.5" />
+      <path d="M12 8v4.5l3 1.5" />
+      <path d="M8 3.5 6.5 5" />
+      <path d="m16 3.5 1.5 1.5" />
+    </BaseIcon>
+  );
+}
+
 export function WatchlistsIcon(props: IconProps) {
   return (
     <BaseIcon {...props}>
@@ -99,16 +110,6 @@ export function WatchlistsIcon(props: IconProps) {
       <circle cx="5.5" cy="6" r="1.25" />
       <circle cx="5.5" cy="12" r="1.25" />
       <path d="M4.5 17.25h2v2h-2z" />
-    </BaseIcon>
-  );
-}
-
-export function ResearchSpacesIcon(props: IconProps) {
-  return (
-    <BaseIcon {...props}>
-      <path d="M4 7.5 12 4l8 3.5-8 3.5z" />
-      <path d="M4 12.5 12 16l8-3.5" />
-      <path d="M4 17.5 12 21l8-3.5" />
     </BaseIcon>
   );
 }

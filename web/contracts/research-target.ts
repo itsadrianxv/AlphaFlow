@@ -5,7 +5,6 @@ export const researchTargetTypeSchema = z.enum([
   "company",
   "industry",
   "watchlist",
-  "space",
   "workflow_run",
 ]);
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import React, { type ReactNode } from "react";
 
@@ -803,16 +804,30 @@ export function ActionStrip(props: {
   description?: ReactNode;
   tone?: Tone;
   actions?: ReactNode;
+  illustrationSrc?: string;
+  illustrationAlt?: string;
   className?: string;
 }) {
-  const { title, description, tone = "info", actions, className } = props;
+  const {
+    title,
+    description,
+    tone = "info",
+    actions,
+    illustrationSrc,
+    illustrationAlt = "",
+    className,
+  } = props;
 
   return (
     <div
-      className={cn("rounded-[16px] border p-4", toneClassMap[tone], className)}
+      className={cn(
+        "relative overflow-hidden rounded-[16px] border p-4",
+        toneClassMap[tone],
+        className,
+      )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
+      <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 max-w-3xl">
           <div className="text-base font-medium text-[var(--app-text-strong)]">
             {title}
           </div>
@@ -824,6 +839,16 @@ export function ActionStrip(props: {
         </div>
         {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
       </div>
+      {illustrationSrc ? (
+        <Image
+          src={illustrationSrc}
+          alt={illustrationAlt}
+          aria-hidden={illustrationAlt ? undefined : true}
+          width={190}
+          height={156}
+          className="app-action-illustration pointer-events-none absolute -right-2 bottom-[-22px] hidden h-[156px] w-[190px] object-contain opacity-80 lg:block"
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,14 +1,9 @@
 import React from "react";
 import { TimingRunConsole } from "~/app/timing/timing-run-console";
-import { TimingLoginRedirectNotice } from "~/app/timing/timing-login-redirect-notice";
-import { auth } from "~/server/auth";
+import { requireAuth } from "~/server/auth/require-auth";
 
 export default async function TimingPage() {
-  const session = await auth();
-
-  if (!session?.user) {
-    return <TimingLoginRedirectNotice redirectTo="/timing" />;
-  }
+  await requireAuth("/timing");
 
   return (
     <React.Suspense fallback={null}>

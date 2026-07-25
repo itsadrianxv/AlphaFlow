@@ -16,11 +16,7 @@ export const TIMING_ACTIONS = [
   "EXIT",
 ] as const;
 
-export const STAGE_ONE_TIMING_ACTIONS = [
-  "WATCH",
-  "PROBE",
-  "ENTER",
-] as const;
+export const STAGE_ONE_TIMING_ACTIONS = ["WATCH", "PROBE", "ENTER"] as const;
 
 export const TIMING_SETUP_TYPES = [
   "TREND_CONTINUATION",
@@ -254,12 +250,12 @@ export type TimingTimeframePlan = {
 export type TimingPresetConfigV2 = {
   schemaVersion: 2;
   setup: TimingSetupType;
-  riskProfile: "BALANCED";
+  riskProfile: "STEADY" | "BALANCED" | "AGGRESSIVE";
   timeframePlan: TimingTimeframePlan;
   ruleGroups: TimingRuleGroupConfig[];
   marketGate: {
-    neutralEntryAction: "PROBE";
-    neutralAddAction: "HOLD";
+    neutralEntryAction: "WATCH" | "PROBE" | "ENTER";
+    neutralAddAction: "HOLD" | "ADD";
     riskOffBlockedActions: Array<"PROBE" | "ENTER" | "ADD">;
   };
   dataPolicy: {
@@ -313,6 +309,8 @@ export type TimingEvidenceData = {
   stockName: string;
   asOfDate: string;
   featureVersion: string;
+  templateVersion?: number | null;
+  validationSource?: "SYSTEM_TEMPLATE" | "HISTORICAL_BACKTEST" | null;
   features: TimingFeatureEvidence[];
   barsByTimeframe: TimingBarsByTimeframe;
   sourceRows: Record<string, Array<Record<string, unknown>>>;
@@ -323,6 +321,17 @@ export type TimingEvidenceData = {
 
 export type TimingEvidenceBatchData = {
   items: TimingEvidenceData[];
+  errors: TimingSignalBatchError[];
+};
+
+export type TimingEvidenceHistoryData = {
+  items: Array<{
+    stockCode: string;
+    stockName: string;
+    timeline: TimingEvidenceData[];
+    bars: TimingBar[];
+    marketStates: Record<string, TimingMarketState>;
+  }>;
   errors: TimingSignalBatchError[];
 };
 
@@ -382,6 +391,8 @@ export type TimingPresetRevisionRecord = {
   configHash: string;
   engineVersion: string;
   featureVersion: string;
+  templateVersion?: number | null;
+  validationSource?: "SYSTEM_BASELINE" | "HISTORICAL_BACKTEST" | null;
   publishedAt?: Date | null;
   archivedAt?: Date | null;
   createdAt: Date;
@@ -393,6 +404,8 @@ export type TimingStrategyRecord = {
   userId: string;
   name: string;
   description?: string | null;
+  origin?: "SYSTEM_TEMPLATE" | "USER";
+  templateKey?: string | null;
   activeRevisionId?: string | null;
   activeRevision?: TimingPresetRevisionRecord | null;
   revisions: TimingPresetRevisionRecord[];
@@ -419,10 +432,7 @@ export type TimingBacktestPerformanceMetrics = {
   maxAdverseExcursionPct: number;
 };
 
-export type TimingExecutionRecordDecision =
-  | "ACCEPTED"
-  | "REJECTED"
-  | "SKIPPED";
+export type TimingExecutionRecordDecision = "ACCEPTED" | "REJECTED" | "SKIPPED";
 
 export type TimingBar = {
   tradeDate: string;
@@ -774,6 +784,8 @@ export type PortfolioSnapshotRecord = {
   totalCapital: number;
   positions: PortfolioPosition[];
   riskPreferences: PortfolioRiskPreferences;
+  source?: "SAVED" | "RUN_INPUT";
+  workflowRunId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -963,7 +975,7 @@ export type TimingRecommendationRecord = {
   userId: string;
   workflowRunId?: string | null;
   portfolioSnapshotId: string;
-  watchListId: string;
+  watchListId?: string | null;
   presetId?: string | null;
   presetRevisionId?: string | null;
   stockCode: string;
@@ -988,7 +1000,7 @@ export type TimingRecommendationDraft = {
   userId: string;
   workflowRunId?: string;
   portfolioSnapshotId: string;
-  watchListId: string;
+  watchListId?: string | null;
   presetId?: string;
   presetRevisionId?: string;
   stockCode: string;

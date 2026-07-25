@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { EvidenceContextCitations } from "~/app/_components/evidence-context-citations";
 import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { MarkdownContent } from "~/app/_components/markdown-content";
 import { statusTone } from "~/app/_components/status-tone";
@@ -42,6 +43,7 @@ import {
 import { useWorkflowRunEvents } from "~/app/workflows/use-workflow-run-events";
 import { WorkflowAgentStep } from "~/app/workflows/workflow-agent-step";
 import { resolveWorkflowShellContext } from "~/app/workflows/workflow-shell-context";
+import type { EvidenceCitation } from "~/server/domain/evidence-context/types";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   INDUSTRY_RESEARCH_TEMPLATE_CODE,
@@ -275,6 +277,12 @@ export function RunInvestorClient({
     run?.status === "SUCCEEDED" &&
     industryConclusionModel !== null;
   const showCompanyShell = templateCode === COMPANY_RESEARCH_TEMPLATE_CODE;
+  const resultEvidenceCitations =
+    run?.result && typeof run.result === "object" && !Array.isArray(run.result)
+      ? ((run.result as Record<string, unknown>).evidenceCitations as
+          | EvidenceCitation[]
+          | undefined)
+      : undefined;
 
   return (
     <WorkspaceShell
@@ -631,6 +639,17 @@ export function RunInvestorClient({
               </div>
 
               <ResearchOpsPanels result={run.result} />
+
+              {resultEvidenceCitations?.length ? (
+                <Panel title="报告证据">
+                  <div className="text-sm leading-7 text-[var(--app-text-muted)]">
+                    结论来源{" "}
+                    <EvidenceContextCitations
+                      citations={resultEvidenceCitations}
+                    />
+                  </div>
+                </Panel>
+              ) : null}
 
               {companyResult ? (
                 <Panel

@@ -234,6 +234,12 @@ export const screeningRouter = createTRPCRouter({
       ),
     ),
 
+  resolveStockMentions: protectedProcedure
+    .input(z.object({ text: z.string().trim().min(1).max(20_000) }))
+    .query(({ input }) =>
+      new PythonScreeningWorkbenchClient().resolveStockMentions(input.text),
+    ),
+
   listIndicatorCatalog: protectedProcedure.query(async () => {
     const client = new PythonCapabilityGatewayClient();
     const catalog = await client.listIndicatorCatalog();

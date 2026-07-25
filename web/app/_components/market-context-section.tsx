@@ -53,6 +53,7 @@ export function MarketContextSection(props: {
       <SectionCard
         title="宏观分析"
         description="正在读取宏观慢变量、资金方向和热门主题。"
+        className="!rounded-none !border-0 !bg-transparent !shadow-none"
       >
         <div className="text-sm leading-6 text-[var(--app-text-muted)]">
           正在整理当前市场环境。
@@ -63,7 +64,11 @@ export function MarketContextSection(props: {
 
   if (snapshotQuery.isError || !snapshotQuery.data) {
     return (
-      <SectionCard title="宏观分析" description="当前未能获取完整宏观分析。">
+      <SectionCard
+        title="宏观分析"
+        description="当前未能获取完整宏观分析。"
+        className="!rounded-none !border-0 !bg-transparent !shadow-none"
+      >
         <InlineNotice
           tone="warning"
           description={snapshotQuery.error?.message ?? "宏观分析暂不可用。"}
@@ -77,7 +82,10 @@ export function MarketContextSection(props: {
   const matchedThemes = findMatchingHotThemes(hotThemes, currentStockCodes);
 
   return (
-    <SectionCard title="宏观分析">
+    <SectionCard
+      title="宏观分析"
+      className="!rounded-none !border-0 !bg-transparent !shadow-none"
+    >
       <div className="grid gap-4">
         {matchedThemes.length > 0 ? (
           <InlineNotice

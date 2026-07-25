@@ -73,7 +73,7 @@ export class WatchlistPortfolioManagerV2Service {
   buildRecommendations(params: {
     userId: string;
     workflowRunId: string;
-    watchListId: string;
+    watchListId?: string | null;
     portfolioSnapshot: PortfolioSnapshotRecord;
     timingCards: TimingCardDraft[];
     riskPlan: PortfolioRiskPlan;

@@ -1,7 +1,6 @@
 import React from "react";
 import { TimingReportClient } from "~/app/timing/reports/[cardId]/timing-report-client";
-import { TimingLoginRedirectNotice } from "~/app/timing/timing-login-redirect-notice";
-import { auth } from "~/server/auth";
+import { requireAuth } from "~/server/auth/require-auth";
 
 type PageProps = {
   params: Promise<{
@@ -10,14 +9,8 @@ type PageProps = {
 };
 
 export default async function TimingReportPage({ params }: PageProps) {
-  const session = await auth();
   const { cardId } = await params;
-
-  if (!session?.user) {
-    return (
-      <TimingLoginRedirectNotice redirectTo={`/timing/reports/${cardId}`} />
-    );
-  }
+  await requireAuth(`/timing/reports/${cardId}`);
 
   return (
     <React.Suspense fallback={null}>

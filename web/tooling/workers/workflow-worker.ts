@@ -9,6 +9,7 @@ import { IndustryResearchWorkflowService } from "~/server/application/intelligen
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
+import { SharedNewsLibraryService } from "~/server/application/intelligence/shared-news-library-service";
 import { MarketRegimeService } from "~/server/application/timing/market-regime-service";
 import { PositionContextService } from "~/server/application/timing/position-context-service";
 import { TimingFeedbackService } from "~/server/application/timing/timing-feedback-service";
@@ -53,6 +54,7 @@ import { TimingReviewLoopLangGraph } from "~/server/infrastructure/workflow/lang
 import { TimingSignalPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/timing-signal-graph";
 import { WatchlistTimingCardsPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/watchlist-timing-cards-graph";
 import { WatchlistTimingPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/watchlist-timing-graph";
+import { TIMING_DECISION_PIPELINE_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
 
@@ -62,6 +64,10 @@ const agentConversationRepository = new PrismaAgentConversationRepository(db);
 const agentRuntimeClient = new AgentRuntimeClient();
 const deepSeekClient = new DeepSeekClient();
 const pythonDataClient = new PythonIntelligenceDataClient();
+const sharedNewsLibraryService = new SharedNewsLibraryService(
+  db,
+  pythonDataClient,
+);
 const capabilityGatewayClient = new PythonCapabilityGatewayClient();
 const confidenceAnalysisService = new ConfidenceAnalysisService({
   client: new PythonConfidenceAnalysisClient(),
@@ -81,6 +87,7 @@ const evidenceContextRepository = new PrismaEvidenceContextRepository(db);
 const impactMappingService = new ImpactMappingService({
   prisma: db,
   dataClient: pythonDataClient,
+  sharedNewsLibraryService,
   capabilityClient: capabilityGatewayClient,
   evidenceRepository: evidenceContextRepository,
   evidenceAwareLlmClient: new EvidenceAwareLlmClient(
@@ -177,6 +184,20 @@ const executionService = new WorkflowExecutionService({
       portfolioManagerService: watchlistPortfolioManagerService,
       recommendationRepository: timingRecommendationRepository,
       reviewSchedulingService: timingReviewSchedulingService,
+    }),
+    new WatchlistTimingPipelineLangGraph({
+      watchListRepository,
+      portfolioSnapshotRepository,
+      timingDataClient: pythonTimingDataClient,
+      analysisService: timingRuleAnalysisService,
+      revisionRepository: timingPresetRevisionRepository,
+      marketContextSnapshotRepository: timingMarketContextSnapshotRepository,
+      marketRegimeService,
+      riskManagerService: watchlistRiskManagerService,
+      portfolioManagerService: watchlistPortfolioManagerService,
+      recommendationRepository: timingRecommendationRepository,
+      reviewSchedulingService: timingReviewSchedulingService,
+      templateCode: TIMING_DECISION_PIPELINE_TEMPLATE_CODE,
     }),
     new TimingReviewLoopLangGraph({
       timingDataClient: pythonTimingDataClient,

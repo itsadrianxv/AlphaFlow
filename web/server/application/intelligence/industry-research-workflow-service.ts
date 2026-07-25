@@ -1,3 +1,8 @@
+import {
+  type EvidenceContextWriter,
+  writeEvidenceContext,
+} from "~/server/application/evidence-context/evidence-context-writer";
+import type { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
 import type { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
 import { reflectIndustryResearch } from "~/server/application/intelligence/research-reflection";
 import {
@@ -35,6 +40,8 @@ import type { DeepSeekClient } from "~/server/infrastructure/intelligence/deepse
 type IndustryResearchWorkflowServiceDependencies = {
   client: DeepSeekClient;
   intelligenceService: IntelligenceAgentService;
+  evidenceContextWriter?: EvidenceContextWriter;
+  evidenceAwareLlmClient?: EvidenceAwareLlmClient;
 };
 
 type QuickExecutionSnapshot = {
@@ -189,10 +196,14 @@ function buildFallbackIndustryReport(params: {
 export class IndustryResearchWorkflowService {
   private readonly client: DeepSeekClient;
   private readonly intelligenceService: IntelligenceAgentService;
+  private readonly evidenceContextWriter?: EvidenceContextWriter;
+  private readonly evidenceAwareLlmClient?: EvidenceAwareLlmClient;
 
   constructor(dependencies: IndustryResearchWorkflowServiceDependencies) {
     this.client = dependencies.client;
     this.intelligenceService = dependencies.intelligenceService;
+    this.evidenceContextWriter = dependencies.evidenceContextWriter;
+    this.evidenceAwareLlmClient = dependencies.evidenceAwareLlmClient;
   }
 
   async buildTaskContract(
@@ -713,6 +724,7 @@ export class IndustryResearchWorkflowService {
     credibility: IndustryResearchGraphState["credibility"];
     topPicks: IndustryResearchResultDto["topPicks"];
     competitionSummary: string;
+    evidenceItemIds?: string[];
   }) {
     const fallback = buildFallbackIndustryReport({
       query: params.state.query,
@@ -738,9 +750,8 @@ export class IndustryResearchWorkflowService {
             .join("\n")
         : "暂无足够相关标的。";
 
-    return this.client
-      .complete(
-        [
+    const messages: Array<{ role: "system" | "user"; content: string }> =
+      [
           {
             role: "system",
             content: [
@@ -767,9 +778,8 @@ export class IndustryResearchWorkflowService {
               `缺口分析：${JSON.stringify(params.state.gapAnalysis ?? {})}`,
             ].join("\n\n"),
           },
-        ],
-        fallback,
-        {
+      ];
+    const options = {
           model:
             params.state.structuredModelFinal ??
             params.state.structuredModelInitial ??
@@ -779,9 +789,23 @@ export class IndustryResearchWorkflowService {
             maxRetries: 1,
             prioritySections: ["重点标的", "缺口分析", "候选标的", "可信度"],
           },
-        },
-      )
-      .catch(() => fallback);
+        };
+    if (this.evidenceAwareLlmClient && params.evidenceItemIds?.length) {
+      return this.evidenceAwareLlmClient
+        .complete({
+          userId: params.state.userId,
+          workflowRunId: params.state.runId,
+          purpose: "industry_final_report",
+          policy: "evidence_required",
+          messages,
+          evidenceItemIds: params.evidenceItemIds,
+          fallbackText: fallback,
+          options,
+        })
+        .then((result) => result.output)
+        .catch(() => fallback);
+    }
+    return this.client.complete(messages, fallback, options).catch(() => fallback);
   }
 
   async finalizeReport(params: {
@@ -854,6 +878,58 @@ export class IndustryResearchWorkflowService {
       gapAnalysis: params.state.gapAnalysis,
       replanRecords: params.state.replanRecords,
     } satisfies IndustryResearchResultDto;
+    const evidenceContext = this.evidenceContextWriter
+      ? await writeEvidenceContext({
+          writer: this.evidenceContextWriter,
+          userId: params.state.userId,
+          workflowRunId: params.state.runId,
+          subject: {
+            subjectType: "industry",
+            subjectId: params.state.query,
+            label: params.state.query,
+          },
+          phase: "industry_research",
+          metadata: { query: params.state.query },
+          blocks: [
+            {
+              blockKey: "industry_research",
+              sourceType: "industry_research_workflow",
+              sourceId: params.state.runId,
+              sourceName: "行业研究工作流",
+              items: [
+                ...(params.state.news ?? []).map((item) => ({
+                  itemKey: item.id,
+                  status: "available" as const,
+                  extractedFact: item.summary,
+                  snippet: item.title,
+                  sourceType: "theme_news",
+                  sourceId: item.id,
+                  sourceName: item.source,
+                  url: undefined,
+                  publishedAt: item.publishedAt,
+                  observedAt: new Date().toISOString(),
+                  fetchedAt: new Date().toISOString(),
+                  valueJson: item,
+                })),
+                ...credibilityResult.evidenceList.map((item, index) => ({
+                  itemKey: `${item.stockCode}-${index}`,
+                  status: "available" as const,
+                  extractedFact: item.evidenceSummary,
+                  snippet: item.evidenceSummary,
+                  sourceType: "company_evidence",
+                  sourceId: item.stockCode,
+                  sourceName: "Python intelligence service",
+                  url: undefined,
+                  publishedAt: item.updatedAt,
+                  observedAt: new Date().toISOString(),
+                  fetchedAt: new Date().toISOString(),
+                  valueJson: item,
+                })),
+              ],
+            },
+          ],
+        })
+      : undefined;
     const fullReportMarkdown = await this.writeFullReportMarkdown({
       state: params.state,
       runtimeConfig: params.runtimeConfig,
@@ -864,6 +940,7 @@ export class IndustryResearchWorkflowService {
       credibility: credibilityResult.credibility,
       topPicks: report.topPicks,
       competitionSummary: competition,
+      evidenceItemIds: evidenceContext?.citations.map((citation) => citation.evidenceItemId),
     });
     const reflection = reflectIndustryResearch({
       taskContract,
@@ -885,6 +962,7 @@ export class IndustryResearchWorkflowService {
       autoEscalationReason: params.state.autoEscalationReason ?? null,
       structuredModelInitial: params.state.structuredModelInitial,
       structuredModelFinal: params.state.structuredModelFinal,
+      evidenceCitations: evidenceContext?.citations,
     };
   }
 }

@@ -17,6 +17,7 @@ import {
   MenuIcon,
   MoonIcon,
   OverviewIcon,
+  ScheduledTasksIcon,
   ScreeningIcon,
   SidebarToggleIcon,
   SunIcon,
@@ -38,13 +39,15 @@ function cn(...values: Array<string | false | null | undefined>) {
 
 export type WorkspaceSection =
   | "home"
+  | "agentRuntime"
   | "screening"
   | "workflows"
-  | "agentRuntime"
   | "timing"
   | "watchlists"
   | "companyResearch"
-  | "researchTargets";
+  | "researchTargets"
+  | "mindMaps"
+  | "scheduledTasks";
 
 export type WorkspaceSectionView = "default" | "history";
 
@@ -72,7 +75,7 @@ const sidebarNavItems: Array<{
   {
     key: "agentRuntime",
     href: "/agent-runtime",
-    label: "Pi Agent",
+    label: "投研智能体",
     icon: AgentRuntimeIcon,
   },
   {
@@ -104,6 +107,18 @@ const sidebarNavItems: Array<{
     href: "/research-targets",
     label: "投研收藏",
     icon: WatchlistsIcon,
+  },
+  {
+    key: "mindMaps",
+    href: "/mind-maps",
+    label: "思维导图",
+    icon: WatchlistsIcon,
+  },
+  {
+    key: "scheduledTasks",
+    href: "/scheduled-tasks",
+    label: "定时任务",
+    icon: ScheduledTasksIcon,
   },
 ];
 
@@ -249,7 +264,7 @@ function SidebarHistoryList(props: {
     activeHistoryId,
     historyItemLimit = HISTORY_ITEM_LIMIT,
     historyLoading = false,
-    historyEmptyText = "暂无历史记录",
+    historyEmptyText,
     sectionView,
     onNavigate,
   } = props;
@@ -312,6 +327,7 @@ function SidebarRail(props: {
   sectionView: WorkspaceSectionView;
   navMode: "desktop" | "mobile";
   collapsed?: boolean;
+  showHistory?: boolean;
   historyHeading: string;
   historyItems: WorkspaceHistoryItem[];
   historyHref?: string;
@@ -327,6 +343,7 @@ function SidebarRail(props: {
     sectionView,
     navMode,
     collapsed = false,
+    showHistory = true,
     historyHeading,
     historyItems,
     historyHref,
@@ -337,8 +354,8 @@ function SidebarRail(props: {
     onNavigate,
     onToggleSidebar,
   } = props;
-  const showAgentNewConversation = section === "agentRuntime" && !collapsed;
   const shouldShowHistory =
+    showHistory &&
     !collapsed &&
     (historyLoading ||
       historyItems.length > 0 ||
@@ -371,11 +388,11 @@ function SidebarRail(props: {
             >
               <SidebarBrand onNavigate={onNavigate} />
             </div>
-            {showAgentNewConversation ? (
+            {section === "agentRuntime" ? (
               <Link
                 href="/agent-runtime"
                 onClick={onNavigate}
-                className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-[var(--app-border-soft)] px-3 text-xs font-medium text-[var(--app-text-muted)] transition-colors hover:border-[var(--app-hover-border)] hover:bg-[var(--app-panel-strong)] hover:text-[var(--app-text-strong)]"
+                className="inline-flex h-8 shrink-0 items-center justify-center rounded-[8px] border border-[var(--app-border-soft)] px-3 text-xs font-medium text-[var(--app-text-muted)] transition-colors hover:border-[var(--app-hover-border)] hover:bg-[var(--app-panel-strong)] hover:text-[var(--app-text-strong)]"
               >
                 新对话
               </Link>
@@ -476,6 +493,7 @@ export function WorkspaceShell(props: {
   description?: string;
   actions?: ReactNode;
   showWatchlistsAction?: boolean;
+  showHistory?: boolean;
   summary?: ReactNode;
   workflowTabs?: WorkflowStageTab[];
   historyItems?: WorkspaceHistoryItem[];
@@ -505,6 +523,7 @@ export function WorkspaceShell(props: {
     historyItemLimit,
     historyLoading = false,
     historyEmptyText = "暂无历史记录",
+    showHistory = true,
     initialDesktopCollapsed,
     contentWidth = "standard",
     titleSize = "default",
@@ -570,6 +589,7 @@ export function WorkspaceShell(props: {
             sectionView={sectionView}
             navMode="desktop"
             collapsed={desktopCollapsed}
+            showHistory={showHistory}
             historyHeading={historyHeading}
             historyItems={historyItems}
             historyHref={historyHref}
@@ -624,6 +644,7 @@ export function WorkspaceShell(props: {
                 section={section}
                 sectionView={sectionView}
                 navMode="mobile"
+                showHistory={showHistory}
                 historyHeading={historyHeading}
                 historyItems={historyItems}
                 historyHref={historyHref}

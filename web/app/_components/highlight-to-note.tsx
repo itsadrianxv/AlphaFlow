@@ -237,7 +237,7 @@ export function HighlightToNote(props: HighlightToNoteProps) {
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={askPiAgent}
               >
-                询问 Pi Agent
+                询问投研智能体
               </button>
             </div>
             {piAgentDraftError ? (

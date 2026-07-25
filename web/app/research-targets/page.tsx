@@ -1,14 +1,9 @@
 import { Suspense } from "react";
 import { ResearchTargetsClient } from "~/app/research-targets/research-targets-client";
-import { ScreeningLoginRedirectNotice } from "~/app/screening/screening-login-redirect-notice";
-import { auth } from "~/server/auth";
+import { requireAuth } from "~/server/auth/require-auth";
 
 export default async function ResearchTargetsPage() {
-  const session = await auth();
-
-  if (!session?.user) {
-    return <ScreeningLoginRedirectNotice redirectTo="/research-targets" />;
-  }
+  await requireAuth("/research-targets");
 
   return (
     <Suspense fallback={null}>

@@ -19,6 +19,7 @@
     "start": "next start",
     "validate:runtime": "tsx tooling/validate-runtime-env.ts",
     "worker:workflow": "tsx tooling/workers/workflow-worker.ts",
+    "worker:scheduler": "tsx tooling/workers/scheduled-task-scheduler.ts",
     "test": "vitest run --config tooling/vitest.config.ts",
     "test:watch": "vitest --config tooling/vitest.config.ts",
     "test:coverage": "vitest run --config tooling/vitest.config.ts --coverage",
@@ -44,6 +45,7 @@
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",
+    "simple-mind-map": "^0.14.0-fix.3",
     "superjson": "^2.2.1",
     "uuid": "^13.0.0",
     "zod": "^3.24.2"

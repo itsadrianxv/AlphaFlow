@@ -13,7 +13,7 @@ if (env.AUTH_WECHAT_ID && env.AUTH_WECHAT_SECRET) {
   socialSignInMethods.push({
     id: "wechat",
     name: "微信",
-    description: "适合桌面扫码进入研究空间。",
+    description: "适合桌面扫码进入应用。",
     type: "oauth",
   });
 }

@@ -80,7 +80,6 @@ model User {
     timingFeedbackObservations        TimingFeedbackObservation[]
     timingPresetAdjustmentSuggestions TimingPresetAdjustmentSuggestion[]
     workflowRuns                      WorkflowRun[]
-    researchSpaces                    ResearchSpace[]
     agentConversations                AgentConversation[]
     savedCompanies                    SavedCompany[]
     savedIndustries                   SavedIndustry[]
@@ -89,6 +88,203 @@ model User {
     researchArtifacts                 ResearchArtifact[]
     evidenceContexts                  EvidenceContext[]
     evidenceContextItems              EvidenceContextItem[]
+    researchContextSnapshots          ResearchContextSnapshot[]
+    scheduledTasks                    ScheduledTask[]
+    collections                       Collection[]
+    mindMaps                          MindMap[]
+}
+
+enum ScheduledTaskStatus {
+    DRAFT
+    ACTIVE
+    PAUSED
+    CANCELLED
+}
+
+enum ScheduledTaskExecutionStatus {
+    PENDING
+    CLAIMED
+    SUBMITTED
+    RUNNING
+    SUCCEEDED
+    FAILED
+    RETRYING
+    CANCELLED
+}
+
+enum ScheduledTaskDeliveryStatus {
+    PENDING
+    SENT
+    FAILED
+    RETRYING
+}
+
+enum CollectionType {
+    COMPANY
+    INDUSTRY
+    WATCHLIST
+}
+
+model Collection {
+    id             String         @id @default(cuid())
+    userId         String
+    collectionType CollectionType
+    title          String
+    description    String?
+    tags           String[]       @default([])
+    payload        Json           @default("{}")
+    archivedAt     DateTime?
+    createdAt      DateTime       @default(now())
+    updatedAt      DateTime       @updatedAt
+
+    user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+    mindMaps       CollectionMindMap[]
+
+    @@index([userId, collectionType, updatedAt])
+    @@index([userId, archivedAt])
+    @@unique([userId, collectionType, title])
+}
+
+model MindMap {
+    id          String   @id @default(cuid())
+    userId      String
+    title       String
+    description String?
+    data        Json
+    config      Json?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+    collections CollectionMindMap[]
+    references  MindMapReference[]
+
+    @@index([userId, updatedAt])
+}
+
+model CollectionMindMap {
+    collectionId String
+    mindMapId    String
+    createdAt    DateTime   @default(now())
+
+    collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+    mindMap    MindMap    @relation(fields: [mindMapId], references: [id], onDelete: Cascade)
+
+    @@id([collectionId, mindMapId])
+    @@index([mindMapId, createdAt])
+}
+
+model MindMapReference {
+    id           String   @id @default(cuid())
+    mindMapId    String
+    nodeId       String?
+    targetType   String
+    targetId     String
+    relationType String?
+    createdAt    DateTime @default(now())
+
+    mindMap MindMap @relation(fields: [mindMapId], references: [id], onDelete: Cascade)
+
+    @@index([mindMapId, nodeId])
+    @@index([targetType, targetId])
+}
+
+model ScheduledTask {
+    id              String             @id @default(cuid())
+    userId          String
+    name            String
+    status          ScheduledTaskStatus @default(DRAFT)
+    currentVersion  Int                @default(1)
+    timezone        String             @default("Asia/Shanghai")
+    nextRunAt       DateTime?
+    createdAt       DateTime           @default(now())
+    updatedAt       DateTime           @updatedAt
+    user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+    versions        ScheduledTaskVersion[]
+    executions      ScheduledTaskExecution[]
+
+    @@index([status, nextRunAt])
+    @@index([userId, status])
+}
+
+model ScheduledTaskVersion {
+    id             String        @id @default(cuid())
+    taskId         String
+    version        Int
+    userPrompt     String
+    scheduleSpec   Json
+    executionPlan  Json
+    outputSpec     Json
+    deliverySpec   Json
+    createdAt      DateTime      @default(now())
+    task           ScheduledTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    executions     ScheduledTaskExecution[]
+
+    @@unique([taskId, version])
+    @@index([taskId, createdAt])
+}
+
+model ScheduledTaskExecution {
+    id             String                         @id @default(cuid())
+    taskId         String
+    taskVersionId  String
+    scheduledAt    DateTime
+    status         ScheduledTaskExecutionStatus  @default(PENDING)
+    workerId       String?
+    agentRunId     String?
+    result         Json?
+    error          Json?
+    attempts       Int                            @default(0)
+    claimedAt      DateTime?
+    startedAt      DateTime?
+    completedAt    DateTime?
+    eventPublishedAt DateTime?
+    lastEventError Json?
+    createdAt      DateTime                       @default(now())
+    updatedAt      DateTime                       @updatedAt
+    task           ScheduledTask                  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+    taskVersion    ScheduledTaskVersion           @relation(fields: [taskVersionId], references: [id], onDelete: Cascade)
+    evidence       ScheduledTaskEvidence[]
+    deliveries     ScheduledTaskDelivery[]
+
+    @@unique([taskId, taskVersionId, scheduledAt])
+    @@index([status, scheduledAt])
+    @@index([taskId, status])
+    @@index([status, eventPublishedAt])
+    @@index([completedAt, eventPublishedAt])
+}
+
+model ScheduledTaskEvidence {
+    id           String                   @id @default(cuid())
+    executionId  String
+    sourceType   String
+    sourceId     String
+    title        String?
+    url          String?
+    observedAt   DateTime?
+    content      String?
+    metadata     Json?
+    createdAt    DateTime                 @default(now())
+    execution    ScheduledTaskExecution  @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+    @@index([executionId, createdAt])
+}
+
+model ScheduledTaskDelivery {
+    id           String                         @id @default(cuid())
+    executionId  String
+    targetType   String
+    targetRef    String?
+    status       ScheduledTaskDeliveryStatus   @default(PENDING)
+    attempts     Int                            @default(0)
+    error        String?
+    sentAt       DateTime?
+    createdAt    DateTime                       @default(now())
+    updatedAt    DateTime                       @updatedAt
+    execution    ScheduledTaskExecution        @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+    @@unique([executionId, targetType, targetRef])
+    @@index([status, createdAt])
 }
 
 model VerificationToken {
@@ -152,71 +348,9 @@ model WatchList {
     user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
     timingAnalysisCards   TimingAnalysisCard[]
     timingRecommendations TimingRecommendation[]
-    spaceLinks            ResearchSpaceWatchListLink[]
 
     @@index([userId])
     @@index([name])
-}
-
-model ResearchSpace {
-    id             String                       @id @default(cuid())
-    userId         String
-    name           String
-    description    String?
-    briefJson      Json
-    createdAt      DateTime                     @default(now())
-    updatedAt      DateTime                     @updatedAt
-
-    user           User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    runLinks       ResearchSpaceRunLink[]
-    watchListLinks ResearchSpaceWatchListLink[]
-    stockLinks     ResearchSpaceStockLink[]
-
-    @@index([userId, updatedAt])
-    @@index([userId, name])
-}
-
-model ResearchSpaceRunLink {
-    id        String        @id @default(cuid())
-    spaceId    String
-    runId      String
-    note       String?
-    createdAt  DateTime     @default(now())
-
-    space      ResearchSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-    run        WorkflowRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
-
-    @@unique([spaceId, runId])
-    @@index([spaceId, createdAt])
-    @@index([runId])
-}
-
-model ResearchSpaceWatchListLink {
-    id          String         @id @default(cuid())
-    spaceId      String
-    watchListId  String
-    createdAt    DateTime      @default(now())
-
-    space        ResearchSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-    watchList    WatchList     @relation(fields: [watchListId], references: [id], onDelete: Cascade)
-
-    @@unique([spaceId, watchListId])
-    @@index([spaceId, createdAt])
-    @@index([watchListId])
-}
-
-model ResearchSpaceStockLink {
-    id         String         @id @default(cuid())
-    spaceId    String
-    stockCode  String
-    stockName  String
-    createdAt  DateTime       @default(now())
-
-    space      ResearchSpace  @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-
-    @@unique([spaceId, stockCode])
-    @@index([spaceId, createdAt])
-    @@index([stockCode])
 }
 
 model SavedCompany {
@@ -236,6 +370,49 @@ model SavedCompany {
     @@unique([userId, stockCode])
     @@index([userId, updatedAt])
     @@index([userId, archivedAt])
+}
+
+model SellSideBrokerRecommendation {
+    id        String   @id @default(cuid())
+    month     String
+    broker    String
+    tsCode    String
+    name      String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([month, broker, tsCode])
+    @@index([month, tsCode])
+}
+
+model SellSideEarningsForecast {
+    id          String   @id @default(cuid())
+    sourceKey   String   @unique
+    tsCode      String
+    name        String
+    reportDate  String
+    reportTitle String?
+    orgName     String
+    quarter     String
+    eps         Float?
+    netProfit   Float?
+    rating      String?
+    maxPrice    Float?
+    minPrice    Float?
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    @@index([tsCode, orgName, quarter, reportDate])
+    @@index([reportDate])
+}
+
+model SellSideRefreshState {
+    id                    String   @id
+    latestRecommendationMonth String?
+    latestForecastDate    String?
+    lastSuccessfulAt      DateTime?
+    lastError             String?
+    updatedAt             DateTime @updatedAt
 }
 
 model SavedIndustry {
@@ -319,6 +496,39 @@ model ResearchArtifact {
     @@index([userId, artifactType, updatedAt])
 }
 
+model SharedNewsDaySync {
+    id              String   @id @default(cuid())
+    date            DateTime @unique
+    status          String
+    leaseExpiresAt  DateTime?
+    attemptedAt     DateTime?
+    completedAt     DateTime?
+    warnings        String[] @default([])
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    @@index([status, leaseExpiresAt])
+}
+
+model SharedNewsItem {
+    id           String   @id @default(cuid())
+    sourceItemId String   @unique
+    sourceKind   String
+    sourceName   String
+    url          String?
+    title        String
+    content      String
+    publishedAt  DateTime
+    contentHash  String
+    rawPayload   Json
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    @@index([publishedAt])
+    @@index([sourceKind, publishedAt])
+    @@index([contentHash])
+}
+
 model EvidenceContext {
     id          String   @id @default(cuid())
     userId      String
@@ -386,15 +596,107 @@ model EvidenceContextItem {
     warnings      String[] @default([])
     limitations   String[] @default([])
     metadataJson  Json
+    recordKind    String   @default("observation")
+    lineageId     String
+    derivedFromItemIds String[] @default([])
+    algorithmVersion String?
+    parametersJson Json?
+    correctionOfItemId String?
+    supersedesItemId String?
+    contentHash   String
     createdAt     DateTime @default(now())
 
     context       EvidenceContext @relation(fields: [contextId], references: [id], onDelete: Cascade)
     block         EvidenceContextBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
     user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    snapshotItems ResearchContextSnapshotItem[]
+    claimCitations ResearchClaimCitation[]
 
-    @@unique([blockId, itemKey])
+    @@index([lineageId, createdAt])
+    @@index([correctionOfItemId])
+    @@index([supersedesItemId])
     @@index([userId, contextId, createdAt])
     @@index([sourceType, sourceId])
+}
+
+model ResearchContextSnapshot {
+    id                 String   @id @default(cuid())
+    userId             String
+    workflowRunId      String?
+    requestGroupId     String
+    requestSequence    Int
+    attempt            Int      @default(1)
+    purpose            String
+    policy             String
+    model              String?
+    requestOptionsJson Json?
+    messagesJson       Json
+    qualityJson        Json
+    projectionVersion  String
+    contentHash        String
+    status             String   @default("prepared")
+    errorMessage       String?
+    createdAt          DateTime @default(now())
+    sentAt             DateTime?
+    completedAt        DateTime?
+
+    user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+    workflowRun   WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+    items         ResearchContextSnapshotItem[]
+    claims        ResearchClaim[]
+
+    @@unique([requestGroupId, attempt])
+    @@index([userId, workflowRunId, createdAt])
+    @@index([workflowRunId, requestSequence])
+}
+
+model ResearchContextSnapshotItem {
+    id                 String   @id @default(cuid())
+    snapshotId         String
+    evidenceItemId     String
+    ordinal            Int
+    projectionJson     Json
+    projectionHash     String
+    truncationReason   String?
+    createdAt          DateTime @default(now())
+
+    snapshot     ResearchContextSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+    evidenceItem EvidenceContextItem @relation(fields: [evidenceItemId], references: [id], onDelete: Restrict)
+
+    @@unique([snapshotId, evidenceItemId])
+    @@unique([snapshotId, ordinal])
+    @@index([evidenceItemId])
+}
+
+model ResearchClaim {
+    id              String   @id @default(cuid())
+    snapshotId      String
+    artifactKey     String
+    ordinal         Int
+    text            String
+    status          String
+    qualityFlags    String[] @default([])
+    createdAt       DateTime @default(now())
+
+    snapshot        ResearchContextSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+    citations       ResearchClaimCitation[]
+
+    @@unique([snapshotId, artifactKey, ordinal])
+    @@index([snapshotId, createdAt])
+}
+
+model ResearchClaimCitation {
+    id              String   @id @default(cuid())
+    claimId         String
+    evidenceItemId  String
+    relation        String   @default("support")
+    createdAt       DateTime @default(now())
+
+    claim           ResearchClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+    evidenceItem    EvidenceContextItem @relation(fields: [evidenceItemId], references: [id], onDelete: Restrict)
+
+    @@unique([claimId, evidenceItemId, relation])
+    @@index([evidenceItemId])
 }
 
 enum ResearchReminderType {
@@ -521,11 +823,14 @@ model PortfolioSnapshot {
     totalCapital    Float
     positions       Json
     riskPreferences Json
+    source          String   @default("SAVED")
+    workflowRunId   String?  @unique
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 
     user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
     timingRecommendations  TimingRecommendation[]
+    workflowRun            WorkflowRun?           @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
 
     @@index([userId, updatedAt])
     @@index([userId, name])
@@ -536,7 +841,7 @@ model TimingRecommendation {
     userId              String
     workflowRunId       String?
     portfolioSnapshotId String
-    watchListId         String
+    watchListId         String?
     presetId            String?
     presetRevisionId    String?
     stockCode           String
@@ -559,7 +864,7 @@ model TimingRecommendation {
     user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
     workflowRun       WorkflowRun?      @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
     portfolioSnapshot PortfolioSnapshot @relation(fields: [portfolioSnapshotId], references: [id], onDelete: Cascade)
-    watchList         WatchList         @relation(fields: [watchListId], references: [id], onDelete: Cascade)
+    watchList         WatchList?        @relation(fields: [watchListId], references: [id], onDelete: SetNull)
     preset            TimingPreset?     @relation(fields: [presetId], references: [id], onDelete: SetNull)
     presetRevision    TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
     reviewRecords     TimingReviewRecord[]
@@ -623,6 +928,8 @@ model TimingPreset {
     userId                String
     name                  String
     description           String?
+    origin                String                 @default("USER")
+    templateKey           String?
     config                Json
     activeRevisionId      String?
     createdAt             DateTime               @default(now())
@@ -639,6 +946,7 @@ model TimingPreset {
     @@index([userId, updatedAt])
     @@unique([activeRevisionId])
     @@unique([userId, name])
+    @@unique([userId, templateKey])
 }
 
 model TimingPresetRevision {
@@ -651,6 +959,8 @@ model TimingPresetRevision {
     configHash        String
     engineVersion     String
     featureVersion    String
+    templateVersion   Int?
+    validationSource  String?
     publishedAt       DateTime?
     archivedAt        DateTime?
     createdAt         DateTime @default(now())
@@ -674,7 +984,7 @@ model TimingBacktestRun {
     id                         String   @id @default(cuid())
     userId                     String
     presetRevisionId           String
-    watchListId                String
+    watchListId                String?
     status                     String   @default("PENDING")
     configHash                 String
     universeSnapshot           Json
@@ -883,13 +1193,14 @@ model WorkflowRun {
     timingSignalSnapshots   TimingSignalSnapshot[]
     timingAnalysisCards     TimingAnalysisCard[]
     timingRecommendations   TimingRecommendation[]
+    portfolioInputSnapshot  PortfolioSnapshot?
     timingKronosForecastSnapshots TimingKronosForecastSnapshot[]
-    spaceLinks              ResearchSpaceRunLink[]
     agentToolCalls          AgentToolCall[]
     agentArtifacts          AgentArtifact[]
     agentConversationMessages AgentConversationMessage[]
     legacyAgentConversation AgentConversation? @relation("LegacyAgentConversationRun")
     evidenceContexts        EvidenceContext[]
+    researchContextSnapshots ResearchContextSnapshot[]
 
     @@index([templateId])
     @@index([userId, createdAt])

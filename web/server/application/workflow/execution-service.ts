@@ -1,15 +1,16 @@
 import { WorkflowEventType, WorkflowNodeRunStatus } from "@prisma/client";
 import { attachWorkflowNodeInsight } from "~/contracts/workflow-node-insight";
+import { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
 import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
 import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
 import { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
-import { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
-import { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
 import { ImpactMappingService } from "~/server/application/intelligence/impact-mapping-service";
+import { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
 import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
+import { SharedNewsLibraryService } from "~/server/application/intelligence/shared-news-library-service";
 import { InsightQualityService } from "~/server/domain/intelligence/services/insight-quality-service";
 import { ReviewPlanPolicy } from "~/server/domain/intelligence/services/review-plan-policy";
 import {
@@ -31,8 +32,8 @@ import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-cl
 import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
 import { PrismaScreeningInsightRepository } from "~/server/infrastructure/intelligence/prisma-screening-insight-repository";
 import { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
-import { PythonMarketContextClient } from "~/server/infrastructure/intelligence/python-market-context-client";
 import { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
+import { PythonMarketContextClient } from "~/server/infrastructure/intelligence/python-market-context-client";
 import { PrismaScreeningSessionRepository } from "~/server/infrastructure/screening/prisma-screening-session-repository";
 import {
   CompanyResearchContractLangGraph,
@@ -41,8 +42,8 @@ import {
   ODRCompanyResearchLangGraph,
 } from "~/server/infrastructure/workflow/langgraph/company-research-graph";
 import { WorkflowGraphRegistry } from "~/server/infrastructure/workflow/langgraph/graph-registry";
-import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
 import { ImpactMappingLangGraph } from "~/server/infrastructure/workflow/langgraph/impact-mapping-graph";
+import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
 import { PiAgentRuntimeLangGraph } from "~/server/infrastructure/workflow/langgraph/pi-agent-runtime-graph";
 import { ScreeningInsightPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph";
 import type { WorkflowGraphRunner } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
@@ -142,6 +143,10 @@ export function createWorkflowExecutionService(
   const prisma = repository.getPrismaClient();
   const deepSeekClient = new DeepSeekClient();
   const intelligenceDataClient = new PythonIntelligenceDataClient();
+  const sharedNewsLibraryService = new SharedNewsLibraryService(
+    prisma,
+    intelligenceDataClient,
+  );
   const capabilityGatewayClient = new PythonCapabilityGatewayClient();
   const confidenceAnalysisService = new ConfidenceAnalysisService({
     client: new PythonConfidenceAnalysisClient(),
@@ -170,19 +175,23 @@ export function createWorkflowExecutionService(
   const impactMappingService = new ImpactMappingService({
     prisma,
     dataClient: intelligenceDataClient,
-    marketContextClient: new PythonMarketContextClient(),
+    sharedNewsLibraryService,
     capabilityClient: capabilityGatewayClient,
+    marketContextClient: new PythonMarketContextClient(),
     evidenceRepository: evidenceContextWriter,
     evidenceAwareLlmClient,
   });
   const industryResearchWorkflowService = new IndustryResearchWorkflowService({
     client: deepSeekClient,
     intelligenceService,
+    evidenceContextWriter,
+    evidenceAwareLlmClient,
   });
   const companyResearchWorkflowService = new CompanyResearchWorkflowService({
     client: deepSeekClient,
     companyResearchService,
     researchToolRegistry,
+    evidenceContextWriter,
   });
   const reminderRepository = new PrismaResearchReminderRepository(prisma);
   const agentRuntimeRepository = new PrismaAgentRuntimeRepository(prisma);
@@ -217,6 +226,7 @@ export function createWorkflowExecutionService(
         synthesisService,
         confidenceAnalysisService,
         reminderSchedulingService,
+        evidenceContextWriter,
       }),
       new PiAgentRuntimeLangGraph({
         agentRuntimeClient: new AgentRuntimeClient(),
@@ -242,22 +252,8 @@ export class WorkflowExecutionService {
     const runningRuns = await this.repository.listRunningRuns(10);
 
     for (const run of runningRuns) {
-      const checkpoint = await this.runtimeStore.loadCheckpoint(run.id);
-
-      if (!checkpoint) {
-        const runDetail = await this.repository.getRunById(run.id);
-        const hasCompletedNodes =
-          runDetail?.nodeRuns.some(
-            (nodeRun) =>
-              nodeRun.status === WorkflowNodeRunStatus.SUCCEEDED ||
-              nodeRun.status === WorkflowNodeRunStatus.SKIPPED,
-          ) ?? false;
-
-        if (!hasCompletedNodes) {
-          continue;
-        }
-      }
-
+      // A worker may stop after claiming a run but before its first checkpoint.
+      // Such a run has no completed nodes, but is still safe to restart from node 1.
       await this.executeRun(run.id, workerId, true);
       return true;
     }

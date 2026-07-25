@@ -1,7 +1,11 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { timingDecisionInputSchema } from "~/contracts/timing-decision";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { MarketRegimeService } from "~/server/application/timing/market-regime-service";
+import { TimingDecisionService } from "~/server/application/timing/timing-decision-service";
 import { applyTimingPresetPatch } from "~/server/application/timing/timing-feedback-service";
 import { TimingReportService } from "~/server/application/timing/timing-report-service";
 import {
@@ -9,6 +13,7 @@ import {
   simulateTimingBacktestExecution,
   summarizeTimingBacktestPerformance,
 } from "~/server/domain/timing/services/timing-backtest-policy";
+import { evaluateTimingRules } from "~/server/domain/timing/services/timing-rule-engine";
 import {
   createTimingPresetConfigV2,
   validateTimingPresetConfigV2,
@@ -17,6 +22,7 @@ import type {
   TimingPresetConfigV2,
   TimingTimeframe,
 } from "~/server/domain/timing/types";
+import { TIMING_DECISION_PIPELINE_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 import { PrismaWatchListRepository } from "~/server/infrastructure/screening/prisma-watch-list-repository";
 import { PrismaPortfolioSnapshotRepository } from "~/server/infrastructure/timing/prisma-portfolio-snapshot-repository";
 import { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
@@ -83,6 +89,7 @@ const listTimingCardsInput = z.object({
     .optional(),
   sourceType: z.enum(["single", "watchlist", "screening"]).optional(),
   watchListId: z.string().uuid().optional(),
+  workflowRunId: z.string().cuid().optional(),
 });
 
 const getTimingCardInput = z.object({
@@ -250,6 +257,7 @@ const createTimingStrategyInput = z.object({
   timeframeTemplate: z
     .enum(["SHORT_SWING", "SWING", "MEDIUM_TERM"])
     .default("SWING"),
+  riskProfile: z.enum(["STEADY", "BALANCED", "AGGRESSIVE"]).default("BALANCED"),
 });
 
 const updateTimingStrategyDraftInput = z.object({
@@ -274,10 +282,45 @@ const timingRunPreflightInput = z.object({
     .optional(),
 });
 
-const runTimingBacktestInput = z.object({
-  revisionId: z.string().cuid(),
-  watchListId: z.string().uuid(),
-});
+const runTimingBacktestInput = z
+  .object({
+    revisionId: z.string().cuid(),
+    watchListId: z.string().uuid().optional(),
+    stockCodes: z
+      .array(z.string().regex(/^\d{6}$/))
+      .min(1)
+      .max(50)
+      .optional(),
+  })
+  .refine((value) => value.watchListId || value.stockCodes?.length, {
+    message: "请选择回放股票。",
+  });
+
+type ScreeningUniverse = {
+  tradingDate?: string;
+  records?: Array<{ stockCode: string; stockName: string; market: string }>;
+};
+
+async function buildBacktestUniverse(initialCodes: string[]) {
+  const selected = new Set(initialCodes);
+  let capturedAt = new Date().toISOString();
+  try {
+    const file = await readFile(
+      path.join(process.cwd(), "..", "data", "screening_stock_universe.json"),
+      "utf8",
+    );
+    const universe = JSON.parse(file) as ScreeningUniverse;
+    capturedAt = universe.tradingDate ?? capturedAt;
+    for (const stock of universe.records ?? []) {
+      if (selected.size >= 20) break;
+      if (stock.market === "BJ" || /ST|退/.test(stock.stockName)) continue;
+      selected.add(stock.stockCode);
+    }
+  } catch {
+    // 股票池不可用时仍允许原始目标进入回放，质量门禁会据实失败。
+  }
+  return { stockCodes: [...selected], capturedAt };
+}
 
 function collectTimingIndicatorIds(config: TimingPresetConfigV2) {
   return [
@@ -324,6 +367,57 @@ const createTimingExecutionRecordInput = z
   });
 
 export const timingRouter = createTRPCRouter({
+  getDecisionDefaults: protectedProcedure.query(async ({ ctx }) => {
+    const [latestRun, latestPortfolio] = await Promise.all([
+      ctx.db.workflowRun.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          template: { is: { code: TIMING_DECISION_PIPELINE_TEMPLATE_CODE } },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { input: true, createdAt: true },
+      }),
+      new PrismaPortfolioSnapshotRepository(ctx.db).getLatestRunInput(
+        ctx.session.user.id,
+      ),
+    ]);
+    const rawInput = latestRun?.input;
+    const previousInput =
+      rawInput &&
+      typeof rawInput === "object" &&
+      !Array.isArray(rawInput) &&
+      "decisionInput" in rawInput
+        ? rawInput.decisionInput
+        : null;
+    return {
+      horizon: "SWING" as const,
+      riskProfile: "BALANCED" as const,
+      previousInput,
+      previousInputAt: latestRun?.createdAt ?? null,
+      previousPortfolio: latestPortfolio,
+    };
+  }),
+
+  previewDecision: protectedProcedure
+    .input(timingDecisionInputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        return await new TimingDecisionService({
+          portfolioRepository: new PrismaPortfolioSnapshotRepository(ctx.db),
+          revisionRepository: new PrismaTimingPresetRevisionRepository(ctx.db),
+          timingDataClient: new PythonTimingDataClient(),
+        }).preview(ctx.session.user.id, input);
+      } catch (error) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            error instanceof Error
+              ? error.message
+              : "暂时无法检查本次分析数据。",
+        });
+      }
+    }),
+
   listTimingStrategies: protectedProcedure.query(async ({ ctx }) => {
     return new PrismaTimingPresetRevisionRepository(ctx.db).listStrategies(
       ctx.session.user.id,
@@ -449,6 +543,7 @@ export const timingRouter = createTRPCRouter({
         config: createTimingPresetConfigV2(
           input.setup,
           input.timeframeTemplate,
+          input.riskProfile,
         ),
       });
     }),
@@ -508,14 +603,8 @@ export const timingRouter = createTRPCRouter({
         ctx.session.user.id,
         input.revisionId,
       );
-      const watchList = await new PrismaWatchListRepository(ctx.db).findById(
-        input.watchListId,
-      );
       if (!revision) {
         throw new TRPCError({ code: "NOT_FOUND", message: "策略修订不存在" });
-      }
-      if (!watchList || watchList.userId !== ctx.session.user.id) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "自选股列表不存在" });
       }
       if (revision.status !== "DRAFT" && revision.status !== "VALIDATING") {
         throw new TRPCError({
@@ -523,6 +612,25 @@ export const timingRouter = createTRPCRouter({
           message: "仅草稿或验证中的修订可发起发布前回放",
         });
       }
+
+      const watchList = input.watchListId
+        ? await new PrismaWatchListRepository(ctx.db).findById(
+            input.watchListId,
+          )
+        : null;
+      if (
+        input.watchListId &&
+        (!watchList || watchList.userId !== ctx.session.user.id)
+      ) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "自选股列表不存在" });
+      }
+      const initialCodes = [
+        ...new Set([
+          ...(input.stockCodes ?? []),
+          ...(watchList?.stocks.map((stock) => stock.stockCode.value) ?? []),
+        ]),
+      ];
+      const universe = await buildBacktestUniverse(initialCodes);
 
       if (revision.status === "DRAFT") {
         await revisionRepository.markValidating(
@@ -536,47 +644,53 @@ export const timingRouter = createTRPCRouter({
         presetRevisionId: revision.id,
         watchListId: input.watchListId,
         configHash: revision.configHash,
-        stockCodes: watchList.stocks.map((stock) => stock.stockCode.value),
+        stockCodes: universe.stockCodes,
         config: revision.config,
+        universeCapturedAt: universe.capturedAt,
       });
 
       try {
-        const cards = await ctx.db.timingAnalysisCard.findMany({
-          where: {
-            userId: ctx.session.user.id,
-            presetRevisionId: revision.id,
-            watchListId: input.watchListId,
-          },
-          include: { signalSnapshot: true },
-          orderBy: { createdAt: "desc" },
-          take: 500,
+        const end = new Date();
+        const start = new Date(end);
+        start.setUTCMonth(
+          start.getUTCMonth() -
+            Math.max(24, revision.config.backtestPolicy.minimumMonths),
+        );
+        const formatDate = (value: Date) => value.toISOString().slice(0, 10);
+        const history = await new PythonTimingDataClient({
+          timeoutMs: 10 * 60 * 1000,
+        }).getEvidenceHistory({
+          stockCodes: universe.stockCodes,
+          startDate: formatDate(start),
+          endDate: formatDate(end),
+          timeframes: collectTimingTimeframes(revision.config),
+          indicatorIds: collectTimingIndicatorIds(revision.config),
+          lookbackDays: 900,
+          sampleEveryTradingDays: 5,
         });
-        const audits = cards
-          .map((card) => ({
-            card,
-            audit: card.decisionAudit as
-              | import("~/server/domain/timing/types").TimingDecisionAudit
-              | null,
-          }))
-          .filter(
-            (
-              item,
-            ): item is typeof item & {
-              audit: import("~/server/domain/timing/types").TimingDecisionAudit;
-            } => Boolean(item.audit),
-          );
-        const dates = audits
-          .map((item) => item.card.signalSnapshot.asOfDate)
-          .sort((left, right) => left.getTime() - right.getTime());
+        const audits = history.items.flatMap((stock) =>
+          stock.timeline.map((evidence) => ({
+            stock,
+            evidence,
+            audit: evaluateTimingRules({
+              config: revision.config,
+              features: evidence.features,
+              marketState: stock.marketStates[evidence.asOfDate] ?? "NEUTRAL",
+              hasPosition: false,
+              strategyRevisionId: revision.id,
+              configHash: revision.configHash,
+            }),
+          })),
+        );
+        const dates = audits.map((item) => item.evidence.asOfDate).sort();
         const coveredMonths =
           dates.length > 1
             ? Math.floor(
-                ((dates.at(-1)?.getTime() ?? 0) - (dates[0]?.getTime() ?? 0)) /
+                (new Date(dates.at(-1) ?? 0).getTime() -
+                  new Date(dates[0] ?? 0).getTime()) /
                   (30.4375 * 24 * 60 * 60 * 1000),
               )
             : 0;
-        const stockCount = new Set(audits.map((item) => item.card.stockCode))
-          .size;
         const primaryEvaluations = audits.flatMap((item) =>
           item.audit.ruleEvaluations.filter((rule) => rule.role === "PRIMARY"),
         );
@@ -588,9 +702,7 @@ export const timingRouter = createTRPCRouter({
             100
           : 0;
         const noLookaheadPassed = audits.every((item) => {
-          const signalDate = item.card.signalSnapshot.asOfDate
-            .toISOString()
-            .slice(0, 10);
+          const signalDate = item.evidence.asOfDate;
           return item.audit.ruleEvaluations.every(
             (rule) => !rule.asOfDate || rule.asOfDate <= signalDate,
           );
@@ -603,7 +715,6 @@ export const timingRouter = createTRPCRouter({
               item.audit.finalAction,
             ),
         );
-        const dataClient = new PythonTimingDataClient();
         const maxReviewDays = Math.max(
           ...revision.config.reviewTradingDays,
           20,
@@ -611,19 +722,8 @@ export const timingRouter = createTRPCRouter({
         const events = [];
         const results = [];
         for (const item of triggered) {
-          const signalDate = item.card.signalSnapshot.asOfDate
-            .toISOString()
-            .slice(0, 10);
-          const end = new Date(item.card.signalSnapshot.asOfDate);
-          end.setUTCDate(
-            end.getUTCDate() + Math.ceil(maxReviewDays * 1.7) + 10,
-          );
-          const bars = await dataClient.getBars({
-            stockCode: item.card.stockCode,
-            start: signalDate,
-            end: end.toISOString().slice(0, 10),
-          });
-          const futureBars = bars.bars.filter(
+          const signalDate = item.evidence.asOfDate;
+          const futureBars = item.stock.bars.filter(
             (bar) => bar.tradeDate > signalDate,
           );
           const next = futureBars[0];
@@ -631,8 +731,8 @@ export const timingRouter = createTRPCRouter({
             futureBars[Math.min(maxReviewDays - 1, futureBars.length - 1)];
           if (!next || !exit || !item.audit.finalAction) {
             events.push({
-              cardId: item.card.id,
-              inputHash: item.card.signalSnapshot.inputHash,
+              stockCode: item.stock.stockCode,
+              inputHash: item.evidence.inputHash,
               decisionAudit: item.audit,
               warning: "缺少次日或退出日行情，事件未模拟成交。",
             });
@@ -661,10 +761,9 @@ export const timingRouter = createTRPCRouter({
           );
           results.push(result);
           events.push({
-            cardId: item.card.id,
-            stockCode: item.card.stockCode,
-            inputHash: item.card.signalSnapshot.inputHash,
-            dataManifest: item.card.signalSnapshot.dataManifest,
+            stockCode: item.stock.stockCode,
+            inputHash: item.evidence.inputHash,
+            dataManifest: item.evidence.dataManifest,
             decisionAudit: item.audit,
             signalDate,
             nextTradingDay: next,
@@ -675,31 +774,23 @@ export const timingRouter = createTRPCRouter({
         const quality = evaluateTimingBacktestQuality({
           config: revision.config,
           coveredMonths,
-          stockCount,
+          stockCount: history.items.length,
           triggeredEvents: triggered.length,
           primaryCompletenessPct,
           noLookaheadPassed,
         });
         const warnings = [
-          "回放基于当前自选股冻结成分，属于样本内验证并存在幸存偏差。",
+          "目标不足5只时已从筛选股票池补足并冻结至最多20只。",
           "冻结事件缺少竞价VWAP时使用下一交易日开盘价成交。",
-          "基准行情尚未纳入冻结事件时，超额收益以0基准降级计算。",
-          ...(cards.length === 500
-            ? [
-                "冻结卡片超过500条，本次仅回放最近500条，质量门禁结果不应视为完整样本。",
-              ]
-            : []),
+          "历史市场状态按决策日冻结；缺失日期按中性门控降级。",
+          "基准收益缺失时，超额收益以0基准降级计算。",
+          ...history.errors.map(
+            (error) => `${error.stockCode}：${error.message}`,
+          ),
         ];
         return repository.complete({
           id: run.id,
-          quality:
-            cards.length === 500
-              ? {
-                  ...quality,
-                  gatePassed: false,
-                  failures: [...quality.failures, "样本被截断。"],
-                }
-              : quality,
+          quality,
           performance: summarizeTimingBacktestPerformance(results),
           events,
           warnings,
@@ -802,6 +893,7 @@ export const timingRouter = createTRPCRouter({
         stockCode: input.stockCode,
         sourceType: input.sourceType,
         watchListId: input.watchListId,
+        workflowRunId: input.workflowRunId,
       });
     }),
 

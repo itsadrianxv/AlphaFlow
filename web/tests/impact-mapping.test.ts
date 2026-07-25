@@ -77,6 +77,9 @@ describe("Impact Mapping", () => {
         traceMaxEvents: 30,
       }).success,
     ).toBe(true);
+    expect(
+      impactMappingInputSchema.safeParse({ mode: "overview" }).success,
+    ).toBe(true);
   });
 
   it("在本地将新闻证券代码命中当前持仓", () => {
@@ -160,6 +163,119 @@ describe("Impact Mapping", () => {
     expect(item?.lineageId).toBe("impact-event:event-1");
   });
 
+  it("overview 将历史新闻去重后持久化并保留来源映射", async () => {
+    const historical = {
+      ...event,
+      id: "history-1",
+      title: "此前算力订单信号",
+      url: "https://example.com/history-1",
+    };
+    const create = vi.fn(async (params) => ({
+      id: "context-1",
+      ...params.context,
+    }));
+    const service = new ImpactMappingService({
+      evidenceRepository: { create },
+    } as never);
+
+    const result = await service.persistObservations({
+      userId: "user-1",
+      runId: "run-1",
+      collected: {
+        ...collected,
+        timelineNewsByEvent: {
+          "event-1": [event, historical, historical],
+        },
+      },
+    });
+    const items = create.mock.calls[0]?.[0]?.context.blocks[0]?.items ?? [];
+
+    expect(items).toHaveLength(2);
+    expect(result.itemIdBySourceId["event-1"]).toBeTruthy();
+    expect(result.itemIdBySourceId["history-1"]).toBeTruthy();
+    expect(
+      items.find(
+        (item: { sourceId?: string }) => item.sourceId === "history-1",
+      )?.url,
+    ).toBe("https://example.com/history-1");
+  });
+
+  it("时间线节点保留原文地址、来源和证据 ID", () => {
+    const service = new ImpactMappingService({} as never);
+    const timeline = service.buildTimeline({
+      collected: {
+        ...collected,
+        news: [
+          {
+            ...event,
+            url: "https://example.com/event-1",
+            source: "测试来源",
+          },
+        ],
+      },
+      persisted,
+    });
+
+    expect(timeline[0]).toMatchObject({
+      eventId: "event-1",
+      url: "https://example.com/event-1",
+      source: "测试来源",
+      evidenceItemIds: ["evidence-1"],
+    });
+  });
+
+  it("未来情景只保留当前事件允许引用的证据", async () => {
+    const service = new ImpactMappingService({
+      evidenceAwareLlmClient: {
+        complete: vi.fn(async () => ({
+          output: JSON.stringify({
+            scenarios: [
+              {
+                id: "scenario-1",
+                name: "订单延续",
+                horizon: "未来一季",
+                triggers: ["新增订单"],
+                confirmationSignals: ["订单披露"],
+                invalidationConditions: ["资本开支下降"],
+                affectedTargets: ["中科曙光"],
+                rationale: "订单延续将强化当前影响。",
+                evidenceItemIds: ["evidence-1", "foreign-evidence"],
+                basis: "inference",
+              },
+              {
+                id: "scenario-2",
+                name: "订单反转",
+                horizon: "未来一季",
+                triggers: ["需求下降"],
+                confirmationSignals: ["订单下修"],
+                invalidationConditions: ["新增订单超预期"],
+                affectedTargets: ["中科曙光"],
+                rationale: "需求下降可能使当前影响反转。",
+                evidenceItemIds: ["foreign-evidence"],
+                basis: "assumption",
+              },
+            ],
+            warnings: [],
+          }),
+        })),
+      },
+    } as never);
+
+    const result = await service.forecastScenarios({
+      userId: "user-1",
+      runId: "run-1",
+      context,
+      collected: { ...collected, selectedEvent: event },
+      persisted,
+      edges: [],
+    });
+
+    expect(result.scenarios.map((scenario) => scenario.evidenceItemIds)).toEqual([
+      ["evidence-1"],
+      [],
+    ]);
+  });
+
   it("雷达模式优先使用共享新闻库", async () => {
     const collectRadar = vi.fn(async () => ({
       news: [event],
@@ -179,6 +295,63 @@ describe("Impact Mapping", () => {
     expect(collectRadar).toHaveBeenCalledWith(expect.objectContaining({ days: 7 }));
     expect(result.news).toEqual([event]);
     expect(result.warnings).toContain("shared_news_reused");
+  });
+
+  it("overview 新闻采集超过 600 秒时失败而不是保存空快照", async () => {
+    vi.useFakeTimers();
+    const service = new ImpactMappingService({
+      sharedNewsLibraryService: {
+        collectRadar: vi.fn(() => new Promise(() => undefined)),
+      },
+    } as never);
+
+    const pending = expect(
+      service.collectEvidence({
+        userId: "user-1",
+        context,
+        input: impactMappingInputSchema.parse({ mode: "overview", days: 7 }),
+      }),
+    ).rejects.toThrow("radar_collect_failed:radar_collect_timeout_600000ms");
+
+    await vi.advanceTimersByTimeAsync(600_000);
+    await pending;
+    vi.useRealTimers();
+  });
+
+  it("overview 首个回溯窗口紧贴当前事件并最多保留五条历史新闻", async () => {
+    const historical = Array.from({ length: 8 }, (_, index) => ({
+      ...event,
+      id: `overview-history-${index}`,
+      title: `历史事件 ${index}`,
+      publishedAt: `2026-07-${String(23 - index).padStart(2, "0")}T10:00:00+08:00`,
+    }));
+    const getNewsRadar = vi.fn(async (_request: unknown) => historical);
+    const service = new ImpactMappingService({
+      sharedNewsLibraryService: {
+        collectRadar: vi.fn(async () => ({ news: [event], warnings: [] })),
+      },
+      dataClient: { getNewsRadar },
+    } as never);
+
+    const result = await service.collectEvidence({
+      userId: "user-1",
+      context,
+      input: impactMappingInputSchema.parse({ mode: "overview", days: 7 }),
+    });
+
+    expect(getNewsRadar).toHaveBeenCalledTimes(12);
+    expect(getNewsRadar.mock.calls[0]?.[0]).toMatchObject({
+      days: 30,
+      endAt: "2026-07-24T02:00:00.000Z",
+      includeMacro: false,
+      traceAnchor: {
+        title: event.title,
+        eventType: event.eventType,
+        relatedStocks: event.relatedStocks,
+      },
+    });
+    expect(result.timelineNewsByEvent?.[event.id]).toHaveLength(6);
+    expect(result.timelineNewsByEvent?.[event.id]?.[0]?.id).toBe(event.id);
   });
 
   it("雷达图跳过时间线和未来分支并产出快照", async () => {
@@ -231,14 +404,14 @@ describe("Impact Mapping", () => {
     expect(graph.getRunResult(finalState)).toEqual(expectedResult);
   });
 
-  it("追溯按 30 天窗口执行并限制为 30 个事件", async () => {
+  it("追溯首窗紧贴当前事件并限制为五条历史新闻", async () => {
     const historical = Array.from({ length: 8 }, (_, index) => ({
       ...event,
       id: `historical-${index}`,
       title: `历史事件 ${index}`,
       publishedAt: `2026-0${Math.max(1, 6 - index)}-01T10:00:00+08:00`,
     }));
-    const getNewsRadar = vi.fn(async () => historical);
+    const getNewsRadar = vi.fn(async (_request: unknown) => historical);
     const service = new ImpactMappingService({
       prisma: {
         workflowRun: {
@@ -272,8 +445,14 @@ describe("Impact Mapping", () => {
       }),
     });
 
-    expect(getNewsRadar).toHaveBeenCalledTimes(4);
-    expect(result.news.length).toBeLessThanOrEqual(30);
-    expect(result.tracedDays).toBe(120);
+    expect(getNewsRadar).toHaveBeenCalledTimes(1);
+    expect(getNewsRadar.mock.calls[0]?.[0]).toMatchObject({
+      days: 30,
+      endAt: "2026-07-24T02:00:00.000Z",
+      includeMacro: false,
+      traceAnchor: { title: event.title },
+    });
+    expect(result.news).toHaveLength(6);
+    expect(result.tracedDays).toBe(30);
   });
 });

@@ -67,6 +67,7 @@ export const env = createEnv({
       .positive()
       .default(300_000),
     ALPHAFLOW_INTERNAL_API_SECRET: z.string().optional(),
+    SELL_SIDE_REFRESH_SECRET: z.string().optional(),
     KRONOS_FORECAST_ENABLED: z.coerce.boolean().default(false),
     KRONOS_DEFAULT_PREDICTION_LENGTH: z.coerce
       .number()
@@ -154,6 +155,9 @@ export const env = createEnv({
       300_000,
     ),
     ALPHAFLOW_INTERNAL_API_SECRET: process.env.ALPHAFLOW_INTERNAL_API_SECRET,
+    SELL_SIDE_REFRESH_SECRET:
+      process.env.SELL_SIDE_REFRESH_SECRET ||
+      process.env.ALPHAFLOW_INTERNAL_API_SECRET,
     KRONOS_FORECAST_ENABLED:
       process.env.KRONOS_FORECAST_ENABLED === "true" ||
       process.env.KRONOS_FORECAST_ENABLED === "1",

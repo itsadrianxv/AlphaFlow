@@ -42,6 +42,8 @@ function mapRevision(record: {
   configHash: string;
   engineVersion: string;
   featureVersion: string;
+  templateVersion: number | null;
+  validationSource: string | null;
   publishedAt: Date | null;
   archivedAt: Date | null;
   createdAt: Date;
@@ -51,6 +53,8 @@ function mapRevision(record: {
     ...record,
     status: record.status as TimingPresetRevisionRecord["status"],
     config: record.config as TimingPresetConfigV2,
+    validationSource:
+      record.validationSource as TimingPresetRevisionRecord["validationSource"],
   };
 }
 
@@ -59,6 +63,8 @@ function mapStrategy(record: {
   userId: string;
   name: string;
   description: string | null;
+  origin: string;
+  templateKey: string | null;
   activeRevisionId: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -70,6 +76,8 @@ function mapStrategy(record: {
     userId: record.userId,
     name: record.name,
     description: record.description,
+    origin: record.origin as TimingStrategyRecord["origin"],
+    templateKey: record.templateKey,
     activeRevisionId: record.activeRevisionId,
     activeRevision: record.activeRevision
       ? mapRevision(record.activeRevision)
@@ -101,6 +109,7 @@ export class PrismaTimingPresetRevisionRepository {
           userId: params.userId,
           name: params.name,
           description: params.description,
+          origin: "USER",
           config: toJson(params.config),
         },
       });
@@ -118,6 +127,99 @@ export class PrismaTimingPresetRevisionRepository {
       });
       return tx.timingPreset.findUniqueOrThrow({
         where: { id: preset.id },
+        include: strategyInclude,
+      });
+    });
+    return mapStrategy(record);
+  }
+
+  async ensureSystemTemplate(params: {
+    userId: string;
+    templateKey: string;
+    templateVersion: number;
+    name: string;
+    description: string;
+    config: TimingPresetConfigV2;
+  }) {
+    const configHash = hashTimingPresetConfig(params.config);
+    const record = await this.prisma.$transaction(async (tx) => {
+      const preset = await tx.timingPreset.findFirst({
+        where: { userId: params.userId, templateKey: params.templateKey },
+        include: strategyInclude,
+      });
+      if (!preset) {
+        const created = await tx.timingPreset.create({
+          data: {
+            userId: params.userId,
+            name: params.name,
+            description: params.description,
+            origin: "SYSTEM_TEMPLATE",
+            templateKey: params.templateKey,
+            config: toJson(params.config),
+          },
+        });
+        const revision = await tx.timingPresetRevision.create({
+          data: {
+            presetId: created.id,
+            userId: params.userId,
+            revisionNumber: 1,
+            status: "PUBLISHED",
+            config: toJson(params.config),
+            configHash,
+            engineVersion: TIMING_RULE_ENGINE_VERSION,
+            featureVersion: TIMING_FEATURE_VERSION,
+            templateVersion: params.templateVersion,
+            validationSource: "SYSTEM_TEMPLATE",
+            publishedAt: new Date(),
+          },
+        });
+        await tx.timingPreset.update({
+          where: { id: created.id },
+          data: { activeRevisionId: revision.id },
+        });
+      } else {
+        const current = preset.activeRevision;
+        if (
+          current?.templateVersion !== params.templateVersion ||
+          current.configHash !== configHash
+        ) {
+          const nextNumber =
+            Math.max(
+              0,
+              ...preset.revisions.map((item) => item.revisionNumber),
+            ) + 1;
+          await tx.timingPresetRevision.updateMany({
+            where: { presetId: preset.id, status: "PUBLISHED" },
+            data: { status: "ARCHIVED", archivedAt: new Date() },
+          });
+          const revision = await tx.timingPresetRevision.create({
+            data: {
+              presetId: preset.id,
+              userId: params.userId,
+              revisionNumber: nextNumber,
+              status: "PUBLISHED",
+              config: toJson(params.config),
+              configHash,
+              engineVersion: TIMING_RULE_ENGINE_VERSION,
+              featureVersion: TIMING_FEATURE_VERSION,
+              templateVersion: params.templateVersion,
+              validationSource: "SYSTEM_TEMPLATE",
+              publishedAt: new Date(),
+            },
+          });
+          await tx.timingPreset.update({
+            where: { id: preset.id },
+            data: {
+              activeRevisionId: revision.id,
+              name: params.name,
+              description: params.description,
+              config: toJson(params.config),
+            },
+          });
+        }
+      }
+      return tx.timingPreset.findFirstOrThrow({
+        where: { userId: params.userId, templateKey: params.templateKey },
         include: strategyInclude,
       });
     });
@@ -260,7 +362,12 @@ export class PrismaTimingPresetRevisionRepository {
       }),
       this.prisma.timingPresetRevision.update({
         where: { id: revision.id },
-        data: { status: "PUBLISHED", publishedAt: now, archivedAt: null },
+        data: {
+          status: "PUBLISHED",
+          publishedAt: now,
+          archivedAt: null,
+          validationSource: "HISTORICAL_BACKTEST",
+        },
       }),
       this.prisma.timingPreset.update({
         where: { id: revision.presetId },

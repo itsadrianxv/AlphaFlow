@@ -32,13 +32,15 @@ type HeaderAction = {
 const pageSize = 18;
 const historyHrefBySection: Record<WorkspaceSection, string | undefined> = {
   home: undefined,
+  agentRuntime: undefined,
   screening: "/screening/history",
   workflows: "/workflows/history",
-  agentRuntime: undefined,
   timing: "/timing/history",
   watchlists: undefined,
   companyResearch: "/company-research/history",
   researchTargets: undefined,
+  mindMaps: undefined,
+  scheduledTasks: undefined,
 };
 
 const statusLabelMap: Record<string, string> = {

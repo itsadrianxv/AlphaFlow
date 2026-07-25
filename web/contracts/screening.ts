@@ -16,6 +16,11 @@ export const searchStockResultSchema = z.object({
   matchField: z.enum(["CODE", "NAME"]),
 });
 
+export const stockMentionSchema = z.object({
+  stockCode: stockCodeSchema,
+  stockName: z.string().min(1),
+});
+
 export const indicatorValueTypeSchema = z.enum([
   "NUMBER",
   "PERCENT",
@@ -331,6 +336,7 @@ export const listFormulasInputSchema = z.object({
 
 export type SearchStocksInput = z.infer<typeof searchStocksInputSchema>;
 export type SearchStockResult = z.infer<typeof searchStockResultSchema>;
+export type StockMention = z.infer<typeof stockMentionSchema>;
 export type IndicatorCatalogItem = z.infer<typeof indicatorCatalogItemSchema>;
 export type IndicatorCategory = z.infer<typeof indicatorCategorySchema>;
 export type CustomFormulaSpec = z.infer<typeof customFormulaSpecSchema>;

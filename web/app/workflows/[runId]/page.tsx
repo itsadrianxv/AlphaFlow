@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { RunInvestorClient } from "~/app/workflows/[runId]/run-investor-client";
-import { auth } from "~/server/auth";
+import { requireAuth } from "~/server/auth/require-auth";
 import { db } from "~/server/db";
 import { COMPANY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
 
@@ -13,9 +13,9 @@ type PageProps = {
 
 export default async function WorkflowRunDetailPage({ params }: PageProps) {
   const { runId } = await params;
-  const session = await auth();
+  const session = await requireAuth(`/workflows/${runId}`);
 
-  if (session?.user?.id) {
+  if (session.user.id) {
     const run = await db.workflowRun.findFirst({
       where: {
         id: runId,

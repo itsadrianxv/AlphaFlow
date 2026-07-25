@@ -24,7 +24,6 @@ function parseRef(value: string): ResearchTargetRef | null {
       type === "company" ||
       type === "industry" ||
       type === "watchlist" ||
-      type === "space" ||
       type === "workflow_run"
     )
   ) {
@@ -38,7 +37,6 @@ const typeLabelMap: Record<ResearchTargetRef["type"], string> = {
   company: "公司",
   industry: "行业",
   watchlist: "自选股",
-  space: "Space",
   workflow_run: "Run",
 };
 
@@ -47,7 +45,6 @@ export function ResearchTargetPicker(props: ResearchTargetPickerProps) {
     "company",
     "industry",
     "watchlist",
-    "space",
     "workflow_run",
   ];
   const targetsQuery = api.researchTarget.listTargets.useQuery({

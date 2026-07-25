@@ -2,9 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { InlineNotice, Panel, WorkspaceShell } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { buildWorkflowRunHistoryItems } from "~/app/_components/workspace-history";
+import { CompanyOverviewPanel } from "~/app/company-research/company-overview-panel";
 import { companyResearchStageTabs } from "~/app/company-research/company-research-stage-tabs";
 import { WorkflowVisualizationPanel } from "~/app/workflows/workflow-visualization-panel";
 import { COMPANY_RESEARCH_TEMPLATE_CODE } from "~/server/domain/workflow/types";
@@ -73,6 +75,9 @@ export function CompanyResearchClient() {
         setter(value);
       }
     }
+    if (searchParams.get("tab") === "overview") {
+      setActiveTabId("overview");
+    }
   }, [searchParams]);
 
   const runsQuery = api.workflow.listRuns.useQuery({
@@ -136,6 +141,25 @@ export function CompanyResearchClient() {
       idempotencyKey: idempotencyKey.trim() || undefined,
     });
   };
+
+  const handleStartFromOverview = (
+    nextCompanyName: string,
+    nextStockCode: string,
+  ) => {
+    setCompanyName(nextCompanyName);
+    setStockCode(nextStockCode);
+    setActiveTabId("target");
+    router.replace(
+      `/company-research?companyName=${encodeURIComponent(nextCompanyName)}&stockCode=${nextStockCode}`,
+    );
+  };
+
+  const overviewPanel = (
+    <CompanyOverviewPanel
+      stockCode={searchParams.get("stockCode") ?? undefined}
+      onStartResearch={handleStartFromOverview}
+    />
+  );
 
   const targetPanel = (
     <>
@@ -313,16 +337,26 @@ export function CompanyResearchClient() {
       historyEmptyText="还没有公司判断记录"
       title="公司判断"
     >
-      <WorkflowStageSwitcher
-        tabs={companyResearchStageTabs}
-        activeTabId={activeTabId}
-        onChange={setActiveTabId}
-        panels={{
-          target: targetPanel,
-          sources: sourcesPanel,
-          launch: launchPanel,
+      <HighlightToNote
+        floatingToolbar
+        source={{
+          kind: "company_research",
+          stockCode: searchParams.get("stockCode") ?? undefined,
+          companyName: companyName.trim() || undefined,
         }}
-      />
+      >
+        <WorkflowStageSwitcher
+          tabs={companyResearchStageTabs}
+          activeTabId={activeTabId}
+          onChange={setActiveTabId}
+          panels={{
+            overview: overviewPanel,
+            target: targetPanel,
+            sources: sourcesPanel,
+            launch: launchPanel,
+          }}
+        />
+      </HighlightToNote>
     </WorkspaceShell>
   );
 }

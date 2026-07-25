@@ -176,22 +176,6 @@ type ResearchTargetDbClient = {
       }>
     >;
   };
-  researchSpace: {
-    findFirst(args: { where: Record<string, unknown> }): Promise<{
-      id: string;
-      name: string;
-      description: string | null;
-      updatedAt?: Date;
-    } | null>;
-    findMany(args: Record<string, unknown>): Promise<
-      Array<{
-        id: string;
-        name: string;
-        description: string | null;
-        updatedAt?: Date;
-      }>
-    >;
-  };
   workflowRun: {
     findFirst(args: { where: Record<string, unknown> }): Promise<{
       id: string;
@@ -442,19 +426,6 @@ async function requireTarget(
     return watchList;
   }
 
-  if (targetRef.type === "space") {
-    const space = await db.researchSpace.findFirst({
-      where: { id: targetRef.id, userId },
-    });
-    if (!space) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Research Space 不存在",
-      });
-    }
-    return space;
-  }
-
   const run = await db.workflowRun.findFirst({
     where: { id: targetRef.id, userId },
   });
@@ -549,13 +520,7 @@ export const researchTargetRouter = createTRPCRouter({
       const db = withResearchTargetDb(ctx.db);
       const userId = ctx.session.user.id;
       const types = new Set<ResearchTargetType>(
-        input?.types ?? [
-          "company",
-          "industry",
-          "watchlist",
-          "space",
-          "workflow_run",
-        ],
+        input?.types ?? ["company", "industry", "watchlist", "workflow_run"],
       );
       const query = input?.query;
       const limit = input?.limit ?? 50;
@@ -621,27 +586,6 @@ export const researchTargetRouter = createTRPCRouter({
             items.push(
               researchTargetSummarySchema.parse({
                 ref: { type: "watchlist", id: record.id },
-                label: record.name,
-                description: record.description,
-                tags: [],
-                updatedAt: toIso(record.updatedAt),
-              }),
-            );
-          }
-        }
-      }
-
-      if (types.has("space")) {
-        const records = await db.researchSpace.findMany({
-          where: { userId },
-          orderBy: { updatedAt: "desc" },
-          take: limit,
-        });
-        for (const record of records) {
-          if (matchesQuery([record.name, record.description], query)) {
-            items.push(
-              researchTargetSummarySchema.parse({
-                ref: { type: "space", id: record.id },
                 label: record.name,
                 description: record.description,
                 tags: [],
@@ -913,7 +857,7 @@ export const researchTargetRouter = createTRPCRouter({
           },
         ],
         fallback,
-        { model: "deepseek-chat", maxOutputTokens: 900 },
+        { model: "deepseek-v4-flash", maxOutputTokens: 900 },
       );
       const updated = await db.researchNote.update({
         where: { id: input.id },
@@ -1117,7 +1061,7 @@ export const researchTargetRouter = createTRPCRouter({
           },
         ],
         fallback,
-        { model: "deepseek-chat", maxOutputTokens: 1800 },
+        { model: "deepseek-v4-flash", maxOutputTokens: 1800 },
       );
       const updated = await db.researchArtifact.update({
         where: { id: input.id },

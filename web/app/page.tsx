@@ -1,36 +1,38 @@
 import { Suspense } from "react";
+
+import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { ImpactMappingWorkspace } from "~/app/_components/impact-mapping-workspace";
-import { MarketContextSection } from "~/app/_components/market-context-section";
+import { OverviewInsightsPanel } from "~/app/_components/overview-insights-panel";
 import { WorkspaceShell } from "~/app/_components/ui";
 import { PiAgentComposer } from "~/app/agent-runtime/agent-runtime-client";
 import { MarketHeatmapClient } from "~/app/heatmap/market-heatmap-client";
-import { auth } from "~/server/auth";
+import { requireAuth } from "~/server/auth/require-auth";
 import { HydrateClient } from "~/trpc/server";
 
 export default async function Home() {
-  const session = await auth();
-  const signedIn = Boolean(session?.user);
+  const session = await requireAuth("/");
+  const signedIn = Boolean(session.user);
 
   return (
     <HydrateClient>
-      <WorkspaceShell section="home">
-        <div className="pb-[264px]">
+      <WorkspaceShell section="home" showHistory={false}>
+        <HighlightToNote floatingToolbar source={{ kind: "overview" }}>
           <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="min-w-0">
-              {signedIn ? <MarketHeatmapClient /> : null}
-              <ImpactMappingWorkspace signedIn={signedIn} />
-              {signedIn ? <MarketContextSection section="home" /> : null}
+              <MarketHeatmapClient />
             </div>
-            <aside
-              aria-hidden="true"
-              className="hidden border-l border-[var(--app-border-soft)] xl:block"
-            />
+            <OverviewInsightsPanel />
+            <div className="min-w-0 xl:col-span-2">
+              <ImpactMappingWorkspace signedIn={signedIn} />
+            </div>
           </div>
-        </div>
+        </HighlightToNote>
         {signedIn ? (
-          <Suspense fallback={null}>
-            <PiAgentComposer />
-          </Suspense>
+          <div className="pb-[144px]">
+            <Suspense fallback={null}>
+              <PiAgentComposer showConversation={false} />
+            </Suspense>
+          </div>
         ) : null}
       </WorkspaceShell>
     </HydrateClient>

@@ -1,8 +1,7 @@
 import React from "react";
 import { buildScreeningRedirectTo } from "~/app/screening/access-control";
-import { ScreeningLoginRedirectNotice } from "~/app/screening/screening-login-redirect-notice";
 import { ScreeningStudioClient } from "~/app/screening/screening-studio-client";
-import { auth } from "~/server/auth";
+import { requireAuth } from "~/server/auth/require-auth";
 
 export default async function ScreeningPage(props: {
   searchParams?: Promise<{
@@ -12,12 +11,8 @@ export default async function ScreeningPage(props: {
   const searchParams = props.searchParams
     ? await props.searchParams
     : undefined;
-  const session = await auth();
   const redirectTo = buildScreeningRedirectTo(searchParams);
-
-  if (!session?.user) {
-    return <ScreeningLoginRedirectNotice redirectTo={redirectTo} />;
-  }
+  await requireAuth(redirectTo);
 
   return (
     <React.Suspense fallback={null}>

@@ -1,4 +1,6 @@
 import { WorkflowEventType, WorkflowRunStatus } from "@prisma/client";
+import type { ImpactMappingInput } from "~/server/domain/intelligence/impact-mapping";
+import type { PortfolioSnapshotDraft } from "~/server/domain/timing/types";
 import {
   WORKFLOW_ERROR_CODES,
   WorkflowDomainError,
@@ -7,15 +9,15 @@ import type {
   ResearchPreferenceInput,
   ResearchTaskContract,
 } from "~/server/domain/workflow/research";
-import type { ImpactMappingInput } from "~/server/domain/intelligence/impact-mapping";
 import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   getWorkflowNodeKeysFromGraphConfig,
-  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   IMPACT_MAPPING_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   PI_AGENT_RUN_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_TEMPLATE_CODE,
+  TIMING_DECISION_PIPELINE_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
   TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
   WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
@@ -86,14 +88,20 @@ export type StartWatchlistTimingCardsPipelineCommand = {
 
 export type StartWatchlistTimingPipelineCommand = {
   userId: string;
-  watchListId: string;
-  portfolioSnapshotId: string;
+  watchListId?: string;
+  sourceWatchListId?: string;
+  targets?: Array<{ stockCode: string; stockName?: string }>;
+  mode?: "SINGLE" | "PORTFOLIO";
+  decisionInput?: Record<string, unknown>;
+  portfolioSnapshotId?: string;
+  portfolioInputSnapshot?: PortfolioSnapshotDraft & { source: "RUN_INPUT" };
   targetRef?: { type: string; id: string };
   asOfDate?: string;
   revisionId: string;
   analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
   watchListName?: string;
   portfolioSnapshotName?: string;
+  templateCode?: string;
   templateVersion?: number;
   idempotencyKey?: string;
 };
@@ -150,6 +158,7 @@ type StartWorkflowCommand = {
   templateVersion?: number;
   input: Record<string, unknown>;
   idempotencyKey?: string;
+  portfolioInputSnapshot?: PortfolioSnapshotDraft & { source: "RUN_INPUT" };
 };
 
 function buildCompanyResearchQuery(command: StartCompanyResearchCommand) {
@@ -312,19 +321,25 @@ export class WorkflowCommandService {
         command.watchListName && command.portfolioSnapshotName
           ? `自选股组合建议 - ${command.watchListName} / ${command.portfolioSnapshotName}`
           : `自选股组合建议 - ${command.watchListId}`,
-      templateCode: WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
+      templateCode:
+        command.templateCode ?? WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
       templateVersion: command.templateVersion,
       input: {
         watchListId: command.watchListId,
+        sourceWatchListId: command.sourceWatchListId,
+        targets: command.targets,
+        mode: command.mode,
+        decisionInput: command.decisionInput,
         targetRef: command.targetRef,
         portfolioSnapshotId: command.portfolioSnapshotId,
         asOfDate: command.asOfDate,
         revisionId: command.revisionId,
         analysisDateMode: command.analysisDateMode,
       },
+      portfolioInputSnapshot: command.portfolioInputSnapshot,
       idempotencyKey:
         command.idempotencyKey ??
-        `watchlist-timing:${command.userId}:${command.watchListId}:${command.portfolioSnapshotId}:${command.analysisDateMode}:${command.asOfDate ?? "latest"}:${command.revisionId}`,
+        `watchlist-timing:${command.userId}:${command.watchListId ?? command.sourceWatchListId ?? "direct"}:${command.portfolioSnapshotId}:${command.analysisDateMode}:${command.asOfDate ?? "latest"}:${command.revisionId}`,
     });
   }
 
@@ -605,6 +620,13 @@ export class WorkflowCommandService {
 
     if (
       !template &&
+      command.templateCode === TIMING_DECISION_PIPELINE_TEMPLATE_CODE
+    ) {
+      template = await this.repository.ensureTimingDecisionPipelineTemplate();
+    }
+
+    if (
+      !template &&
       command.templateCode === SCREENING_TO_TIMING_TEMPLATE_CODE
     ) {
       template =
@@ -649,6 +671,7 @@ export class WorkflowCommandService {
       input: command.input,
       nodeKeys,
       idempotencyKey: command.idempotencyKey,
+      portfolioInputSnapshot: command.portfolioInputSnapshot,
     });
 
     return {

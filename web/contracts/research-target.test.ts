@@ -43,13 +43,7 @@ const sampleWorkspaceResult = {
 
 describe("research-target contracts", () => {
   it("accepts the unified target reference types", () => {
-    for (const type of [
-      "company",
-      "industry",
-      "watchlist",
-      "space",
-      "workflow_run",
-    ]) {
+    for (const type of ["company", "industry", "watchlist", "workflow_run"]) {
       expect(
         researchTargetRefSchema.safeParse({ type, id: "target-1" }).success,
       ).toBe(true);
@@ -57,6 +51,10 @@ describe("research-target contracts", () => {
 
     expect(
       researchTargetRefSchema.safeParse({ type: "screening", id: "x" }).success,
+    ).toBe(false);
+    expect(
+      researchTargetRefSchema.safeParse({ type: "space", id: "target-1" })
+        .success,
     ).toBe(false);
   });
 

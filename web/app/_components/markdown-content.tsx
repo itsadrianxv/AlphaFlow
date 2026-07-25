@@ -1,9 +1,15 @@
+"use client";
+
 /* biome-ignore lint/correctness/noUnusedImports: React is required for server-side JSX rendering in tests. */
 import React, { type ComponentPropsWithoutRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
+import {
+  remarkStockMentions,
+  StockMention,
+} from "~/app/_components/stock-mention";
 import { cn } from "~/app/_components/ui";
+import { api } from "~/trpc/react";
 
 export type MarkdownContentProps = {
   content: string;
@@ -35,14 +41,20 @@ function MarkdownParagraph(
 
 export function MarkdownContent(props: MarkdownContentProps) {
   const content = props.content.trim();
+  const compact = props.compact ?? false;
+  const proseClassName = textClassName(compact);
+  const mentionsQuery = api.screening.resolveStockMentions.useQuery(
+    { text: content || " " },
+    {
+      enabled: content.length > 0,
+      refetchOnWindowFocus: false,
+      staleTime: 10 * 60 * 1000,
+    },
+  );
 
   if (content.length === 0) {
     return null;
   }
-
-  const compact = props.compact ?? false;
-  const proseClassName = textClassName(compact);
-
   return (
     <div
       className={cn(
@@ -55,7 +67,10 @@ export function MarkdownContent(props: MarkdownContentProps) {
       )}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[
+          remarkGfm,
+          [remarkStockMentions, mentionsQuery.data ?? []],
+        ]}
         components={{
           h1: ({ node: _node, className, ...rest }) => (
             <h1
@@ -138,15 +153,29 @@ export function MarkdownContent(props: MarkdownContentProps) {
               {...rest}
             />
           ),
-          a: ({ node: _node, className, href, ...rest }) => (
-            <a
-              className={cn("break-all", className)}
-              href={href}
-              rel={href?.startsWith("http") ? "noreferrer" : undefined}
-              target={href?.startsWith("http") ? "_blank" : undefined}
-              {...rest}
-            />
-          ),
+          a: ({ node: _node, className, href, children, ...rest }) => {
+            if (href?.startsWith("stock-mention:")) {
+              const stockCode = href.slice("stock-mention:".length);
+              const stockName = Array.isArray(children)
+                ? children.map((item) => String(item)).join("")
+                : String(children);
+              return (
+                <StockMention stockCode={stockCode} stockName={stockName} />
+              );
+            }
+
+            return (
+              <a
+                className={cn("break-all", className)}
+                href={href}
+                rel={href?.startsWith("http") ? "noreferrer" : undefined}
+                target={href?.startsWith("http") ? "_blank" : undefined}
+                {...rest}
+              >
+                {children}
+              </a>
+            );
+          },
           pre: ({ node: _node, className, ...rest }) => (
             <pre
               className={cn(

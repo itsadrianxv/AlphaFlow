@@ -15,7 +15,7 @@ function mapRecord(record: {
   userId: string;
   workflowRunId: string | null;
   portfolioSnapshotId: string;
-  watchListId: string;
+  watchListId: string | null;
   presetId: string | null;
   presetRevisionId: string | null;
   stockCode: string;

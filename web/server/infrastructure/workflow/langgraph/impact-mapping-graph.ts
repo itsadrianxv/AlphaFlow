@@ -1,7 +1,10 @@
-import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
-import type { ImpactMappingService, ImpactCollectedEvidence, PersistedImpactEvidence } from "~/server/application/intelligence/impact-mapping-service";
+import { Annotation, END, StateGraph } from "@langchain/langgraph";
+import type {
+  ImpactCollectedEvidence,
+  ImpactMappingService,
+  PersistedImpactEvidence,
+} from "~/server/application/intelligence/impact-mapping-service";
 import {
-  impactMappingInputSchema,
   type ImpactContext,
   type ImpactEdge,
   type ImpactMappingInput,
@@ -9,6 +12,7 @@ import {
   type ImpactRadarEvent,
   type ImpactScenario,
   type ImpactTimelineItem,
+  impactMappingInputSchema,
 } from "~/server/domain/intelligence/impact-mapping";
 import {
   IMPACT_MAPPING_NODE_KEYS,
@@ -37,6 +41,27 @@ type ImpactMappingGraphState = WorkflowGraphState & {
   warnings: string[];
   finalResult?: ImpactMappingResult;
 };
+
+function evidenceForEvent(
+  persisted: PersistedImpactEvidence,
+  collected: ImpactCollectedEvidence,
+  eventId: string,
+): PersistedImpactEvidence {
+  const sourceIds = [
+    eventId,
+    ...(collected.timelineNewsByEvent?.[eventId] ?? []).map((item) => item.id),
+  ];
+  return {
+    ...persisted,
+    evidenceItemIds: [
+      ...new Set(
+        sourceIds
+          .map((sourceId) => persisted.itemIdBySourceId[sourceId])
+          .filter((itemId): itemId is string => Boolean(itemId)),
+      ),
+    ],
+  };
+}
 
 const WorkflowState = Annotation.Root({
   runId: Annotation<string>,
@@ -72,10 +97,12 @@ export class ImpactMappingLangGraph extends BaseWorkflowLangGraph<
   readonly templateCode = IMPACT_MAPPING_TEMPLATE_CODE;
   readonly templateVersion = 1;
 
-  constructor(private readonly service: ImpactMappingService) {
+  constructor(service: ImpactMappingService) {
     const executors: Record<
       ImpactMappingNodeKey,
-      (state: ImpactMappingGraphState) => Promise<Partial<ImpactMappingGraphState>>
+      (
+        state: ImpactMappingGraphState,
+      ) => Promise<Partial<ImpactMappingGraphState>>
     > = {
       load_impact_context: async (state) => ({
         context: await service.loadContext(state.userId, state.impactInput),
@@ -103,15 +130,74 @@ export class ImpactMappingLangGraph extends BaseWorkflowLangGraph<
         if (!state.context || !state.collected || !state.persisted) {
           throw new Error("影响映射前置数据不完整");
         }
-        if (state.impactInput.mode === "radar") {
+        if (
+          state.impactInput.mode === "radar" ||
+          state.impactInput.mode === "overview"
+        ) {
           const radarEvents = service.buildRadarEvents({
             context: state.context,
             collected: state.collected,
             persisted: state.persisted,
           });
+          if (state.impactInput.mode === "radar") {
+            return {
+              radarEvents,
+              impactEdges: radarEvents.flatMap((item) => item.impactEdges),
+            };
+          }
+          const featuredIds =
+            state.collected.featuredEventIds ??
+            radarEvents.slice(0, 3).map((item) => item.event.id);
+          const featured = radarEvents.filter((item) =>
+            featuredIds.includes(item.event.id),
+          );
+          const context = state.context;
+          const collected = state.collected;
+          const persisted = state.persisted;
+          const mapped = await Promise.all(
+            featured.map(async (item) => {
+              const result = await service.mapDeepImpacts({
+                userId: state.userId,
+                runId: state.runId,
+                context,
+                collected: {
+                  ...collected,
+                  news: [item.event],
+                  selectedEvent: item.event,
+                },
+                persisted: evidenceForEvent(
+                  persisted,
+                  collected,
+                  item.event.id,
+                ),
+              });
+              return result;
+            }),
+          );
+          const edgeByEvent = new Map(
+            featured.map((item) => [item.event.id, item.impactEdges]),
+          );
+          featured.forEach((item, index) => {
+            edgeByEvent.set(
+              item.event.id,
+              mapped[index]?.edges ?? item.impactEdges,
+            );
+          });
+          const enriched = radarEvents
+            .map((item) => ({
+              ...item,
+              impactEdges: edgeByEvent.get(item.event.id) ?? item.impactEdges,
+            }))
+            .sort(
+              (left, right) =>
+                Number(featuredIds.includes(right.event.id)) -
+                  Number(featuredIds.includes(left.event.id)) ||
+                right.importanceScore - left.importanceScore,
+            );
           return {
-            radarEvents,
-            impactEdges: radarEvents.flatMap((item) => item.impactEdges),
+            radarEvents: enriched,
+            impactEdges: enriched.flatMap((item) => item.impactEdges),
+            warnings: mapped.flatMap((item) => item?.warnings ?? []),
           };
         }
         const mapped = await service.mapDeepImpacts({
@@ -127,16 +213,89 @@ export class ImpactMappingLangGraph extends BaseWorkflowLangGraph<
         if (!state.collected || !state.persisted) {
           throw new Error("时间线证据不完整");
         }
+        const collected = state.collected;
+        const persisted = state.persisted;
+        if (state.impactInput.mode === "overview") {
+          return {
+            radarEvents: state.radarEvents.map((item) => {
+              const timelineNews =
+                collected.timelineNewsByEvent?.[item.event.id];
+              if (!timelineNews) return item;
+              return {
+                ...item,
+                analysis: {
+                  timeline: service.buildTimeline({
+                    collected: { ...collected, timelineNews },
+                    persisted,
+                  }),
+                  scenarios: [],
+                  traceState: {
+                    oldestOccurredAt: timelineNews
+                      .map((news) => news.publishedAt)
+                      .sort()[0],
+                    tracedDays: 360,
+                    eventCount: timelineNews.length,
+                    canContinue: true,
+                  },
+                  warnings: [],
+                },
+              };
+            }),
+          };
+        }
         return {
           timeline: service.buildTimeline({
-            collected: state.collected,
-            persisted: state.persisted,
+            collected,
+            persisted,
           }),
         };
       },
       forecast_impact_scenarios: async (state) => {
         if (!state.context || !state.collected || !state.persisted) {
           throw new Error("未来分支前置数据不完整");
+        }
+        const context = state.context;
+        const collected = state.collected;
+        const persisted = state.persisted;
+        if (state.impactInput.mode === "overview") {
+          const featured = new Set(collected.featuredEventIds ?? []);
+          const forecasts = await Promise.all(
+            state.radarEvents.map(async (item) => {
+              if (!featured.has(item.event.id)) return undefined;
+              return service.forecastScenarios({
+                userId: state.userId,
+                runId: state.runId,
+                context,
+                collected: {
+                  ...collected,
+                  news: [item.event],
+                  selectedEvent: item.event,
+                },
+                persisted: evidenceForEvent(
+                  persisted,
+                  collected,
+                  item.event.id,
+                ),
+                edges: item.impactEdges,
+              });
+            }),
+          );
+          return {
+            radarEvents: state.radarEvents.map((item, index) => ({
+              ...item,
+              ...(forecasts[index]
+                ? {
+                    analysis: {
+                      timeline: item.analysis?.timeline ?? [],
+                      scenarios: forecasts[index]?.scenarios ?? [],
+                      warnings: forecasts[index]?.warnings ?? [],
+                    },
+                  }
+                : {}),
+            })),
+            scenarios: forecasts.flatMap((item) => item?.scenarios ?? []),
+            warnings: forecasts.flatMap((item) => item?.warnings ?? []),
+          };
         }
         const forecast = await service.forecastScenarios({
           userId: state.userId,
@@ -199,7 +358,9 @@ export class ImpactMappingLangGraph extends BaseWorkflowLangGraph<
     super({ graph: graph.compile(), nodeOrder: IMPACT_MAPPING_NODE_KEYS });
   }
 
-  buildInitialState(params: WorkflowGraphBuildInitialStateParams): ImpactMappingGraphState {
+  buildInitialState(
+    params: WorkflowGraphBuildInitialStateParams,
+  ): ImpactMappingGraphState {
     return {
       runId: params.runId,
       userId: params.userId,
@@ -255,8 +416,14 @@ export class ImpactMappingLangGraph extends BaseWorkflowLangGraph<
   ) {
     if (nodeKey === "map_impact_layers" && state.impactInput.mode === "radar") {
       return [
-        { nodeKey: "build_impact_timeline" as const, reason: "雷达模式不生成深度时间线" },
-        { nodeKey: "forecast_impact_scenarios" as const, reason: "雷达模式不生成未来分支" },
+        {
+          nodeKey: "build_impact_timeline" as const,
+          reason: "雷达模式不生成深度时间线",
+        },
+        {
+          nodeKey: "forecast_impact_scenarios" as const,
+          reason: "雷达模式不生成未来分支",
+        },
       ];
     }
     return [];

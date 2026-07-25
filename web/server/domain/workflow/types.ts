@@ -13,6 +13,7 @@ import type {
   TechnicalAssessment,
   TimingAnalysisCardRecord,
   TimingCardDraft,
+  TimingEvidenceData,
   TimingFeedbackContext,
   TimingPresetAdjustmentSuggestionRecord,
   TimingPresetConfig,
@@ -25,7 +26,6 @@ import type {
   TimingReviewRecord,
   TimingSignalBatchError,
   TimingSignalData,
-  TimingEvidenceData,
   TimingSignalSnapshotRecord,
 } from "~/server/domain/timing/types";
 import type {
@@ -57,6 +57,8 @@ export const WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE =
   "watchlist_timing_cards_pipeline_v1";
 export const WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE =
   "watchlist_timing_pipeline_v1";
+export const TIMING_DECISION_PIPELINE_TEMPLATE_CODE =
+  "watchlist_timing_pipeline_v2";
 export const SCREENING_TO_TIMING_TEMPLATE_CODE = "screening_to_timing_v1";
 export const TIMING_REVIEW_LOOP_TEMPLATE_CODE = "timing_review_loop_v1";
 export const PI_AGENT_RUN_TEMPLATE_CODE = "pi_agent_run_v1";
@@ -231,7 +233,7 @@ export type WorkflowNodeKey =
   | string;
 
 export type IndustryResearchStructuredModel =
-  | "deepseek-chat"
+  | "deepseek-v4-flash"
   | "deepseek-reasoner";
 
 export type IndustryResearchAutoEscalationReason =
@@ -255,7 +257,7 @@ export function resolveIndustryResearchRequestedDepth(
 export function resolveIndustryResearchStructuredModel(
   requestedDepth: ResearchAnalysisDepth,
 ): IndustryResearchStructuredModel {
-  return requestedDepth === "deep" ? "deepseek-reasoner" : "deepseek-chat";
+  return requestedDepth === "deep" ? "deepseek-reasoner" : "deepseek-v4-flash";
 }
 
 export function buildIndustryResearchExecutionMetadata(
@@ -617,7 +619,10 @@ export type WatchlistTimingCardsPipelineInput = {
 };
 
 export type WatchlistTimingPipelineInput = {
-  watchListId: string;
+  watchListId?: string;
+  sourceWatchListId?: string;
+  targets?: TimingPipelineTarget[];
+  mode?: "SINGLE" | "PORTFOLIO";
   portfolioSnapshotId: string;
   revisionId: string;
   analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
@@ -653,7 +658,7 @@ export type TimingPipelineTarget = {
 };
 
 export type TimingWatchlistContext = {
-  id: string;
+  id?: string;
   name: string;
   stockCount: number;
 };

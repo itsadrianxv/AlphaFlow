@@ -248,11 +248,11 @@ export const DEFAULT_RESEARCH_RUNTIME_CONFIG: ResearchRuntimeConfig = {
   maxContentCharsPerSource: 2400,
   maxNotesCharsForCompression: 9000,
   models: {
-    clarification: "deepseek-chat",
-    planning: "deepseek-chat",
-    research: "deepseek-chat",
-    compression: "deepseek-chat",
-    report: "deepseek-chat",
+    clarification: "deepseek-v4-flash",
+    planning: "deepseek-v4-flash",
+    research: "deepseek-v4-flash",
+    compression: "deepseek-v4-flash",
+    report: "deepseek-v4-flash",
   },
   toolProviders: {
     webSearch: "tavily",

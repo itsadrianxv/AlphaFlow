@@ -9,6 +9,7 @@ import type {
 const SHANGHAI_TIME_ZONE = "Asia/Shanghai";
 const LEASE_MS = 60_000;
 const WAIT_MS = 5_000;
+const FRESH_MS = 60 * 60 * 1_000;
 
 type RadarTargets = Omit<NewsRadarRequest, "days" | "limit" | "endAt"> & {
   days: number;
@@ -128,7 +129,13 @@ export class SharedNewsLibraryService {
     const existing = await this.prisma.sharedNewsDaySync.findUnique({
       where: { date: marker },
     });
-    if (existing?.status === "COMPLETED") return [];
+    const isToday = dateKey === shanghaiDateKey(now);
+    const isFresh =
+      existing?.completedAt &&
+      now.getTime() - existing.completedAt.getTime() < FRESH_MS;
+    if (existing?.status === "COMPLETED" && (!isToday || isFresh)) {
+      return existing.warnings ?? [];
+    }
 
     let owned = false;
     if (!existing) {
@@ -150,8 +157,14 @@ export class SharedNewsLibraryService {
       const claimed = await this.prisma.sharedNewsDaySync.updateMany({
         where: {
           date: marker,
-          status: { not: "COMPLETED" },
-          OR: [{ status: "FAILED" }, { leaseExpiresAt: { lt: now } }],
+          OR: [
+            { status: "FAILED" },
+            { leaseExpiresAt: { lt: now } },
+            {
+              status: "COMPLETED",
+              completedAt: { lte: new Date(now.getTime() - FRESH_MS) },
+            },
+          ],
         },
         data: {
           status: "PENDING",
@@ -192,8 +205,8 @@ export class SharedNewsLibraryService {
         this.prisma.sharedNewsDaySync.update({
           where: { date: marker },
           data: {
-            status: response.complete ? "COMPLETED" : "FAILED",
-            completedAt: response.complete ? new Date() : null,
+            status: "COMPLETED",
+            completedAt: new Date(),
             leaseExpiresAt: null,
             warnings,
           },
@@ -218,7 +231,7 @@ export class SharedNewsLibraryService {
       const current = await this.prisma.sharedNewsDaySync.findUnique({
         where: { date: marker },
       });
-      if (current?.status === "COMPLETED") return [];
+      if (current?.status === "COMPLETED") return current.warnings ?? [];
       if (current?.status === "FAILED") return current.warnings;
       await new Promise((resolve) => setTimeout(resolve, 250));
     }

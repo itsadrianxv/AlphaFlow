@@ -11,6 +11,10 @@ describe("Pi Agent selection draft handoff", () => {
     "utf8",
   );
   const homeSource = readFileSync("app/page.tsx", "utf8");
+  const agentRuntimePageSource = readFileSync(
+    "app/agent-runtime/page.tsx",
+    "utf8",
+  );
   const draftSource = readFileSync(
     "app/agent-runtime/selection-draft.ts",
     "utf8",
@@ -18,8 +22,8 @@ describe("Pi Agent selection draft handoff", () => {
 
   it("adds an ask Pi Agent action to the floating highlight toolbar", () => {
     expect(highlightSource).toContain("writePiAgentSelectionDraft");
-    expect(highlightSource).toContain("询问 Pi Agent");
-    expect(highlightSource).toContain('"/?draft=selection"');
+    expect(highlightSource).toContain("询问投研智能体");
+    expect(highlightSource).toContain('"/agent-runtime?draft=selection"');
     expect(highlightSource).toContain("无法暂存选中文本");
   });
 
@@ -42,6 +46,7 @@ describe("Pi Agent selection draft handoff", () => {
     expect(agentRuntimeSource).toContain("setPrompt((current) =>");
     expect(agentRuntimeSource).toContain("promptTextareaRef.current?.focus()");
     expect(agentRuntimeSource).toContain("router.replace");
+    expect(agentRuntimeSource).toContain('"/agent-runtime"');
     expect(draftEffectIndex).toBeGreaterThanOrEqual(0);
     expect(sendMutationIndex).toBeGreaterThan(draftEffectIndex);
   });
@@ -49,14 +54,16 @@ describe("Pi Agent selection draft handoff", () => {
   it("keeps Pi Agent message highlights in the current conversation", () => {
     expect(agentRuntimeSource).toContain("piAgentHref={props.piAgentHref}");
     expect(agentRuntimeSource).toContain(
-      "piAgentHref={`/?conversationId=${encodeURIComponent(",
+      "piAgentHref={`/agent-runtime?conversationId=${encodeURIComponent(",
     );
     expect(agentRuntimeSource).toContain(")}&draft=selection`}");
   });
 
-  it("renders Pi Agent on the overview page without a standalone route", () => {
-    expect(homeSource).toContain("<PiAgentComposer />");
+  it("restores the standalone investment research agent page", () => {
+    expect(homeSource).toContain("<PiAgentComposer showConversation={false} />");
     expect(agentRuntimeSource).toContain("pi-agent-composer fixed");
-    expect(existsSync("app/agent-runtime/page.tsx")).toBe(false);
+    expect(agentRuntimePageSource).toContain("AgentRuntimeClientPage");
+    expect(agentRuntimePageSource).toContain("/agent-runtime");
+    expect(existsSync("app/agent-runtime/page.tsx")).toBe(true);
   });
 });

@@ -16,6 +16,8 @@ function mapRecord(record: {
   totalCapital: number;
   positions: unknown;
   riskPreferences: unknown;
+  source: string;
+  workflowRunId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }): PortfolioSnapshotRecord {
@@ -29,6 +31,8 @@ function mapRecord(record: {
     positions: record.positions as PortfolioSnapshotRecord["positions"],
     riskPreferences:
       record.riskPreferences as PortfolioSnapshotRecord["riskPreferences"],
+    source: record.source as PortfolioSnapshotRecord["source"],
+    workflowRunId: record.workflowRunId,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
   };
@@ -37,7 +41,12 @@ function mapRecord(record: {
 export class PrismaPortfolioSnapshotRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(params: PortfolioSnapshotDraft) {
+  async create(
+    params: PortfolioSnapshotDraft & {
+      source?: "SAVED" | "RUN_INPUT";
+      workflowRunId?: string;
+    },
+  ) {
     const record = await this.prisma.portfolioSnapshot.create({
       data: {
         userId: params.userId,
@@ -47,6 +56,8 @@ export class PrismaPortfolioSnapshotRepository {
         totalCapital: params.totalCapital,
         positions: toJson(params.positions),
         riskPreferences: toJson(params.riskPreferences),
+        source: params.source ?? "SAVED",
+        workflowRunId: params.workflowRunId,
       },
     });
 
@@ -99,6 +110,7 @@ export class PrismaPortfolioSnapshotRepository {
     const records = await this.prisma.portfolioSnapshot.findMany({
       where: {
         userId,
+        source: "SAVED",
       },
       orderBy: [
         {
@@ -108,5 +120,32 @@ export class PrismaPortfolioSnapshotRepository {
     });
 
     return records.map((record) => mapRecord(record));
+  }
+
+  async getLatestRunInput(userId: string) {
+    const record = await this.prisma.portfolioSnapshot.findFirst({
+      where: { userId, source: "RUN_INPUT" },
+      orderBy: { createdAt: "desc" },
+    });
+    return record ? mapRecord(record) : null;
+  }
+
+  async attachToRun(id: string, userId: string, workflowRunId: string) {
+    const record = await this.prisma.portfolioSnapshot.findFirst({
+      where: { id, userId, source: "RUN_INPUT" },
+    });
+    if (!record) return null;
+    return mapRecord(
+      await this.prisma.portfolioSnapshot.update({
+        where: { id },
+        data: { workflowRunId },
+      }),
+    );
+  }
+
+  async deleteRunInput(id: string, userId: string) {
+    return this.prisma.portfolioSnapshot.deleteMany({
+      where: { id, userId, source: "RUN_INPUT", workflowRunId: null },
+    });
   }
 }

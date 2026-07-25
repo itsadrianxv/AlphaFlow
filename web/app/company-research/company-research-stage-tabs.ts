@@ -2,6 +2,11 @@ import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
 
 export const companyResearchStageTabs: WorkflowStageTab[] = [
   {
+    id: "overview",
+    label: "公司概况",
+    summary: "",
+  },
+  {
     id: "target",
     label: "研究目标",
     summary: "",

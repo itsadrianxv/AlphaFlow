@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { SharedNewsLibraryService } from "~/server/application/intelligence/shared-news-library-service";
 
 const rawItem = {
@@ -31,6 +31,8 @@ function completedPrisma() {
 }
 
 describe("SharedNewsLibraryService", () => {
+  afterEach(() => vi.useRealTimers());
+
   it("当天已完成时直接复用数据库新闻，不再调用 Minishare", async () => {
     const prisma = completedPrisma();
     const getDailyNews = vi.fn();
@@ -45,6 +47,46 @@ describe("SharedNewsLibraryService", () => {
     expect(getDailyNews).not.toHaveBeenCalled();
     expect(resolveNewsRadar).toHaveBeenCalledWith(expect.objectContaining({ rawItems: [rawItem] }));
     expect(result.warnings).toEqual([]);
+  });
+
+  it("当天缓存 59 分钟内复用，达到 60 分钟后重新采集", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-24T04:00:00.000Z"));
+    const completedAt = new Date("2026-07-24T03:01:00.000Z");
+    const getDailyNews = vi.fn(async () => ({
+      items: [rawItem],
+      sourceStatus: { fast: true, major: true, cctv: true },
+      complete: true,
+    }));
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const prisma = {
+      sharedNewsDaySync: {
+        findUnique: vi.fn(async () => ({
+          status: "COMPLETED",
+          completedAt,
+          warnings: [],
+        })),
+        updateMany,
+        update: vi.fn(async () => ({})),
+      },
+      sharedNewsItem: {
+        upsert: vi.fn(async () => ({})),
+        findMany: vi.fn(async () => [{ rawPayload: rawItem }]),
+      },
+      $transaction: vi.fn(async (operations) => Promise.all(operations)),
+    };
+    const service = new SharedNewsLibraryService(
+      prisma as never,
+      { getDailyNews, resolveNewsRadar: vi.fn(async () => []) } as never,
+    );
+
+    await service.collectRadar({ ...targets, endAt: "2026-07-24T12:00:00+08:00" });
+    expect(getDailyNews).not.toHaveBeenCalled();
+
+    vi.setSystemTime(new Date("2026-07-24T04:01:00.000Z"));
+    await service.collectRadar({ ...targets, endAt: "2026-07-24T12:01:00+08:00" });
+    expect(updateMany).toHaveBeenCalledTimes(1);
+    expect(getDailyNews).toHaveBeenCalledTimes(1);
   });
 
   it("缺失日期由一个领取者采集并写入共享库", async () => {

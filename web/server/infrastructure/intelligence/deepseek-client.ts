@@ -45,12 +45,12 @@ type DeepSeekResponse = {
 };
 
 const MODEL_CONTEXT_LIMIT_HINTS: Record<string, number> = {
-  "deepseek-chat": 64_000,
+  "deepseek-v4-flash": 64_000,
   "deepseek-reasoner": 64_000,
 };
 
 const MODEL_TIMEOUT_MINIMUMS: Partial<Record<string, number>> = {
-  "deepseek-chat": 45_000,
+  "deepseek-v4-flash": 45_000,
   "deepseek-reasoner": 60_000,
 };
 
@@ -109,7 +109,7 @@ export class DeepSeekClient {
   constructor(config?: DeepSeekClientConfig) {
     this.apiKey = config?.apiKey ?? env.DEEPSEEK_API_KEY;
     this.baseUrl = config?.baseUrl ?? env.DEEPSEEK_BASE_URL;
-    this.model = config?.model ?? "deepseek-chat";
+    this.model = config?.model ?? "deepseek-v4-flash";
     this.timeoutMs = config?.timeoutMs ?? env.DEEPSEEK_TIMEOUT_MS;
   }
 

@@ -1,5 +1,4 @@
-import { randomUUID } from "node:crypto";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   type EvidenceCitation,
@@ -228,6 +227,7 @@ export class PrismaTimingAnalysisCardRepository {
     stockCode?: string;
     sourceType?: TimingSourceType;
     watchListId?: string;
+    workflowRunId?: string;
   }) {
     const records = await this.prisma.timingAnalysisCard.findMany({
       where: {
@@ -235,6 +235,7 @@ export class PrismaTimingAnalysisCardRepository {
         stockCode: params.stockCode,
         sourceType: params.sourceType,
         watchListId: params.watchListId,
+        workflowRunId: params.workflowRunId,
       },
       include: {
         signalSnapshot: true,

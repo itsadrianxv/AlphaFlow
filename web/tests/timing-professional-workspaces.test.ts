@@ -15,13 +15,15 @@ describe("择时专业双工作区", () => {
     "utf8",
   );
 
-  it("运行台引用已发布修订并执行真实数据预检", () => {
-    expect(consoleSource).toContain("getTimingRunPreflight");
+  it("运行台使用任务型接口执行投资者视角预检与本轮结果过滤", () => {
+    expect(consoleSource).toContain("previewDecision");
+    expect(consoleSource).toContain("startTimingDecision");
     expect(consoleSource).toContain("LATEST_COMPLETE");
     expect(consoleSource).toContain("CURRENT_PARTIAL");
-    expect(consoleSource).toContain("preflight.data?.canRun");
-    expect(consoleSource).toContain("missingPrimary");
-    expect(consoleSource).toContain("unresolvedVetos");
+    expect(consoleSource).toContain("preview.data?.canRun");
+    expect(consoleSource).toContain("workflowRunId: runId");
+    expect(consoleSource).toContain("数据齐全");
+    expect(consoleSource).toContain("仅观察");
   });
 
   it("策略编辑器包含五个专业视图与不可变修订操作", () => {

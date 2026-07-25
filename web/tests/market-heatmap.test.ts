@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildMarketHeatmapOption,
+  buildHeatmapPreviewKlineOption,
   getHeatmapColor,
 } from "~/app/heatmap/market-heatmap-client";
 
@@ -33,12 +34,23 @@ describe("A 股概念热力图", () => {
 
   it("按概念和市值生成嵌套 Treemap 数据", () => {
     const option = buildMarketHeatmapOption(snapshot, "dark");
-    const series = option.series[0] as { data: Array<{ children: Array<{ itemStyle: { color: string } }> }> };
+    const series = option.series[0] as {
+      data: Array<{ children: Array<{ itemStyle: { color: string } }> }>;
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+    };
 
     expect(series.data).toHaveLength(1);
     expect(series.data[0]?.children).toHaveLength(2);
     expect(series.data[0]?.children[0]?.itemStyle.color).toBe("#ae6470");
     expect(series.data[0]?.children[1]?.itemStyle.color).toBe("#61914d");
+    expect(series.left).toBe(0);
+    expect(series.top).toBe(0);
+    expect(series.right).toBe(0);
+    expect(series.bottom).toBe(0);
+    expect(option.tooltip).toEqual({ show: false });
   });
 
   it("在上游出现重复概念时只保留首次出现的概念", () => {
@@ -54,5 +66,19 @@ describe("A 股概念热力图", () => {
 
     expect(series.data).toHaveLength(1);
     expect(series.data[0]?.name).toBe("算力");
+  });
+
+  it("为悬停卡片生成最近日线的 K 线序列", () => {
+    const option = buildHeatmapPreviewKlineOption(
+      [
+        { tradeDate: "2026-07-23", open: 10, high: 11, low: 9.8, close: 10.5 },
+        { tradeDate: "2026-07-24", open: 10.5, high: 10.8, low: 10.1, close: 10.2 },
+      ],
+      "dark",
+    );
+    const series = option.series[0] as { type: string; data: number[][] };
+
+    expect(series.type).toBe("candlestick");
+    expect(series.data).toEqual([[10, 10.5, 9.8, 11], [10.5, 10.2, 10.1, 10.8]]);
   });
 });

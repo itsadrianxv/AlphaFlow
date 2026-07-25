@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -14,6 +15,7 @@ import {
 } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { buildScreeningWorkspaceHistoryItems } from "~/app/_components/workspace-history";
+import { companyOverviewHref } from "~/app/company-research/company-overview-link";
 import { screeningStageTabs } from "~/app/screening/screening-stage-tabs";
 import {
   annualPresetOptions,
@@ -2104,7 +2106,14 @@ export function ScreeningStudioClient() {
                               }
                             />
                           </td>
-                          <td>{row.stockName}</td>
+                          <td>
+                            <Link
+                              href={companyOverviewHref(row.stockCode)}
+                              className="hover:underline"
+                            >
+                              {row.stockName}
+                            </Link>
+                          </td>
                           <td>{row.stockCode}</td>
                           {resultColumns.map((column) => {
                             const seriesMetric = row.metrics[column.metricId];

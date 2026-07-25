@@ -1,8 +1,20 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  buildStockKlinePreviewOption,
+  StockKlineHoverCard,
+} from "~/app/_components/stock-kline-hover-card";
 import { type ThemeMode, useTheme } from "~/app/_components/theme-provider";
+import { companyOverviewHref } from "~/app/company-research/company-overview-link";
 import type { MarketHeatmapSnapshot } from "~/contracts/market-heatmap";
 import { api } from "~/trpc/react";
 
@@ -22,6 +34,13 @@ type TreeMapLabelLayoutParams = {
   text?: string;
 };
 
+type HoveredStock = {
+  stockCode: string;
+  stockName: string;
+  x: number;
+  y: number;
+};
+
 const HEATMAP_COLORS = {
   dark: {
     negative: ["#5d7356", "#61914d", "#62A344"],
@@ -39,7 +58,7 @@ const HEATMAP_COLORS = {
   },
 } as const;
 
-const MIN_LABEL_FONT_SIZE = 11;
+const MIN_LABEL_FONT_SIZE = 5;
 const MAX_LABEL_FONT_SIZE = 18;
 
 function getTextUnits(value: string) {
@@ -135,23 +154,14 @@ export function buildMarketHeatmapOption(
   );
   return {
     animationDuration: 180,
-    tooltip: {
-      backgroundColor: theme === "dark" ? "#16191d" : "#ffffff",
-      borderColor: theme === "dark" ? "#34383d" : "#c8ccd0",
-      textStyle: { color: colors.text, fontFamily: "var(--font-body)" },
-      formatter: (params: { data?: TreeMapDatum }) => {
-        const item = params.data;
-        if (!item?.stockCode) return item?.name ?? "";
-        const change =
-          item.changePercent == null
-            ? "--"
-            : `${item.changePercent >= 0 ? "+" : ""}${item.changePercent.toFixed(2)}%`;
-        return `<strong>${item.stockName}</strong><br/>${item.stockCode}<br/>市值：${formatMarketCap(item.value)}<br/>涨跌幅：${change}<br/>概念：${item.conceptName}`;
-      },
-    },
+    tooltip: { show: false },
     series: [
       {
         type: "treemap",
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
         roam: false,
         nodeClick: false,
         breadcrumb: { show: false },
@@ -202,13 +212,27 @@ export function buildMarketHeatmapOption(
   };
 }
 
-function formatMarketCap(value: number) {
-  return `${(value / 10_000).toFixed(value >= 10_000 ? 0 : 1)} 亿元`;
+export function buildHeatmapPreviewKlineOption(
+  bars: Array<{
+    tradeDate: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+  }>,
+  theme: ThemeMode,
+) {
+  return buildStockKlinePreviewOption(bars, theme);
 }
 
 export function MarketHeatmapClient() {
+  const router = useRouter();
   const { theme } = useTheme();
   const [expanded, setExpanded] = useState(false);
+  const [hoveredStock, setHoveredStock] = useState<HoveredStock | null>(null);
+  const clearHoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
   const chartElement = useRef<HTMLDivElement>(null);
   const query = api.heatmap.getSnapshot.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -227,6 +251,26 @@ export function MarketHeatmapClient() {
     [expanded, query.data],
   );
   const legendColors = HEATMAP_COLORS[theme];
+  const previewBars = api.companyOverview.bars.useQuery(
+    {
+      stockCode: hoveredStock?.stockCode ?? "000001",
+      timeframe: "DAILY",
+      adjust: "",
+    },
+    {
+      enabled: Boolean(hoveredStock),
+      refetchOnWindowFocus: false,
+      staleTime: 60_000,
+    },
+  );
+
+  const cancelClearHover = useCallback(() => {
+    if (clearHoverTimer.current) clearTimeout(clearHoverTimer.current);
+  }, []);
+  const scheduleClearHover = useCallback(() => {
+    cancelClearHover();
+    clearHoverTimer.current = setTimeout(() => setHoveredStock(null), 120);
+  }, [cancelClearHover]);
 
   useEffect(() => {
     if (!chartElement.current || !snapshot) return;
@@ -247,6 +291,35 @@ export function MarketHeatmapClient() {
       ]);
       const chart = init(chartElement.current);
       chart.setOption(buildMarketHeatmapOption(snapshot, theme), true);
+      chart.on("mouseover", (params) => {
+        const datum = params.data as TreeMapDatum | undefined;
+        const event = params.event as unknown as
+          | { offsetX?: number; offsetY?: number }
+          | undefined;
+        if (!datum?.stockCode || !datum.stockName || !datum.conceptName) return;
+        cancelClearHover();
+        const containerWidth = chartElement.current?.clientWidth ?? 0;
+        const containerHeight = chartElement.current?.clientHeight ?? 0;
+        setHoveredStock({
+          stockCode: datum.stockCode,
+          stockName: datum.stockName,
+          x: Math.min(
+            Math.max(event?.offsetX ?? 12, 12),
+            Math.max(12, containerWidth - 292),
+          ),
+          y: Math.min(
+            Math.max(event?.offsetY ?? 12, 12),
+            Math.max(12, containerHeight - 190),
+          ),
+        });
+      });
+      chart.on("globalout", scheduleClearHover);
+      chart.on("click", (params) => {
+        const datum = params.data as TreeMapDatum | undefined;
+        if (datum?.stockCode) {
+          router.push(companyOverviewHref(datum.stockCode));
+        }
+      });
       const observer = new ResizeObserver(() => chart.resize());
       observer.observe(chartElement.current);
       cleanup = () => {
@@ -258,11 +331,11 @@ export function MarketHeatmapClient() {
       disposed = true;
       cleanup();
     };
-  }, [snapshot, theme]);
+  }, [cancelClearHover, router, scheduleClearHover, snapshot, theme]);
 
   return (
     <section className="pt-2">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--app-border-soft)] pb-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-4">
         <div className="min-w-0">
           <h1 className="text-xl font-semibold text-[var(--app-text-strong)]">
             A 股概念热力图
@@ -288,7 +361,7 @@ export function MarketHeatmapClient() {
         </div>
       ) : null}
       {snapshot ? (
-        <div className="pt-5">
+        <div>
           <div className="mb-4 flex justify-end text-sm text-[var(--app-text-muted)]">
             <div
               className="flex items-center gap-2"
@@ -319,10 +392,31 @@ export function MarketHeatmapClient() {
               <span className="text-xs">上涨</span>
             </div>
           </div>
-          <div
-            ref={chartElement}
-            className="min-h-[680px] w-full overflow-hidden border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)]"
-          />
+          <div className="relative" onPointerLeave={scheduleClearHover}>
+            <div
+              ref={chartElement}
+              className="min-h-[680px] w-full overflow-hidden bg-[var(--app-bg-inset)]"
+            />
+            {hoveredStock ? (
+              <StockKlineHoverCard
+                stockCode={hoveredStock.stockCode}
+                stockName={hoveredStock.stockName}
+                bars={previewBars.data?.bars ?? []}
+                loading={previewBars.isLoading}
+                theme={theme}
+                style={{
+                  left: hoveredStock.x,
+                  top: hoveredStock.y,
+                  position: "absolute",
+                }}
+                onOpen={() =>
+                  router.push(companyOverviewHref(hoveredStock.stockCode))
+                }
+                onPointerEnter={cancelClearHover}
+                onPointerLeave={scheduleClearHover}
+              />
+            ) : null}
+          </div>
         </div>
       ) : null}
     </section>

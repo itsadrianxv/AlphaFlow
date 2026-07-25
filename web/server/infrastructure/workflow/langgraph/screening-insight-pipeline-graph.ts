@@ -1,4 +1,8 @@
 import { Annotation, END, StateGraph } from "@langchain/langgraph";
+import {
+  type EvidenceContextWriter,
+  writeEvidenceContext,
+} from "~/server/application/evidence-context/evidence-context-writer";
 import type { ConfidenceAnalysisService } from "~/server/application/intelligence/confidence-analysis-service";
 import type { InsightDataClient } from "~/server/application/intelligence/insight-archive-service";
 import {
@@ -91,6 +95,7 @@ export type ScreeningInsightPipelineGraphDependencies = {
   synthesisService: InsightSynthesisService;
   confidenceAnalysisService: ConfidenceAnalysisService;
   reminderSchedulingService: ReminderSchedulingService;
+  evidenceContextWriter?: EvidenceContextWriter;
   maxInsightsPerSession?: number;
 };
 
@@ -123,6 +128,7 @@ function toInsightCard(params: {
   score: number;
   draft: SynthesizedInsightDraft;
   existing?: ScreeningInsight | null;
+  evidenceCitations?: ScreeningInsightPipelineInsightCard["evidenceCitations"];
 }): ScreeningInsightPipelineInsightCard {
   const confidenceSummary = summarizeConfidenceAnalysis(
     params.draft.confidenceAnalysis,
@@ -144,6 +150,7 @@ function toInsightCard(params: {
     catalysts: params.draft.catalysts.map((item) => item.toDict()),
     reviewPlan: params.draft.reviewPlan.toDict(),
     evidenceRefs: params.draft.evidenceRefs.map((item) => item.toDict()),
+    evidenceCitations: params.evidenceCitations,
     confidenceAnalysis: params.draft.confidenceAnalysis,
     confidenceScore: confidenceSummary.confidenceScore,
     confidenceLevel: confidenceSummary.confidenceLevel,
@@ -212,6 +219,7 @@ export class ScreeningInsightPipelineLangGraph extends BaseWorkflowLangGraph<
     const synthesisService = dependencies.synthesisService;
     const confidenceAnalysisService = dependencies.confidenceAnalysisService;
     const reminderSchedulingService = dependencies.reminderSchedulingService;
+    const evidenceContextWriter = dependencies.evidenceContextWriter;
     const maxInsightsPerSession = dependencies.maxInsightsPerSession ?? 10;
 
     const loadSessionOrThrow = async (
@@ -310,6 +318,62 @@ export class ScreeningInsightPipelineLangGraph extends BaseWorkflowLangGraph<
               stock,
               evidence,
             ).map((item) => item.toDict());
+            const evidenceContext = evidenceContextWriter
+              ? await writeEvidenceContext({
+                  writer: evidenceContextWriter,
+                  userId: state.userId,
+                  workflowRunId: state.runId,
+                  subject: {
+                    subjectType: "stock",
+                    subjectId: stock.stockCode.value,
+                    label: stock.stockName,
+                  },
+                  phase: "screening",
+                  metadata: { screeningSessionId: session.id },
+                  blocks: [
+                    {
+                      blockKey: "screening",
+                      sourceType: "screening_session",
+                      sourceId: session.id,
+                      sourceName: session.strategyName,
+                      items: [
+                        {
+                          itemKey: "screening_score",
+                          status: "available",
+                          extractedFact: `${stock.stockName} 筛选得分 ${Math.round(stock.score * 100)}`,
+                          snippet: stock.scoreExplanations[0],
+                          sourceType: "screening_session",
+                          sourceId: session.id,
+                          sourceName: session.strategyName,
+                          publishedAt:
+                            session.completedAt?.toISOString() ??
+                            session.executedAt.toISOString(),
+                          observedAt: new Date().toISOString(),
+                          fetchedAt: new Date().toISOString(),
+                          valueJson: factsBundle.screening,
+                        },
+                        ...(evidence
+                          ? [
+                              {
+                                itemKey: "external_evidence",
+                                status: "available" as const,
+                                extractedFact: evidence.evidenceSummary,
+                                snippet: evidence.evidenceSummary,
+                                sourceType: "python_intelligence",
+                                sourceId: stock.stockCode.value,
+                                sourceName: "Python intelligence service",
+                                publishedAt: evidence.updatedAt,
+                                observedAt: new Date().toISOString(),
+                                fetchedAt: new Date().toISOString(),
+                                valueJson: evidence,
+                              },
+                            ]
+                          : []),
+                      ],
+                    },
+                  ],
+                })
+              : undefined;
 
             evidenceBundle.push({
               stockCode: stock.stockCode.value,
@@ -318,6 +382,7 @@ export class ScreeningInsightPipelineLangGraph extends BaseWorkflowLangGraph<
               factsBundle,
               evidenceRefs,
               evidence,
+              evidenceCitations: evidenceContext?.citations,
             });
           }
 
@@ -361,6 +426,7 @@ export class ScreeningInsightPipelineLangGraph extends BaseWorkflowLangGraph<
                   confidenceAnalysis,
                 },
                 existing,
+                evidenceCitations: item.evidenceCitations,
               }),
             );
           }
@@ -710,6 +776,7 @@ export class ScreeningInsightPipelineLangGraph extends BaseWorkflowLangGraph<
         supportedClaimCount: item.supportedClaimCount,
         insufficientClaimCount: item.insufficientClaimCount,
         contradictedClaimCount: item.contradictedClaimCount,
+        evidenceCitations: item.evidenceCitations,
       })),
     };
   }

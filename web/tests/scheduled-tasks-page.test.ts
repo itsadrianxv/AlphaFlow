@@ -1,0 +1,21 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+const root = path.resolve(import.meta.dirname, "..");
+
+describe("定时任务页面", () => {
+  it("在侧边导航中提供定时任务入口", async () => {
+    const source = await readFile(path.join(root, "app/_components/workspace-shell.tsx"), "utf8");
+    expect(source).toContain('href: "/scheduled-tasks"');
+    expect(source).toContain('label: "定时任务"');
+  });
+
+  it("提供筛选、暂停、恢复和取消操作", async () => {
+    const source = await readFile(path.join(root, "app/scheduled-tasks/scheduled-tasks-client.tsx"), "utf8");
+    expect(source).toContain("scheduledTask.pause");
+    expect(source).toContain("scheduledTask.resume");
+    expect(source).toContain("scheduledTask.cancel");
+    expect(source).toContain("任务状态筛选");
+  });
+});

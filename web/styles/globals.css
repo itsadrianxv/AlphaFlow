@@ -211,6 +211,15 @@ body {
   color: var(--app-text-subtle);
 }
 
+.login-dancing {
+  filter: invert(1);
+  transition: filter 160ms ease;
+}
+
+[data-theme="light"] .login-dancing {
+  filter: none;
+}
+
 .app-button {
   display: inline-flex;
   align-items: center;
@@ -229,17 +238,6 @@ body {
     background-color 160ms ease,
     border-color 160ms ease,
     color 160ms ease;
-}
-
-.app-action-illustration {
-  filter: saturate(0.92) contrast(1.03);
-}
-
-.app-sidebar-illustration {
-  transition:
-    max-height 180ms ease,
-    opacity 160ms ease,
-    padding 180ms ease;
 }
 
 .app-button:hover {
@@ -425,6 +423,13 @@ select:focus {
     > div {
     margin-right: 0;
     margin-left: max(2.5rem, calc((100vw - 1538px) / 2 + 2.5rem));
+    max-width: calc(100vw - 338px);
+  }
+
+  [data-workflow-shell="mistral"][data-sidebar-collapsed="false"]
+    .pi-agent-composer
+    > div {
+    max-width: calc(100vw - 338px);
   }
 
   [data-workflow-shell="mistral"][data-sidebar-collapsed="true"]
@@ -435,6 +440,33 @@ select:focus {
     > div {
     margin-right: 0;
     margin-left: max(2.5rem, calc((100vw - 1368px) / 2 + 2.5rem));
+    max-width: calc(100vw - 168px);
+  }
+
+  [data-workflow-shell="mistral"][data-sidebar-collapsed="true"]
+    .pi-agent-composer
+    > div {
+    max-width: calc(100vw - 168px);
+  }
+
+  @media (min-width: 1280px) {
+    [data-workflow-shell="mistral"][data-sidebar-collapsed="false"]
+      .pi-agent-composer
+      > div,
+    [data-workflow-shell="mistral"][data-sidebar-collapsed="false"]
+      .pi-agent-conversation
+      > div {
+      max-width: min(912px, calc(100vw - 626px));
+    }
+
+    [data-workflow-shell="mistral"][data-sidebar-collapsed="true"]
+      .pi-agent-composer
+      > div,
+    [data-workflow-shell="mistral"][data-sidebar-collapsed="true"]
+      .pi-agent-conversation
+      > div {
+      max-width: min(912px, calc(100vw - 456px));
+    }
   }
 }
 

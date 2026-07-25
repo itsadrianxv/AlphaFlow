@@ -33,6 +33,27 @@ const DEFAULT_BACKTEST_POLICY: TimingPresetConfigV2["backtestPolicy"] = {
   sellTaxBps: 5,
 };
 
+export const TIMING_RISK_PROFILE_DEFAULTS = {
+  STEADY: {
+    maxSingleNamePct: 10,
+    maxThemeExposurePct: 25,
+    defaultProbePct: 2,
+    maxPortfolioRiskBudgetPct: 15,
+  },
+  BALANCED: {
+    maxSingleNamePct: 12,
+    maxThemeExposurePct: 28,
+    defaultProbePct: 3,
+    maxPortfolioRiskBudgetPct: 20,
+  },
+  AGGRESSIVE: {
+    maxSingleNamePct: 15,
+    maxThemeExposurePct: 35,
+    defaultProbePct: 5,
+    maxPortfolioRiskBudgetPct: 30,
+  },
+} as const;
+
 export const TIMING_TIMEFRAME_TEMPLATES: Record<
   TimingHorizonTemplate,
   TimingTimeframePlan & { reviewTradingDays: number[] }
@@ -228,17 +249,64 @@ const SETUP_RULE_GROUPS: Record<TimingSetupType, TimingRuleGroupConfig[]> = {
       role: "CONFIRMATION",
       minSatisfied: 2,
       rules: [
-        rule({ id: "breakout-volume", name: "突破量能", indicatorId: "liquidity.volume_ratio_20", role: "CONFIRMATION", timeframe: "DAILY", operator: ">=", threshold: 1.5, explanation: "成交量达到20日均量的1.5倍。" }),
-        rule({ id: "breakout-turnover", name: "换手活跃", indicatorId: "liquidity.turnover_above_median_20", role: "CONFIRMATION", timeframe: "DAILY", operator: "==", threshold: true, explanation: "换手率高于过去20日中位数。" }),
-        rule({ id: "breakout-rs", name: "相对强弱确认", indicatorId: "relative_strength.return_20d", role: "CONFIRMATION", timeframe: "DAILY", operator: ">", threshold: 0, explanation: "20日超额收益为正。" }),
-        rule({ id: "breakout-auction", name: "开盘竞价质量", indicatorId: "auction.close_above_vwap", role: "CONFIRMATION", timeframe: "DAILY", operator: "==", threshold: true, explanation: "盘后竞价证据显示集合竞价收盘价不弱于VWAP。" }),
+        rule({
+          id: "breakout-volume",
+          name: "突破量能",
+          indicatorId: "liquidity.volume_ratio_20",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: ">=",
+          threshold: 1.5,
+          explanation: "成交量达到20日均量的1.5倍。",
+        }),
+        rule({
+          id: "breakout-turnover",
+          name: "换手活跃",
+          indicatorId: "liquidity.turnover_above_median_20",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          explanation: "换手率高于过去20日中位数。",
+        }),
+        rule({
+          id: "breakout-rs",
+          name: "相对强弱确认",
+          indicatorId: "relative_strength.return_20d",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: ">",
+          threshold: 0,
+          explanation: "20日超额收益为正。",
+        }),
+        rule({
+          id: "breakout-auction",
+          name: "开盘竞价质量",
+          indicatorId: "auction.close_above_vwap",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          explanation: "盘后竞价证据显示集合竞价收盘价不弱于VWAP。",
+        }),
       ],
     },
     {
       role: "VETO",
       minSatisfied: 0,
       rules: [
-        rule({ id: "breakout-failure", name: "突破快速失败", indicatorId: "breakout.failed_within_2", role: "VETO", timeframe: "DAILY", operator: "==", threshold: true, required: true, vetoSeverity: "CRITICAL", explanation: "突破后两个交易日内收盘跌回突破位下方。" }),
+        rule({
+          id: "breakout-failure",
+          name: "突破快速失败",
+          indicatorId: "breakout.failed_within_2",
+          role: "VETO",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          required: true,
+          vetoSeverity: "CRITICAL",
+          explanation: "突破后两个交易日内收盘跌回突破位下方。",
+        }),
         sharedLiquidityVeto,
       ],
     },
@@ -248,26 +316,105 @@ const SETUP_RULE_GROUPS: Record<TimingSetupType, TimingRuleGroupConfig[]> = {
       role: "PRIMARY",
       minSatisfied: 2,
       rules: [
-        rule({ id: "pullback-weekly-trend", name: "周线趋势完整", indicatorId: "trend.close_above_ema20", role: "PRIMARY", timeframe: "WEEKLY", operator: "==", threshold: true, required: true, explanation: "完整周线仍处于EMA20上方。" }),
-        rule({ id: "pullback-support-recovery", name: "回踩支撑后收复", indicatorId: "pullback.recovered_ema20_or_cost50", role: "PRIMARY", timeframe: "DAILY", operator: "==", threshold: true, required: true, explanation: "价格触及EMA20或筹码中位成本后重新收复。" }),
+        rule({
+          id: "pullback-weekly-trend",
+          name: "周线趋势完整",
+          indicatorId: "trend.close_above_ema20",
+          role: "PRIMARY",
+          timeframe: "WEEKLY",
+          operator: "==",
+          threshold: true,
+          required: true,
+          explanation: "完整周线仍处于EMA20上方。",
+        }),
+        rule({
+          id: "pullback-support-recovery",
+          name: "回踩支撑后收复",
+          indicatorId: "pullback.recovered_ema20_or_cost50",
+          role: "PRIMARY",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          required: true,
+          explanation: "价格触及EMA20或筹码中位成本后重新收复。",
+        }),
       ],
     },
     {
       role: "CONFIRMATION",
       minSatisfied: 2,
       rules: [
-        rule({ id: "pullback-rsi", name: "RSI恢复", indicatorId: "momentum.rsi12", role: "CONFIRMATION", timeframe: "DAILY", operator: ">=", threshold: 50, explanation: "RSI12恢复到50及以上。" }),
-        rule({ id: "pullback-volume", name: "缩量后恢复成交", indicatorId: "pullback.volume_recovery", role: "CONFIRMATION", timeframe: "DAILY", operator: "==", threshold: true, explanation: "回撤阶段缩量，收复支撑时成交恢复。" }),
-        rule({ id: "pullback-cost", name: "站上加权成本", indicatorId: "chip.close_above_weighted_cost", role: "CONFIRMATION", timeframe: "DAILY", operator: "==", threshold: true, explanation: "标准化价格重新站上筹码加权平均成本。" }),
-        rule({ id: "pullback-rs", name: "相对强弱未破坏", indicatorId: "relative_strength.return_20d", role: "CONFIRMATION", timeframe: "DAILY", operator: ">", threshold: 0, explanation: "20日相对强弱保持为正。" }),
+        rule({
+          id: "pullback-rsi",
+          name: "RSI恢复",
+          indicatorId: "momentum.rsi12",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: ">=",
+          threshold: 50,
+          explanation: "RSI12恢复到50及以上。",
+        }),
+        rule({
+          id: "pullback-volume",
+          name: "缩量后恢复成交",
+          indicatorId: "pullback.volume_recovery",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          explanation: "回撤阶段缩量，收复支撑时成交恢复。",
+        }),
+        rule({
+          id: "pullback-cost",
+          name: "站上加权成本",
+          indicatorId: "chip.close_above_weighted_cost",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          explanation: "标准化价格重新站上筹码加权平均成本。",
+        }),
+        rule({
+          id: "pullback-rs",
+          name: "相对强弱未破坏",
+          indicatorId: "relative_strength.return_20d",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: ">",
+          threshold: 0,
+          explanation: "20日相对强弱保持为正。",
+        }),
       ],
     },
     {
       role: "VETO",
       minSatisfied: 0,
       rules: [
-        rule({ id: "pullback-ema60-veto", name: "跌破EMA60", indicatorId: "trend.close_below_ema60", role: "VETO", timeframe: "DAILY", operator: "==", threshold: true, confirmationBars: 2, required: true, vetoSeverity: "CRITICAL", explanation: "连续跌破EMA60表明回撤已演变为结构破坏。" }),
-        rule({ id: "pullback-cost15-veto", name: "跌破15分位成本", indicatorId: "chip.close_below_cost15", role: "VETO", timeframe: "DAILY", operator: "==", threshold: true, confirmationBars: 2, vetoSeverity: "WARNING", explanation: "连续跌破低分位成本带表示筹码承接失败。" }),
+        rule({
+          id: "pullback-ema60-veto",
+          name: "跌破EMA60",
+          indicatorId: "trend.close_below_ema60",
+          role: "VETO",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          confirmationBars: 2,
+          required: true,
+          vetoSeverity: "CRITICAL",
+          explanation: "连续跌破EMA60表明回撤已演变为结构破坏。",
+        }),
+        rule({
+          id: "pullback-cost15-veto",
+          name: "跌破15分位成本",
+          indicatorId: "chip.close_below_cost15",
+          role: "VETO",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          confirmationBars: 2,
+          vetoSeverity: "WARNING",
+          explanation: "连续跌破低分位成本带表示筹码承接失败。",
+        }),
         sharedLiquidityVeto,
       ],
     },
@@ -277,25 +424,91 @@ const SETUP_RULE_GROUPS: Record<TimingSetupType, TimingRuleGroupConfig[]> = {
       role: "PRIMARY",
       minSatisfied: 2,
       rules: [
-        rule({ id: "reversal-nine-turn", name: "九转下行序列", indicatorId: "reversal.nine_down_count", role: "PRIMARY", timeframe: "DAILY", operator: ">=", threshold: 8, explanation: "下九转计数达到8或9。" }),
-        rule({ id: "reversal-rsi", name: "RSI超跌", indicatorId: "momentum.rsi12", role: "PRIMARY", timeframe: "DAILY", operator: "<=", threshold: 30, explanation: "RSI12处于超跌区。" }),
-        rule({ id: "reversal-chip", name: "低胜率或低成本区", indicatorId: "chip.oversold_zone", role: "PRIMARY", timeframe: "DAILY", operator: "==", threshold: true, explanation: "胜率不高于10%或价格接近15分位成本。" }),
+        rule({
+          id: "reversal-nine-turn",
+          name: "九转下行序列",
+          indicatorId: "reversal.nine_down_count",
+          role: "PRIMARY",
+          timeframe: "DAILY",
+          operator: ">=",
+          threshold: 8,
+          explanation: "下九转计数达到8或9。",
+        }),
+        rule({
+          id: "reversal-rsi",
+          name: "RSI超跌",
+          indicatorId: "momentum.rsi12",
+          role: "PRIMARY",
+          timeframe: "DAILY",
+          operator: "<=",
+          threshold: 30,
+          explanation: "RSI12处于超跌区。",
+        }),
+        rule({
+          id: "reversal-chip",
+          name: "低胜率或低成本区",
+          indicatorId: "chip.oversold_zone",
+          role: "PRIMARY",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          explanation: "胜率不高于10%或价格接近15分位成本。",
+        }),
       ],
     },
     {
       role: "CONFIRMATION",
       minSatisfied: 2,
       rules: [
-        rule({ id: "reversal-ema5", name: "收复EMA5", indicatorId: "trend.close_above_ema5", role: "CONFIRMATION", timeframe: "DAILY", operator: "==", threshold: true, explanation: "价格重新站上短期均线。" }),
-        rule({ id: "reversal-macd", name: "MACD柱改善", indicatorId: "momentum.macd_histogram_rising", role: "CONFIRMATION", timeframe: "DAILY", operator: "==", threshold: true, confirmationBars: 2, explanation: "MACD柱连续两日改善。" }),
-        rule({ id: "reversal-auction", name: "竞价转强", indicatorId: "auction.close_above_vwap", role: "CONFIRMATION", timeframe: "DAILY", operator: "==", threshold: true, explanation: "集合竞价收盘价不弱于VWAP。" }),
+        rule({
+          id: "reversal-ema5",
+          name: "收复EMA5",
+          indicatorId: "trend.close_above_ema5",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          explanation: "价格重新站上短期均线。",
+        }),
+        rule({
+          id: "reversal-macd",
+          name: "MACD柱改善",
+          indicatorId: "momentum.macd_histogram_rising",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          confirmationBars: 2,
+          explanation: "MACD柱连续两日改善。",
+        }),
+        rule({
+          id: "reversal-auction",
+          name: "竞价转强",
+          indicatorId: "auction.close_above_vwap",
+          role: "CONFIRMATION",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          explanation: "集合竞价收盘价不弱于VWAP。",
+        }),
       ],
     },
     {
       role: "VETO",
       minSatisfied: 0,
       rules: [
-        rule({ id: "reversal-new-low", name: "确认后再创新低", indicatorId: "reversal.new_low_after_confirmation", role: "VETO", timeframe: "DAILY", operator: "==", threshold: true, required: true, vetoSeverity: "CRITICAL", explanation: "反转确认后再创新低表示假设失效。" }),
+        rule({
+          id: "reversal-new-low",
+          name: "确认后再创新低",
+          indicatorId: "reversal.new_low_after_confirmation",
+          role: "VETO",
+          timeframe: "DAILY",
+          operator: "==",
+          threshold: true,
+          required: true,
+          vetoSeverity: "CRITICAL",
+          explanation: "反转确认后再创新低表示假设失效。",
+        }),
         sharedLiquidityVeto,
       ],
     },
@@ -305,12 +518,48 @@ const SETUP_RULE_GROUPS: Record<TimingSetupType, TimingRuleGroupConfig[]> = {
 export function createTimingPresetConfigV2(
   setup: TimingSetupType,
   template: TimingHorizonTemplate = "SWING",
+  riskProfile: TimingPresetConfigV2["riskProfile"] = "BALANCED",
 ): TimingPresetConfigV2 {
   const timeframe = TIMING_TIMEFRAME_TEMPLATES[template];
+  const ruleGroups = structuredClone(SETUP_RULE_GROUPS[setup]);
+  if (riskProfile === "STEADY") {
+    for (const group of ruleGroups) {
+      if (group.role === "CONFIRMATION") {
+        group.minSatisfied = Math.min(
+          group.rules.length,
+          group.minSatisfied + 1,
+        );
+      }
+      if (group.role !== "VETO") {
+        for (const item of group.rules) {
+          item.confirmationBars = Math.min(3, item.confirmationBars + 1);
+        }
+      }
+    }
+  } else if (riskProfile === "AGGRESSIVE") {
+    for (const group of ruleGroups) {
+      if (group.role === "CONFIRMATION") {
+        group.minSatisfied = Math.max(1, group.minSatisfied - 1);
+      }
+      if (group.role !== "VETO") {
+        for (const item of group.rules) item.confirmationBars = 1;
+      }
+    }
+  }
+  const marketGate =
+    riskProfile === "STEADY"
+      ? { ...BALANCED_MARKET_GATE, neutralEntryAction: "WATCH" as const }
+      : riskProfile === "AGGRESSIVE"
+        ? {
+            ...BALANCED_MARKET_GATE,
+            neutralEntryAction: "ENTER" as const,
+            neutralAddAction: "ADD" as const,
+          }
+        : BALANCED_MARKET_GATE;
   return structuredClone({
     schemaVersion: 2,
     setup,
-    riskProfile: "BALANCED",
+    riskProfile,
     timeframePlan: {
       template: timeframe.template,
       contextTimeframes: timeframe.contextTimeframes,
@@ -318,8 +567,8 @@ export function createTimingPresetConfigV2(
       executionTimeframe: timeframe.executionTimeframe,
       fallbackExecutionTimeframe: timeframe.fallbackExecutionTimeframe,
     },
-    ruleGroups: SETUP_RULE_GROUPS[setup],
-    marketGate: BALANCED_MARKET_GATE,
+    ruleGroups,
+    marketGate,
     dataPolicy: DEFAULT_DATA_POLICY,
     reviewTradingDays: timeframe.reviewTradingDays,
     backtestPolicy: DEFAULT_BACKTEST_POLICY,
@@ -334,11 +583,15 @@ export function validateTimingPresetConfigV2(config: TimingPresetConfigV2) {
   }
   for (const group of config.ruleGroups) {
     const enabled = group.rules.filter((item) => item.enabled);
-    if (group.role !== "VETO" && (group.minSatisfied < 1 || group.minSatisfied > enabled.length)) {
+    if (
+      group.role !== "VETO" &&
+      (group.minSatisfied < 1 || group.minSatisfied > enabled.length)
+    ) {
       errors.push(`${group.role}规则组的法定数无效。`);
     }
     for (const item of enabled) {
-      if (item.role !== group.role) errors.push(`规则${item.name}的角色与规则组不一致。`);
+      if (item.role !== group.role)
+        errors.push(`规则${item.name}的角色与规则组不一致。`);
       if (item.confirmationBars < 1 || item.confirmationBars > 20) {
         errors.push(`规则${item.name}的连续确认根数必须位于1到20之间。`);
       }

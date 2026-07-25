@@ -57,7 +57,6 @@ function DetailList(props: { items: string[]; emptyText: string }) {
 function ActionLinks(props: { model: IndustryConclusionViewModel }) {
   const formatActionLabel = (label: string) =>
     label
-      .replaceAll("Space", "研究空间")
       .replaceAll("Report", "报告")
       .replaceAll("Debug", "调试");
 

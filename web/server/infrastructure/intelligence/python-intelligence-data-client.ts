@@ -61,9 +61,17 @@ export type NewsRadarRequest = {
     stockCode: string;
     companyName: string;
     aliases?: string[];
+    priority?: number;
   }>;
-  industries: Array<{ name: string; aliases?: string[] }>;
+  industries: Array<{ name: string; aliases?: string[]; priority?: number }>;
   includeMacro?: boolean;
+  traceAnchor?: {
+    title: string;
+    summary: string;
+    eventType: string;
+    relatedStocks: string[];
+    scopeTags: Array<"macro" | "theme" | "industry" | "company">;
+  };
 };
 
 type ThemeCandidatesGatewayData = {
@@ -240,6 +248,7 @@ export class PythonIntelligenceDataClient {
           companies: params.companies,
           industries: params.industries,
           includeMacro: params.includeMacro ?? true,
+          traceAnchor: params.traceAnchor,
         }),
       },
     );
@@ -272,6 +281,7 @@ export class PythonIntelligenceDataClient {
           companies: params.companies,
           industries: params.industries,
           includeMacro: params.includeMacro ?? true,
+          traceAnchor: params.traceAnchor,
           rawItems: params.rawItems,
         }),
       },

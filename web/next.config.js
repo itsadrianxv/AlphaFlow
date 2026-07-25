@@ -8,6 +8,18 @@ import "./env.js";
 const config = {
   serverExternalPackages: ["@prisma/client", "prisma"],
   transpilePackages: ["echarts", "zrender"],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "opendoodles.s3-us-west-1.amazonaws.com",
+        pathname: "/dancing.svg",
+      },
+    ],
+  },
+  experimental: {
+    authInterrupts: true,
+  },
 };
 
 export default config;

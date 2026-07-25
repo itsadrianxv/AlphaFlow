@@ -5,6 +5,7 @@ import {
   WorkflowNodeRunStatus,
   WorkflowRunStatus,
 } from "@prisma/client";
+import type { PortfolioSnapshotDraft } from "~/server/domain/timing/types";
 import { DEFAULT_RESEARCH_RUNTIME_CONFIG } from "~/server/domain/workflow/research";
 import {
   COMPANY_RESEARCH_NODE_KEYS,
@@ -12,16 +13,17 @@ import {
   COMPANY_RESEARCH_V1_NODE_KEYS,
   COMPANY_RESEARCH_V3_NODE_KEYS,
   COMPANY_RESEARCH_V4_NODE_KEYS,
-  INDUSTRY_RESEARCH_NODE_KEYS,
-  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   IMPACT_MAPPING_NODE_KEYS,
   IMPACT_MAPPING_TEMPLATE_CODE,
+  INDUSTRY_RESEARCH_NODE_KEYS,
+  INDUSTRY_RESEARCH_TEMPLATE_CODE,
   PI_AGENT_RUN_NODE_KEYS,
   PI_AGENT_RUN_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_NODE_KEYS,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   SCREENING_TO_TIMING_NODE_KEYS,
   SCREENING_TO_TIMING_TEMPLATE_CODE,
+  TIMING_DECISION_PIPELINE_TEMPLATE_CODE,
   TIMING_REVIEW_LOOP_NODE_KEYS,
   TIMING_REVIEW_LOOP_TEMPLATE_CODE,
   TIMING_SIGNAL_PIPELINE_NODE_KEYS,
@@ -466,6 +468,38 @@ export class PrismaWorkflowRunRepository {
     });
   }
 
+  async ensureTimingDecisionPipelineTemplate() {
+    return this.prisma.workflowTemplate.upsert({
+      where: {
+        code_version: {
+          code: TIMING_DECISION_PIPELINE_TEMPLATE_CODE,
+          version: 1,
+        },
+      },
+      create: {
+        code: TIMING_DECISION_PIPELINE_TEMPLATE_CODE,
+        version: 1,
+        graphConfig: { nodes: WATCHLIST_TIMING_PIPELINE_NODE_KEYS },
+        inputSchema: {
+          type: "object",
+          required: ["targets", "portfolioSnapshotId", "revisionId"],
+          properties: {
+            targets: { type: "array", minItems: 1 },
+            portfolioSnapshotId: { type: "string" },
+            revisionId: { type: "string" },
+            mode: { enum: ["SINGLE", "PORTFOLIO"] },
+            asOfDate: { type: "string" },
+          },
+        },
+        isActive: true,
+      },
+      update: {
+        graphConfig: { nodes: WATCHLIST_TIMING_PIPELINE_NODE_KEYS },
+        isActive: true,
+      },
+    });
+  }
+
   async ensureScreeningToTimingPipelineTemplate() {
     return this.prisma.workflowTemplate.upsert({
       where: {
@@ -593,7 +627,7 @@ export class PrismaWorkflowRunRepository {
       type: "object",
       required: ["mode"],
       properties: {
-        mode: { enum: ["radar", "deep_dive", "trace"] },
+        mode: { enum: ["radar", "overview", "deep_dive", "trace"] },
         portfolioSnapshotId: { type: "string" },
         watchListIds: { type: "array", items: { type: "string" }, maxItems: 5 },
         eventId: { type: "string" },
@@ -652,14 +686,35 @@ export class PrismaWorkflowRunRepository {
     input: Record<string, unknown>;
     nodeKeys: string[];
     idempotencyKey?: string;
+    portfolioInputSnapshot?: PortfolioSnapshotDraft & { source: "RUN_INPUT" };
   }) {
     return this.prisma.$transaction(async (tx) => {
+      const portfolio = params.portfolioInputSnapshot
+        ? await tx.portfolioSnapshot.create({
+            data: {
+              userId: params.portfolioInputSnapshot.userId,
+              name: params.portfolioInputSnapshot.name,
+              baseCurrency: params.portfolioInputSnapshot.baseCurrency,
+              cash: params.portfolioInputSnapshot.cash,
+              totalCapital: params.portfolioInputSnapshot.totalCapital,
+              positions: toJson(params.portfolioInputSnapshot.positions),
+              riskPreferences: toJson(
+                params.portfolioInputSnapshot.riskPreferences,
+              ),
+              source: "RUN_INPUT",
+            },
+          })
+        : null;
       const run = await tx.workflowRun.create({
         data: {
           templateId: params.templateId,
           userId: params.userId,
           query: params.query,
-          input: toJson(params.input),
+          input: toJson({
+            ...params.input,
+            portfolioSnapshotId:
+              portfolio?.id ?? params.input.portfolioSnapshotId,
+          }),
           status: WorkflowRunStatus.PENDING,
           progressPercent: 0,
           checkpointKey: "",
@@ -697,6 +752,13 @@ export class PrismaWorkflowRunRepository {
           occurredAt: new Date(),
         },
       });
+
+      if (portfolio) {
+        await tx.portfolioSnapshot.update({
+          where: { id: portfolio.id },
+          data: { workflowRunId: run.id },
+        });
+      }
 
       return run;
     });
