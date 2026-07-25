@@ -510,7 +510,7 @@ relationship 记录工具调用 {
 }
 relationship 产出Agent产物 {
 }
-relationship 拥有 Agent 对话 {
+relationship "拥有 Agent 对话" as 拥有Agent对话 {
 }
 relationship 包含对话消息 {
 }
@@ -529,6 +529,12 @@ relationship 关联择时卡工作流 {
 relationship 关联择时建议工作流 {
 }
 relationship 关联预测工作流 {
+}
+relationship 关联反馈观察 {
+}
+relationship 关联反馈预设 {
+}
+relationship 关联调整预设 {
 }
 relationship 用户获得反馈观察 {
 }
@@ -589,8 +595,8 @@ User -1- 用户获得预设调整建议
 用户获得预设调整建议 -N- TimingPresetAdjustmentSuggestion
 User -1- 执行工作流
 执行工作流 -N- WorkflowRun
-User -1- 拥有 Agent 对话
-拥有 Agent 对话 -N- AgentConversation
+User -1- 拥有Agent对话
+拥有Agent对话 -N- AgentConversation
 
 ResearchSpace -1- 关联空间运行
 关联空间运行 -N- ResearchSpaceRunLink

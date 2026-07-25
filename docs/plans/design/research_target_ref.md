@@ -2,13 +2,11 @@
 
 ## 结论
 
-保留 `ResearchTargetRef`，但不要让 `SavedCompany`、`SavedIndustry`、`WatchList` 继承某个统一父类。
-
 推荐模型是三层：
 
 ```text
 第一层：真实业务对象
-SavedCompany / SavedIndustry / WatchList / ResearchSpace / WorkflowRun
+SavedCompany / SavedIndustry / WatchList / WorkflowRun
 
 第二层：统一引用
 ResearchTargetRef = { type, id }
@@ -32,7 +30,7 @@ ResearchNote / FinancialSnapshot / ResearchArtifact
 - 关注理由
 - 标签
 
-公司相关的假设、风险、结论、摘录、报告和财务快照，不建议都做成 `SavedCompany` 的固定字段，而应沉淀为 `ResearchNote`、`FinancialSnapshot`、`ResearchArtifact`。
+公司相关的假设、风险、结论、摘录、报告和财务快照，不做成 `SavedCompany` 的固定字段，而应沉淀为 `ResearchNote`、`FinancialSnapshot`、`ResearchArtifact`。
 
 ### 收藏行业
 
@@ -45,7 +43,7 @@ ResearchNote / FinancialSnapshot / ResearchArtifact
 - 关注理由
 - 标签
 
-行业驱动、风险、跟踪指标、相关公司和研究结论也应优先通过灵活笔记和报告承载，而不是全部固化为预设字段。
+行业驱动、风险、跟踪指标、相关公司和研究结论也应通过灵活笔记和报告承载，不是固化为预设字段。
 
 ### 自选股
 
@@ -69,7 +67,6 @@ type ResearchTargetRef =
   | { type: "company"; id: string }
   | { type: "industry"; id: string }
   | { type: "watchlist"; id: string }
-  | { type: "space"; id: string }
   | { type: "workflow_run"; id: string };
 ```
 
@@ -132,7 +129,6 @@ model ResearchNote {
 - 某个公司的笔记
 - 某个行业的笔记
 - 某个自选股列表的笔记
-- 某个 Research Space 的笔记
 - 某次 Workflow Run 的笔记
 
 `FinancialSnapshot` 和 `ResearchArtifact` 也采用同样方式关联目标对象。
@@ -182,33 +178,8 @@ AI 可以帮助格式化高亮内容，例如：
 - 整理为待验证问题
 - 整理为跟踪指标
 
-这些分类应作为弱结构化的 `kind`、`tags` 或正文格式存在，不应变成强制 schema。
+这些分类应作为弱结构化的 markdown 格式存在，不应变成强制 schema。
 
-## 为什么不用继承
-
-不建议建立一个父类或父表让 `SavedCompany`、`SavedIndustry`、`WatchList` 继承。
-
-原因：
-
-- 三者唯一约束不同；
-- 生命周期不同；
-- 页面行为不同；
-- `WatchList` 是操作集合，不是知识档案；
-- `WorkflowRun` 和 `ResearchSpace` 也可被引用，但不适合成为收藏对象的子类；
-- Prisma 中做继承式模型会让查询、权限和约束变复杂。
-
-更稳妥的方式是：业务对象显式建模，附属内容通过 `ResearchTargetRef` 统一关联。
-
-## 灵活 schema 原则
-
-投资者通常不是每次都需要完整研究框架。他们可能已经理解部分逻辑，只想保存新的增量信息。
-
-因此：
-
-- 实体表保存稳定身份和轻量元信息；
-- 研究内容保存为灵活的 note、snapshot、artifact；
-- AI 可以帮助整理格式，但不强迫用户填满预设字段；
-- 页面可以提供默认分组视图，例如假设、风险、催化、跟踪指标，但底层仍使用灵活笔记块。
 
 ## 推荐关系
 
@@ -231,7 +202,3 @@ WatchList
       <- FinancialSnapshot
       <- ResearchArtifact
 ```
-
-简化成一句话：
-
-`SavedCompany`、`SavedIndustry`、`WatchList` 是被研究或操作的对象；`ResearchTargetRef` 是指向这些对象的地址；`ResearchNote`、`FinancialSnapshot`、`ResearchArtifact` 是贴在这个地址上的内容。
