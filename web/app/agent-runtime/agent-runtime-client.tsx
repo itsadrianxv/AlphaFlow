@@ -2,15 +2,16 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { EvidenceContextCitations } from "~/app/_components/evidence-context-citations";
 import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { MarkdownContent } from "~/app/_components/markdown-content";
-import { InlineNotice, StatusPill, WorkspaceShell } from "~/app/_components/ui";
-import type { WorkspaceHistoryItem } from "~/app/_components/workspace-shell";
+import { InlineNotice, StatusPill } from "~/app/_components/ui";
 import {
   consumePiAgentSelectionDraft,
   PI_AGENT_SELECTION_DRAFT_QUERY,
 } from "~/app/agent-runtime/selection-draft";
 import type { ResearchTargetRef } from "~/contracts/research-target";
+import type { EvidenceCitation } from "~/server/domain/evidence-context/types";
 import { api, type RouterOutputs } from "~/trpc/react";
 
 type Conversation = NonNullable<
@@ -55,19 +56,22 @@ const skillCategoryOrder = [
   "盘中监控与复盘",
 ] as const;
 
-function buildHistoryItems(
-  conversations: RouterOutputs["agentRuntime"]["listConversations"]["items"],
-): WorkspaceHistoryItem[] {
-  return conversations.map((conversation) => ({
-    id: conversation.id,
-    title: conversation.title,
-    href: `/agent-runtime?conversationId=${conversation.id}`,
-    activeMatchHref: `/agent-runtime?conversationId=${conversation.id}`,
-  }));
-}
-
-function messageText(message: Message, liveText?: string) {
-  return liveText !== undefined ? liveText : message.content;
+function parseEvidenceTokens(content: string): {
+  text: string;
+  citations: EvidenceCitation[];
+} {
+  const citations: EvidenceCitation[] = [];
+  const text = content.replace(
+    /\[\[evidence:([^\]]+)\]\]/g,
+    (_match, itemId: string) => {
+      const evidenceItemId = itemId.trim();
+      if (evidenceItemId) {
+        citations.push({ evidenceItemId, relation: "support" });
+      }
+      return "";
+    },
+  );
+  return { text, citations };
 }
 
 function latestRunningRunId(conversation?: Conversation) {
@@ -90,7 +94,10 @@ function ChatMessage(props: {
 }) {
   const { message, liveText } = props;
   const isUser = message.role === "USER";
-  const content = messageText(message, liveText);
+  const parsed = parseEvidenceTokens(
+    liveText !== undefined ? liveText : message.content,
+  );
+  const content = parsed.text;
 
   if (isUser) {
     return (
@@ -126,6 +133,9 @@ function ChatMessage(props: {
               content={content}
               className="max-w-none [&>*+*]:mt-4"
             />
+            <div className="mt-2">
+              <EvidenceContextCitations citations={parsed.citations} />
+            </div>
           </HighlightToNote>
         ) : (
           <div className="text-sm text-[var(--app-text-subtle)]">
@@ -182,7 +192,7 @@ function StopIcon(props: { className?: string }) {
   );
 }
 
-export function AgentRuntimeClientPage() {
+export function PiAgentComposer() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get("conversationId") ?? "";
@@ -204,9 +214,6 @@ export function AgentRuntimeClientPage() {
   const migrationRequestedRef = useRef(false);
 
   const skillsQuery = api.agentRuntime.listSkills.useQuery();
-  const conversationsQuery = api.agentRuntime.listConversations.useQuery({
-    limit: 30,
-  });
   const conversationQuery = api.agentRuntime.getConversation.useQuery(
     { conversationId: selectedConversationId },
     {
@@ -250,9 +257,7 @@ export function AgentRuntimeClientPage() {
     const nextSearchParams = new URLSearchParams(searchParams.toString());
     nextSearchParams.delete("draft");
     const nextQuery = nextSearchParams.toString();
-    router.replace(
-      nextQuery ? `/agent-runtime?${nextQuery}` : "/agent-runtime",
-    );
+    router.replace(nextQuery ? `/?${nextQuery}` : "/");
   }, [router, searchParams]);
 
   useEffect(() => {
@@ -334,10 +339,6 @@ export function AgentRuntimeClientPage() {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
   });
 
-  const historyItems = useMemo(
-    () => buildHistoryItems(conversationsQuery.data?.items ?? []),
-    [conversationsQuery.data?.items],
-  );
   const selectedSkills = useMemo(
     () =>
       selectedSkillIds
@@ -429,7 +430,7 @@ export function AgentRuntimeClientPage() {
           conversationId: result.conversationId,
         }),
       ]);
-      router.push(`/agent-runtime?conversationId=${result.conversationId}`);
+      router.push(`/?conversationId=${result.conversationId}`);
       setActiveRunId(result.runId);
     },
   });
@@ -489,21 +490,15 @@ export function AgentRuntimeClientPage() {
     });
   };
 
-  const renderComposer = (variant: "centered" | "fixed") => (
-    <div
-      className={
-        variant === "fixed"
-          ? "pi-agent-composer fixed right-0 bottom-0 left-0 z-30 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4"
-          : "w-full py-4"
-      }
-    >
+  const renderComposer = () => (
+    <div className="pi-agent-composer fixed right-0 bottom-0 left-0 z-30 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] py-4">
       <div className="mx-auto w-full max-w-[820px] px-1 sm:px-4">
         <div className="mb-3 flex justify-end">
           {activeGenerationRunId ? (
             <StatusPill tone="info" label="正在生成" />
           ) : null}
         </div>
-        <div className="relative rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] transition-[border-color,box-shadow,background-color] focus-within:border-[var(--app-accent-strong)] focus-within:bg-[var(--app-bg-elevated)] focus-within:shadow-[0_0_0_3px_rgba(59,158,255,0.16)]">
+        <div className="relative rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] transition-[border-color,box-shadow,background-color] focus-within:border-[var(--app-accent-strong)] focus-within:bg-[var(--app-bg-elevated)] focus-within:shadow-[0_0_0_3px_var(--app-focus-ring)]">
           <textarea
             ref={promptTextareaRef}
             className="min-h-[104px] w-full resize-none rounded-[22px] border-0 bg-transparent pt-4 pr-16 pb-16 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
@@ -526,7 +521,7 @@ export function AgentRuntimeClientPage() {
               aria-haspopup="menu"
               aria-expanded={skillMenuOpen}
               title="选择 skill"
-              className="inline-flex h-10 shrink-0 items-center rounded-full border border-[var(--app-border-soft)] bg-[rgba(255,255,255,0.04)] px-3 text-xs font-medium text-[var(--app-text-subtle)] transition-colors hover:border-[rgba(255,255,255,0.28)] hover:bg-[rgba(255,255,255,0.08)]"
+              className="inline-flex h-10 shrink-0 items-center rounded-full border border-[var(--app-border-soft)] bg-[var(--app-hover-surface)] px-3 text-xs font-medium text-[var(--app-text-subtle)] transition-colors hover:border-[var(--app-hover-border)] hover:bg-[var(--app-hover-surface)]"
               onClick={() => setSkillMenuOpen((current) => !current)}
             >
               选择 Skill
@@ -567,8 +562,8 @@ export function AgentRuntimeClientPage() {
                         className={[
                           "grid w-full gap-1 rounded-[10px] px-3 py-2.5 text-left text-sm transition-colors",
                           active
-                            ? "bg-white text-black"
-                            : "text-[var(--app-text-muted)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
+                            ? "bg-[var(--app-primary-surface)] text-[var(--app-on-primary)]"
+                            : "text-[var(--app-text-muted)] hover:bg-[var(--app-hover-surface)] hover:text-[var(--app-text-strong)]",
                         ].join(" ")}
                         onClick={() => toggleSkill(skill.id)}
                       >
@@ -586,7 +581,7 @@ export function AgentRuntimeClientPage() {
                           className={[
                             "line-clamp-2 text-xs leading-5",
                             active
-                              ? "text-black/68"
+                              ? "text-[var(--app-text-strong)]/68"
                               : "text-[var(--app-text-subtle)]",
                           ].join(" ")}
                         >
@@ -613,8 +608,8 @@ export function AgentRuntimeClientPage() {
                       className={[
                         "h-8 rounded-[8px] px-2 text-left text-xs font-medium transition-colors",
                         active
-                          ? "bg-white text-black"
-                          : "text-[var(--app-text-subtle)] hover:bg-[rgba(255,255,255,0.08)] hover:text-[var(--app-text-strong)]",
+                          ? "bg-[var(--app-primary-surface)] text-[var(--app-on-primary)]"
+                          : "text-[var(--app-text-subtle)] hover:bg-[var(--app-hover-surface)] hover:text-[var(--app-text-strong)]",
                       ].join(" ")}
                       onClick={() => setActiveSkillCategory(category)}
                     >
@@ -638,7 +633,7 @@ export function AgentRuntimeClientPage() {
               type="button"
               aria-label="停止生成"
               title="停止生成"
-              className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(255,255,255,0.18)] bg-[var(--app-danger)] text-white transition-colors hover:bg-[#e6002e] disabled:cursor-not-allowed disabled:opacity-60"
+              className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-danger-border)] bg-[var(--app-danger)] text-white transition-colors hover:bg-[var(--app-danger-text-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={cancelMutation.isPending}
               onClick={() =>
                 cancelMutation.mutate({ runId: activeGenerationRunId })
@@ -651,7 +646,7 @@ export function AgentRuntimeClientPage() {
               type="button"
               aria-label="发送消息"
               title="发送"
-              className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white bg-white text-black transition-colors hover:bg-[rgba(255,255,255,0.86)] disabled:cursor-not-allowed disabled:border-[var(--app-border-soft)] disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
+              className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-primary-border)] bg-[var(--app-primary-surface)] text-[var(--app-on-primary)] transition-colors hover:bg-[var(--app-primary-surface-hover)] disabled:cursor-not-allowed disabled:border-[var(--app-border-soft)] disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
               disabled={!canSend || sendMutation.isPending}
               onClick={handleSend}
             >
@@ -675,36 +670,12 @@ export function AgentRuntimeClientPage() {
       ) : null}
     </div>
   );
-  const showCenteredComposer =
-    !selectedConversationId && !activeGenerationRunId;
-
   return (
-    <WorkspaceShell
-      section="agentRuntime"
-      historyItems={historyItems}
-      historyHref="/agent-runtime"
-      historyLoading={conversationsQuery.isLoading}
-      historyEmptyText="还没有 Pi Agent 对话"
-      activeHistoryId={selectedConversationId}
-      showWatchlistsAction={false}
-      contentWidth="wide"
-      titleSize="compact"
-    >
-      <div
-        className={[
-          "flex min-h-[calc(100vh-150px)] flex-col",
-          showCenteredComposer ? "justify-center" : undefined,
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <div
-          className={["flex-1", showCenteredComposer ? "hidden" : "pb-[260px]"]
-            .filter(Boolean)
-            .join(" ")}
-        >
-          {selectedConversation ? (
-            <div className="mx-auto grid w-full max-w-[820px] gap-6 px-1 sm:px-4">
+    <>
+      {selectedConversation ? (
+        <section className="pi-agent-conversation fixed right-0 bottom-[248px] left-0 z-20 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)]">
+          <div className="app-scroll mx-auto max-h-[min(42vh,460px)] w-full max-w-[820px] overflow-y-auto px-4 py-5">
+            <div className="grid gap-6">
               {selectedConversation.messages.map((message) => (
                 <ChatMessage
                   key={message.id}
@@ -712,22 +683,21 @@ export function AgentRuntimeClientPage() {
                   liveText={liveMessages[message.id]}
                   lastTargetRef={lastTargetRef}
                   onLastTargetRefChange={setLastTargetRef}
-                  piAgentHref={`/agent-runtime?conversationId=${encodeURIComponent(
+                  piAgentHref={`/?conversationId=${encodeURIComponent(
                     selectedConversationId,
                   )}&draft=selection`}
                 />
               ))}
               <div ref={messagesEndRef} />
             </div>
-          ) : selectedConversationId && conversationQuery.isLoading ? (
-            <div className="mx-auto w-full max-w-[820px] px-1 text-sm text-[var(--app-text-muted)] sm:px-4">
-              加载中
-            </div>
-          ) : null}
+          </div>
+        </section>
+      ) : selectedConversationId && conversationQuery.isLoading ? (
+        <div className="pi-agent-conversation fixed right-0 bottom-[248px] left-0 z-20 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] px-4 py-5 text-center text-sm text-[var(--app-text-muted)]">
+          加载中
         </div>
-
-        {renderComposer(showCenteredComposer ? "centered" : "fixed")}
-      </div>
-    </WorkspaceShell>
+      ) : null}
+      {renderComposer()}
+    </>
   );
 }

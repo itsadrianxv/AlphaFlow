@@ -24,16 +24,16 @@ type TreeMapLabelLayoutParams = {
 
 const HEATMAP_COLORS = {
   dark: {
-    negative: ["#4c6551", "#47765a", "#3a8960"],
+    negative: ["#5d7356", "#61914d", "#62A344"],
     neutral: "#44484a",
-    positive: ["#805261", "#9a5e70", "#b66b80"],
+    positive: ["#805a64", "#ae6470", "#D25D72"],
     text: "#f4f5f6",
     border: "#151719",
   },
   light: {
-    negative: ["#d1ddd1", "#acc9b1", "#83ad8b"],
+    negative: ["#d1ddd1", "#aacb9c", "#88bc74"],
     neutral: "#daddde",
-    positive: ["#e6d0d6", "#d8aab7", "#c57f92"],
+    positive: ["#e6d0d6", "#dfa7b4", "#e58d9d"],
     text: "#18201a",
     border: "#ffffff",
   },
@@ -206,16 +206,6 @@ function formatMarketCap(value: number) {
   return `${(value / 10_000).toFixed(value >= 10_000 ? 0 : 1)} 亿元`;
 }
 
-function formatSnapshotTime(value: string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(new Date(value));
-}
-
 export function MarketHeatmapClient() {
   const { theme } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -277,18 +267,6 @@ export function MarketHeatmapClient() {
           <h1 className="text-xl font-semibold text-[var(--app-text-strong)]">
             A 股概念热力图
           </h1>
-          {snapshot ? (
-            <p className="mt-1 text-sm text-[var(--app-text-muted)]">
-              {snapshot.priceSource === "rt_min" ? "盘中分钟行情" : "收盘行情"}{" "}
-              ·{" "}
-              {formatSnapshotTime(
-                query.dataUpdatedAt
-                  ? new Date(query.dataUpdatedAt).toISOString()
-                  : new Date().toISOString(),
-              )}{" "}
-              更新
-            </p>
-          ) : null}
         </div>
         <button
           type="button"
@@ -311,11 +289,7 @@ export function MarketHeatmapClient() {
       ) : null}
       {snapshot ? (
         <div className="pt-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--app-text-muted)]">
-            <span>
-              {snapshot.concepts.length} 个概念 · 市值按{" "}
-              {snapshot.marketCapAsOf} 数据计算
-            </span>
+          <div className="mb-4 flex justify-end text-sm text-[var(--app-text-muted)]">
             <div
               className="flex items-center gap-2"
               role="img"

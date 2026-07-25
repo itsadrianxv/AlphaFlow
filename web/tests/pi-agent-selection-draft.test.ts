@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("Pi Agent selection draft handoff", () => {
@@ -10,6 +10,7 @@ describe("Pi Agent selection draft handoff", () => {
     "app/agent-runtime/agent-runtime-client.tsx",
     "utf8",
   );
+  const homeSource = readFileSync("app/page.tsx", "utf8");
   const draftSource = readFileSync(
     "app/agent-runtime/selection-draft.ts",
     "utf8",
@@ -18,7 +19,7 @@ describe("Pi Agent selection draft handoff", () => {
   it("adds an ask Pi Agent action to the floating highlight toolbar", () => {
     expect(highlightSource).toContain("writePiAgentSelectionDraft");
     expect(highlightSource).toContain("询问 Pi Agent");
-    expect(highlightSource).toContain('"/agent-runtime?draft=selection"');
+    expect(highlightSource).toContain('"/?draft=selection"');
     expect(highlightSource).toContain("无法暂存选中文本");
   });
 
@@ -48,8 +49,14 @@ describe("Pi Agent selection draft handoff", () => {
   it("keeps Pi Agent message highlights in the current conversation", () => {
     expect(agentRuntimeSource).toContain("piAgentHref={props.piAgentHref}");
     expect(agentRuntimeSource).toContain(
-      "piAgentHref={`/agent-runtime?conversationId=${encodeURIComponent(",
+      "piAgentHref={`/?conversationId=${encodeURIComponent(",
     );
     expect(agentRuntimeSource).toContain(")}&draft=selection`}");
+  });
+
+  it("renders Pi Agent on the overview page without a standalone route", () => {
+    expect(homeSource).toContain("<PiAgentComposer />");
+    expect(agentRuntimeSource).toContain("pi-agent-composer fixed");
+    expect(existsSync("app/agent-runtime/page.tsx")).toBe(false);
   });
 });

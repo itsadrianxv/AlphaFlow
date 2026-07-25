@@ -26,8 +26,8 @@ const snapshot = {
 
 describe("A 股概念热力图", () => {
   it("用绿色表达下跌、粉色表达上涨、灰色表达平盘", () => {
-    expect(getHeatmapColor(-3, "dark")).toBe("#47765a");
-    expect(getHeatmapColor(3, "dark")).toBe("#9a5e70");
+    expect(getHeatmapColor(-3, "dark")).toBe("#61914d");
+    expect(getHeatmapColor(3, "dark")).toBe("#ae6470");
     expect(getHeatmapColor(0, "dark")).toBe("#44484a");
   });
 
@@ -37,8 +37,8 @@ describe("A 股概念热力图", () => {
 
     expect(series.data).toHaveLength(1);
     expect(series.data[0]?.children).toHaveLength(2);
-    expect(series.data[0]?.children[0]?.itemStyle.color).toBe("#9a5e70");
-    expect(series.data[0]?.children[1]?.itemStyle.color).toBe("#47765a");
+    expect(series.data[0]?.children[0]?.itemStyle.color).toBe("#ae6470");
+    expect(series.data[0]?.children[1]?.itemStyle.color).toBe("#61914d");
   });
 
   it("在上游出现重复概念时只保留首次出现的概念", () => {
