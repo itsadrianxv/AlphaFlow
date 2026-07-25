@@ -11,6 +11,9 @@ import os
 import re
 from typing import Literal
 from zoneinfo import ZoneInfo
+from concurrent.futures import ThreadPoolExecutor, wait
+from multiprocessing import get_context
+from queue import Empty
 
 import httpx
 
@@ -57,6 +60,97 @@ class NewsRetrievalResult:
     warnings: list[GatewayWarning] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class DailyNewsRetrievalResult:
+    items: list[dict]
+    source_status: dict[str, bool]
+    warnings: list[GatewayWarning] = field(default_factory=list)
+
+
+def _fetch_daily_source_process(
+    token: str,
+    kind: str,
+    start_at: datetime,
+    end_at: datetime,
+    output,
+) -> None:
+    try:
+        client = MinishareNewsClient(token)
+        if kind == "fast":
+            records = client.fetch_fast_news(start_at, end_at, limit=750)
+        elif kind == "major":
+            records = client.fetch_major_news(start_at, end_at)
+        else:
+            records = client.fetch_cctv_news(start_at.date())
+        output.put((kind, True, [item.to_dict() for item in records], ""))
+    except Exception as exc:  # noqa: BLE001
+        output.put((kind, False, [], str(exc)))
+
+
+def _fetch_daily_sources_isolated(
+    *, token: str, start_at: datetime, end_at: datetime
+) -> DailyNewsRetrievalResult:
+    """Use one killable process per upstream source to enforce a real deadline."""
+    context = get_context("spawn" if os.name == "nt" else "fork")
+    output = context.Queue()
+    processes = {
+        kind: context.Process(
+            target=_fetch_daily_source_process,
+            args=(token, kind, start_at, end_at, output),
+            daemon=True,
+        )
+        for kind in ("fast", "major", "cctv")
+    }
+    for process in processes.values():
+        process.start()
+
+    records: list[RawNewsRecord] = []
+    warnings: list[GatewayWarning] = []
+    source_status = {kind: False for kind in processes}
+    deadline = datetime.now().timestamp() + 15
+    results: dict[str, tuple[bool, list[dict], str]] = {}
+    while len(results) < len(processes) and datetime.now().timestamp() < deadline:
+        try:
+            kind, succeeded, payload, message = output.get(timeout=0.1)
+            results[kind] = (succeeded, payload, message)
+        except Empty:
+            continue
+    for kind, process in processes.items():
+        if process.is_alive():
+            process.terminate()
+        process.join(timeout=1)
+        result = results.get(kind)
+        if result is None:
+            warnings.append(GatewayWarning(
+                code=f"minishare_{kind}_timeout",
+                message=f"{kind} 新闻源请求超时(15000ms)",
+            ))
+            continue
+        succeeded, payload, message = result
+        if succeeded:
+            records.extend(_raw_record_from_dict(item) for item in payload)
+            source_status[kind] = True
+        else:
+            warnings.append(GatewayWarning(
+                code=f"minishare_{kind}_partial",
+                message=f"{kind} 新闻源暂不可用: {message}",
+            ))
+    output.close()
+    if not any(source_status.values()):
+        raise GatewayError(
+            code="minishare_news_failed",
+            message="Minishare 新闻源全部不可用",
+            status_code=502,
+            provider="minishare",
+            warnings=warnings,
+        )
+    return DailyNewsRetrievalResult(
+        items=[item.to_dict() for item in records],
+        source_status=source_status,
+        warnings=warnings,
+    )
+
+
 @dataclass
 class MinishareNewsProvider:
     """按业务范围编排 Minishare 三类新闻并输出 provider-neutral 证据。"""
@@ -81,7 +175,7 @@ class MinishareNewsProvider:
             "DEEPSEEK_TIMEOUT_MS", "15000"
         )
         try:
-            self.deepseek_timeout_ms = max(1_000, int(raw_timeout))
+            self.deepseek_timeout_ms = min(15_000, max(1_000, int(raw_timeout)))
         except (TypeError, ValueError):
             self.deepseek_timeout_ms = 15_000
         self.client = self.client or MinishareNewsClient(self.token)
@@ -169,6 +263,114 @@ class MinishareNewsProvider:
             deduped[: min(120, max(limit * 4, 50))],
             query=query,
             warnings=warnings,
+            targets=targets,
+        )
+
+    def get_daily_raw(self, target_date: datetime) -> DailyNewsRetrievalResult:
+        """Fetch one Shanghai calendar day without applying radar-specific filters."""
+        if not self.token:
+            raise GatewayError(
+                code="minishare_not_configured",
+                message="MINISHARE_TOKEN 未配置",
+                status_code=503,
+                provider=self.provider_name,
+            )
+        day = target_date.astimezone(_SHANGHAI)
+        start_at = day.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_at = start_at + timedelta(days=1) - timedelta(microseconds=1)
+        if isinstance(self.client, MinishareNewsClient):
+            return _fetch_daily_sources_isolated(
+                token=self.token,
+                start_at=start_at,
+                end_at=end_at,
+            )
+        return self._get_daily_raw_with_client(start_at, end_at)
+
+    def _get_daily_raw_with_client(
+        self, start_at: datetime, end_at: datetime
+    ) -> DailyNewsRetrievalResult:
+        """Mock-friendly fallback; production requests use isolated processes."""
+        records: list[RawNewsRecord] = []
+        warnings: list[GatewayWarning] = []
+        source_status: dict[str, bool] = {"fast": False, "major": False, "cctv": False}
+
+        def fetch(kind: str) -> list[RawNewsRecord]:
+            if kind == "fast":
+                return self.client.fetch_fast_news(start_at, end_at, limit=750)
+            if kind == "major":
+                return self.client.fetch_major_news(start_at, end_at)
+            return self.client.fetch_cctv_news(start_at.date())
+
+        # The Minishare SDK is synchronous. A bounded worker prevents one source
+        # from serializing the other two while the route itself runs in FastAPI's pool.
+        executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="minishare-news")
+        futures = {executor.submit(fetch, kind): kind for kind in source_status}
+        done, pending = wait(futures, timeout=15)
+        for future in done:
+            kind = futures[future]
+            try:
+                records.extend(future.result())
+                source_status[kind] = True
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(GatewayWarning(
+                    code=f"minishare_{kind}_partial",
+                    message=f"{kind} 新闻源暂不可用: {getattr(exc, 'message', exc)}",
+                ))
+        for future in pending:
+            kind = futures[future]
+            future.cancel()
+            warnings.append(GatewayWarning(
+                code=f"minishare_{kind}_timeout",
+                message=f"{kind} 新闻源请求超时(15000ms)",
+            ))
+        # Do not wait for a hung SDK call here. The route returns partial data and
+        # the bounded FastAPI worker remains isolated from the event loop.
+        executor.shutdown(wait=False, cancel_futures=True)
+        if not any(source_status.values()):
+            raise GatewayError(
+                code="minishare_news_failed",
+                message="Minishare 新闻源全部不可用",
+                status_code=502,
+                provider=self.provider_name,
+                warnings=warnings,
+            )
+        return DailyNewsRetrievalResult(
+            items=[item.to_dict() for item in records],
+            source_status=source_status,
+            warnings=warnings,
+        )
+
+    def resolve_radar(
+        self,
+        *,
+        raw_items: list[dict],
+        companies: tuple[RadarCompany, ...],
+        industries: tuple[RadarIndustry, ...],
+        days: int,
+        limit: int,
+    ) -> NewsRetrievalResult:
+        terms = [*_MACRO_TERMS]
+        stocks: list[str] = []
+        for company in companies:
+            terms.extend((company.company_name, company.stock_code, *company.aliases))
+            stocks.append(company.stock_code)
+        for industry in industries:
+            terms.extend((industry.name, *industry.aliases))
+        query = NewsQuery(
+            scope="macro", target="事件雷达", days=days, limit=limit,
+            terms=tuple(_unique_text(terms)), related_stocks=tuple(_unique_text(stocks)),
+        )
+        records = [_raw_record_from_dict(item) for item in raw_items]
+        recalled = self._recall(records, query)
+        targets = {
+            "companies": [{"stockCode": item.stock_code, "companyName": item.company_name, "aliases": list(item.aliases)} for item in companies],
+            "industries": [{"name": item.name, "aliases": list(item.aliases)} for item in industries],
+            "includeMacro": True,
+        }
+        return self._analyze_and_standardize(
+            self._dedupe(recalled)[: min(120, max(limit * 4, 50))],
+            query=query,
+            warnings=[],
             targets=targets,
         )
 
@@ -508,6 +710,27 @@ def _model_candidate(item: dict) -> dict:
         "sourceName": item["sourceName"],
         "matchedTerms": item["matchedTerms"],
     }
+
+
+def _raw_record_from_dict(value: dict) -> RawNewsRecord:
+    source_kind = str(value.get("sourceKind") or "fast")
+    if source_kind not in {"fast", "major", "cctv"}:
+        source_kind = "fast"
+    content = _text(value.get("content"))
+    title = _text(value.get("title")) or content[:80]
+    published_at = _text(value.get("publishedAt"))
+    if not content or not published_at:
+        raise ValueError("原始新闻缺少 content 或 publishedAt")
+    return RawNewsRecord(
+        sourceKind=source_kind,
+        sourceName=_text(value.get("sourceName")) or f"minishare:{source_kind}",
+        url=_text(value.get("url")) or None,
+        title=title,
+        content=content,
+        publishedAt=published_at,
+        contentHash=_text(value.get("contentHash")) or hashlib.sha256(content.encode("utf-8")).hexdigest(),
+        sourceItemId=_text(value.get("sourceItemId")) or hashlib.sha256(f"{source_kind}|{published_at}|{title}".encode("utf-8")).hexdigest()[:24],
+    )
 
 
 def _clean_attribution(value: dict) -> dict | None:

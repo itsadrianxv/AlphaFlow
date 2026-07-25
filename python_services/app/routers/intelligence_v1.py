@@ -5,8 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, Request
 
 from app.contracts.intelligence import (
+    DailyNewsRequest,
+    DailyNewsResponse,
     NewsRadarRequest,
     NewsRadarResponse,
+    NewsRadarResolveRequest,
     StockEvidenceBatchRequest,
     StockEvidenceBatchResponse,
     StockEvidenceResponse,
@@ -22,7 +25,7 @@ router = APIRouter(prefix="/api/v1/intelligence")
 
 
 @router.post("/news/radar", response_model=NewsRadarResponse)
-async def get_news_radar(
+def get_news_radar(
     request: Request,
     body: NewsRadarRequest,
 ):
@@ -33,6 +36,26 @@ async def get_news_radar(
         days=body.days,
         limit=body.limit,
         end_at=body.endAt,
+    )
+
+
+@router.post("/news/daily", response_model=DailyNewsResponse)
+def get_daily_news(request: Request, body: DailyNewsRequest):
+    return intelligence_gateway.get_daily_news(
+        request_id=request.state.request_id,
+        target_date=body.date,
+    )
+
+
+@router.post("/news/radar/resolve", response_model=NewsRadarResponse)
+def resolve_news_radar(request: Request, body: NewsRadarResolveRequest):
+    return intelligence_gateway.resolve_news_radar(
+        request_id=request.state.request_id,
+        companies=[item.model_dump() for item in body.companies],
+        industries=[item.model_dump() for item in body.industries],
+        days=body.days,
+        limit=body.limit,
+        raw_items=body.rawItems,
     )
 
 

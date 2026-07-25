@@ -13,7 +13,7 @@ import pytest
 
 from app.gateway.common import GatewayError
 from app.providers.minishare.client import MinishareNewsClient, RawNewsRecord
-from app.providers.minishare.news import MinishareNewsProvider, NewsQuery
+from app.providers.minishare.news import MinishareNewsProvider, NewsQuery, RadarCompany
 
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 
@@ -79,6 +79,37 @@ def test_low_level_client_normalizes_three_sources() -> None:
     assert major[0].content == "完整长新闻正文"
     assert major[0].url == "https://example.com/major"
     assert cctv[0].sourceName == "CCTV 新闻联播"
+
+
+def test_daily_raw_returns_partial_records_and_source_status() -> None:
+    client = Mock()
+    client.fetch_fast_news.return_value = [_raw("fast", content="当天快讯")]
+    client.fetch_major_news.return_value = [_raw("major", content="当天要闻")]
+    client.fetch_cctv_news.side_effect = RuntimeError("cctv offline")
+    provider = _provider(client=client, api_key="")
+
+    result = provider.get_daily_raw(datetime(2026, 7, 24, tzinfo=_SHANGHAI))
+
+    assert result.source_status == {"fast": True, "major": True, "cctv": False}
+    assert len(result.items) == 2
+    assert result.items[0]["sourceItemId"]
+    assert result.warnings[0].code == "minishare_cctv_partial"
+
+
+def test_resolve_radar_uses_persisted_raw_items_without_fetching_sources() -> None:
+    provider = _provider(client=Mock(), api_key="")
+    raw = _raw("major", content="中科曙光扩大算力资本开支", title="算力扩产").to_dict()
+
+    result = provider.resolve_radar(
+        raw_items=[raw],
+        companies=(RadarCompany("603019", "中科曙光"),),
+        industries=(),
+        days=1,
+        limit=10,
+    )
+
+    assert result.items[0]["content"] == raw["content"]
+    assert result.items[0]["analysisStatus"] == "partial"
 
 
 def test_source_strategy_matches_scope() -> None:

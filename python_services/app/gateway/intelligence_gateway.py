@@ -7,6 +7,8 @@ import time
 
 from app.contracts.common import BatchItemError
 from app.contracts.intelligence import (
+    DailyNewsData,
+    DailyNewsResponse,
     NewsRadarData,
     NewsRadarResponse,
     StockEvidenceBatchData,
@@ -195,6 +197,62 @@ class IntelligenceGateway:
                 industryCount=len(normalized_industries),
                 newsItems=[to_theme_news_item(item) for item in cached.data.items],
             ),
+        )
+
+    def get_daily_news(self, request_id: str, target_date) -> DailyNewsResponse:
+        started_at = time.perf_counter()
+        result = self._news_provider.get_daily_raw(target_date)
+        return DailyNewsResponse(
+            meta=build_meta(
+                request_id=request_id,
+                provider=self._news_provider.provider_name,
+                started_at=started_at,
+                cache_hit=False,
+                is_stale=False,
+                warnings=result.warnings,
+            ),
+            data=DailyNewsData(
+                date=target_date.isoformat(),
+                items=result.items,
+                sourceStatus=result.source_status,
+                complete=all(result.source_status.values()),
+            ),
+        )
+
+    def resolve_news_radar(
+        self,
+        request_id: str,
+        *,
+        companies: list[dict],
+        industries: list[dict],
+        days: int,
+        limit: int,
+        raw_items: list[dict],
+    ) -> NewsRadarResponse:
+        started_at = time.perf_counter()
+        normalized_companies = tuple(RadarCompany(
+            stock_code=str(item.get("stockCode") or "").strip(),
+            company_name=str(item.get("companyName") or item.get("stockCode") or "").strip(),
+            aliases=tuple(str(value).strip() for value in item.get("aliases") or [] if str(value).strip()),
+        ) for item in companies)
+        normalized_industries = tuple(RadarIndustry(
+            name=str(item.get("name") or "").strip(),
+            aliases=tuple(str(value).strip() for value in item.get("aliases") or [] if str(value).strip()),
+        ) for item in industries)
+        result = self._news_provider.resolve_radar(
+            raw_items=raw_items,
+            companies=normalized_companies,
+            industries=normalized_industries,
+            days=days,
+            limit=limit,
+        )
+        warnings = self._dedupe_warnings(result.warnings)
+        return NewsRadarResponse(
+            meta=build_meta(request_id=request_id, provider=self._news_provider.provider_name,
+                            started_at=started_at, cache_hit=False, is_stale=False, warnings=warnings),
+            data=NewsRadarData(days=days, companyCount=len(normalized_companies),
+                                industryCount=len(normalized_industries),
+                                newsItems=[to_theme_news_item(item) for item in result.items]),
         )
 
     def get_theme_concepts(

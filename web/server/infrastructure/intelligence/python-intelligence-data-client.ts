@@ -35,6 +35,24 @@ type NewsRadarGatewayData = {
   newsItems: ThemeNewsItem[];
 };
 
+export type DailyNewsGatewayItem = {
+  sourceKind: "fast" | "major" | "cctv";
+  sourceName: string;
+  url?: string | null;
+  title: string;
+  content: string;
+  publishedAt: string;
+  contentHash: string;
+  sourceItemId: string;
+};
+
+export type DailyNewsGatewayData = {
+  date: string;
+  items: DailyNewsGatewayItem[];
+  sourceStatus: Record<string, boolean>;
+  complete: boolean;
+};
+
 export type NewsRadarRequest = {
   days?: number;
   limit?: number;
@@ -162,26 +180,50 @@ export class PythonIntelligenceDataClient {
     return payload.newsItems;
   }
 
-  async getMacroNews(params?: { days?: number; limit?: number }): Promise<ThemeNewsItem[]> {
-    const search = new URLSearchParams({ days: String(params?.days ?? 7), limit: String(params?.limit ?? 20) });
+  async getMacroNews(params?: {
+    days?: number;
+    limit?: number;
+  }): Promise<ThemeNewsItem[]> {
+    const search = new URLSearchParams({
+      days: String(params?.days ?? 7),
+      limit: String(params?.limit ?? 20),
+    });
     const payload = await this.request<ScopedNewsGatewayData>(
       this.intelligencePath(`/news/macro?${search.toString()}`),
     );
     return payload.newsItems;
   }
 
-  async getIndustryNews(params: { industry: string; days?: number; limit?: number }): Promise<ThemeNewsItem[]> {
-    const search = new URLSearchParams({ days: String(params.days ?? 7), limit: String(params.limit ?? 20) });
+  async getIndustryNews(params: {
+    industry: string;
+    days?: number;
+    limit?: number;
+  }): Promise<ThemeNewsItem[]> {
+    const search = new URLSearchParams({
+      days: String(params.days ?? 7),
+      limit: String(params.limit ?? 20),
+    });
     const payload = await this.request<ScopedNewsGatewayData>(
-      this.intelligencePath(`/industries/${encodeURIComponent(params.industry)}/news?${search.toString()}`),
+      this.intelligencePath(
+        `/industries/${encodeURIComponent(params.industry)}/news?${search.toString()}`,
+      ),
     );
     return payload.newsItems;
   }
 
-  async getCompanyNews(params: { stockCode: string; days?: number; limit?: number }): Promise<ThemeNewsItem[]> {
-    const search = new URLSearchParams({ days: String(params.days ?? 7), limit: String(params.limit ?? 20) });
+  async getCompanyNews(params: {
+    stockCode: string;
+    days?: number;
+    limit?: number;
+  }): Promise<ThemeNewsItem[]> {
+    const search = new URLSearchParams({
+      days: String(params.days ?? 7),
+      limit: String(params.limit ?? 20),
+    });
     const payload = await this.request<ScopedNewsGatewayData>(
-      this.intelligencePath(`/stocks/${encodeURIComponent(params.stockCode)}/news?${search.toString()}`),
+      this.intelligencePath(
+        `/stocks/${encodeURIComponent(params.stockCode)}/news?${search.toString()}`,
+      ),
     );
     return payload.newsItems;
   }
@@ -198,6 +240,39 @@ export class PythonIntelligenceDataClient {
           companies: params.companies,
           industries: params.industries,
           includeMacro: params.includeMacro ?? true,
+        }),
+      },
+    );
+    return payload.newsItems;
+  }
+
+  async getDailyNews(date: string): Promise<DailyNewsGatewayData> {
+    return this.request<DailyNewsGatewayData>(
+      this.intelligencePath("/news/daily"),
+      {
+        method: "POST",
+        body: JSON.stringify({ date }),
+      },
+    );
+  }
+
+  async resolveNewsRadar(
+    params: NewsRadarRequest & {
+      rawItems: DailyNewsGatewayItem[];
+    },
+  ): Promise<ThemeNewsItem[]> {
+    const payload = await this.request<NewsRadarGatewayData>(
+      this.intelligencePath("/news/radar/resolve"),
+      {
+        method: "POST",
+        body: JSON.stringify({
+          days: params.days ?? 7,
+          limit: params.limit ?? 50,
+          endAt: params.endAt,
+          companies: params.companies,
+          industries: params.industries,
+          includeMacro: params.includeMacro ?? true,
+          rawItems: params.rawItems,
         }),
       },
     );

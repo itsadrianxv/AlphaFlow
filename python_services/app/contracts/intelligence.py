@@ -63,6 +63,25 @@ class NewsRadarRequest(BaseModel):
     includeMacro: bool = True
 
 
+class DailyNewsRequest(BaseModel):
+    date: datetime
+
+
+class DailyNewsData(BaseModel):
+    date: str
+    items: list[dict] = Field(default_factory=list)
+    sourceStatus: dict[str, bool] = Field(default_factory=dict)
+    complete: bool = False
+
+
+class DailyNewsResponse(GatewayResponse[DailyNewsData]):
+    pass
+
+
+class NewsRadarResolveRequest(NewsRadarRequest):
+    rawItems: list[dict] = Field(default_factory=list, max_length=2000)
+
+
 class NewsRadarData(BaseModel):
     days: int
     companyCount: int

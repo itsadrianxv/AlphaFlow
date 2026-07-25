@@ -160,6 +160,27 @@ describe("Impact Mapping", () => {
     expect(item?.lineageId).toBe("impact-event:event-1");
   });
 
+  it("雷达模式优先使用共享新闻库", async () => {
+    const collectRadar = vi.fn(async () => ({
+      news: [event],
+      warnings: ["shared_news_reused"],
+    }));
+    const service = new ImpactMappingService({
+      sharedNewsLibraryService: { collectRadar },
+      dataClient: { getNewsRadar: vi.fn() },
+    } as never);
+
+    const result = await service.collectEvidence({
+      userId: "user-1",
+      context,
+      input: impactMappingInputSchema.parse({ mode: "radar", days: 7 }),
+    });
+
+    expect(collectRadar).toHaveBeenCalledWith(expect.objectContaining({ days: 7 }));
+    expect(result.news).toEqual([event]);
+    expect(result.warnings).toContain("shared_news_reused");
+  });
+
   it("雷达图跳过时间线和未来分支并产出快照", async () => {
     const radarEvents = [
       {

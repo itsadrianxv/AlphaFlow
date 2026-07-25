@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import type { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
+import type { SharedNewsLibraryService } from "~/server/application/intelligence/shared-news-library-service";
 import type { EvidenceCitation } from "~/server/domain/evidence-context/types";
 import {
   type ImpactContext,
@@ -138,6 +139,7 @@ export class ImpactMappingService {
     private readonly deps: {
       prisma: PrismaClient;
       dataClient: PythonIntelligenceDataClient;
+      sharedNewsLibraryService?: Pick<SharedNewsLibraryService, "collectRadar">;
       capabilityClient: PythonCapabilityGatewayClient;
       marketContextClient?: Pick<PythonMarketContextClient, "getSnapshot">;
       evidenceRepository: PrismaEvidenceContextRepository;
@@ -288,16 +290,25 @@ export class ImpactMappingService {
   }): Promise<ImpactCollectedEvidence> {
     const { input, context } = params;
     if (input.mode === "radar") {
-      const news = await this.deps.dataClient.getNewsRadar({
+      const request = {
         days: input.days,
         limit: 50,
         companies: context.companies,
         industries: context.industries,
-      });
+      };
+      const collected = this.deps.sharedNewsLibraryService
+        ? await this.deps.sharedNewsLibraryService.collectRadar(request)
+        : {
+            news: await this.deps.dataClient.getNewsRadar(request),
+            warnings: [],
+          };
       return {
-        news,
+        news: collected.news,
         web: [],
-        warnings: news.flatMap((item) => item.warnings ?? []),
+        warnings: [
+          ...collected.warnings,
+          ...collected.news.flatMap((item) => item.warnings ?? []),
+        ],
         tracedDays: input.days,
       };
     }
