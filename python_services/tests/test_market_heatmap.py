@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pandas as pd
+from fastapi.testclient import TestClient
 
 from app.data_providers.contracts import MarketSnapshotRow
+from app.gateway.common import gateway_cache
 from app.gateway.market_gateway import MarketGateway
 from app.infrastructure.cache.memory_cache import MemoryCache
 from app.jobs.refresh_market_heatmap import RefreshMarketHeatmapJob
+from app.main import app
 from app.providers.tushare.client import TushareProviderClient
 
 
@@ -109,6 +114,28 @@ def test_gateway_returns_requested_concept_count_from_cached_fifteen_concept_sna
 
     assert len(response.data.concepts) == 8
     assert response.data.concepts[0].conceptName == "概念 1"
+
+
+def test_heatmap_endpoint_accepts_supported_query_limits() -> None:
+    client = TestClient(app)
+    sample = FakeHeatmapClient().get_market_heatmap_snapshot(
+        limit=15,
+        prefer_intraday=False,
+    )
+
+    with patch(
+        "app.providers.tushare.client.TushareProviderClient.get_market_heatmap_snapshot",
+        return_value=sample,
+    ):
+        for concept_limit in (8, 15):
+            gateway_cache.clear()
+            response = client.get(
+                "/api/v1/market/heatmap",
+                params={"conceptLimit": concept_limit},
+            )
+
+            assert response.status_code == 200
+            assert len(response.json()["data"]["concepts"]) == concept_limit
 
 
 class ClosedMarketProviderClient:

@@ -11,7 +11,14 @@ import {
   WorkflowDomainError,
 } from "~/server/domain/workflow/errors";
 
-type GatewayPayload = { data?: unknown; error?: { message?: string } };
+type GatewayPayload = {
+  data?: unknown;
+  error?: { message?: string };
+  detail?: Array<{ msg?: string }>;
+};
+
+const getGatewayErrorMessage = (payload: GatewayPayload) =>
+  payload.error?.message ?? payload.detail?.[0]?.msg ?? "未知错误";
 
 export class PythonMarketHeatmapClient {
   async getSnapshot(): Promise<MarketHeatmapSnapshot> {
@@ -35,7 +42,7 @@ export class PythonMarketHeatmapClient {
       if (!response.ok) {
         throw new WorkflowDomainError(
           WORKFLOW_ERROR_CODES.INTELLIGENCE_DATA_UNAVAILABLE,
-          `热力图数据服务异常(${response.status}): ${payload.error?.message ?? "未知错误"}`,
+          `热力图数据服务异常(${response.status}): ${getGatewayErrorMessage(payload)}`,
         );
       }
       return marketHeatmapSnapshotSchema.parse(payload.data);

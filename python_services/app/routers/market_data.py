@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from enum import IntEnum
 
 from fastapi import APIRouter, Query, Request
 
@@ -32,14 +32,22 @@ _VALID_HISTORY_INDICATORS = {
 }
 
 
+class HeatmapConceptLimit(IntEnum):
+    EIGHT = 8
+    FIFTEEN = 15
+
+
 @router.get("/heatmap", response_model=MarketHeatmapResponse)
 async def get_market_heatmap(
     request: Request,
-    concept_limit: Literal[8, 15] = Query(15, alias="conceptLimit"),
+    concept_limit: HeatmapConceptLimit = Query(
+        HeatmapConceptLimit.FIFTEEN,
+        alias="conceptLimit",
+    ),
 ):
     return market_gateway.get_heatmap_snapshot(
         request_id=request.state.request_id,
-        concept_limit=concept_limit,
+        concept_limit=int(concept_limit),
     )
 
 
