@@ -169,6 +169,17 @@ def test_searcher_prioritizes_code_matches_over_earlier_name_matches() -> None:
     assert searcher.search("000", 20)[0]["stockCode"] == "000001"
 
 
+def test_searcher_resolves_company_names_in_text() -> None:
+    records = [
+        {"stockCode": "000001", "stockName": "平安银行", "market": "SZ"},
+        {"stockCode": "000002", "stockName": "平安", "market": "SZ"},
+    ]
+
+    matches = ScreeningStockSearcher.resolve_mentions("平安银行的净息差高于平安", records)
+
+    assert [item["stockName"] for item in matches] == ["平安银行", "平安"]
+
+
 def test_missing_snapshot_is_unavailable(tmp_path) -> None:
     with pytest.raises(StockUniverseUnavailableError, match="尚未首次刷新"):
         ScreeningStockUniverseStore(tmp_path / "missing.json").load_records()

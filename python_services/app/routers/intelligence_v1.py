@@ -36,6 +36,8 @@ def get_news_radar(
         days=body.days,
         limit=body.limit,
         end_at=body.endAt,
+        include_macro=body.includeMacro,
+        trace_anchor=body.traceAnchor.model_dump() if body.traceAnchor else None,
     )
 
 
@@ -56,6 +58,8 @@ def resolve_news_radar(request: Request, body: NewsRadarResolveRequest):
         days=body.days,
         limit=body.limit,
         raw_items=body.rawItems,
+        include_macro=body.includeMacro,
+        trace_anchor=body.traceAnchor.model_dump() if body.traceAnchor else None,
     )
 
 

@@ -22,6 +22,7 @@ class ThemeNewsItem(BaseModel):
     relatedStocks: list[str] = Field(default_factory=list)
     scopeTags: list[Literal["macro", "theme", "industry", "company"]] = Field(default_factory=list)
     eventType: str = "其他"
+    eventRelation: Literal["same_event", "prior_signal", "follow_up"] | None = None
     matchReason: str = ""
     content: str = ""
     url: str | None = None
@@ -47,11 +48,23 @@ class NewsRadarCompanyInput(BaseModel):
     stockCode: str = Field(..., pattern=r"^\d{6}$")
     companyName: str = ""
     aliases: list[str] = Field(default_factory=list, max_length=20)
+    priority: int | None = Field(default=None, ge=0, le=1_000_000)
 
 
 class NewsRadarIndustryInput(BaseModel):
     name: str = Field(..., min_length=1)
     aliases: list[str] = Field(default_factory=list, max_length=20)
+    priority: int | None = Field(default=None, ge=0, le=1_000_000)
+
+
+class NewsTraceAnchorInput(BaseModel):
+    title: str = Field(..., min_length=1)
+    summary: str = ""
+    eventType: str = "其他"
+    relatedStocks: list[str] = Field(default_factory=list, max_length=100)
+    scopeTags: list[Literal["macro", "theme", "industry", "company"]] = Field(
+        default_factory=list
+    )
 
 
 class NewsRadarRequest(BaseModel):
@@ -61,6 +74,7 @@ class NewsRadarRequest(BaseModel):
     companies: list[NewsRadarCompanyInput] = Field(default_factory=list, max_length=100)
     industries: list[NewsRadarIndustryInput] = Field(default_factory=list, max_length=20)
     includeMacro: bool = True
+    traceAnchor: NewsTraceAnchorInput | None = None
 
 
 class DailyNewsRequest(BaseModel):

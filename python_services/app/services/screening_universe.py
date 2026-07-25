@@ -62,6 +62,30 @@ class ScreeningStockSearcher:
 
         return [*code_matches, *name_matches][:limit]
 
+    def get_universe(self) -> list[dict[str, str]]:
+        return list(self._get_universe())
+
+    @staticmethod
+    def resolve_mentions(
+        text: str, records: list[dict[str, str]]
+    ) -> list[dict[str, str]]:
+        normalized_text = text.strip().lower()
+        if not normalized_text:
+            return []
+
+        matches = [
+            {
+                "stockCode": item["stockCode"],
+                "stockName": item["stockName"],
+            }
+            for item in records
+            if item["stockName"].strip().lower() in normalized_text
+        ]
+        return sorted(
+            matches,
+            key=lambda item: (-len(item["stockName"]), item["stockCode"]),
+        )
+
     def _get_universe(self) -> list[dict[str, str]]:
         cached = self._cache
         now = self._now_fn()

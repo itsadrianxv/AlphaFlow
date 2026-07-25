@@ -19,6 +19,7 @@ from app.services.theme_concept_rules_registry import ThemeConceptRulesRegistry
 _ETF_PREFIXES = ("15", "16", "18", "50", "51", "52", "56", "58", "159")
 _RULES_REGISTRY = ThemeConceptRulesRegistry()
 _GENERIC_THEME_KEYS = {"ai", "人工智能", "aigc"}
+_HEATMAP_MAX_STOCKS_PER_CONCEPT = 100
 _SW_INDUSTRY_SOURCE = "SW2021"
 _SW_THEME_INDUSTRY_HINTS: dict[str, list[str]] = {
     "ai": ["计算机", "软件开发", "IT服务", "电子", "通信"],
@@ -455,6 +456,7 @@ class TushareProviderClient:
             if not stocks:
                 continue
             stocks.sort(key=lambda item: item["marketCap"], reverse=True)
+            stocks = stocks[:_HEATMAP_MAX_STOCKS_PER_CONCEPT]
             total_market_cap = sum(item["marketCap"] for item in stocks)
             weighted_change_numerator = sum(
                 item["marketCap"] * item["changePercent"]

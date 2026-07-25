@@ -22,6 +22,7 @@ import { createInternalTools } from "./tool-policy";
 import type { AgentRuntimeConfig, StartRunRequest } from "./types";
 import type { AgentRuntimeRunStore } from "./run-store";
 import { WebInternalClient } from "./web-internal-client";
+import { ScheduledTaskEventPublisher } from "./scheduled-task-events";
 
 function extractMessageText(message: AgentMessage | unknown) {
   if (!message || typeof message !== "object") {
@@ -47,6 +48,22 @@ function extractMessageText(message: AgentMessage | unknown) {
     })
     .filter(Boolean)
     .join("\n");
+}
+
+function parseScheduledOutput(text: string) {
+  const candidate = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  try {
+    const parsed = JSON.parse(candidate) as Record<string, unknown>;
+    return {
+      title: typeof parsed.title === "string" ? parsed.title : "定时任务",
+      summary: typeof parsed.summary === "string" ? parsed.summary : text,
+      body: typeof parsed.body === "string" ? parsed.body : text,
+      evidence: Array.isArray(parsed.evidence) ? parsed.evidence : [],
+      quality: parsed.quality && typeof parsed.quality === "object" ? parsed.quality : { status: "OK", warnings: [] },
+    };
+  } catch {
+    return { title: "定时任务", summary: text, body: text, evidence: [], quality: { status: "DEGRADED", warnings: ["Agent 未返回结构化 JSON"] } };
+  }
 }
 
 function createSeedMessage(role: "user" | "assistant", content: string): AgentMessage {
@@ -237,6 +254,7 @@ export class PiAdapter {
   private readonly pythonGatewayClient: PythonGatewayClient;
   private readonly webInternalClient: WebInternalClient;
   private readonly sessionRepo: JsonlSessionRepo;
+  private readonly scheduledEvents: ScheduledTaskEventPublisher;
 
   constructor(
     private readonly config: AgentRuntimeConfig,
@@ -245,6 +263,7 @@ export class PiAdapter {
   ) {
     this.pythonGatewayClient = new PythonGatewayClient(config);
     this.webInternalClient = new WebInternalClient(config);
+    this.scheduledEvents = new ScheduledTaskEventPublisher(config);
     const sessionEnv = new RestrictedExecutionEnv({
       cwd: process.cwd(),
       readRoots: [process.cwd(), path.resolve(config.sessionRoot)],
@@ -367,6 +386,12 @@ export class PiAdapter {
     const abortController = new AbortController();
     this.store.attachAbortController(request.runId, abortController);
     this.store.markRunning(request.runId);
+    const scheduledContext = request.context as Record<string, unknown> | undefined;
+    const executionId = typeof scheduledContext?.executionId === "string" ? scheduledContext.executionId : undefined;
+    const taskId = typeof scheduledContext?.taskId === "string" ? scheduledContext.taskId : "";
+    const taskVersionId = typeof scheduledContext?.taskVersionId === "string" ? scheduledContext.taskVersionId : "";
+    const publishScheduled = (eventType: "execution.started" | "execution.succeeded" | "execution.failed" | "execution.cancelled", status: string, error?: string) => executionId && taskId && taskVersionId ? this.scheduledEvents.publish({ eventType, executionId, taskId, taskVersionId, runId: request.runId, status, resultRef: executionId, attempt: "1", ...(error ? { errorMessage: error } : {}) }).catch((publishError) => { this.store.appendEvent(request.runId, "run.failed", { event: "scheduled_event_publish_failed", error: publishError instanceof Error ? publishError.message : String(publishError) }); }) : Promise.resolve();
+    await publishScheduled("execution.started", "running");
 
     const tempRoot = path.join(os.tmpdir(), "alphaflow-agent-runtime", request.runId);
     await fs.mkdir(tempRoot, { recursive: true });
@@ -395,6 +420,17 @@ export class PiAdapter {
       return;
     }
 
+    const allToolNames = [
+        "internal_web_search", "internal_web_fetch", "internal_concept_match", "internal_screening_query",
+        "internal_research_targets_list", "internal_research_target_detail", "internal_research_notes_list",
+        "internal_research_artifacts_list", "internal_watchlist_detail", "internal_stock_search", "internal_stock_profile",
+        "internal_stock_bars", "internal_stock_daily_basic", "internal_index_market", "internal_index_constituents",
+        "internal_moneyflow", "internal_market_events", "internal_shareholder_events", "internal_financial_statements",
+        "internal_financial_indicators", "internal_earnings_events", "internal_fund_market", "internal_convertible_bond_market", "internal_macro_rates",
+      ];
+    const activeToolNames = request.allowedCapabilities?.length
+      ? allToolNames.filter((name) => request.allowedCapabilities?.includes(name))
+      : allToolNames;
     const harness = new AgentHarness({
       env,
       session,
@@ -416,32 +452,7 @@ export class PiAdapter {
         maxToolCalls: this.config.maxToolCallsPerRun,
         toolTimeoutMs: this.config.toolTimeoutMs,
       }),
-      activeToolNames: [
-        "internal_web_search",
-        "internal_web_fetch",
-        "internal_concept_match",
-        "internal_screening_query",
-        "internal_research_targets_list",
-        "internal_research_target_detail",
-        "internal_research_notes_list",
-        "internal_research_artifacts_list",
-        "internal_watchlist_detail",
-        "internal_stock_search",
-        "internal_stock_profile",
-        "internal_stock_bars",
-        "internal_stock_daily_basic",
-        "internal_index_market",
-        "internal_index_constituents",
-        "internal_moneyflow",
-        "internal_market_events",
-        "internal_shareholder_events",
-        "internal_financial_statements",
-        "internal_financial_indicators",
-        "internal_earnings_events",
-        "internal_fund_market",
-        "internal_convertible_bond_market",
-        "internal_macro_rates",
-      ],
+      activeToolNames,
     });
 
     abortController.signal.addEventListener(
@@ -479,6 +490,10 @@ export class PiAdapter {
         generatedAt: new Date().toISOString(),
         context: asJsonObject(request.context),
       };
+      if (executionId) {
+        await this.webInternalClient.persistScheduledTaskResult(executionId, { runId: request.runId, status: "SUCCEEDED", ...parseScheduledOutput(text) });
+        await publishScheduled("execution.succeeded", "succeeded");
+      }
 
       this.store.appendEvent(request.runId, "artifact.created", {
         kind: "report",
@@ -489,11 +504,19 @@ export class PiAdapter {
       this.store.markSucceeded(request.runId, finalOutput);
     } catch (error) {
       if (abortController.signal.aborted) {
+        if (executionId) {
+          await this.webInternalClient.persistScheduledTaskResult(executionId, { runId: request.runId, status: "CANCELLED", error: { message: "cancel_requested" } }).catch(() => undefined);
+          await publishScheduled("execution.cancelled", "cancelled", "cancel_requested");
+        }
         this.store.markCancelled(request.runId, "cancel_requested");
         return;
       }
 
       const message = error instanceof Error ? error.message : "未知错误";
+      if (executionId) {
+        await this.webInternalClient.persistScheduledTaskResult(executionId, { runId: request.runId, status: "FAILED", error: { message } }).catch(() => undefined);
+        await publishScheduled("execution.failed", "failed", message);
+      }
       this.store.markFailed(request.runId, "PI_AGENT_FAILED", message);
     } finally {
       await env.cleanup();

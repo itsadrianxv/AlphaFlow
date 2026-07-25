@@ -4,7 +4,7 @@ import { isRecord } from "./json";
 import { PiAdapter } from "./pi-adapter";
 import { AgentRuntimeRunStore } from "./run-store";
 import { SkillRegistry } from "./skill-registry";
-import type { AgentRuntimeEvent, StartRunRequest } from "./types";
+import type { AgentRuntimeEvent, ScheduledTaskRunRequest, StartRunRequest } from "./types";
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -79,7 +79,15 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
             skillId: typeof item.skillId === "string" ? item.skillId : undefined,
           }))
       : undefined,
+    allowedCapabilities: Array.isArray(value.allowedCapabilities)
+      ? value.allowedCapabilities.filter((item): item is string => typeof item === "string")
+      : undefined,
   };
+}
+
+function parseScheduledRequest(value: unknown): ScheduledTaskRunRequest | null {
+  if (!isRecord(value) || typeof value.executionId !== "string" || typeof value.taskId !== "string" || typeof value.taskVersionId !== "string" || typeof value.userId !== "string" || typeof value.runId !== "string" || !isRecord(value.executionPlan) || !Array.isArray(value.allowedCapabilities) || typeof value.scheduledAt !== "string") return null;
+  return { executionId: value.executionId, taskId: value.taskId, taskVersionId: value.taskVersionId, userId: value.userId, runId: value.runId, executionPlan: value.executionPlan, allowedCapabilities: value.allowedCapabilities.filter((v): v is string => typeof v === "string"), scheduledAt: value.scheduledAt };
 }
 
 async function readJsonBody(request: IncomingMessage) {
@@ -147,6 +155,18 @@ async function main() {
 
         const run = store.snapshot(parsed.runId);
         sendJson(response, existing ? 200 : 202, run);
+        return;
+      }
+
+      if (request.method === "POST" && url.pathname === "/internal/scheduled-task-runs") {
+        const parsed = parseScheduledRequest(await readJsonBody(request));
+        if (!parsed) { sendJson(response, 400, { error: "INVALID_SCHEDULED_TASK_REQUEST" }); return; }
+        const existing = store.snapshot(parsed.runId);
+        const prompt = `执行已确认的定时任务。executionId=${parsed.executionId}。请严格按照 executionPlan 执行，并只返回结构化 JSON 结果。`;
+        const run: StartRunRequest = { runId: parsed.runId, userId: parsed.userId, skillId: "scheduled-task-execution", skillIds: ["scheduled-task-execution"], prompt, allowedCapabilities: parsed.allowedCapabilities, title: "定时任务执行", context: { executionId: parsed.executionId, taskId: parsed.taskId, taskVersionId: parsed.taskVersionId, executionPlan: parsed.executionPlan, allowedCapabilities: parsed.allowedCapabilities, scheduledAt: parsed.scheduledAt } };
+        store.createOrGet(run);
+        if (!existing) void adapter.start(run);
+        sendJson(response, existing ? 200 : 202, store.snapshot(parsed.runId));
         return;
       }
 

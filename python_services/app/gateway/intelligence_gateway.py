@@ -130,6 +130,8 @@ class IntelligenceGateway:
         days: int,
         limit: int,
         end_at=None,
+        include_macro: bool = True,
+        trace_anchor: dict | None = None,
         force_refresh: bool = False,
     ) -> NewsRadarResponse:
         started_at = time.perf_counter()
@@ -143,6 +145,7 @@ class IntelligenceGateway:
                     for value in item.get("aliases") or []
                     if str(value).strip()
                 ),
+                priority=item.get("priority"),
             )
             for item in companies
         )
@@ -154,6 +157,7 @@ class IntelligenceGateway:
                     for value in item.get("aliases") or []
                     if str(value).strip()
                 ),
+                priority=item.get("priority"),
             )
             for item in industries
         )
@@ -166,6 +170,8 @@ class IntelligenceGateway:
                 "days": days,
                 "limit": limit,
                 "endAt": end_at.isoformat() if end_at else None,
+                "includeMacro": include_macro,
+                "traceAnchor": trace_anchor,
             },
             fetcher=lambda: self._news_provider.get_radar(
                 companies=normalized_companies,
@@ -173,8 +179,10 @@ class IntelligenceGateway:
                 days=days,
                 limit=limit,
                 end_at=end_at,
+                include_macro=include_macro,
+                trace_anchor=trace_anchor,
             ),
-            cache_policy=get_cache_policy("theme_news"),
+            cache_policy=get_cache_policy("news_radar"),
             retry_policy=self._retry_policy,
             cache=self._cache,
             force_refresh=force_refresh,
@@ -228,16 +236,20 @@ class IntelligenceGateway:
         days: int,
         limit: int,
         raw_items: list[dict],
+        include_macro: bool = True,
+        trace_anchor: dict | None = None,
     ) -> NewsRadarResponse:
         started_at = time.perf_counter()
         normalized_companies = tuple(RadarCompany(
             stock_code=str(item.get("stockCode") or "").strip(),
             company_name=str(item.get("companyName") or item.get("stockCode") or "").strip(),
             aliases=tuple(str(value).strip() for value in item.get("aliases") or [] if str(value).strip()),
+            priority=item.get("priority"),
         ) for item in companies)
         normalized_industries = tuple(RadarIndustry(
             name=str(item.get("name") or "").strip(),
             aliases=tuple(str(value).strip() for value in item.get("aliases") or [] if str(value).strip()),
+            priority=item.get("priority"),
         ) for item in industries)
         result = self._news_provider.resolve_radar(
             raw_items=raw_items,
@@ -245,6 +257,8 @@ class IntelligenceGateway:
             industries=normalized_industries,
             days=days,
             limit=limit,
+            include_macro=include_macro,
+            trace_anchor=trace_anchor,
         )
         warnings = self._dedupe_warnings(result.warnings)
         return NewsRadarResponse(

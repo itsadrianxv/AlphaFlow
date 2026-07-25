@@ -13,7 +13,12 @@ import pytest
 
 from app.gateway.common import GatewayError
 from app.providers.minishare.client import MinishareNewsClient, RawNewsRecord
-from app.providers.minishare.news import MinishareNewsProvider, NewsQuery, RadarCompany
+from app.providers.minishare.news import (
+    MinishareNewsProvider,
+    NewsQuery,
+    RadarCompany,
+    RadarIndustry,
+)
 
 _SHANGHAI = ZoneInfo("Asia/Shanghai")
 
@@ -110,6 +115,157 @@ def test_resolve_radar_uses_persisted_raw_items_without_fetching_sources() -> No
 
     assert result.items[0]["content"] == raw["content"]
     assert result.items[0]["analysisStatus"] == "partial"
+
+
+def test_radar_prioritizes_targets_then_fills_by_heat() -> None:
+    provider = _provider(client=Mock(), api_key="")
+    target = _raw("fast", content="旧目标公司发布经营进展", title="目标新闻").to_dict()
+    target["publishedAt"] = "2026-07-23T10:00:00+08:00"
+    hot = _raw("major", content="央行降息改善流动性", title="热门新闻").to_dict()
+    hot["publishedAt"] = "2026-07-24T11:50:00+08:00"
+    filler = _raw("cctv", content="消费需求持续恢复", title="补足新闻").to_dict()
+    filler["publishedAt"] = "2026-07-24T11:40:00+08:00"
+
+    candidates = provider._radar_candidates(
+        [_raw_record_from_dict_for_test(item) for item in (target, hot, filler)],
+        (RadarCompany("603019", "旧目标公司", priority=9),),
+        (RadarIndustry("算力", priority=3),),
+        end_at=datetime(2026, 7, 24, 12, 0, tzinfo=_SHANGHAI),
+        days=7,
+        limit=3,
+    )
+
+    assert [item["title"] for item in candidates] == [
+        "目标新闻",
+        "热门新闻",
+        "补足新闻",
+    ]
+
+
+def test_trace_radar_requires_core_subject_relation_and_score() -> None:
+    provider = _provider(client=Mock())
+    related = _raw(
+        "major",
+        title="香港楼市成交持续升温",
+        content="香港市场内地买家购房成交继续增加",
+    ).to_dict()
+    unrelated = _raw(
+        "fast",
+        title="丁二烯橡胶主力合约上涨",
+        content="香港市场关注丁二烯橡胶价格上涨",
+    ).to_dict()
+
+    def fake_attribute(candidates, _query, *, targets):
+        assert targets["includeMacro"] is False
+        return {item["id"]: {"attributions": []} for item in candidates}
+
+    def fake_rerank(candidates, _query, _attributed, *, trace_anchor):
+        assert trace_anchor["title"] == "内地买家涌入香港楼市"
+        return {
+            item["id"]: {
+                "title": item["title"],
+                "summary": item["content"],
+                "relevanceScore": 0.88,
+                "sharesCoreSubject": "楼市" in item["title"],
+                "eventRelation": "prior_signal"
+                if "楼市" in item["title"]
+                else "unrelated",
+                "matchReason": "同一香港楼市事件脉络",
+            }
+            for item in candidates
+        }
+
+    with (
+        patch.object(provider, "_attribute", side_effect=fake_attribute),
+        patch.object(provider, "_rerank", side_effect=fake_rerank),
+    ):
+        result = provider.resolve_radar(
+            raw_items=[related, unrelated],
+            companies=(),
+            industries=(RadarIndustry("香港市场"),),
+            days=30,
+            limit=10,
+            include_macro=False,
+            trace_anchor={
+                "title": "内地买家涌入香港楼市",
+                "summary": "上半年扫货超千亿港元",
+                "eventType": "房地产",
+                "relatedStocks": [],
+                "scopeTags": ["industry"],
+            },
+        )
+
+    assert [item["title"] for item in result.items] == ["香港楼市成交持续升温"]
+    assert result.items[0]["eventRelation"] == "prior_signal"
+
+
+def test_trace_radar_returns_empty_when_model_cannot_confirm_relation() -> None:
+    provider = _provider(client=Mock(), api_key="")
+    result = provider.resolve_radar(
+        raw_items=[
+            _raw(
+                "major",
+                title="香港楼市成交持续升温",
+                content="香港市场内地买家购房成交继续增加",
+            ).to_dict()
+        ],
+        companies=(),
+        industries=(RadarIndustry("香港市场"),),
+        days=30,
+        limit=10,
+        include_macro=False,
+        trace_anchor={
+            "title": "内地买家涌入香港楼市",
+            "summary": "",
+            "eventType": "房地产",
+            "relatedStocks": [],
+            "scopeTags": ["industry"],
+        },
+    )
+
+    assert result.items == []
+
+
+def test_radar_bounds_fuzzy_dedupe_pool_for_shared_news_library() -> None:
+    provider = _provider(client=Mock(), api_key="")
+    items = [
+        RawNewsRecord(
+            sourceKind="fast",
+            sourceName="source:fast",
+            url=None,
+            title=f"市场快讯 {index}",
+            content=f"市场需求变化与第 {index} 条独立新闻",
+            publishedAt="2026-07-24T10:00:00+08:00",
+            contentHash=f"hash-{index}",
+            sourceItemId=f"source-{index}",
+        )
+        for index in range(400)
+    ]
+
+    with patch.object(provider, "_dedupe", wraps=provider._dedupe) as dedupe:
+        provider._radar_candidates(
+            items,
+            companies=(),
+            industries=(),
+            end_at=datetime(2026, 7, 24, 12, 0, tzinfo=_SHANGHAI),
+            days=7,
+            limit=10,
+        )
+
+    assert len(dedupe.call_args.args[0]) == 180
+
+
+def _raw_record_from_dict_for_test(item: dict) -> RawNewsRecord:
+    return RawNewsRecord(
+        sourceKind=item["sourceKind"],
+        sourceName=item["sourceName"],
+        url=item["url"],
+        title=item["title"],
+        content=item["content"],
+        publishedAt=item["publishedAt"],
+        contentHash=item["contentHash"],
+        sourceItemId=item["sourceItemId"],
+    )
 
 
 def test_source_strategy_matches_scope() -> None:

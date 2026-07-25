@@ -9,6 +9,8 @@ from app.contracts.timing import (
     TimingBarsResponse,
     TimingEvidenceBatchRequest,
     TimingEvidenceBatchResponse,
+    TimingEvidenceHistoryRequest,
+    TimingEvidenceHistoryResponse,
     TimingSignalBatchRequest,
     TimingSignalBatchResponse,
     TimingSignalResponse,
@@ -48,7 +50,7 @@ def _validate_adjust(adjust: str) -> str:
             status_code=400,
             provider="gateway",
         )
-    return normalized or "qfq"
+    return normalized
 
 
 @router.get("/stocks/{stock_code}/bars", response_model=TimingBarsResponse)
@@ -151,6 +153,31 @@ async def get_stock_evidence_batch(
         timeframes=body.timeframes,
         indicator_ids=body.indicatorIds,
         lookback_days=body.lookbackDays,
+    )
+
+
+@router.post("/stocks/evidence/history", response_model=TimingEvidenceHistoryResponse)
+async def get_stock_evidence_history(
+    request: Request,
+    body: TimingEvidenceHistoryRequest,
+):
+    invalid_codes = [code for code in body.stockCodes if not is_valid_stock_code(code)]
+    if invalid_codes:
+        raise GatewayError(
+            code="invalid_stock_code",
+            message=f"无效的股票代码格式: {', '.join(invalid_codes)}",
+            status_code=400,
+            provider="gateway",
+        )
+    return timing_gateway.get_evidence_history(
+        request_id=request.state.request_id,
+        stock_codes=body.stockCodes,
+        start_date=body.startDate,
+        end_date=body.endDate,
+        timeframes=body.timeframes,
+        indicator_ids=body.indicatorIds,
+        lookback_days=body.lookbackDays,
+        sample_every_trading_days=body.sampleEveryTradingDays,
     )
 
 

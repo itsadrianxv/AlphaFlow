@@ -62,7 +62,7 @@ cd python_services
 python -m venv .venv
 .venv\Scripts\activate  # Windows
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000
 ```
 
 说明：

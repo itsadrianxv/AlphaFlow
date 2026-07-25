@@ -82,7 +82,7 @@ services:
       - ../data:/app/data
       - python_theme_rules_data:/data/theme-concept-rules
     command:
-      ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+      ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/app"]
     healthcheck:
       test:
         [
@@ -120,7 +120,7 @@ services:
       - ../.models/Kronos:/opt/kronos:ro
       - ../.models/huggingface:/models/huggingface
     command:
-      ["uvicorn", "kronos_service.app:app", "--host", "0.0.0.0", "--port", "8010", "--reload"]
+      ["uvicorn", "kronos_service.app:app", "--host", "0.0.0.0", "--port", "8010", "--reload", "--reload-dir", "/app/kronos_service"]
     healthcheck:
       test:
         [
@@ -139,6 +139,8 @@ services:
       dockerfile: docker/agent-runtime/Dockerfile
     restart: unless-stopped
     depends_on:
+      redis:
+        condition: service_healthy
       python-service:
         condition: service_healthy
     environment:
@@ -147,6 +149,9 @@ services:
       AGENT_RUNTIME_PORT: "8020"
       ALPHAFLOW_WEB_INTERNAL_URL: ${ALPHAFLOW_WEB_INTERNAL_URL:-http://web:3000}
       ALPHAFLOW_INTERNAL_API_SECRET: ${ALPHAFLOW_INTERNAL_API_SECRET:-dev-internal-secret}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      SCHEDULED_TASK_EVENT_STREAM: ${SCHEDULED_TASK_EVENT_STREAM:-scheduled-task:events}
+      SCHEDULED_TASK_EVENT_MAXLEN: ${SCHEDULED_TASK_EVENT_MAXLEN:-10000}
       PYTHON_SERVICE_URL: ${PYTHON_SERVICE_URL:-http://python-service:8000}
       PYTHON_SERVICE_TIMEOUT_MS: ${PYTHON_SERVICE_TIMEOUT_MS:-60000}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
@@ -223,6 +228,7 @@ services:
       AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL:-http://agent-runtime:8020}
       AGENT_RUNTIME_TIMEOUT_MS: ${AGENT_RUNTIME_TIMEOUT_MS:-300000}
       ALPHAFLOW_INTERNAL_API_SECRET: ${ALPHAFLOW_INTERNAL_API_SECRET:-dev-internal-secret}
+      SELL_SIDE_REFRESH_SECRET: ${SELL_SIDE_REFRESH_SECRET:-}
       KRONOS_FORECAST_ENABLED: ${KRONOS_FORECAST_ENABLED:-false}
       KRONOS_DEFAULT_PREDICTION_LENGTH: ${KRONOS_DEFAULT_PREDICTION_LENGTH:-60}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
@@ -287,7 +293,40 @@ services:
       - web_node_modules:/repo/web/node_modules
       - web_next:/repo/web/.next
     command:
-      ["sh", "-c", "npx prisma generate && npm run validate:runtime && npm run worker:workflow"]
+      ["sh", "-c", "npm run validate:runtime && npm run worker:workflow"]
+
+  scheduler:
+    build:
+      context: ..
+      dockerfile: docker/web/Dockerfile
+      args:
+        SKIP_ENV_VALIDATION: "1"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      agent-runtime:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL:-http://agent-runtime:8020}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      ALPHAFLOW_INTERNAL_API_SECRET: ${ALPHAFLOW_INTERNAL_API_SECRET:-dev-internal-secret}
+      SCHEDULED_TASK_EVENT_STREAM: ${SCHEDULED_TASK_EVENT_STREAM:-scheduled-task:events}
+      SCHEDULED_TASK_EVENT_GROUP: ${SCHEDULED_TASK_EVENT_GROUP:-scheduler}
+      SCHEDULED_TASK_EVENT_BLOCK_MS: ${SCHEDULED_TASK_EVENT_BLOCK_MS:-5000}
+      SCHEDULED_TASK_EVENT_CLAIM_IDLE_MS: ${SCHEDULED_TASK_EVENT_CLAIM_IDLE_MS:-60000}
+      SCHEDULED_TASK_EVENT_BATCH_SIZE: ${SCHEDULED_TASK_EVENT_BATCH_SIZE:-20}
+      SCHEDULER_POLL_INTERVAL_MS: ${SCHEDULER_POLL_INTERVAL_MS:-5000}
+      SCHEDULER_CONCURRENCY: ${SCHEDULER_CONCURRENCY:-4}
+      FEISHU_WEBHOOK_URL: ${FEISHU_WEBHOOK_URL:-}
+    volumes:
+      - ../web:/repo/web
+      - web_node_modules:/repo/web/node_modules
+    command: ["sh", "-c", "npx prisma generate && npm run worker:scheduler"]
 volumes:
   postgres_data:
   redis_data:

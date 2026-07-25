@@ -62,4 +62,11 @@ export class WebInternalClient {
       signal?.removeEventListener("abort", abort);
     }
   }
+
+  async persistScheduledTaskResult(executionId: string, body: Record<string, unknown>) {
+    if (!this.apiSecret) throw new Error("缺少 ALPHAFLOW_INTERNAL_API_SECRET");
+    const response = await fetch(`${this.baseUrl}/api/internal/scheduled-task-runs/${encodeURIComponent(executionId)}/result`, { method: "POST", headers: { "Content-Type": "application/json", "X-Alphaflow-Internal-Secret": this.apiSecret }, body: JSON.stringify(body) });
+    if (!response.ok) throw new Error(`Scheduled task result persistence failed: ${response.status}`);
+    return response.json();
+  }
 }

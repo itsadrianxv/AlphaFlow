@@ -23,6 +23,7 @@ _DATASET_POLICIES: dict[str, CachePolicy] = {
     "timing_signal": CachePolicy(fresh_ttl_seconds=300, stale_ttl_seconds=1800),
     "theme_candidates": CachePolicy(fresh_ttl_seconds=300, stale_ttl_seconds=1800),
     "theme_news": CachePolicy(fresh_ttl_seconds=300, stale_ttl_seconds=1800),
+    "news_radar": CachePolicy(fresh_ttl_seconds=3600, stale_ttl_seconds=7200),
     "theme_concepts": CachePolicy(fresh_ttl_seconds=600, stale_ttl_seconds=7200),
     "market_context_snapshot": CachePolicy(fresh_ttl_seconds=1800, stale_ttl_seconds=7200),
     "market_heatmap_snapshot": CachePolicy(fresh_ttl_seconds=21600, stale_ttl_seconds=259200),
@@ -30,6 +31,8 @@ _DATASET_POLICIES: dict[str, CachePolicy] = {
     "concept_constituents": CachePolicy(fresh_ttl_seconds=86400, stale_ttl_seconds=259200),
     "company_evidence": CachePolicy(fresh_ttl_seconds=21600, stale_ttl_seconds=86400),
     "company_research_pack": CachePolicy(fresh_ttl_seconds=21600, stale_ttl_seconds=86400),
+    "company_overview": CachePolicy(fresh_ttl_seconds=21600, stale_ttl_seconds=86400),
+    "money_flow_overview": CachePolicy(fresh_ttl_seconds=21600, stale_ttl_seconds=259200),
 }
 
 

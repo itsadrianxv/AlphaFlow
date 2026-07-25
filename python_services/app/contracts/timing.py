@@ -207,6 +207,31 @@ class TimingEvidenceBatchRequest(BaseModel):
     lookbackDays: int = Field(default=365, ge=120, le=900)
 
 
+class TimingEvidenceHistoryRequest(BaseModel):
+    stockCodes: list[str] = Field(..., min_length=1, max_length=100)
+    startDate: str
+    endDate: str
+    timeframes: list[TimingTimeframe] = Field(
+        default_factory=lambda: ["MONTHLY", "WEEKLY", "DAILY"]
+    )
+    indicatorIds: list[str] = Field(default_factory=list, max_length=100)
+    lookbackDays: int = Field(default=900, ge=120, le=900)
+    sampleEveryTradingDays: int = Field(default=5, ge=1, le=20)
+
+
+class TimingEvidenceHistoryItem(BaseModel):
+    stockCode: str
+    stockName: str
+    timeline: list[TimingEvidenceData] = Field(default_factory=list)
+    bars: list[TimingBar] = Field(default_factory=list)
+    marketStates: dict[str, TimingMarketState] = Field(default_factory=dict)
+
+
+class TimingEvidenceHistoryData(BaseModel):
+    items: list[TimingEvidenceHistoryItem] = Field(default_factory=list)
+    errors: list[BatchItemError] = Field(default_factory=list)
+
+
 class MarketIndexSnapshot(BaseModel):
     code: str
     name: str
@@ -299,6 +324,10 @@ class TimingSignalBatchResponse(GatewayResponse[TimingSignalBatchData]):
 
 
 class TimingEvidenceBatchResponse(GatewayResponse[TimingEvidenceBatchData]):
+    pass
+
+
+class TimingEvidenceHistoryResponse(GatewayResponse[TimingEvidenceHistoryData]):
     pass
 
 

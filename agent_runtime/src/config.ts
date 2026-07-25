@@ -33,5 +33,8 @@ export function readConfig(): AgentRuntimeConfig {
     modelId: process.env.AGENT_RUNTIME_MODEL_ID ?? "deepseek-v4-flash",
     modelTimeoutMs: readNumber("AGENT_RUNTIME_MODEL_TIMEOUT_MS", 120_000),
     modelMaxRetries: readNumber("AGENT_RUNTIME_MODEL_MAX_RETRIES", 1),
+    redisUrl: process.env.REDIS_URL ?? "redis://redis:6379",
+    scheduledTaskEventStream: process.env.SCHEDULED_TASK_EVENT_STREAM ?? "scheduled-task:events",
+    scheduledTaskEventMaxLen: readNumber("SCHEDULED_TASK_EVENT_MAXLEN", 10_000),
   };
 }

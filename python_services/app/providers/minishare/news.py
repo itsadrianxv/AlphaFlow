@@ -29,6 +29,12 @@ _MACRO_TERMS = (
     "GDP", "PMI", "汇率", "关税", "美联储", "财政", "监管", "资本开支",
     "需求", "流动性", "风险偏好", "大宗商品", "房地产", "出口", "消费",
 )
+_TRACE_GENERIC_TERMS = {
+    "公司", "行业", "市场", "今日", "最新", "相关", "表示", "发布", "同比",
+    "增长", "下降", "需求", "价格", "投资", "资本", "上半", "半年", "消息",
+}
+_TRACE_RELATIONS = {"same_event", "prior_signal", "follow_up"}
+_TRACE_MIN_RELEVANCE = 0.65
 
 
 @dataclass(frozen=True)
@@ -46,12 +52,14 @@ class RadarCompany:
     stock_code: str
     company_name: str
     aliases: tuple[str, ...] = ()
+    priority: int | None = None
 
 
 @dataclass(frozen=True)
 class RadarIndustry:
     name: str
     aliases: tuple[str, ...] = ()
+    priority: int | None = None
 
 
 @dataclass(frozen=True)
@@ -215,21 +223,30 @@ class MinishareNewsProvider:
         days: int,
         limit: int,
         end_at: datetime | None = None,
+        include_macro: bool = True,
+        trace_anchor: dict | None = None,
     ) -> NewsRetrievalResult:
-        terms = [*_MACRO_TERMS]
+        terms = [*_MACRO_TERMS] if include_macro else []
         stocks: list[str] = []
         for company in companies:
             terms.extend((company.company_name, company.stock_code, *company.aliases))
-            stocks.append(company.stock_code)
         for industry in industries:
             terms.extend((industry.name, *industry.aliases))
+        if trace_anchor:
+            terms.extend(
+                (
+                    str(trace_anchor.get("title") or ""),
+                    str(trace_anchor.get("summary") or ""),
+                    str(trace_anchor.get("eventType") or ""),
+                )
+            )
         query = NewsQuery(
             scope="macro",
             target="事件雷达",
             days=days,
             limit=limit,
             terms=tuple(_unique_text(terms)),
-            related_stocks=tuple(_unique_text(stocks)),
+            related_stocks=(),
         )
         end_at = end_at or datetime.now(_SHANGHAI)
         if end_at.tzinfo is None:
@@ -242,28 +259,39 @@ class MinishareNewsProvider:
             kinds=("fast", "major", "cctv"),
             fast_limit=min(1500, max(limit * 15, 300)),
         )
-        recalled = self._recall(raw_items, query)
-        deduped = self._dedupe(recalled)
+        deduped = self._radar_candidates(
+            raw_items,
+            companies,
+            industries,
+            end_at=end_at,
+            days=days,
+            limit=limit,
+            include_macro=include_macro,
+            trace_anchor=trace_anchor,
+        )
         targets = {
             "companies": [
                 {
                     "stockCode": item.stock_code,
                     "companyName": item.company_name,
                     "aliases": list(item.aliases),
+                    "priority": item.priority,
                 }
                 for item in companies
             ],
             "industries": [
-                {"name": item.name, "aliases": list(item.aliases)}
+                {"name": item.name, "aliases": list(item.aliases), "priority": item.priority}
                 for item in industries
             ],
-            "includeMacro": True,
+            "includeMacro": include_macro,
         }
         return self._analyze_and_standardize(
             deduped[: min(120, max(limit * 4, 50))],
             query=query,
             warnings=warnings,
             targets=targets,
+            preserve_order=True,
+            trace_anchor=trace_anchor,
         )
 
     def get_daily_raw(self, target_date: datetime) -> DailyNewsRetrievalResult:
@@ -348,31 +376,188 @@ class MinishareNewsProvider:
         industries: tuple[RadarIndustry, ...],
         days: int,
         limit: int,
+        include_macro: bool = True,
+        trace_anchor: dict | None = None,
     ) -> NewsRetrievalResult:
-        terms = [*_MACRO_TERMS]
-        stocks: list[str] = []
+        terms = [*_MACRO_TERMS] if include_macro else []
         for company in companies:
             terms.extend((company.company_name, company.stock_code, *company.aliases))
-            stocks.append(company.stock_code)
         for industry in industries:
             terms.extend((industry.name, *industry.aliases))
+        if trace_anchor:
+            terms.extend(
+                (
+                    str(trace_anchor.get("title") or ""),
+                    str(trace_anchor.get("summary") or ""),
+                    str(trace_anchor.get("eventType") or ""),
+                )
+            )
         query = NewsQuery(
             scope="macro", target="事件雷达", days=days, limit=limit,
-            terms=tuple(_unique_text(terms)), related_stocks=tuple(_unique_text(stocks)),
+            terms=tuple(_unique_text(terms)), related_stocks=(),
         )
         records = [_raw_record_from_dict(item) for item in raw_items]
-        recalled = self._recall(records, query)
+        end_at = datetime.now(_SHANGHAI)
+        selected = self._radar_candidates(
+            records,
+            companies,
+            industries,
+            end_at=end_at,
+            days=days,
+            limit=limit,
+            include_macro=include_macro,
+            trace_anchor=trace_anchor,
+        )
         targets = {
-            "companies": [{"stockCode": item.stock_code, "companyName": item.company_name, "aliases": list(item.aliases)} for item in companies],
-            "industries": [{"name": item.name, "aliases": list(item.aliases)} for item in industries],
-            "includeMacro": True,
+            "companies": [{"stockCode": item.stock_code, "companyName": item.company_name, "aliases": list(item.aliases), "priority": item.priority} for item in companies],
+            "industries": [{"name": item.name, "aliases": list(item.aliases), "priority": item.priority} for item in industries],
+            "includeMacro": include_macro,
         }
         return self._analyze_and_standardize(
-            self._dedupe(recalled)[: min(120, max(limit * 4, 50))],
+            selected,
             query=query,
             warnings=[],
             targets=targets,
+            preserve_order=True,
+            trace_anchor=trace_anchor,
         )
+
+    def _radar_candidates(
+        self,
+        items: list[RawNewsRecord],
+        companies: tuple[RadarCompany, ...],
+        industries: tuple[RadarIndustry, ...],
+        *,
+        end_at: datetime,
+        days: int,
+        limit: int,
+        include_macro: bool = True,
+        trace_anchor: dict | None = None,
+    ) -> list[dict]:
+        targets: list[tuple[int, tuple[str, ...]]] = []
+        for index, company in enumerate(companies):
+            terms = _unique_text((company.company_name, company.stock_code, *company.aliases))
+            targets.append((company.priority if company.priority is not None else len(companies) - index, tuple(terms)))
+        for index, industry in enumerate(industries):
+            terms = _unique_text((industry.name, *industry.aliases))
+            targets.append((industry.priority if industry.priority is not None else len(industries) - index, tuple(terms)))
+
+        anchor_terms = _trace_terms(trace_anchor) if trace_anchor else set()
+        anchor_stocks = {
+            str(value)
+            for value in (trace_anchor or {}).get("relatedStocks") or []
+            if str(value)
+        }
+        prepared: list[dict] = []
+        for raw in items:
+            item = raw.to_dict()
+            text = f"{raw.title}\n{raw.content}".lower()
+            macro_matches = [term for term in _MACRO_TERMS if term.lower() in text]
+            matched_targets = [
+                priority
+                for priority, terms in targets
+                if any(term.lower() in text for term in terms)
+            ]
+            item["id"] = raw.sourceItemId
+            item["matchedTerms"] = macro_matches or ["全局新闻"]
+            item["targetPriority"] = max(matched_targets, default=-1)
+            item["matchedStocks"] = [
+                company.stock_code
+                for company in companies
+                if any(
+                    term.lower() in text
+                    for term in _unique_text((company.company_name, company.stock_code, *company.aliases))
+                )
+            ]
+            normalized_text = re.sub(r"\s+", "", text)
+            item["anchorMatches"] = sorted(
+                term for term in anchor_terms if term.lower() in normalized_text
+            )
+            item["anchorStockMatch"] = bool(
+                anchor_stocks.intersection(item["matchedStocks"])
+            )
+            item["macroMatchCount"] = len(macro_matches)
+            item["initialRelevanceScore"] = round(
+                min(0.98, 0.42 + 0.12 * max(1, len(macro_matches))), 2
+            )
+            prepared.append(item)
+
+        recall_pool = prepared
+        if trace_anchor or not include_macro:
+            recall_pool = [
+                item
+                for item in prepared
+                if item.get("targetPriority", -1) >= 0
+                or item["anchorMatches"]
+                or item["anchorStockMatch"]
+            ]
+
+        # 共享日库最多会传入 2000 条新闻；先做确定性精排，避免近似去重退化为 O(n²)。
+        exact_by_hash: dict[str, dict] = {}
+        for item in recall_pool:
+            current = exact_by_hash.get(item["contentHash"])
+            if current is None or (
+                _SOURCE_PRIORITY.get(item["sourceKind"], 0), len(item["content"])
+            ) > (
+                _SOURCE_PRIORITY.get(current["sourceKind"], 0),
+                len(current["content"]),
+            ):
+                exact_by_hash[item["contentHash"]] = item
+        preselected = sorted(
+            exact_by_hash.values(),
+            key=lambda item: (
+                bool(item.get("anchorStockMatch")),
+                len(item.get("anchorMatches") or []),
+                item.get("targetPriority", -1),
+                item["initialRelevanceScore"],
+                item["publishedAt"],
+                _SOURCE_PRIORITY.get(item["sourceKind"], 0),
+            ),
+            reverse=True,
+        )[: max(180, limit * 6)]
+        deduped = self._dedupe(preselected)
+        window_seconds = max(1, days * 86_400)
+        for item in deduped:
+            published_at = datetime.fromisoformat(str(item["publishedAt"]).replace("Z", "+00:00"))
+            if published_at.tzinfo is None:
+                published_at = published_at.replace(tzinfo=_SHANGHAI)
+            age_seconds = max(0, (end_at - published_at.astimezone(end_at.tzinfo)).total_seconds())
+            freshness = max(0.0, 1.0 - age_seconds / window_seconds)
+            source_refs = item.get("sourceRefs") or []
+            coverage = min(1.0, len(source_refs) / 3)
+            source_quality = _SOURCE_PRIORITY.get(item["sourceKind"], 0) / 3
+            macro_coverage = min(1.0, item.get("macroMatchCount", 0) / 3)
+            item["heatScore"] = round(
+                freshness * 0.4 + coverage * 0.3 + source_quality * 0.2 + macro_coverage * 0.1,
+                6,
+            )
+
+        target_news = sorted(
+            (
+                item
+                for item in deduped
+                if item.get("targetPriority", -1) >= 0
+                or (trace_anchor and (item["anchorMatches"] or item["anchorStockMatch"]))
+            ),
+            key=lambda item: (
+                bool(item.get("anchorStockMatch")),
+                len(item.get("anchorMatches") or []),
+                item["targetPriority"],
+                item["heatScore"],
+                item["publishedAt"],
+                item["id"],
+            ),
+            reverse=True,
+        )
+        if trace_anchor or not include_macro:
+            return target_news[:limit]
+        selected_ids = {item["id"] for item in target_news[:limit]}
+        global_news = sorted(
+            (item for item in deduped if item["id"] not in selected_ids),
+            key=lambda item: (item["heatScore"], item["publishedAt"], item["id"]),
+            reverse=True,
+        )
+        return [*target_news[:limit], *global_news][:limit]
 
     @staticmethod
     def _source_kinds(scope: NewsScope) -> tuple[str, ...]:
@@ -516,6 +701,8 @@ class MinishareNewsProvider:
         query: NewsQuery,
         warnings: list[GatewayWarning],
         targets: dict | None = None,
+        preserve_order: bool = False,
+        trace_anchor: dict | None = None,
     ) -> NewsRetrievalResult:
         if not candidates:
             return NewsRetrievalResult(items=[], warnings=warnings)
@@ -541,7 +728,9 @@ class MinishareNewsProvider:
                     )
                 )
             try:
-                ranked = self._rerank(candidates, query, attributed)
+                ranked = self._rerank(
+                    candidates, query, attributed, trace_anchor=trace_anchor
+                )
             except Exception as exc:  # noqa: BLE001
                 analysis_warnings.append(
                     GatewayWarning(
@@ -562,11 +751,25 @@ class MinishareNewsProvider:
             )
             for source in candidates
         ]
-        standardized = [item for item in standardized if item["relevanceScore"] > 0]
-        standardized.sort(
-            key=lambda item: (item["relevanceScore"], item["publishedAt"]),
-            reverse=True,
-        )
+        if trace_anchor:
+            accepted_ids = {
+                source_id
+                for source_id, ranking in ranked.items()
+                if ranking.get("sharesCoreSubject") is True
+                and ranking.get("eventRelation") in _TRACE_RELATIONS
+                and _score(ranking.get("relevanceScore"), 0) >= _TRACE_MIN_RELEVANCE
+            }
+            standardized = [item for item in standardized if item["id"] in accepted_ids]
+        else:
+            standardized = [item for item in standardized if item["relevanceScore"] > 0]
+        if preserve_order:
+            order = {item["id"]: index for index, item in enumerate(candidates)}
+            standardized.sort(key=lambda item: order.get(item["id"], len(order)))
+        else:
+            standardized.sort(
+                key=lambda item: (item["relevanceScore"], item["publishedAt"]),
+                reverse=True,
+            )
         return NewsRetrievalResult(
             items=standardized[: query.limit], warnings=analysis_warnings
         )
@@ -596,14 +799,27 @@ class MinishareNewsProvider:
         candidates: list[dict],
         query: NewsQuery,
         attributed: dict[str, dict],
+        *,
+        trace_anchor: dict | None = None,
     ) -> dict[str, dict]:
         payload = {
             "scope": query.scope,
             "target": query.target,
+            "traceAnchor": trace_anchor,
             "instructions": (
                 "逐条阅读完整 content 并结合 attribution 输出 title、summary、sentiment、"
                 "relevanceScore、eventType、matchReason。summary 不超过120字；"
                 "sentiment 只能为 positive、neutral、negative；relevanceScore 为0到1。"
+                + (
+                    " 当前任务是判断候选新闻是否属于 traceAnchor 的同一事件脉络。"
+                    "每条还必须输出 sharesCoreSubject 布尔值与 eventRelation；"
+                    "eventRelation 只能为 same_event、prior_signal、follow_up、unrelated。"
+                    "只有共享核心实体或行业主题，或者存在可说明的直接因果链，"
+                    "才能将 sharesCoreSubject 设为 true。仅同属财经新闻，或只共享需求、"
+                    "价格、市场、增长等泛化词，必须判为 unrelated 并给低于0.65的分数。"
+                    if trace_anchor
+                    else ""
+                )
             ),
             "candidates": [
                 {**_model_candidate(item), "attribution": attributed.get(item["id"])}
@@ -623,7 +839,7 @@ class MinishareNewsProvider:
                 "Content-Type": "application/json",
             },
             json={
-                "model": "deepseek-chat",
+                "model": "deepseek-v4-flash",
                 "temperature": 0.1,
                 "response_format": {"type": "json_object"},
                 "messages": [
@@ -688,9 +904,12 @@ class MinishareNewsProvider:
             if ranking.get("sentiment") in {"positive", "neutral", "negative"}
             else "neutral",
             "relevanceScore": relevance,
-            "relatedStocks": _unique_text([*query.related_stocks, *model_stocks]),
+            "relatedStocks": _unique_text([*source.get("matchedStocks", []), *query.related_stocks, *model_stocks]),
             "scopeTags": _unique_text(scope_tags),
             "eventType": _text(ranking.get("eventType")) or "其他",
+            "eventRelation": ranking.get("eventRelation")
+            if ranking.get("eventRelation") in _TRACE_RELATIONS
+            else None,
             "matchReason": _text(ranking.get("matchReason"))
             or "命中目标关键词：" + "、".join(source["matchedTerms"]),
             "attributions": attributions,
@@ -765,6 +984,25 @@ def _is_near_duplicate(left: dict, right: dict) -> bool:
 
 def _fingerprint_text(value: str) -> str:
     return re.sub(r"[^\w\u4e00-\u9fff]", "", value).lower()
+
+
+def _trace_terms(anchor: dict) -> set[str]:
+    text = " ".join(
+        str(anchor.get(key) or "") for key in ("title", "summary", "eventType")
+    ).lower()
+    terms = {
+        token
+        for token in re.findall(r"[a-z][a-z0-9.+-]{1,}|\d{6}", text)
+        if token not in _TRACE_GENERIC_TERMS
+    }
+    for chunk in re.findall(r"[\u4e00-\u9fff]{2,}", text):
+        for size in (2, 3, 4):
+            terms.update(
+                chunk[index : index + size]
+                for index in range(len(chunk) - size + 1)
+                if chunk[index : index + size] not in _TRACE_GENERIC_TERMS
+            )
+    return terms
 
 
 def _json_object(content: str) -> str:

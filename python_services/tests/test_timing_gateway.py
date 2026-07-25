@@ -117,6 +117,30 @@ def test_get_signal_batch_reuses_benchmark_histories() -> None:
     assert signal_provider.benchmark_codes == list(SIGNAL_BENCHMARK_CODES)
 
 
+def test_evidence_history_never_returns_future_evidence() -> None:
+    signal_provider = FakeSignalProvider()
+    gateway = TimingGateway(
+        signal_data_provider=signal_provider,
+        market_context_provider=FakeMarketContextProvider(),
+    )
+
+    response = gateway.get_evidence_history(
+        request_id="history-1",
+        stock_codes=["600519"],
+        start_date="2025-06-01",
+        end_date="2025-10-31",
+        timeframes=["DAILY"],
+        indicator_ids=["trend.close_above_ema20"],
+        lookback_days=120,
+        sample_every_trading_days=20,
+    )
+
+    assert len(response.data.items) == 1
+    assert response.data.items[0].timeline
+    for evidence in response.data.items[0].timeline:
+        assert all(feature.asOfDate <= evidence.asOfDate for feature in evidence.features)
+
+
 def test_get_signal_returns_bars_when_requested() -> None:
     signal_provider = FakeSignalProvider()
     gateway = TimingGateway(

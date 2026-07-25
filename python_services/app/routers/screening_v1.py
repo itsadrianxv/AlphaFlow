@@ -33,6 +33,10 @@ class ScreeningQueryRequest(BaseModel):
     timeConfig: dict[str, str]
 
 
+class StockMentionsRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=20_000)
+
+
 @lru_cache(maxsize=1)
 def get_stock_searcher() -> ScreeningStockSearcher:
     store = ScreeningStockUniverseStore()
@@ -46,6 +50,18 @@ def search_stocks(
 ):
     try:
         return get_stock_searcher().search(keyword, limit)
+    except StockUniverseUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/stocks/mentions")
+def resolve_stock_mentions(request: StockMentionsRequest):
+    try:
+        searcher = get_stock_searcher()
+        records = searcher.get_universe()
+        return searcher.resolve_mentions(request.text, records)
     except StockUniverseUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001

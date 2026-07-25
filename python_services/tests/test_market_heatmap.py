@@ -71,6 +71,38 @@ class FakeHeatmapProvider:
         ]
 
 
+class LargeConceptHeatmapProvider:
+    provider_name = "tushare"
+
+    def get_raw_frame(self, dataset: str, **params: str) -> pd.DataFrame:
+        if dataset == "ths_index":
+            return pd.DataFrame([
+                {"ts_code": "885001.TI", "name": "大概念", "exchange": "A", "type": "N"}
+            ])
+        if dataset == "ths_hot":
+            return pd.DataFrame([
+                {"trade_date": "20260724", "ts_code": "885001.TI", "rank": 1, "hot": 100}
+            ])
+        if dataset == "ths_member":
+            return pd.DataFrame([
+                {"con_code": f"{index:06d}.SZ", "con_name": f"股票 {index}"}
+                for index in range(1, 102)
+            ])
+        return pd.DataFrame()
+
+    def get_market_snapshot(self):
+        return [
+            MarketSnapshotRow(
+                stockCode=f"{index:06d}", stockName=f"股票 {index}", industry=None,
+                tradeDate="2026-07-24", open=None, high=None, low=None, close=10,
+                preClose=10, changeAmount=0, changePercent=1, volume=None, amount=None,
+                turnoverRate=None, turnoverRateFree=None, volumeRatio=None,
+                marketCap=index, floatMarketCap=index,
+            )
+            for index in range(1, 102)
+        ]
+
+
 def test_heatmap_snapshot_sorts_concepts_retains_cross_concept_stocks_and_uses_intraday_change() -> None:
     client = TushareProviderClient(provider=FakeHeatmapProvider())
 
@@ -85,6 +117,18 @@ def test_heatmap_snapshot_sorts_concepts_retains_cross_concept_stocks_and_uses_i
     ]
     assert snapshot["concepts"][1]["marketCap"] == 12000
     assert snapshot["concepts"][1]["changePercent"] == 7.5
+
+
+def test_heatmap_snapshot_limits_each_concept_to_top_100_stocks_by_market_cap() -> None:
+    client = TushareProviderClient(provider=LargeConceptHeatmapProvider())
+
+    snapshot = client.get_market_heatmap_snapshot(limit=15)
+
+    concept = snapshot["concepts"][0]
+    assert len(concept["stocks"]) == 100
+    assert concept["stocks"][0]["stockCode"] == "000101"
+    assert concept["stocks"][-1]["stockCode"] == "000002"
+    assert concept["marketCap"] == sum(range(2, 102))
 
 
 class FakeHeatmapClient:

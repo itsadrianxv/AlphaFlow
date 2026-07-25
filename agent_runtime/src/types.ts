@@ -51,6 +51,18 @@ export type StartRunRequest = {
   title?: string;
   context?: Record<string, unknown>;
   sessionSeed?: AgentRuntimeSeedMessage[];
+  allowedCapabilities?: string[];
+};
+
+export type ScheduledTaskRunRequest = {
+  executionId: string;
+  taskId: string;
+  taskVersionId: string;
+  userId: string;
+  runId: string;
+  executionPlan: Record<string, unknown>;
+  allowedCapabilities: string[];
+  scheduledAt: string;
 };
 
 export type AgentRuntimeSeedMessage = {
@@ -105,4 +117,7 @@ export type AgentRuntimeConfig = {
   modelId: string;
   modelTimeoutMs: number;
   modelMaxRetries: number;
+  redisUrl: string;
+  scheduledTaskEventStream: string;
+  scheduledTaskEventMaxLen: number;
 };

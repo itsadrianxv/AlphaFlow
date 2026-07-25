@@ -23,6 +23,9 @@ from app.contracts.timing import (
     TimingBarsResponse,
     TimingEvidenceBatchData,
     TimingEvidenceBatchResponse,
+    TimingEvidenceHistoryData,
+    TimingEvidenceHistoryItem,
+    TimingEvidenceHistoryResponse,
     TimingSignalBatchData,
     TimingSignalBatchResponse,
     TimingSignalData,
@@ -168,7 +171,6 @@ class TimingGateway:
             as_of_date=as_of_date,
             lookback_days=lookback_days,
         )
-
         for stock_code in stock_codes:
             try:
                 result = self._get_signal_result(
@@ -350,6 +352,106 @@ class TimingGateway:
             indicator_ids=indicator_ids,
             benchmark_history=benchmark_history,
             tradable=tradable,
+        )
+
+    def get_evidence_history(
+        self,
+        *,
+        request_id: str,
+        stock_codes: list[str],
+        start_date: str,
+        end_date: str,
+        timeframes: list[TimingTimeframe],
+        indicator_ids: list[str],
+        lookback_days: int,
+        sample_every_trading_days: int,
+    ) -> TimingEvidenceHistoryResponse:
+        started_at = time.perf_counter()
+        items: list[TimingEvidenceHistoryItem] = []
+        errors: list[BatchItemError] = []
+        benchmark_histories = self._load_signal_benchmark_histories(
+            as_of_date=end_date,
+            lookback_days=lookback_days,
+        )
+        market_states: dict[str, str] = {}
+        for stock_code in stock_codes:
+            try:
+                profile = self._signal_data_provider.get_stock_profile(stock_code)
+                raw_daily = self._get_stock_bars(
+                    self._signal_data_provider,
+                    stock_code=stock_code,
+                    start_date=start_date.replace("-", ""),
+                    end_date=end_date.replace("-", ""),
+                    adjust="qfq",
+                    timeframe="DAILY",
+                )
+                daily = timing_indicators_service.normalize_history(raw_daily)
+                daily_dates = pd.to_datetime(daily["trade_date"])
+                daily = daily.loc[
+                    (daily_dates >= pd.Timestamp(start_date))
+                    & (daily_dates <= pd.Timestamp(end_date))
+                ].reset_index(drop=True)
+                sample_dates = [
+                    str(value)
+                    for value in daily["trade_date"].iloc[::sample_every_trading_days].tolist()
+                ]
+                if len(daily) and str(daily.iloc[-1]["trade_date"]) not in sample_dates:
+                    sample_dates.append(str(daily.iloc[-1]["trade_date"]))
+                timeline = []
+                for decision_date in sample_dates:
+                    evidence = self._build_evidence_data(
+                        stock_code=stock_code,
+                        as_of_date=decision_date,
+                        timeframes=timeframes,
+                        indicator_ids=indicator_ids,
+                        lookback_days=lookback_days,
+                        benchmark_history=benchmark_histories.get("510300"),
+                    )
+                    # 该检查在数据边界阻止任何未来证据进入回放。
+                    if all(feature.asOfDate <= decision_date for feature in evidence.features):
+                        timeline.append(evidence)
+                    if decision_date not in market_states:
+                        try:
+                            score = self._build_market_context(
+                                as_of_date=decision_date,
+                            ).features.stateScore
+                            market_states[decision_date] = (
+                                "RISK_ON" if score >= 65
+                                else "RISK_OFF" if score <= 40
+                                else "NEUTRAL"
+                            )
+                        except Exception:  # noqa: BLE001
+                            market_states[decision_date] = "NEUTRAL"
+                items.append(TimingEvidenceHistoryItem(
+                    stockCode=stock_code,
+                    stockName=profile.stockName,
+                    timeline=timeline,
+                    bars=timing_indicators_service.build_bars(daily),
+                    marketStates={date: market_states[date] for date in sample_dates},
+                ))
+            except Exception as exc:  # noqa: BLE001
+                errors.append(BatchItemError(
+                    stockCode=stock_code,
+                    code=str(getattr(exc, "code", "history_fetch_failed")),
+                    message=str(exc),
+                ))
+        warnings = []
+        if errors:
+            warnings.append(GatewayWarning(
+                code="partial_results",
+                message="历史证据存在部分股票失败，已保留其余可用样本",
+            ))
+        return TimingEvidenceHistoryResponse(
+            meta=build_meta(
+                request_id=request_id,
+                provider=self._signal_data_provider.provider_name,
+                started_at=started_at,
+                cache_hit=False,
+                is_stale=False,
+                warnings=warnings,
+                as_of=end_date,
+            ),
+            data=TimingEvidenceHistoryData(items=items, errors=errors),
         )
 
     def get_market_context(
