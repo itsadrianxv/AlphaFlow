@@ -325,11 +325,15 @@ describe("Impact Mapping", () => {
       title: `历史事件 ${index}`,
       publishedAt: `2026-07-${String(23 - index).padStart(2, "0")}T10:00:00+08:00`,
     }));
-    const getNewsRadar = vi.fn(async (_request: unknown) => historical);
+    const collectRadar = vi.fn(
+      async (request: { traceAnchor?: unknown }) =>
+        request.traceAnchor
+          ? { news: historical, warnings: [] }
+          : { news: [event], warnings: [] },
+    );
+    const getNewsRadar = vi.fn();
     const service = new ImpactMappingService({
-      sharedNewsLibraryService: {
-        collectRadar: vi.fn(async () => ({ news: [event], warnings: [] })),
-      },
+      sharedNewsLibraryService: { collectRadar },
       dataClient: { getNewsRadar },
     } as never);
 
@@ -339,8 +343,9 @@ describe("Impact Mapping", () => {
       input: impactMappingInputSchema.parse({ mode: "overview", days: 7 }),
     });
 
-    expect(getNewsRadar).toHaveBeenCalledTimes(12);
-    expect(getNewsRadar.mock.calls[0]?.[0]).toMatchObject({
+    expect(collectRadar).toHaveBeenCalledTimes(13);
+    expect(getNewsRadar).not.toHaveBeenCalled();
+    expect(collectRadar.mock.calls[1]?.[0]).toMatchObject({
       days: 30,
       endAt: "2026-07-24T02:00:00.000Z",
       includeMacro: false,

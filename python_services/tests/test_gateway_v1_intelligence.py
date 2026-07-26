@@ -159,6 +159,35 @@ def test_v1_news_radar_returns_standardized_items():
     assert payload["data"]["newsItems"][0]["content"] == "完整正文"
 
 
+def test_v1_news_radar_resolve_forwards_end_at():
+    result_type = __import__(
+        "app.providers.minishare.news", fromlist=["NewsRetrievalResult"]
+    ).NewsRetrievalResult
+    with patch(
+        "app.gateway.intelligence_gateway.MinishareNewsProvider.resolve_radar",
+        return_value=result_type(items=[]),
+    ) as resolve_radar:
+        response = client.post(
+            "/api/v1/intelligence/news/radar/resolve",
+            json={
+                "days": 30,
+                "limit": 10,
+                "endAt": "2026-07-24T12:00:00+08:00",
+                "companies": [
+                    {"stockCode": "603019", "companyName": "中科曙光"}
+                ],
+                "industries": [{"name": "算力"}],
+                "rawItems": [],
+            },
+        )
+
+    assert response.status_code == 200
+    assert (
+        resolve_radar.call_args.kwargs["end_at"].isoformat()
+        == "2026-07-24T12:00:00+08:00"
+    )
+
+
 def test_v1_theme_concepts_returns_stale_cache_when_provider_fails():
     cache_key = build_cache_key(
         dataset="theme_concepts",

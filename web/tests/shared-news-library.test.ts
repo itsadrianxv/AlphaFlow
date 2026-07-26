@@ -45,7 +45,12 @@ describe("SharedNewsLibraryService", () => {
     const result = await service.collectRadar(targets);
 
     expect(getDailyNews).not.toHaveBeenCalled();
-    expect(resolveNewsRadar).toHaveBeenCalledWith(expect.objectContaining({ rawItems: [rawItem] }));
+    expect(resolveNewsRadar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        endAt: targets.endAt,
+        rawItems: [rawItem],
+      }),
+    );
     expect(result.warnings).toEqual([]);
   });
 

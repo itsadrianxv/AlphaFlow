@@ -376,6 +376,7 @@ class MinishareNewsProvider:
         industries: tuple[RadarIndustry, ...],
         days: int,
         limit: int,
+        end_at: datetime | None = None,
         include_macro: bool = True,
         trace_anchor: dict | None = None,
     ) -> NewsRetrievalResult:
@@ -397,7 +398,11 @@ class MinishareNewsProvider:
             terms=tuple(_unique_text(terms)), related_stocks=(),
         )
         records = [_raw_record_from_dict(item) for item in raw_items]
-        end_at = datetime.now(_SHANGHAI)
+        end_at = end_at or datetime.now(_SHANGHAI)
+        if end_at.tzinfo is None:
+            end_at = end_at.replace(tzinfo=_SHANGHAI)
+        else:
+            end_at = end_at.astimezone(_SHANGHAI)
         selected = self._radar_candidates(
             records,
             companies,

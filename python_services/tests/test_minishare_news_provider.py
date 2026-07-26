@@ -117,6 +117,29 @@ def test_resolve_radar_uses_persisted_raw_items_without_fetching_sources() -> No
     assert result.items[0]["analysisStatus"] == "partial"
 
 
+def test_resolve_radar_uses_supplied_end_at() -> None:
+    provider = _provider(client=Mock(), api_key="")
+    raw = _raw("major", content="中科曙光扩大算力资本开支", title="算力扩产").to_dict()
+    supplied_end_at = datetime(2026, 7, 24, 12, 0, tzinfo=_SHANGHAI)
+    captured: dict[str, datetime] = {}
+
+    def fake_candidates(*_args, end_at: datetime, **_kwargs):
+        captured["end_at"] = end_at
+        return []
+
+    with patch.object(provider, "_radar_candidates", side_effect=fake_candidates):
+        provider.resolve_radar(
+            raw_items=[raw],
+            companies=(RadarCompany("603019", "中科曙光"),),
+            industries=(),
+            days=30,
+            limit=10,
+            end_at=supplied_end_at,
+        )
+
+    assert captured["end_at"] == supplied_end_at
+
+
 def test_radar_prioritizes_targets_then_fills_by_heat() -> None:
     provider = _provider(client=Mock(), api_key="")
     target = _raw("fast", content="旧目标公司发布经营进展", title="目标新闻").to_dict()

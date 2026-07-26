@@ -236,6 +236,7 @@ class IntelligenceGateway:
         days: int,
         limit: int,
         raw_items: list[dict],
+        end_at=None,
         include_macro: bool = True,
         trace_anchor: dict | None = None,
     ) -> NewsRadarResponse:
@@ -257,6 +258,7 @@ class IntelligenceGateway:
             industries=normalized_industries,
             days=days,
             limit=limit,
+            end_at=end_at,
             include_macro=include_macro,
             trace_anchor=trace_anchor,
         )

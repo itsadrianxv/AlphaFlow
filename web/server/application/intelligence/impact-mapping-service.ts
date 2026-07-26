@@ -188,6 +188,36 @@ export class ImpactMappingService {
     },
   ) {}
 
+  private async collectNewsRadar(
+    request: {
+      days: number;
+      limit: number;
+      endAt?: string;
+      companies: ImpactContext["companies"];
+      industries: ImpactContext["industries"];
+      includeMacro?: boolean;
+      traceAnchor?: ReturnType<typeof traceAnchor>;
+    },
+    label: string,
+  ): Promise<{ news: ThemeNewsItem[]; warnings: string[] }> {
+    if (this.deps.sharedNewsLibraryService) {
+      return withDeadline(
+        this.deps.sharedNewsLibraryService.collectRadar(request),
+        NEWS_DEADLINE_MS,
+        label,
+      );
+    }
+
+    return {
+      news: await withDeadline(
+        this.deps.dataClient.getNewsRadar(request),
+        NEWS_DEADLINE_MS,
+        label,
+      ),
+      warnings: [],
+    };
+  }
+
   async loadContext(
     userId: string,
     input: ImpactMappingInput,
@@ -391,20 +421,7 @@ export class ImpactMappingService {
       };
       let collected: { news: ThemeNewsItem[]; warnings: string[] };
       try {
-        collected = this.deps.sharedNewsLibraryService
-          ? await withDeadline(
-              this.deps.sharedNewsLibraryService.collectRadar(request),
-              NEWS_DEADLINE_MS,
-              "radar_collect",
-            )
-          : {
-              news: await withDeadline(
-                this.deps.dataClient.getNewsRadar(request),
-                NEWS_DEADLINE_MS,
-                "radar_collect",
-              ),
-              warnings: [],
-            };
+        collected = await this.collectNewsRadar(request, "radar_collect");
       } catch (error) {
         collected = {
           news: [],
@@ -446,8 +463,8 @@ export class ImpactMappingService {
               eventTime - index * TRACE_WINDOW_DAYS * 86_400_000,
             );
             try {
-              return await withDeadline(
-                this.deps.dataClient.getNewsRadar({
+              const traced = await this.collectNewsRadar(
+                {
                   days: TRACE_WINDOW_DAYS,
                   limit: 30,
                   endAt: endAt.toISOString(),
@@ -455,10 +472,11 @@ export class ImpactMappingService {
                   industries: context.industries,
                   includeMacro: false,
                   traceAnchor: traceAnchor(event),
-                }),
-                NEWS_DEADLINE_MS,
+                },
                 "overview_trace_window",
               );
+              warnings.push(...traced.warnings);
+              return traced.news;
             } catch (error) {
               warnings.push(
                 `overview_trace_window_failed:${error instanceof Error ? error.message : String(error)}`,

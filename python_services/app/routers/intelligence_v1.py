@@ -57,6 +57,7 @@ def resolve_news_radar(request: Request, body: NewsRadarResolveRequest):
         industries=[item.model_dump() for item in body.industries],
         days=body.days,
         limit=body.limit,
+        end_at=body.endAt,
         raw_items=body.rawItems,
         include_macro=body.includeMacro,
         trace_anchor=body.traceAnchor.model_dump() if body.traceAnchor else None,
