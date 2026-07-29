@@ -18,7 +18,6 @@ from app.contracts.timing import (
     MarketLeadershipPoint,
     MarketVolatilityPoint,
     TimingMarketContextAvailability,
-    TimingBar,
     TimingBarsData,
     TimingBarsResponse,
     TimingEvidenceBatchData,
@@ -554,25 +553,7 @@ class TimingGateway:
             )
 
         normalized = timing_indicators_service.normalize_history(history)
-        bars = [
-            TimingBar(
-                tradeDate=(
-                    row.trade_date.strftime("%Y-%m-%d %H:%M:%S")
-                    if normalized_timeframe.startswith("MINUTE_")
-                    else row.trade_date.strftime("%Y-%m-%d")
-                ),
-                open=round(float(row.open), 4),
-                high=round(float(row.high), 4),
-                low=round(float(row.low), 4),
-                close=round(float(row.close), 4),
-                volume=round(float(row.volume), 4),
-                amount=None if row.amount is None else round(float(row.amount), 4),
-                turnoverRate=None
-                if row.turnover_rate is None
-                else round(float(row.turnover_rate), 4),
-            )
-            for row in normalized.itertuples(index=False)
-        ]
+        bars = timing_indicators_service.build_bars(normalized)
 
         return TimingBarsData(
             stockCode=stock_code,

@@ -108,6 +108,64 @@ def test_get_timing_bars_success(install_gateway) -> None:
     assert len(payload["data"]["bars"]) == 280
 
 
+@pytest.mark.parametrize(
+    "timeframe",
+    [
+        "DAILY",
+        "WEEKLY",
+        "MONTHLY",
+        "MINUTE_60",
+        "MINUTE_30",
+        "MINUTE_15",
+        "MINUTE_1",
+    ],
+)
+def test_get_timing_bars_serializes_non_finite_optional_values_as_null(
+    install_gateway,
+    timeframe: str,
+) -> None:
+    class MissingOptionalBarsProvider(FakeDataProvider):
+        def get_bars(
+            self,
+            stock_code: str,
+            timeframe: str = "DAILY",
+            start_date: str | None = None,
+            end_date: str | None = None,
+            adjust: str = "qfq",
+        ) -> list[DailyBar]:
+            del start_date, end_date, adjust
+            trade_date = (
+                "2026-07-28 10:00:00"
+                if timeframe.startswith("MINUTE_")
+                else "2026-07-28"
+            )
+            return [
+                DailyBar(
+                    stockCode=stock_code,
+                    tradeDate=trade_date,
+                    open=10.0,
+                    high=11.0,
+                    low=9.0,
+                    close=10.5,
+                    volume=1_000.0,
+                    amount=float("inf"),
+                    turnoverRate=float("nan"),
+                ),
+            ]
+
+    install_gateway(MissingOptionalBarsProvider())
+
+    response = client.get(
+        "/api/v1/timing/stocks/002475/bars",
+        params={"timeframe": timeframe, "adjust": "qfq"},
+    )
+
+    assert response.status_code == 200
+    bar = response.json()["data"]["bars"][0]
+    assert bar["amount"] is None
+    assert bar["turnoverRate"] is None
+
+
 def test_get_timing_signal_success(install_gateway) -> None:
     install_gateway(FakeDataProvider())
 

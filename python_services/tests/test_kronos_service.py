@@ -6,7 +6,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from kronos_service.app import create_app
-from kronos_service.service import KronosForecastError, future_period_dates
+from kronos_service.service import (
+    KronosForecastError,
+    format_forecast_trade_date,
+    future_period_dates,
+)
 
 
 def build_bars(count: int) -> list[dict[str, float | str]]:
@@ -195,3 +199,10 @@ def test_future_period_dates_follow_selected_timeframe():
         "MINUTE_30",
     )
     assert minute_dates == ["2026-07-24 13:00:00", "2026-07-24 13:30:00"]
+
+
+def test_forecast_trade_date_preserves_intraday_timestamp():
+    value = "2026-07-24 13:30:00.000000"
+
+    assert format_forecast_trade_date(value, "MINUTE_30") == "2026-07-24 13:30:00"
+    assert format_forecast_trade_date(value, "DAILY") == "2026-07-24"

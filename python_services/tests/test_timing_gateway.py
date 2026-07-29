@@ -8,6 +8,7 @@ from app.data_providers.contracts import DailyBar, StockProfile
 from app.data_providers.errors import DataUnavailableError
 from app.gateway.common import GatewayError
 from app.gateway.timing_gateway import SIGNAL_BENCHMARK_CODES, TimingGateway
+from app.services.timing_indicators import timing_indicators_service
 
 
 def _sample_bars(stock_code: str) -> list[DailyBar]:
@@ -159,6 +160,31 @@ def test_get_signal_returns_bars_when_requested() -> None:
     assert response.data.bars is not None
     assert len(response.data.bars) == 260
     assert response.data.bars[0].tradeDate == "2025-01-02"
+
+
+def test_build_bars_drops_non_finite_required_values_and_nulls_optional_values() -> None:
+    import pandas as pd
+
+    history = pd.DataFrame(
+        {
+            "日期": ["2026-07-27", "2026-07-28"],
+            "开盘": [float("inf"), 10.0],
+            "最高": [11.0, 11.0],
+            "最低": [9.0, 9.0],
+            "收盘": [10.5, 10.5],
+            "成交量": [1_000.0, 1_000.0],
+            "成交额": [10_000.0, float("-inf")],
+            "换手率": [1.0, float("inf")],
+        },
+    )
+
+    normalized = timing_indicators_service.normalize_history(history)
+    bars = timing_indicators_service.build_bars(normalized)
+
+    assert len(bars) == 1
+    assert bars[0].tradeDate == "2026-07-28"
+    assert bars[0].amount is None
+    assert bars[0].turnoverRate is None
 
 
 def test_get_bars_without_explicit_start_retries_with_unbounded_start() -> None:

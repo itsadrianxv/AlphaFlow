@@ -12,7 +12,7 @@ export const impactMappingModeSchema = z.enum([
 export const impactMappingInputSchema = z
   .object({
     mode: impactMappingModeSchema.default("radar"),
-    portfolioSnapshotId: z.string().cuid().optional(),
+    portfolioCompositionId: z.string().cuid().optional(),
     watchListIds: z.array(z.string().min(1)).max(5).default([]),
     eventId: z.string().min(1).optional(),
     baseRunId: z.string().cuid().optional(),

@@ -1,68 +1,38 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-describe("择时专业双工作区", () => {
-  const consoleSource = readFileSync(
-    "app/timing/timing-run-console.tsx",
-    "utf8",
-  );
-  const editorSource = readFileSync(
-    "app/timing/strategies/timing-strategy-editor.tsx",
-    "utf8",
-  );
-  const reportSource = readFileSync(
-    "app/timing/reports/[cardId]/timing-report-view.tsx",
-    "utf8",
-  );
+describe("择时研究工作台", () => {
+  const consoleSource = readFileSync("app/timing/timing-run-console.tsx", "utf8");
+  const editorSource = readFileSync("app/timing/strategies/timing-strategy-editor.tsx", "utf8");
+  const reportSource = readFileSync("app/timing/reports/[cardId]/timing-report-view.tsx", "utf8");
+  const historySource = readFileSync("app/timing/history/timing-history-client.tsx", "utf8");
 
-  it("运行台使用任务型接口执行投资者视角预检与本轮结果过滤", () => {
-    expect(consoleSource).toContain("previewDecision");
-    expect(consoleSource).toContain("startTimingDecision");
-    expect(consoleSource).toContain("LATEST_COMPLETE");
-    expect(consoleSource).toContain("CURRENT_PARTIAL");
-    expect(consoleSource).toContain("preview.data?.canRun");
-    expect(consoleSource).toContain("workflowRunId: runId");
-    expect(consoleSource).toContain("数据齐全");
-    expect(consoleSource).toContain("仅观察");
+  it("运行台只接受研究对象和相对权重组合", () => {
+    expect(consoleSource).toContain("个股研究");
+    expect(consoleSource).toContain("组合诊断");
+    expect(consoleSource).toContain("归一化权重");
+    expect(consoleSource).toContain("startResearchRun");
   });
 
-  it("策略编辑器包含五个专业视图与不可变修订操作", () => {
-    for (const label of [
-      "交易意图",
-      "周期结构",
-      "规则配置",
-      "风控复盘",
-      "回放发布",
-    ]) {
-      expect(editorSource).toContain(label);
+  it("报告提供五个研究页签和独立环境解释", () => {
+    for (const label of ["研究概览", "技术结构", "市场环境", "模型预测", "数据证据"]) {
+      expect(reportSource).toContain(label);
     }
-    expect(editorSource).toContain("cloneTimingStrategyRevision");
-    expect(editorSource).toContain("runTimingBacktest");
-    expect(editorSource).toContain("publishTimingStrategyRevision");
-    expect(editorSource).toContain('selectedRevision?.status === "DRAFT"');
+    expect(reportSource).toContain("不参与个股研究状态判定");
+    expect(reportSource).toContain("不参与综合分数或研究状态");
   });
 
-  it("规则配置允许周期、阈值、连续确认、必选和否决级别覆盖", () => {
-    expect(editorSource).toContain("confirmationBars");
-    expect(editorSource).toContain("vetoSeverity");
-    expect(editorSource).toContain("minSatisfied");
-    expect(editorSource).toContain("rule.timeframe");
-    expect(editorSource).toContain("reviewTradingDays");
+  it("规则编辑器使用校验发布且历史页仅展示研究档案", () => {
+    expect(editorSource).toContain("校验发布");
+    expect(editorSource).toContain("validateResearchRuleRevision");
+    expect(editorSource).toContain("publishResearchRuleRevision");
+    expect(historySource).toContain("研究档案");
   });
 
-  it("报告只展示确定性审计，不展示综合分和置信度", () => {
-    expect(reportSource).toContain("确定性规则审计");
-    expect(reportSource).toContain("冻结数据清单");
-    expect(reportSource).toContain("potentialAction");
-    expect(reportSource).toContain("finalAction");
-    expect(reportSource).not.toContain("综合择时评分");
-    expect(reportSource).not.toContain("六大择时模型");
-  });
-
-  it("桌面表格在窄屏保持横向滚动且表单可换列", () => {
-    expect(consoleSource).toContain("overflow-x-auto");
-    expect(consoleSource).toContain("md:grid-cols-2");
-    expect(editorSource).toContain("overflow-x-auto");
-    expect(editorSource).toContain("xl:grid-cols-[260px_minmax(0,1fr)]");
+  it("研究界面不包含交易执行输出", () => {
+    const source = [consoleSource, editorSource, reportSource, historySource].join("\n");
+    for (const forbidden of ["买入", "卖出", "加仓", "减仓", "持有", "允许执行", "仓位建议", "止损价", "订单计划", "胜率", "预期收益"]) {
+      expect(source).not.toContain(forbidden);
+    }
   });
 });

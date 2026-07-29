@@ -33,6 +33,15 @@ ENGINE_WEIGHTS = {
 }
 
 
+def _finite_float(value: object) -> float | None:
+    """将任意数值规范化为可安全序列化的有限浮点数。"""
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    return numeric if math.isfinite(numeric) else None
+
+
 class TimingIndicatorsService:
     minimum_lookback_days = 240
 
@@ -135,25 +144,35 @@ class TimingIndicatorsService:
         )
 
     def build_bars(self, history: pd.DataFrame) -> list[TimingBar]:
-        return [
-            TimingBar(
-                tradeDate=(
-                    row.trade_date.strftime("%Y-%m-%d %H:%M:%S")
-                    if isinstance(row.trade_date, (datetime, pd.Timestamp))
-                    else row.trade_date.strftime("%Y-%m-%d")
+        bars: list[TimingBar] = []
+        for row in history.itertuples(index=False):
+            required_values = {
+                "open": _finite_float(row.open),
+                "high": _finite_float(row.high),
+                "low": _finite_float(row.low),
+                "close": _finite_float(row.close),
+                "volume": _finite_float(row.volume),
+            }
+            if any(value is None for value in required_values.values()):
+                continue
+
+            bars.append(
+                TimingBar(
+                    tradeDate=(
+                        row.trade_date.strftime("%Y-%m-%d %H:%M:%S")
+                        if isinstance(row.trade_date, (datetime, pd.Timestamp))
+                        else row.trade_date.strftime("%Y-%m-%d")
+                    ),
+                    open=round(required_values["open"], 4),
+                    high=round(required_values["high"], 4),
+                    low=round(required_values["low"], 4),
+                    close=round(required_values["close"], 4),
+                    volume=round(required_values["volume"], 4),
+                    amount=self._optional_bar_value(row.amount),
+                    turnoverRate=self._optional_bar_value(row.turnover_rate),
                 ),
-                open=self._round_float(row.open),
-                high=self._round_float(row.high),
-                low=self._round_float(row.low),
-                close=self._round_float(row.close),
-                volume=self._round_float(row.volume),
-                amount=None if pd.isna(row.amount) else self._round_float(row.amount),
-                turnoverRate=None
-                if pd.isna(row.turnover_rate)
-                else self._round_float(row.turnover_rate),
             )
-            for row in history.itertuples(index=False)
-        ]
+        return bars
 
     def normalize_history(self, history: pd.DataFrame) -> pd.DataFrame:
         if history.empty:
@@ -217,6 +236,19 @@ class TimingIndicatorsService:
         if "turnover_rate" not in frame.columns:
             frame["turnover_rate"] = np.nan
 
+        numeric_columns = [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "amount",
+            "turnover_rate",
+        ]
+        frame[numeric_columns] = frame[numeric_columns].replace(
+            [np.inf, -np.inf],
+            np.nan,
+        )
         frame = frame.dropna(subset=["trade_date", "open", "high", "low", "close", "volume"])
         frame = frame.sort_values("trade_date").reset_index(drop=True)
 
@@ -777,9 +809,14 @@ class TimingIndicatorsService:
         return max(min_value, min(max_value, float(value)))
 
     def _round_float(self, value: float) -> float:
-        if pd.isna(value):
+        numeric = _finite_float(value)
+        if numeric is None:
             return 0.0
-        return round(float(value), 4)
+        return round(numeric, 4)
+
+    def _optional_bar_value(self, value: object) -> float | None:
+        numeric = _finite_float(value)
+        return None if numeric is None else round(numeric, 4)
 
     def _round_probability(self, value: float) -> float:
         return round(self._clamp(value, 0.0, 1.0), 4)

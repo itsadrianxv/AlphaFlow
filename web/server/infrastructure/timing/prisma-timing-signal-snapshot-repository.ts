@@ -126,6 +126,50 @@ export class PrismaTimingSignalSnapshotRepository {
     return records.map((record) => mapRecord(record));
   }
 
+  async createResearchSnapshots(params: {
+    userId: string;
+    workflowRunId?: string;
+    sourceType: TimingSourceType;
+    sourceId: string;
+    presetRevisionId?: string;
+    signals: TimingSignalData[];
+    evidence: TimingEvidenceData[];
+  }) {
+    const evidenceByCode = new Map(
+      params.evidence.map((item) => [item.stockCode, item]),
+    );
+    const records = await this.prisma.$transaction(
+      params.signals.map((signal) => {
+        const evidence = evidenceByCode.get(signal.stockCode);
+        return this.prisma.timingSignalSnapshot.create({
+          data: {
+            userId: params.userId,
+            workflowRunId: params.workflowRunId,
+            stockCode: signal.stockCode,
+            stockName: signal.stockName,
+            asOfDate: toDateOnly(signal.asOfDate),
+            sourceType: params.sourceType,
+            sourceId: params.sourceId,
+            timeframe: "DAILY",
+            barsCount: signal.barsCount,
+            bars: signal.bars ? toJson(signal.bars) : undefined,
+            barsByTimeframe: signal.barsByTimeframe
+              ? toJson(signal.barsByTimeframe)
+              : undefined,
+            indicators: toJson(signal.indicators),
+            signalContext: toJson(signal.signalContext),
+            presetRevisionId: params.presetRevisionId,
+            featureEvidence: evidence ? toJson(evidence.features) : undefined,
+            dataManifest: evidence ? toJson(evidence.dataManifest) : undefined,
+            featureVersion: evidence?.featureVersion,
+            inputHash: evidence?.inputHash,
+          },
+        });
+      }),
+    );
+    return records.map(mapRecord);
+  }
+
   async updateFrozenBars(params: {
     signalSnapshotId: string;
     bars: TimingBar[];

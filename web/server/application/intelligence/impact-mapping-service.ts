@@ -136,7 +136,7 @@ function parsePositions(value: unknown) {
     .map((item) => ({
       stockCode: asString(item.stockCode),
       stockName: asString(item.stockName),
-      currentWeightPct: asNumber(item.currentWeightPct),
+      currentWeightPct: asNumber(item.weightPct),
     }))
     .filter((item) => /^\d{6}$/.test(item.stockCode));
 }
@@ -224,11 +224,11 @@ export class ImpactMappingService {
   ): Promise<ImpactContext> {
     const [portfolio, watchLists, savedCompanies, savedIndustries] =
       await Promise.all([
-        input.portfolioSnapshotId
-          ? this.deps.prisma.portfolioSnapshot.findFirst({
-              where: { id: input.portfolioSnapshotId, userId },
+        input.portfolioCompositionId
+          ? this.deps.prisma.portfolioComposition?.findFirst({
+              where: { id: input.portfolioCompositionId, userId },
             })
-          : this.deps.prisma.portfolioSnapshot.findFirst({
+          : this.deps.prisma.portfolioComposition?.findFirst({
               where: { userId },
               orderBy: { updatedAt: "desc" },
             }),

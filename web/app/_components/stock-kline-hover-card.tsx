@@ -17,6 +17,7 @@ export function buildStockKlinePreviewOption(
   theme: ThemeMode,
 ) {
   const closes = bars.map((bar) => bar.close);
+  const recent20 = bars.slice(-20);
   const average = (windowSize: number) =>
     bars.map((bar, index) => ({
       tradeDate: bar.tradeDate,
@@ -36,7 +37,8 @@ export function buildStockKlinePreviewOption(
         ema60: [],
         ema120: [],
         recentHigh60d: Math.max(...bars.map((bar) => bar.high), 0),
-        recentLow20d: Math.min(...bars.map((bar) => bar.low), 0),
+        recentLow20d:
+          recent20.length > 0 ? Math.min(...recent20.map((bar) => bar.low)) : 0,
         avgVolume20: 0,
         volumeSpikeDates: [],
       },

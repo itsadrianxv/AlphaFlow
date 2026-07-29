@@ -3,8 +3,6 @@
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, { useEffect, useRef, useState } from "react";
 import { type ThemeMode, useTheme } from "~/app/_components/theme-provider";
-import { StatusPill } from "~/app/_components/ui";
-import { formatKronosModelLabel } from "~/app/timing/timing-labels";
 import type {
   TimingBar,
   TimingChartLevels,
@@ -383,7 +381,7 @@ export function buildTimingReportChartOption(
     ...(input.forecast
       ? [
           {
-            name: "Kronos 风险区间",
+            name: "模型风险区间",
             type: "line",
             data: allDates.map((date) => {
               const point = input.forecast?.points.find(
@@ -393,14 +391,10 @@ export function buildTimingReportChartOption(
             }),
             symbol: "none",
             lineStyle: { opacity: 0 },
-            areaStyle: {
-              color: colors.forecastArea,
-              origin: "end",
-            },
             stack: "kronos-band",
           },
           {
-            name: "Kronos 预测高点",
+            name: "模型预测高点",
             type: "line",
             data: allDates.map((date) => {
               const point = input.forecast?.points.find(
@@ -417,7 +411,7 @@ export function buildTimingReportChartOption(
             stack: "kronos-band",
           },
           {
-            name: "Kronos 预测收盘",
+            name: "模型预测收盘",
             type: "line",
             data: allDates.map((date) => {
               const point = input.forecast?.points.find(
@@ -761,31 +755,6 @@ export function TimingReportChart(props: {
         ref={containerRef}
         className="h-[420px] w-full rounded-[8px] border border-[var(--app-border-soft)] bg-[var(--app-panel-soft)]"
       />
-
-      <div className="flex flex-wrap gap-2">
-        <StatusPill
-          label={`60${timeframeUnit(timeframe)}高点 ${chartLevels.recentHigh60d.toFixed(2)}`}
-        />
-        <StatusPill
-          label={`20${timeframeUnit(timeframe)}低点 ${chartLevels.recentLow20d.toFixed(2)}`}
-        />
-        <StatusPill
-          label={`20${timeframeUnit(timeframe)}均量 ${Math.round(chartLevels.avgVolume20)}`}
-          tone="info"
-        />
-        <StatusPill
-          label={`放量日期 ${chartLevels.volumeSpikeDates.length}`}
-          tone="warning"
-        />
-        <StatusPill
-          label={
-            forecast
-              ? `Kronos 预测 · ${formatKronosModelLabel(forecast.modelName)} · ${forecast.predictionLength}${timeframeUnit(timeframe)}`
-              : "Kronos 预测不可用"
-          }
-          tone={forecast ? "info" : "warning"}
-        />
-      </div>
     </div>
   );
 }

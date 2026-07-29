@@ -139,6 +139,11 @@ def future_period_dates(
     return [item.strftime("%Y-%m-%d") for item in dates]
 
 
+def format_forecast_trade_date(value: object, timeframe: KronosTimeframe) -> str:
+    text = str(value)
+    return text[:19] if timeframe.startswith("MINUTE_") else text[:10]
+
+
 def bars_to_frame(bars: list[KronosBar]) -> pd.DataFrame:
     return pd.DataFrame(
         [
@@ -362,7 +367,9 @@ class KronosModelForecaster:
         for row in pred_df.to_dict(orient="records"):
             points.append(
                 {
-                    "tradeDate": str(row["tradeDate"])[:10],
+                    "tradeDate": format_forecast_trade_date(
+                        row["tradeDate"], timeframe
+                    ),
                     "open": round(float(row["open"]), 4),
                     "high": round(float(row["high"]), 4),
                     "low": round(float(row["low"]), 4),

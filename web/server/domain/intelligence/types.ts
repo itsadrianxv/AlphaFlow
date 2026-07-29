@@ -95,12 +95,6 @@ export type InsightQualityFlag =
 
 export type ScreeningInsightStatus = "ACTIVE" | "NEEDS_REVIEW" | "ARCHIVED";
 
-export type ResearchReminderType = "REVIEW";
-
-export type ResearchReminderTargetType = "SCREENING_INSIGHT" | "TIMING_REVIEW";
-
-export type ResearchReminderStatus = "PENDING" | "TRIGGERED" | "CANCELLED";
-
 export type InsightConceptMatch = {
   concept: string;
   confidence: InsightConfidence;

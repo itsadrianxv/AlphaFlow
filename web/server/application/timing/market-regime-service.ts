@@ -172,18 +172,18 @@ export class MarketRegimeService {
     const constraints =
       state === "RISK_OFF"
         ? [
-            "Prefer WATCH/HOLD/TRIM over aggressive ADD actions.",
-            "Tighten invalidation discipline and keep cash flexibility.",
-            "Require stronger relative strength before dockering new risk.",
+            "市场广度收缩，个股技术结构的持续性更容易受到扰动。",
+            "波动扩张会降低短周期信号的稳定性。",
+            "需要单独核对相对强弱与流动性证据是否同步恶化。",
           ]
         : state === "RISK_ON"
           ? [
-              "Allow stronger names to consume risk budget first.",
-              "Use relative strength and breakout quality to prioritize adds.",
+              "市场广度与基准趋势相对积极，但不代表任一个股技术结构成立。",
+              "领涨结构和相对强弱可用于解释市场内部差异。",
             ]
           : [
-              "Keep position sizing balanced while waiting for cleaner market expansion.",
-              "Use transition and breadth trend as secondary confirmation.",
+              "市场内部证据分化，广度和波动尚未形成一致方向。",
+              "环境状态仅用于解释个股研究背景，不参与个股状态判定。",
             ];
 
     const summary =

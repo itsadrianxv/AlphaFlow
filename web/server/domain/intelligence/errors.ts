@@ -13,11 +13,3 @@ export class ScreeningInsightNotFoundError extends Error {
     Object.setPrototypeOf(this, ScreeningInsightNotFoundError.prototype);
   }
 }
-
-export class ResearchReminderNotFoundError extends Error {
-  constructor(reminderId: string) {
-    super(`提醒 ${reminderId} 不存在`);
-    this.name = "ResearchReminderNotFoundError";
-    Object.setPrototypeOf(this, ResearchReminderNotFoundError.prototype);
-  }
-}

@@ -18,7 +18,7 @@ describe("TimingReportClient highlight-to-note toolbar", () => {
   it("records timing report source metadata for saved highlights", () => {
     expect(source).toContain('kind: "timing_report"');
     expect(source).toContain("cardId");
-    expect(source).toContain("stockCode: report.card.stockCode");
-    expect(source).toContain("stockName: report.card.stockName");
+    expect(source).toContain("stockCode: report.report.stockCode");
+    expect(source).toContain("stockName: report.report.stockName");
   });
 });

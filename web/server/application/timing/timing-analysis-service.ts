@@ -1,493 +1,190 @@
-import { resolveTimingPresetConfig } from "~/server/domain/timing/preset";
-import { TimingActionPolicy } from "~/server/domain/timing/services/timing-action-policy";
-import { TimingConfidencePolicy } from "~/server/domain/timing/services/timing-confidence-policy";
 import type {
   TechnicalAssessment,
-  TimingCardDraft,
+  TimingDimensionKey,
+  TimingDimensionStatus,
   TimingEngineBreakdownItem,
-  TimingExecutionCondition,
   TimingIndicators,
-  TimingPresetConfig,
+  TimingObservationCondition,
+  TimingResearchDimension,
   TimingRiskFlag,
   TimingSignalData,
-  TimingSignalEngineResult,
-  TimingSourceType,
+  TimingSignalEngineKey,
+  TimingTrendState,
 } from "~/server/domain/timing/types";
-import { TechnicalSignalSet } from "~/server/domain/timing/value-objects/technical-signal-set";
 
-const actionLabelMap = {
-  WATCH: "观望",
-  PROBE: "试仓",
-  ENTER: "建仓",
-  ADD: "加仓",
-  HOLD: "持有",
-  TRIM: "减仓",
-  EXIT: "卖出",
-} as const;
+const ENGINE_LABELS: Record<TimingSignalEngineKey, string> = {
+  multiTimeframeAlignment: "多周期一致性",
+  relativeStrength: "相对强弱",
+  volatilityPercentile: "波动状态",
+  liquidityStructure: "流动性结构",
+  breakoutFailure: "突破结构",
+  gapVolumeQuality: "量价结构",
+};
 
-function formatActionLabel(action: keyof typeof actionLabelMap) {
-  return actionLabelMap[action] ?? action;
+function round(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
-function uniqueFlags(flags: string[]): TimingRiskFlag[] {
-  return [...new Set(flags)].filter((flag): flag is TimingRiskFlag =>
-    [
-      "HIGH_VOLATILITY",
-      "OVERBOUGHT",
-      "OVERSOLD",
-      "TREND_WEAKENING",
-      "HIGH_CORRELATION",
-      "CROWDING_RISK",
-      "EVENT_UNCERTAINTY",
-      "WEAK_RELATIVE_STRENGTH",
-      "THIN_LIQUIDITY",
-      "FAILED_BREAKOUT",
-      "NEAR_INVALIDATION",
-    ].includes(flag),
-  );
+function dimensionStatus(score: number | null): TimingDimensionStatus {
+  if (score === null) return "UNAVAILABLE";
+  if (score >= 20) return "POSITIVE";
+  if (score <= -20) return "NEGATIVE";
+  return "MIXED";
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
+function trendState(indicators: TimingIndicators): TimingTrendState {
+  if (indicators.close > indicators.ema20 && indicators.ema20 > indicators.ema60) return "UP_TREND";
+  if (indicators.close < indicators.ema20 && indicators.ema20 < indicators.ema60) return "DOWN_TREND";
+  const distancePct = Math.abs(indicators.close / Math.max(indicators.ema20, 0.0001) - 1) * 100;
+  return distancePct <= 2 ? "TRANSITION" : "RANGE";
 }
 
-function summarizeBreakdownLabel(item: TimingEngineBreakdownItem) {
-  return `${item.label}: ${item.detail}`;
+function engineMap(snapshot: TimingSignalData) {
+  return new Map(snapshot.signalContext.engines.map((item) => [item.key, item]));
 }
 
-function formatConditionNote(condition: TimingExecutionCondition) {
-  const actual =
-    condition.actual === undefined || condition.actual === null
-      ? ""
-      : `当前 ${condition.actual}${condition.unit ?? ""}，`;
-  return `${condition.label}: ${actual}${condition.explanation}`;
+function scoreOf(engines: Map<TimingSignalEngineKey, TimingSignalData["signalContext"]["engines"][number]>, keys: TimingSignalEngineKey[]) {
+  const values = keys.map((key) => engines.get(key)?.score).filter((value): value is number => typeof value === "number");
+  return values.length ? round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
 }
 
-function categoryForEngine(
-  key: TimingEngineBreakdownItem["key"],
-): TimingExecutionCondition["category"] {
-  switch (key) {
-    case "multiTimeframeAlignment":
-      return "TREND";
-    case "relativeStrength":
-      return "RELATIVE_STRENGTH";
-    case "liquidityStructure":
-    case "gapVolumeQuality":
-      return "LIQUIDITY";
-    case "breakoutFailure":
-      return "BREAKOUT";
-    case "volatilityPercentile":
-      return "VOLATILITY";
-    default:
-      return "TREND";
-  }
+function buildDimension(params: {
+  key: TimingDimensionKey;
+  label: string;
+  score: number | null;
+  engines: Map<TimingSignalEngineKey, TimingSignalData["signalContext"]["engines"][number]>;
+  engineKeys: TimingSignalEngineKey[];
+  asOfDate: string;
+}): TimingResearchDimension {
+  const evidence = params.engineKeys.flatMap((key) => {
+    const engine = params.engines.get(key);
+    return engine ? [`${ENGINE_LABELS[key]}：${engine.detail}`] : [];
+  });
+  const limitations = params.engineKeys.flatMap((key) => params.engines.get(key)?.warnings ?? []);
+  if (!evidence.length) limitations.push("当前数据未生成该维度的有效证据。");
+  return {
+    key: params.key,
+    label: params.label,
+    status: dimensionStatus(params.score),
+    score: params.score,
+    evidence,
+    limitations: [...new Set(limitations)],
+    dataAsOf: evidence.length ? params.asOfDate : null,
+  };
 }
 
-function conditionSeverity(
-  score: number,
-): TimingExecutionCondition["severity"] {
-  if (Math.abs(score) >= 55) {
-    return "CRITICAL";
-  }
-  if (Math.abs(score) >= 30) {
-    return "WARNING";
-  }
-  return "INFO";
-}
-
-function buildTriggerConditions(
-  breakdown: TimingEngineBreakdownItem[],
-  indicators: TimingIndicators,
-) {
-  const positive = breakdown
-    .filter((item) => item.status === "positive")
-    .sort((left, right) => right.score - left.score)
-    .slice(0, 3)
-    .map(
-      (item): TimingExecutionCondition => ({
-        id: `trigger:${item.key}`,
-        kind: "TRIGGER",
-        category: categoryForEngine(item.key),
-        label: item.label,
-        metric: item.key,
-        operator: ">=",
-        threshold: 20,
-        actual: item.score,
-        lookbackDays: 20,
-        status: "TRIGGERED",
-        severity: conditionSeverity(item.score),
-        explanation: item.detail,
-      }),
-    );
-
-  if (
-    indicators.close >= indicators.ema20 &&
-    indicators.ema20 >= indicators.ema60
-  ) {
-    positive.unshift({
-      id: "trigger:price-above-ema20-ema60",
-      kind: "TRIGGER",
+function buildObservationConditions(indicators: TimingIndicators): TimingObservationCondition[] {
+  const ema20Distance = round((indicators.close / Math.max(indicators.ema20, 0.0001) - 1) * 100);
+  return [
+    {
+      id: "trend-above-ema20",
+      kind: "CONFIRMATION",
       category: "TREND",
-      label: "价格站上中期均线",
-      metric: "close_vs_ema20_ema60",
+      label: "中期趋势结构",
+      metric: "close_vs_ema20",
       operator: ">=",
-      threshold: "ema20 >= ema60",
-      actual: `${indicators.close}/${indicators.ema20}/${indicators.ema60}`,
-      status: "TRIGGERED",
+      threshold: Number(indicators.ema20.toFixed(4)),
+      actual: Number(indicators.close.toFixed(4)),
+      status: indicators.close >= indicators.ema20 ? "MET" : ema20Distance >= -2 ? "NEAR" : "PENDING",
       severity: "INFO",
-      explanation:
-        "收盘价位于 EMA20 上方，且 EMA20 不弱于 EMA60，趋势结构具备继续观察价值。",
-    });
-  }
-
-  if (indicators.volumeRatio20 >= 1.1) {
-    positive.push({
-      id: "trigger:volume-ratio20",
-      kind: "TRIGGER",
+      explanation: "价格与 EMA20 的关系用于观察中期趋势结构是否保持。",
+    },
+    {
+      id: "momentum-macd",
+      kind: "CHANGE",
+      category: "MOMENTUM",
+      label: "动量方向变化",
+      metric: "macd_histogram",
+      operator: ">",
+      threshold: 0,
+      actual: indicators.macd.histogram,
+      status: indicators.macd.histogram > 0 ? "MET" : Math.abs(indicators.macd.histogram) <= 0.05 ? "NEAR" : "PENDING",
+      severity: "INFO",
+      explanation: "MACD 柱跨越零轴代表动量结构发生变化，需要结合趋势证据复核。",
+    },
+    {
+      id: "liquidity-volume",
+      kind: "CONFIRMATION",
       category: "LIQUIDITY",
-      label: "成交量能确认",
-      metric: "volumeRatio20",
+      label: "成交活跃度",
+      metric: "volume_ratio_20",
       operator: ">=",
       threshold: 1.1,
       actual: indicators.volumeRatio20,
-      status: "TRIGGERED",
+      status: indicators.volumeRatio20 >= 1.1 ? "MET" : indicators.volumeRatio20 >= 0.9 ? "NEAR" : "PENDING",
       severity: "INFO",
-      explanation: "20 日量比高于 1.1，说明当前信号有一定成交配合。",
-    });
-  }
-
-  return positive.slice(0, 4);
+      explanation: "成交量相对近期均值的变化用于判断当前结构是否得到成交支持。",
+    },
+    {
+      id: "volatility-expansion",
+      kind: "RISK",
+      category: "VOLATILITY",
+      label: "短期波动扩张",
+      metric: "realized_vol_20_vs_120",
+      operator: ">=",
+      threshold: 1.5,
+      actual: round(indicators.realizedVol20 / Math.max(indicators.realizedVol120, 0.0001)),
+      status: indicators.realizedVol20 >= indicators.realizedVol120 * 1.5 ? "MET" : "PENDING",
+      severity: "WARNING",
+      explanation: "短期波动显著高于长期波动时，技术证据的不确定性上升。",
+    },
+  ];
 }
 
-function buildInvalidationConditions(
-  breakdown: TimingEngineBreakdownItem[],
-  indicators: TimingIndicators,
-) {
-  const negative = breakdown
-    .filter((item) => item.status === "negative")
-    .sort((left, right) => left.score - right.score)
-    .slice(0, 3)
-    .map(
-      (item): TimingExecutionCondition => ({
-        id: `invalidation:${item.key}`,
-        kind: "INVALIDATION",
-        category: categoryForEngine(item.key),
-        label: item.label,
-        metric: item.key,
-        operator: "<=",
-        threshold: -20,
-        actual: item.score,
-        lookbackDays: 20,
-        status: "TRIGGERED",
-        severity: conditionSeverity(item.score),
-        explanation: item.detail,
-      }),
-    );
-
-  const ema20BufferPct =
-    (indicators.close / Math.max(indicators.ema20, 0.0001) - 1) * 100;
-  negative.unshift({
-    id: "invalidation:close-below-ema20",
-    kind: "INVALIDATION",
-    category: "PRICE_LEVEL",
-    label: "跌破 EMA20",
-    metric: "close_vs_ema20",
-    operator: "<",
-    threshold: Number(indicators.ema20.toFixed(4)),
-    actual: Number(indicators.close.toFixed(4)),
-    unit: "",
-    lookbackDays: 2,
-    status:
-      indicators.close < indicators.ema20
-        ? "TRIGGERED"
-        : ema20BufferPct <= 2
-          ? "NEAR"
-          : "PENDING",
-    severity: indicators.close < indicators.ema20 ? "CRITICAL" : "WARNING",
-    explanation:
-      indicators.close < indicators.ema20
-        ? "收盘价已经跌破 EMA20，本次择时假设需要重评。"
-        : "若连续收盘跌破 EMA20，趋势假设需要重评。",
-  });
-
-  if (indicators.close <= indicators.ema60 || indicators.rsi.value <= 35) {
-    negative.push({
-      id: "invalidation:trend-or-momentum-break",
-      kind: "INVALIDATION",
-      category: "TREND",
-      label: "趋势或动能破坏",
-      metric: "close_vs_ema60_or_rsi",
-      operator: "<=",
-      threshold: "close<=ema60 或 RSI<=35",
-      actual: `close ${indicators.close} / ema60 ${indicators.ema60} / RSI ${indicators.rsi.value}`,
-      status: "TRIGGERED",
-      severity: "CRITICAL",
-      explanation:
-        "中期均线或动能指标已经进入防守区，继续执行进攻动作需要降级。",
-    });
+function riskFlags(snapshot: TimingSignalData): TimingRiskFlag[] {
+  const flags: TimingRiskFlag[] = [];
+  const indicators = snapshot.indicators;
+  if (indicators.rsi.value >= 72) flags.push("OVERBOUGHT");
+  if (indicators.rsi.value <= 28) flags.push("OVERSOLD");
+  if (indicators.close < indicators.ema20) flags.push("TREND_WEAKENING");
+  if (indicators.realizedVol20 > indicators.realizedVol120 * 1.5) flags.push("HIGH_VOLATILITY");
+  for (const engine of snapshot.signalContext.engines) {
+    for (const warning of engine.warnings) {
+      if (warning.includes("liquid")) flags.push("THIN_LIQUIDITY");
+      if (warning.includes("breakout")) flags.push("FAILED_BREAKOUT");
+    }
   }
-
-  return negative.slice(0, 4);
-}
-
-function toStatus(score: number): TimingEngineBreakdownItem["status"] {
-  if (score >= 20) {
-    return "positive";
-  }
-  if (score <= -20) {
-    return "negative";
-  }
-  return "neutral";
-}
-
-function scaleEngineScore(
-  engine: TimingSignalEngineResult,
-  nextWeight: number,
-) {
-  if (engine.weight <= 0) {
-    return engine.score;
-  }
-
-  return clamp((engine.score * nextWeight) / engine.weight, -100, 100);
+  return [...new Set(flags)];
 }
 
 export class TimingAnalysisService {
-  constructor(
-    private readonly deps: {
-      confidencePolicy?: TimingConfidencePolicy;
-      actionPolicy?: TimingActionPolicy;
-    } = {},
-  ) {}
-
-  private get confidencePolicy() {
-    return this.deps.confidencePolicy ?? new TimingConfidencePolicy();
-  }
-
-  private get actionPolicy() {
-    return this.deps.actionPolicy ?? new TimingActionPolicy();
-  }
-
-  buildTechnicalAssessments(
-    signalSnapshots: TimingSignalData[],
-    presetConfig?: TimingPresetConfig,
-  ) {
-    return signalSnapshots.map((snapshot) =>
-      this.buildAssessment(snapshot, presetConfig),
-    );
-  }
-
-  buildCards(params: {
-    userId: string;
-    workflowRunId?: string;
-    sourceType: TimingSourceType;
-    sourceId: string;
-    watchListId?: string;
-    presetId?: string;
-    presetConfig?: TimingPresetConfig;
-    signalSnapshots: TimingSignalData[];
-    technicalAssessments: TechnicalAssessment[];
-    hasPortfolioContext?: boolean;
-  }): TimingCardDraft[] {
-    const snapshotByCode = new Map(
-      params.signalSnapshots.map((snapshot) => [snapshot.stockCode, snapshot]),
-    );
-
-    return params.technicalAssessments.map((assessment) => {
-      const snapshot = snapshotByCode.get(assessment.stockCode);
-
-      if (!snapshot) {
-        throw new Error(`Missing timing snapshot for ${assessment.stockCode}`);
-      }
-
-      const actionBias = this.actionPolicy.decide(
-        {
-          direction: assessment.direction,
-          confidence: assessment.confidence,
-          signalStrength: assessment.signalStrength,
-          hasPortfolioContext: params.hasPortfolioContext,
-        },
-        params.presetConfig,
-      );
-
-      const actionRationale =
-        actionBias === "ADD"
-          ? "多周期、相对强弱与结构质量同步支持进攻型动作。"
-          : actionBias === "PROBE"
-            ? "信号已具备试仓条件，但仍需观察市场与位置上下文的确认。"
-            : actionBias === "WATCH"
-              ? "当前更适合维持观察，等待结构或环境进一步改善。"
-              : actionBias === "TRIM"
-                ? "信号与风险提示开始偏向防守，适合先收缩风险暴露。"
-                : actionBias === "EXIT"
-                  ? "负向结构已超过容错区间，应优先退出。"
-                  : "当前信号更偏向持有与等待。";
-
-      return {
-        userId: params.userId,
-        workflowRunId: params.workflowRunId,
-        watchListId: params.watchListId,
-        presetId: params.presetId,
-        stockCode: assessment.stockCode,
-        stockName: assessment.stockName,
-        asOfDate: assessment.asOfDate,
-        sourceType: params.sourceType,
-        sourceId: params.sourceId,
-        actionBias,
-        confidence: assessment.confidence,
-        summary: `${assessment.stockName} 当前偏向 ${formatActionLabel(actionBias)}，核心依据是 ${assessment.signalContext.summary}`,
-        triggerNotes: assessment.triggerNotes,
-        invalidationNotes: assessment.invalidationNotes,
-        riskFlags: assessment.riskFlags,
-        reasoning: {
-          signalContext: assessment.signalContext,
-          actionRationale,
-          indicators: snapshot.indicators,
-        },
-      };
-    });
-  }
-
-  private buildAssessment(
-    snapshot: TimingSignalData,
-    presetConfig?: TimingPresetConfig,
-  ): TechnicalAssessment {
-    const resolvedPresetConfig = resolveTimingPresetConfig(presetConfig);
-    const indicators = TechnicalSignalSet.create(
-      snapshot.indicators,
-    ).toObject();
-
-    const engineBreakdown = snapshot.signalContext.engines.map((engine) => {
-      const nextWeight =
-        resolvedPresetConfig.signalEngineWeights?.[engine.key] ?? engine.weight;
-      const nextScore = scaleEngineScore(engine, nextWeight);
-
-      return {
+  buildTechnicalAssessments(signalSnapshots: TimingSignalData[]): TechnicalAssessment[] {
+    return signalSnapshots.map((snapshot) => {
+      const engines = engineMap(snapshot);
+      const breakdown: TimingEngineBreakdownItem[] = snapshot.signalContext.engines.map((engine) => ({
         key: engine.key,
         label: engine.label,
-        status: toStatus(nextScore),
-        score: Math.round(nextScore),
-        confidence: Math.round(engine.confidence * 100) / 100,
-        weight: Math.round(nextWeight * 100) / 100,
+        status: engine.score >= 20 ? "positive" : engine.score <= -20 ? "negative" : "neutral",
+        score: round(engine.score),
+        confidence: round(engine.confidence),
+        weight: round(engine.weight),
         detail: engine.detail,
-      } satisfies TimingEngineBreakdownItem;
+      }));
+      const dimensions = [
+        buildDimension({ key: "multiTimeframe", label: "多周期一致性", score: scoreOf(engines, ["multiTimeframeAlignment"]), engines, engineKeys: ["multiTimeframeAlignment"], asOfDate: snapshot.asOfDate }),
+        buildDimension({ key: "momentumTrend", label: "动量与趋势", score: round((snapshot.signalContext.composite.score + (snapshot.indicators.macd.histogram > 0 ? 20 : -20)) / 2), engines, engineKeys: ["multiTimeframeAlignment"], asOfDate: snapshot.asOfDate }),
+        buildDimension({ key: "priceVolume", label: "量价结构", score: scoreOf(engines, ["gapVolumeQuality", "breakoutFailure"]), engines, engineKeys: ["gapVolumeQuality", "breakoutFailure"], asOfDate: snapshot.asOfDate }),
+        buildDimension({ key: "relativeStrength", label: "相对强弱", score: scoreOf(engines, ["relativeStrength"]), engines, engineKeys: ["relativeStrength"], asOfDate: snapshot.asOfDate }),
+        buildDimension({ key: "volatility", label: "波动", score: scoreOf(engines, ["volatilityPercentile"]), engines, engineKeys: ["volatilityPercentile"], asOfDate: snapshot.asOfDate }),
+        buildDimension({ key: "liquidity", label: "流动性", score: scoreOf(engines, ["liquidityStructure"]), engines, engineKeys: ["liquidityStructure"], asOfDate: snapshot.asOfDate }),
+      ];
+      const compositeScore = round(snapshot.signalContext.composite.score);
+      const availableDimensions = dimensions.filter((item) => item.status !== "UNAVAILABLE").length;
+      return {
+        stockCode: snapshot.stockCode,
+        stockName: snapshot.stockName,
+        asOfDate: snapshot.asOfDate,
+        researchState: availableDimensions < 4 ? "DATA_INCOMPLETE" : compositeScore >= 20 ? "CONFIRMED" : compositeScore > 0 ? "FORMING" : "NO_SETUP",
+        trendState: trendState(snapshot.indicators),
+        compositeScore,
+        confidence: round(snapshot.signalContext.composite.confidence),
+        dimensions,
+        observationConditions: buildObservationConditions(snapshot.indicators),
+        riskFlags: riskFlags(snapshot),
+        summary: `综合技术结构得分 ${compositeScore.toFixed(1)}，${availableDimensions} 个研究维度具备有效证据。`,
+        explanation: "研究状态仅描述当前技术结构，不构成交易动作或仓位建议。",
+        engineBreakdown: breakdown,
+      };
     });
-
-    const weightedScoreNumerator = engineBreakdown.reduce(
-      (sum, item) => sum + item.score * item.weight * item.confidence,
-      0,
-    );
-    const weightedScoreDenominator = engineBreakdown.reduce(
-      (sum, item) => sum + item.weight * item.confidence,
-      0,
-    );
-    const compositeScore =
-      weightedScoreDenominator > 0
-        ? weightedScoreNumerator / weightedScoreDenominator
-        : snapshot.signalContext.composite.score;
-    const direction =
-      compositeScore > 20
-        ? "bullish"
-        : compositeScore < -20
-          ? "bearish"
-          : "neutral";
-    const signalStrength = Math.round(Math.abs(compositeScore));
-
-    const riskFlags = uniqueFlags(
-      snapshot.signalContext.engines.flatMap((engine) => engine.warnings),
-    );
-    if (indicators.rsi.value >= 72) {
-      riskFlags.push("OVERBOUGHT");
-    }
-    if (indicators.rsi.value <= 28) {
-      riskFlags.push("OVERSOLD");
-    }
-    if (
-      indicators.close < indicators.ema20 ||
-      snapshot.signalContext.composite.score <= -20
-    ) {
-      riskFlags.push("TREND_WEAKENING");
-    }
-
-    const confidence = this.confidencePolicy.calculate(
-      {
-        direction,
-        signalStrength,
-        factorBreakdown: engineBreakdown,
-        riskFlags: uniqueFlags(riskFlags),
-      },
-      resolvedPresetConfig,
-    );
-
-    const positiveFactors = engineBreakdown
-      .filter((item) => item.status === "positive")
-      .sort((left, right) => right.score - left.score);
-    const negativeFactors = engineBreakdown
-      .filter((item) => item.status === "negative")
-      .sort((left, right) => left.score - right.score);
-
-    const triggerConditions = buildTriggerConditions(
-      engineBreakdown,
-      indicators,
-    );
-    const invalidationConditions = buildInvalidationConditions(
-      engineBreakdown,
-      indicators,
-    );
-    const triggerNotes = triggerConditions.length
-      ? triggerConditions.map((item) => formatConditionNote(item))
-      : positiveFactors
-          .slice(0, 3)
-          .map((item) => summarizeBreakdownLabel(item));
-    const invalidationNotes = invalidationConditions.length
-      ? invalidationConditions.map((item) => formatConditionNote(item))
-      : negativeFactors.length
-        ? negativeFactors
-            .slice(0, 3)
-            .map((item) => summarizeBreakdownLabel(item))
-        : ["若多周期结构破坏且相对强弱继续下滑，本次择时假设需要重评。"];
-
-    const topPositive = positiveFactors[0]?.label ?? "暂无明显优势";
-    const topNegative = negativeFactors[0]?.label ?? "暂无显著拖累";
-    const explanation =
-      direction === "bullish"
-        ? `优势集中在 ${topPositive}，且负面拖累主要来自 ${topNegative}。`
-        : direction === "bearish"
-          ? `负面集中在 ${topNegative}，当前需要等待结构修复。`
-          : `正负因子拉扯，最强优势是 ${topPositive}，主要拖累是 ${topNegative}。`;
-    const summary =
-      direction === "bullish"
-        ? `综合择时评分 ${compositeScore.toFixed(1)}，多个择时模型整体偏多。`
-        : direction === "bearish"
-          ? `综合择时评分 ${compositeScore.toFixed(1)}，多个择时模型整体偏空。`
-          : `综合择时评分 ${compositeScore.toFixed(1)}，当前多空分歧较大。`;
-
-    return {
-      stockCode: snapshot.stockCode,
-      stockName: snapshot.stockName,
-      asOfDate: snapshot.asOfDate,
-      direction,
-      compositeScore: Math.round(compositeScore * 100) / 100,
-      signalStrength,
-      confidence,
-      engineBreakdown,
-      triggerNotes,
-      invalidationNotes,
-      riskFlags: uniqueFlags(riskFlags),
-      explanation,
-      signalContext: {
-        direction,
-        compositeScore: Math.round(compositeScore * 100) / 100,
-        signalStrength,
-        confidence,
-        engineBreakdown,
-        triggerNotes,
-        invalidationNotes,
-        triggerConditions,
-        invalidationConditions,
-        riskFlags: uniqueFlags(riskFlags),
-        explanation,
-        summary,
-      },
-    };
   }
 }

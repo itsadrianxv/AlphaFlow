@@ -1,249 +1,97 @@
 import type {
-  TimingAction,
+  TimingDimensionKey,
+  TimingDimensionStatus,
   TimingDirection,
   TimingMarketBreadthTrend,
   TimingMarketState,
   TimingMarketTransition,
   TimingMarketVolatilityTrend,
-  TimingReviewHorizon,
-  TimingReviewVerdict,
+  TimingResearchState,
   TimingRiskFlag,
   TimingSignalEngineKey,
-  TimingSignalMetricValue,
+  TimingTrendState,
 } from "~/server/domain/timing/types";
 
-const timingActionLabelMap: Record<TimingAction, string> = {
-  WATCH: "观望",
-  PROBE: "试仓",
-  ENTER: "建仓",
-  ADD: "加仓",
-  HOLD: "持有",
-  TRIM: "减仓",
-  EXIT: "卖出",
-};
-
-const timingDirectionLabelMap: Record<TimingDirection, string> = {
-  bullish: "偏多",
-  neutral: "中性",
-  bearish: "偏空",
-};
-
-const timingSignalKeyLabelMap: Record<TimingSignalEngineKey, string> = {
-  multiTimeframeAlignment: "多周期一致性",
+const labels = {
+  DATA_INCOMPLETE: "数据不完整",
+  NO_SETUP: "暂无结构",
+  FORMING: "结构形成中",
+  CONFIRMED: "结构已确认",
+  INVALIDATED: "结构已失效",
+  UP_TREND: "上行趋势",
+  RANGE: "区间整理",
+  DOWN_TREND: "下行趋势",
+  TRANSITION: "结构转换",
+  POSITIVE: "积极",
+  MIXED: "混合",
+  NEGATIVE: "偏弱",
+  UNAVAILABLE: "不可用",
+  multiTimeframe: "多周期一致性",
+  momentumTrend: "动量与趋势",
+  priceVolume: "量价结构",
   relativeStrength: "相对强弱",
-  volatilityPercentile: "波动分位",
-  liquidityStructure: "流动性结构",
-  breakoutFailure: "突破有效性",
-  gapVolumeQuality: "缺口与放量质量",
-  kronosForecast: "Kronos 预测",
-};
-
-const timingMetricLabelMap: Record<string, string> = {
-  bullishChecks: "看多信号数",
-  bearishChecks: "看空信号数",
-  return20d: "20日涨幅",
-  excess20d: "20日超额收益",
-  excess60d: "60日超额收益",
-  stockReturn20d: "个股20日涨幅",
-  stockReturn60d: "个股60日涨幅",
-  volatilityPercentile: "波动分位",
-  atrPercentile: "ATR 分位",
-  atrRatio: "ATR 比率",
-  volumeRatio20: "20日量比",
-  amountPercentile: "成交额分位",
-  turnoverRate: "换手率",
-  turnoverPercentile: "换手率分位",
-  failureRate: "失败率",
-  distanceTo60dHighPct: "距60日高点",
-  recentGapCount: "近期缺口数",
-  latestVolumeRatio20: "最新 20 日量比",
-  sampleSize: "样本数",
-  positiveSampleSize: "正向样本数",
-  negativeSampleSize: "负向样本数",
-  indexAtrRatio: "指数 ATR 比率",
-};
-
-const timingMarketStateLabelMap: Record<TimingMarketState, string> = {
-  RISK_ON: "风险偏好",
-  NEUTRAL: "中性环境",
-  RISK_OFF: "风险收缩",
-};
-
-const timingMarketTransitionLabelMap: Record<TimingMarketTransition, string> = {
-  IMPROVING: "持续改善",
-  STABLE: "维持稳定",
-  DETERIORATING: "持续走弱",
-  PIVOT_UP: "向上拐点",
-  PIVOT_DOWN: "向下拐点",
-};
-
-const timingRiskFlagLabelMap: Record<TimingRiskFlag, string> = {
+  volatility: "波动",
+  liquidity: "流动性",
+  RISK_ON: "RISK_ON",
+  NEUTRAL: "NEUTRAL",
+  RISK_OFF: "RISK_OFF",
+  IMPROVING: "改善",
+  STABLE: "稳定",
+  DETERIORATING: "走弱",
+  PIVOT_UP: "向上转折",
+  PIVOT_DOWN: "向下转折",
+  EXPANDING: "扩张",
+  STALLING: "停滞",
+  CONTRACTING: "收缩",
+  RISING: "上升",
+  FALLING: "下降",
+  bullish: "偏强",
+  neutral: "中性",
+  bearish: "偏弱",
   HIGH_VOLATILITY: "高波动",
-  OVERBOUGHT: "短线过热",
-  OVERSOLD: "短线超跌",
-  TREND_WEAKENING: "趋势转弱",
-  HIGH_CORRELATION: "高相关性",
-  CROWDING_RISK: "拥挤风险",
+  OVERBOUGHT: "动量偏热",
+  OVERSOLD: "动量偏弱",
+  TREND_WEAKENING: "趋势走弱",
+  HIGH_CORRELATION: "高相关",
+  CROWDING_RISK: "暴露集中",
   EVENT_UNCERTAINTY: "事件不确定性",
   WEAK_RELATIVE_STRENGTH: "相对强度偏弱",
   THIN_LIQUIDITY: "流动性偏弱",
-  FAILED_BREAKOUT: "突破失败",
-  NEAR_INVALIDATION: "接近失效位",
-};
+  FAILED_BREAKOUT: "突破结构失效",
+  NEAR_STRUCTURE_CHANGE: "接近结构变化",
+  multiTimeframeAlignment: "多周期一致性",
+  volatilityPercentile: "波动分位",
+  liquidityStructure: "流动性结构",
+  breakoutFailure: "突破失效",
+  gapVolumeQuality: "缺口与量能",
+  kronosForecast: "模型预测",
+} as const;
 
-const timingReviewHorizonLabelMap: Record<TimingReviewHorizon, string> = {
-  T5: "T+5",
-  T10: "T+10",
-  T20: "T+20",
-};
-
-const timingReviewVerdictLabelMap: Record<TimingReviewVerdict, string> = {
-  SUCCESS: "验证成功",
-  MIXED: "结果分化",
-  FAILURE: "验证失败",
-};
-
-const timingBreadthTrendLabelMap: Record<TimingMarketBreadthTrend, string> = {
-  EXPANDING: "广度扩张",
-  STALLING: "广度停滞",
-  CONTRACTING: "广度收缩",
-};
-
-const timingVolatilityTrendLabelMap: Record<
-  TimingMarketVolatilityTrend,
-  string
-> = {
-  RISING: "波动抬升",
-  STABLE: "波动稳定",
-  FALLING: "波动回落",
-};
-
-function formatNumber(value: number, digits = 2) {
-  return value.toFixed(digits).replace(/\.00$/, "");
+function formatLabel(value: string) {
+  return labels[value as keyof typeof labels] ?? value;
 }
 
-export function formatKronosModelLabel(modelName: string) {
-  const shortName = modelName.split("/").at(-1) ?? modelName;
-  return shortName.endsWith("模型") ? shortName : `${shortName} 模型`;
-}
+export const formatTimingResearchStateLabel = (value: TimingResearchState | string) => formatLabel(value);
+export const formatTimingTrendStateLabel = (value: TimingTrendState | string) => formatLabel(value);
+export const formatTimingDimensionStatusLabel = (value: TimingDimensionStatus | string) => formatLabel(value);
+export const formatTimingDimensionLabel = (value: TimingDimensionKey | string) => formatLabel(value);
+export const formatTimingDirectionLabel = (value: TimingDirection | string) => formatLabel(value);
+export const formatTimingEngineLabel = (value: TimingSignalEngineKey | string) => formatLabel(value);
+export const formatTimingSignalKeyLabel = formatTimingEngineLabel;
+export const formatTimingMarketStateLabel = (value: TimingMarketState | string) => formatLabel(value);
+export const formatTimingMarketTransitionLabel = (value: TimingMarketTransition | string) => formatLabel(value);
+export const formatTimingBreadthTrendLabel = (value: TimingMarketBreadthTrend | string) => formatLabel(value);
+export const formatTimingVolatilityTrendLabel = (value: TimingMarketVolatilityTrend | string) => formatLabel(value);
+export const formatTimingRiskFlagLabel = (value: TimingRiskFlag | string) => formatLabel(value);
+export const formatTimingMetricLabel = formatLabel;
 
 export function formatTimingNarrative(value?: string | null) {
-  if (!value) {
-    return "";
-  }
-
-  return value
-    .replace(/\bWATCH\b/g, "观望")
-    .replace(/\bHOLD\b/g, "持有")
-    .replace(/\bEXIT\b/g, "卖出")
-    .replace(/\bbullish\b/g, "偏多")
-    .replace(/\bneutral\b/g, "中性")
-    .replace(/\bbearish\b/g, "偏空")
-    .replace(/\bComposite\b/g, "综合择时评分")
-    .replace(/多子引擎/g, "多个择时模型")
-    .replace(/六大证据引擎/g, "六大择时模型")
-    .replace(
-      /Kronos forecast unavailable; auxiliary weight treated as 0\./g,
-      "Kronos 预测暂不可用，辅助权重按 0 处理。",
-    )
-    .replace(/Kronos forecast:\s*/g, "Kronos 预测：")
-    .replace(/Kronos forecast is\s*/g, "Kronos 预测为")
-    .replace(/expected return/g, "预期收益")
-    .replace(/max drawdown/g, "最大回撤")
-    .replace(/confidence/g, "置信度");
+  if (!value) return "";
+  return value.replace(/Kronos/gi, "模型");
 }
 
-export function formatTimingActionLabel(value: TimingAction | string) {
-  return timingActionLabelMap[value as TimingAction] ?? value;
-}
-
-export function formatTimingDirectionLabel(value: TimingDirection | string) {
-  return timingDirectionLabelMap[value as TimingDirection] ?? value;
-}
-
-export function formatTimingEngineLabel(value: TimingSignalEngineKey | string) {
-  return timingSignalKeyLabelMap[value as TimingSignalEngineKey] ?? value;
-}
-
-export const formatTimingSignalKeyLabel = formatTimingEngineLabel;
-
-export function formatTimingMetricLabel(value: string) {
-  return timingMetricLabelMap[value] ?? value;
-}
-
-export function formatTimingMarketStateLabel(
-  value: TimingMarketState | string,
-) {
-  return timingMarketStateLabelMap[value as TimingMarketState] ?? value;
-}
-
-export function formatTimingMarketTransitionLabel(
-  value: TimingMarketTransition | string,
-) {
-  return (
-    timingMarketTransitionLabelMap[value as TimingMarketTransition] ?? value
-  );
-}
-
-export function formatTimingRiskFlagLabel(value: TimingRiskFlag | string) {
-  return timingRiskFlagLabelMap[value as TimingRiskFlag] ?? value;
-}
-
-export function formatTimingReviewHorizonLabel(
-  value: TimingReviewHorizon | string,
-) {
-  return timingReviewHorizonLabelMap[value as TimingReviewHorizon] ?? value;
-}
-
-export function formatTimingReviewVerdictLabel(
-  value: TimingReviewVerdict | string,
-) {
-  return timingReviewVerdictLabelMap[value as TimingReviewVerdict] ?? value;
-}
-
-export function formatTimingBreadthTrendLabel(
-  value: TimingMarketBreadthTrend | string,
-) {
-  return timingBreadthTrendLabelMap[value as TimingMarketBreadthTrend] ?? value;
-}
-
-export function formatTimingVolatilityTrendLabel(
-  value: TimingMarketVolatilityTrend | string,
-) {
-  return (
-    timingVolatilityTrendLabelMap[value as TimingMarketVolatilityTrend] ?? value
-  );
-}
-
-export function formatTimingMetricValue(
-  metricKey: string,
-  value: TimingSignalMetricValue,
-) {
-  if (value === null || value === undefined) {
-    return "-";
-  }
-
-  if (typeof value === "boolean") {
-    return value ? "是" : "否";
-  }
-
-  if (typeof value !== "number") {
-    return String(value);
-  }
-
-  if (
-    metricKey.endsWith("Pct") ||
-    metricKey.endsWith("Percentile") ||
-    metricKey === "turnoverRate" ||
-    metricKey === "failureRate" ||
-    metricKey === "return20d" ||
-    metricKey === "excess20d" ||
-    metricKey === "excess60d" ||
-    metricKey === "stockReturn20d" ||
-    metricKey === "stockReturn60d"
-  ) {
-    return `${formatNumber(value)}%`;
-  }
-
-  return formatNumber(value);
+export function formatTimingMetricValue(value: unknown) {
+  if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  if (typeof value === "boolean") return value ? "是" : "否";
+  return value == null ? "暂无" : String(value);
 }

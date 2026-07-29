@@ -1,8 +1,5 @@
-import type { MarketRegimeService } from "~/server/application/timing/market-regime-service";
-import { TimingExecutionPlanService } from "~/server/application/timing/timing-execution-plan-service";
 import type {
   MarketContextAnalysis,
-  TimingAnalysisCardRecord,
   TimingBar,
   TimingChartLevels,
   TimingChartLinePoint,
@@ -10,386 +7,126 @@ import type {
   TimingReportPayload,
   TimingReportSeriesPayload,
   TimingSignalEngineKey,
-  TimingSignalEngineResult,
   TimingTimeframe,
 } from "~/server/domain/timing/types";
-import type { PrismaTimingAnalysisCardRepository } from "~/server/infrastructure/timing/prisma-timing-analysis-card-repository";
 import type { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
 import type { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
-import type { PrismaTimingRecommendationRepository } from "~/server/infrastructure/timing/prisma-timing-recommendation-repository";
-import type { PrismaTimingReviewRecordRepository } from "~/server/infrastructure/timing/prisma-timing-review-record-repository";
+import type { PrismaTimingResearchReportRepository } from "~/server/infrastructure/timing/prisma-timing-research-report-repository";
 import type { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
 import type { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
 
-const TIMING_REPORT_EVIDENCE_KEYS: TimingSignalEngineKey[] = [
-  "multiTimeframeAlignment",
-  "relativeStrength",
-  "volatilityPercentile",
-  "liquidityStructure",
-  "breakoutFailure",
-  "gapVolumeQuality",
-];
-
 function average(values: number[]) {
-  if (values.length === 0) {
-    return 0;
-  }
-
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
 
-function hasFrozenBars(bars?: TimingBar[]) {
-  return Array.isArray(bars) && bars.length > 0;
-}
-
-function calculateEmaSeries(
-  bars: TimingBar[],
-  period: number,
-): TimingChartLinePoint[] {
-  if (bars.length === 0) {
-    return [];
-  }
-
+function calculateEmaSeries(bars: TimingBar[], period: number): TimingChartLinePoint[] {
   const multiplier = 2 / (period + 1);
   let previous = bars[0]?.close ?? 0;
-
   return bars.map((bar, index) => {
-    if (index === 0) {
-      previous = bar.close;
-    } else {
-      previous = (bar.close - previous) * multiplier + previous;
-    }
-
-    return {
-      tradeDate: bar.tradeDate,
-      value: Math.round(previous * 10_000) / 10_000,
-    };
+    previous = index === 0 ? bar.close : (bar.close - previous) * multiplier + previous;
+    return { tradeDate: bar.tradeDate, value: Math.round(previous * 10_000) / 10_000 };
   });
 }
 
-function computeChartLevels(bars: TimingBar[]): TimingChartLevels {
+export function computeTimingChartLevels(bars: TimingBar[]): TimingChartLevels {
   const last60 = bars.slice(-60);
   const last20 = bars.slice(-20);
-  const avgVolume20 = average(last20.map((bar) => bar.volume));
-
-  const volumeSpikeDates = bars
-    .map((bar, index) => {
-      const window = bars.slice(Math.max(0, index - 19), index + 1);
-      const windowAverage = average(window.map((item) => item.volume));
-
-      return windowAverage > 0 && bar.volume >= windowAverage * 1.5
-        ? bar.tradeDate
-        : null;
-    })
-    .filter((value): value is string => Boolean(value));
-
   return {
     ema5: calculateEmaSeries(bars, 5),
     ema20: calculateEmaSeries(bars, 20),
     ema60: calculateEmaSeries(bars, 60),
     ema120: calculateEmaSeries(bars, 120),
-    recentHigh60d:
-      Math.max(...last60.map((bar) => bar.high), bars.at(-1)?.high ?? 0) || 0,
-    recentLow20d:
-      Math.min(...last20.map((bar) => bar.low), bars.at(-1)?.low ?? 0) || 0,
-    avgVolume20: Math.round(avgVolume20 * 10_000) / 10_000,
-    volumeSpikeDates,
+    recentHigh60d: Math.max(...last60.map((bar) => bar.high), bars.at(-1)?.high ?? 0) || 0,
+    recentLow20d: Math.min(...last20.map((bar) => bar.low), bars.at(-1)?.low ?? 0) || 0,
+    avgVolume20: Math.round(average(last20.map((bar) => bar.volume)) * 10_000) / 10_000,
+    volumeSpikeDates: bars.flatMap((bar, index) => {
+      const windowAverage = average(bars.slice(Math.max(0, index - 19), index + 1).map((item) => item.volume));
+      return windowAverage > 0 && bar.volume >= windowAverage * 1.5 ? [bar.tradeDate] : [];
+    }),
   };
 }
 
-function toPlaceholderEvidence(
-  key: TimingSignalEngineKey,
-): TimingSignalEngineResult {
-  return {
-    key,
-    label: key,
-    direction: "neutral",
-    score: 0,
-    confidence: 0,
-    weight: 0,
-    detail: "No evidence available.",
-    metrics: {},
-    warnings: [],
-  };
+function buildEvidence(engines: NonNullable<TimingReportPayload["report"]["signalSnapshot"]>["signalContext"]["engines"]): TimingReportEvidence {
+  return Object.fromEntries(engines.map((engine) => [engine.key, engine])) as TimingReportEvidence;
 }
 
-function buildEvidence(
-  engines: TimingSignalEngineResult[],
-): TimingReportEvidence {
-  const engineByKey = new Map(engines.map((engine) => [engine.key, engine]));
-
-  return TIMING_REPORT_EVIDENCE_KEYS.reduce((record, key) => {
-    record[key] = engineByKey.get(key) ?? toPlaceholderEvidence(key);
-    return record;
-  }, {} as TimingReportEvidence);
-}
-
-function buildFallbackMarketContext(params: {
-  card: TimingAnalysisCardRecord;
-  asOfDate: string;
-}): MarketContextAnalysis {
-  const state = params.card.marketState ?? "NEUTRAL";
-  const transition = params.card.marketTransition ?? "STABLE";
-
+function fallbackMarketContext(asOfDate: string): MarketContextAnalysis {
   return {
-    state,
-    transition,
-    regimeConfidence: params.card.confidence,
+    state: "NEUTRAL",
+    transition: "STABLE",
+    regimeConfidence: 0,
     persistenceDays: 0,
-    summary:
-      "市场环境快照暂不可用，当前报告先使用降级宏观分析占位展示，不阻塞择时报告详情加载。",
-    constraints: [
-      `未找到 ${params.asOfDate} 的市场环境快照，详情页未再同步请求实时 market context。`,
-      "市场广度、波动与领涨代理数据恢复后，可由后续任务重新生成完整市场环境快照。",
-    ],
-    breadthTrend:
-      state === "RISK_ON"
-        ? "EXPANDING"
-        : state === "RISK_OFF"
-          ? "CONTRACTING"
-          : "STALLING",
-    volatilityTrend:
-      state === "RISK_ON"
-        ? "FALLING"
-        : state === "RISK_OFF"
-          ? "RISING"
-          : "STABLE",
-    leadership: {
-      leaderCode: "",
-      leaderName: "N/A",
-      switched: false,
-      previousLeaderCode: null,
-    },
+    summary: "市场环境快照不可用，本报告不据此调整个股研究状态。",
+    constraints: ["市场广度、波动与领涨结构暂不可用。"],
+    breadthTrend: "STALLING",
+    volatilityTrend: "STABLE",
+    leadership: { leaderCode: "", leaderName: "暂无", switched: false, previousLeaderCode: null },
     snapshot: {
-      asOfDate: params.asOfDate,
+      asOfDate,
       indexes: [],
-      latestBreadth: {
-        asOfDate: params.asOfDate,
-        totalCount: 0,
-        advancingCount: 0,
-        decliningCount: 0,
-        flatCount: 0,
-        positiveRatio: 0,
-        aboveThreePctRatio: 0,
-        belowThreePctRatio: 0,
-        medianChangePct: 0,
-        averageTurnoverRate: null,
-      },
-      latestVolatility: {
-        asOfDate: params.asOfDate,
-        highVolatilityCount: 0,
-        highVolatilityRatio: 0,
-        limitDownLikeCount: 0,
-        indexAtrRatio: 0,
-      },
-      latestLeadership: {
-        asOfDate: params.asOfDate,
-        leaderCode: "",
-        leaderName: "N/A",
-        ranking5d: [],
-        ranking10d: [],
-        switched: false,
-        previousLeaderCode: null,
-      },
+      latestBreadth: { asOfDate, totalCount: 0, advancingCount: 0, decliningCount: 0, flatCount: 0, positiveRatio: 0, aboveThreePctRatio: 0, belowThreePctRatio: 0, medianChangePct: 0, averageTurnoverRate: null },
+      latestVolatility: { asOfDate, highVolatilityCount: 0, highVolatilityRatio: 0, limitDownLikeCount: 0, indexAtrRatio: 0 },
+      latestLeadership: { asOfDate, leaderCode: "", leaderName: "暂无", ranking5d: [], ranking10d: [], switched: false, previousLeaderCode: null },
       breadthSeries: [],
       volatilitySeries: [],
       leadershipSeries: [],
-      features: {
-        benchmarkStrength: 0,
-        breadthScore: 0,
-        riskScore: 0,
-        stateScore: 0,
-      },
+      features: { benchmarkStrength: 0, breadthScore: 0, riskScore: 0, stateScore: 0 },
     },
     stateScore: 0,
   };
 }
 
 export class TimingReportService {
-  constructor(
-    private readonly deps: {
-      analysisCardRepository: Pick<
-        PrismaTimingAnalysisCardRepository,
-        "getByIdForUser"
-      >;
-      signalSnapshotRepository: Pick<
-        PrismaTimingSignalSnapshotRepository,
-        "updateFrozenBars"
-      >;
-      reviewRecordRepository: Pick<
-        PrismaTimingReviewRecordRepository,
-        "listForUser"
-      >;
-      recommendationRepository?: Pick<
-        PrismaTimingRecommendationRepository,
-        "listForUser"
-      >;
-      marketContextSnapshotRepository: Pick<
-        PrismaTimingMarketContextSnapshotRepository,
-        "getByAsOfDate" | "listRecent" | "upsert"
-      >;
-      kronosForecastSnapshotRepository?: Pick<
-        PrismaTimingKronosForecastSnapshotRepository,
-        "getLatestForStock"
-      >;
-      timingDataClient: Pick<
-        PythonTimingDataClient,
-        "getBars" | "getMarketContext"
-      >;
-      marketRegimeService: Pick<MarketRegimeService, "analyze">;
-      executionPlanService?: TimingExecutionPlanService;
-    },
-  ) {}
+  constructor(private readonly deps: {
+    researchReportRepository: Pick<PrismaTimingResearchReportRepository, "getByIdForUser">;
+    signalSnapshotRepository: Pick<PrismaTimingSignalSnapshotRepository, "updateFrozenBars">;
+    marketContextSnapshotRepository: Pick<PrismaTimingMarketContextSnapshotRepository, "getByAsOfDate">;
+    kronosForecastSnapshotRepository?: Pick<PrismaTimingKronosForecastSnapshotRepository, "getLatestForStock">;
+    timingDataClient: Pick<PythonTimingDataClient, "getBars">;
+  }) {}
 
-  private get executionPlanService() {
-    return this.deps.executionPlanService ?? new TimingExecutionPlanService();
-  }
-
-  async getTimingReport(params: {
-    userId: string;
-    cardId: string;
-  }): Promise<TimingReportPayload | null> {
-    const card = await this.deps.analysisCardRepository.getByIdForUser(
-      params.userId,
-      params.cardId,
-    );
-
-    if (!card) {
-      return null;
+  async getTimingReport(params: { userId: string; reportId: string }): Promise<TimingReportPayload | null> {
+    const report = await this.deps.researchReportRepository.getByIdForUser(params.userId, params.reportId);
+    if (!report) return null;
+    const asOfDate = report.asOfDate ?? report.signalSnapshot?.asOfDate;
+    if (!asOfDate) return null;
+    let bars = report.signalSnapshot?.bars ?? [];
+    if (!bars.length) {
+      bars = (await this.deps.timingDataClient.getBars({ stockCode: report.stockCode, end: asOfDate })).bars;
+      if (report.signalSnapshotId) await this.deps.signalSnapshotRepository.updateFrozenBars({ signalSnapshotId: report.signalSnapshotId, bars });
     }
-
-    const asOfDate = card.asOfDate ?? card.signalSnapshot?.asOfDate;
-    if (!asOfDate) {
-      return null;
-    }
-
-    const [
-      bars,
-      reviewTimeline,
-      marketSnapshot,
-      kronosForecastSnapshot,
-      recommendations,
-    ] = await Promise.all([
-      hasFrozenBars(card.signalSnapshot?.bars)
-        ? Promise.resolve(card.signalSnapshot?.bars ?? [])
-        : this.deps.timingDataClient
-            .getBars({
-              stockCode: card.stockCode,
-              end: asOfDate,
-            })
-            .then(async (barsResponse) => {
-              if (card.signalSnapshotId) {
-                await this.deps.signalSnapshotRepository.updateFrozenBars({
-                  signalSnapshotId: card.signalSnapshotId,
-                  bars: barsResponse.bars,
-                });
-              }
-
-              return barsResponse.bars;
-            }),
-      this.deps.reviewRecordRepository.listForUser({
-        userId: params.userId,
-        stockCode: card.stockCode,
-        limit: 5,
-        completedOnly: true,
-      }),
+    const [marketSnapshot, forecastSnapshot] = await Promise.all([
       this.deps.marketContextSnapshotRepository.getByAsOfDate(asOfDate),
-      this.deps.kronosForecastSnapshotRepository?.getLatestForStock({
-        userId: params.userId,
-        stockCode: card.stockCode,
-        asOfDate,
-        timeframe: "DAILY",
-      }) ?? Promise.resolve(null),
-      card.workflowRunId && card.watchListId
-        ? (this.deps.recommendationRepository?.listForUser({
-            userId: params.userId,
-            limit: 1,
-            workflowRunId: card.workflowRunId,
-            watchListId: card.watchListId,
-            stockCode: card.stockCode,
-          }) ?? Promise.resolve([]))
-        : Promise.resolve([]),
+      this.deps.kronosForecastSnapshotRepository?.getLatestForStock({ userId: params.userId, stockCode: report.stockCode, asOfDate, timeframe: "DAILY" }) ?? Promise.resolve(null),
     ]);
-
-    const marketContext =
-      marketSnapshot?.analysis ??
-      buildFallbackMarketContext({
-        card,
-        asOfDate,
-      });
-    const chartLevels = computeChartLevels(bars);
-    const recommendation = recommendations[0] ?? null;
-
     return {
-      card,
+      report,
       bars,
-      chartLevels,
-      evidence: buildEvidence(card.signalSnapshot?.signalContext.engines ?? []),
-      marketContext,
-      recommendation,
-      executionPlan: this.executionPlanService.build({
-        card,
-        bars,
-        chartLevels,
-        marketContext,
-        recommendation,
-      }),
-      reviewTimeline,
-      kronosForecast: kronosForecastSnapshot?.forecast,
+      chartLevels: computeTimingChartLevels(bars),
+      evidence: buildEvidence(report.signalSnapshot?.signalContext.engines ?? []),
+      marketContext: marketSnapshot?.analysis ?? fallbackMarketContext(asOfDate),
+      modelOutlook: forecastSnapshot?.forecast,
     };
   }
 
-  async getTimingSeries(params: {
-    userId: string;
-    cardId: string;
-    timeframe: TimingTimeframe;
-  }): Promise<TimingReportSeriesPayload | null> {
-    const card = await this.deps.analysisCardRepository.getByIdForUser(
-      params.userId,
-      params.cardId,
-    );
-    if (!card) {
-      return null;
-    }
-
-    const asOfDate = card.asOfDate ?? card.signalSnapshot?.asOfDate;
-    if (!asOfDate) {
-      return null;
-    }
-
-    const frozenBars = card.signalSnapshot?.barsByTimeframe?.[params.timeframe];
-    const dailyBars = card.signalSnapshot?.bars;
-    const barsResponse =
-      (frozenBars?.length ?? 0) > 0 ||
-      (params.timeframe === "DAILY" && (dailyBars?.length ?? 0) > 0)
-        ? null
-        : await this.deps.timingDataClient.getBars({
-            stockCode: card.stockCode,
-            end: asOfDate,
-            timeframe: params.timeframe,
-          });
-    const bars =
-      frozenBars ??
-      (params.timeframe === "DAILY" ? dailyBars : undefined) ??
-      barsResponse?.bars ??
-      [];
-    const snapshot =
-      (await this.deps.kronosForecastSnapshotRepository?.getLatestForStock({
-        userId: params.userId,
-        stockCode: card.stockCode,
-        asOfDate,
-        timeframe: params.timeframe,
-      })) ?? null;
-
+  async getTimingSeries(params: { userId: string; reportId: string; timeframe: TimingTimeframe }): Promise<TimingReportSeriesPayload | null> {
+    const report = await this.deps.researchReportRepository.getByIdForUser(params.userId, params.reportId);
+    if (!report) return null;
+    const asOfDate = report.asOfDate ?? report.signalSnapshot?.asOfDate;
+    if (!asOfDate) return null;
+    const frozen = report.signalSnapshot?.barsByTimeframe?.[params.timeframe];
+    const response = frozen?.length ? null : await this.deps.timingDataClient.getBars({ stockCode: report.stockCode, end: asOfDate, timeframe: params.timeframe });
+    const bars = frozen ?? response?.bars ?? [];
+    const forecast = await this.deps.kronosForecastSnapshotRepository?.getLatestForStock({ userId: params.userId, stockCode: report.stockCode, asOfDate, timeframe: params.timeframe });
     return {
-      stockCode: card.stockCode,
-      stockName: card.stockName,
+      stockCode: report.stockCode,
+      stockName: report.stockName,
       timeframe: params.timeframe,
       adjust: params.timeframe.startsWith("MINUTE_") ? "none" : "qfq",
       bars,
-      chartLevels: computeChartLevels(bars),
-      kronosForecast: snapshot?.forecast,
-      warnings: [...(barsResponse ? [] : []), ...(snapshot?.warnings ?? [])],
+      chartLevels: computeTimingChartLevels(bars),
+      modelOutlook: forecast?.forecast,
+      warnings: forecast?.warnings ?? [],
     };
   }
 }

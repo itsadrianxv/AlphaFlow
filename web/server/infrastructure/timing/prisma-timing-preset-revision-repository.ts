@@ -6,7 +6,7 @@ import {
   TIMING_RULE_ENGINE_VERSION,
 } from "~/server/domain/timing/services/timing-rule-engine";
 import type {
-  TimingPresetConfigV2,
+  TimingResearchRuleConfig,
   TimingPresetRevisionRecord,
   TimingStrategyRecord,
 } from "~/server/domain/timing/types";
@@ -26,7 +26,7 @@ function stableValue(value: unknown): unknown {
   return value;
 }
 
-export function hashTimingPresetConfig(config: TimingPresetConfigV2) {
+export function hashTimingPresetConfig(config: TimingResearchRuleConfig) {
   return createHash("sha256")
     .update(JSON.stringify(stableValue(config)))
     .digest("hex");
@@ -52,7 +52,7 @@ function mapRevision(record: {
   return {
     ...record,
     status: record.status as TimingPresetRevisionRecord["status"],
-    config: record.config as TimingPresetConfigV2,
+    config: record.config as TimingResearchRuleConfig,
     validationSource:
       record.validationSource as TimingPresetRevisionRecord["validationSource"],
   };
@@ -100,7 +100,7 @@ export class PrismaTimingPresetRevisionRepository {
     userId: string;
     name: string;
     description?: string;
-    config: TimingPresetConfigV2;
+    config: TimingResearchRuleConfig;
   }) {
     const configHash = hashTimingPresetConfig(params.config);
     const record = await this.prisma.$transaction(async (tx) => {
@@ -139,7 +139,7 @@ export class PrismaTimingPresetRevisionRepository {
     templateVersion: number;
     name: string;
     description: string;
-    config: TimingPresetConfigV2;
+    config: TimingResearchRuleConfig;
   }) {
     const configHash = hashTimingPresetConfig(params.config);
     const record = await this.prisma.$transaction(async (tx) => {
@@ -255,7 +255,7 @@ export class PrismaTimingPresetRevisionRepository {
     revisionId: string;
     name: string;
     description?: string;
-    config: TimingPresetConfigV2;
+    config: TimingResearchRuleConfig;
   }) {
     const revision = await this.prisma.timingPresetRevision.findFirst({
       where: { id: params.revisionId, userId: params.userId },
@@ -366,7 +366,7 @@ export class PrismaTimingPresetRevisionRepository {
           status: "PUBLISHED",
           publishedAt: now,
           archivedAt: null,
-          validationSource: "HISTORICAL_BACKTEST",
+          validationSource: "RULE_COVERAGE_VALIDATION",
         },
       }),
       this.prisma.timingPreset.update({
