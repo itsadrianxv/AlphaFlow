@@ -25,15 +25,15 @@ export function buildWorkflowRunHistoryItems(
 }
 
 export function buildTimingReportHistoryItems(
-  cards: Array<{
+  reports: Array<{
     id: string;
     stockCode: string;
     stockName?: string | null;
   }>,
 ): WorkspaceHistoryItem[] {
-  return cards.map((card) => ({
-    id: card.id,
-    title: `择时信号卡 - ${card.stockCode}`,
-    href: `/timing/reports/${card.id}`,
+  return reports.map((report) => ({
+    id: report.id,
+    title: `择时研究报告 - ${report.stockCode}`,
+    href: `/timing/reports/${report.id}`,
   }));
 }

@@ -16,7 +16,6 @@ import {
 } from "~/app/_components/ui";
 import {
   buildScreeningWorkspaceHistoryItems,
-  buildTimingReportHistoryItems,
   buildWorkflowRunHistoryItems,
 } from "~/app/_components/workspace-history";
 import { IndustryConclusionDetail } from "~/app/workflows/[runId]/industry-conclusion-detail";
@@ -36,7 +35,6 @@ import { ResearchOpsPanels } from "~/app/workflows/research-ops-panels";
 import {
   buildResearchDigest,
   extractConfidenceAnalysis,
-  extractTimingReportCardIds,
   getIndustryResearchModePills,
   isCompanyResearchResult,
 } from "~/app/workflows/research-view-models";
@@ -48,10 +46,6 @@ import {
   COMPANY_RESEARCH_TEMPLATE_CODE,
   INDUSTRY_RESEARCH_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
-  TIMING_REVIEW_LOOP_TEMPLATE_CODE,
-  TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
-  WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
-  WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
 } from "~/server/domain/workflow/types";
 import { api } from "~/trpc/react";
 
@@ -104,15 +98,6 @@ function getTitle(templateCode?: string) {
 
   if (templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE) {
     return "行业结论";
-  }
-
-  if (
-    templateCode === TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE ||
-    templateCode === WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE ||
-    templateCode === WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE ||
-    templateCode === TIMING_REVIEW_LOOP_TEMPLATE_CODE
-  ) {
-    return "择时结论";
   }
 
   return "研究结论";
@@ -185,15 +170,6 @@ export function RunInvestorClient({
       refetchOnWindowFocus: false,
     },
   );
-  const timingHistoryQuery = api.timing.listTimingCards.useQuery(
-    {
-      limit: 8,
-    },
-    {
-      enabled: shellContext.historyQueryKind === "timing",
-      refetchOnWindowFocus: false,
-    },
-  );
   const workflowHistoryQuery = api.workflow.listRuns.useQuery(
     {
       limit: 8,
@@ -209,19 +185,13 @@ export function RunInvestorClient({
       ? buildScreeningWorkspaceHistoryItems(screeningHistoryQuery.data ?? [])
       : shellContext.historyQueryKind === "companyResearch"
         ? buildWorkflowRunHistoryItems(companyHistoryQuery.data?.items ?? [])
-        : shellContext.historyQueryKind === "timing"
-          ? buildTimingReportHistoryItems(timingHistoryQuery.data ?? [])
-          : buildWorkflowRunHistoryItems(
-              workflowHistoryQuery.data?.items ?? [],
-            );
+        : buildWorkflowRunHistoryItems(workflowHistoryQuery.data?.items ?? []);
   const historyLoading =
     shellContext.historyQueryKind === "screening"
       ? screeningHistoryQuery.isLoading
       : shellContext.historyQueryKind === "companyResearch"
         ? companyHistoryQuery.isLoading
-        : shellContext.historyQueryKind === "timing"
-          ? timingHistoryQuery.isLoading
-          : workflowHistoryQuery.isLoading;
+        : workflowHistoryQuery.isLoading;
   const canApprove =
     run !== undefined &&
     templateCode === SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE &&
@@ -261,7 +231,6 @@ export function RunInvestorClient({
     templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE
       ? getIndustryResearchModePills(run?.result, run?.input)
       : [];
-  const timingReportCardIds = extractTimingReportCardIds(run?.result);
   const nextSectionItems =
     digest.gaps.length > 0 ? digest.gaps : digest.nextActions;
   const industryConclusionModel = buildIndustryConclusionViewModel({
@@ -270,7 +239,6 @@ export function RunInvestorClient({
     status: run?.status,
     input: run?.input,
     result: run?.result,
-    timingReportCardIds,
   });
   const showIndustryConclusion =
     templateCode === INDUSTRY_RESEARCH_TEMPLATE_CODE &&
@@ -289,11 +257,7 @@ export function RunInvestorClient({
       section={shellContext.section}
       historyItems={historyItems}
       historyHref={shellContext.historyHref}
-      activeHistoryId={
-        shellContext.historyQueryKind === "timing"
-          ? (timingReportCardIds[0] ?? undefined)
-          : runId
-      }
+      activeHistoryId={runId}
       historyLoading={historyLoading}
       title={getTitle(templateCode)}
       description={undefined}
@@ -306,14 +270,6 @@ export function RunInvestorClient({
           <Link href={`/workflows/${runId}/debug`} className="app-button">
             调试视图
           </Link>
-          {timingReportCardIds[0] ? (
-            <Link
-              href={`/timing/reports/${timingReportCardIds[0]}`}
-              className="app-button app-button-primary"
-            >
-              查看单股报告
-            </Link>
-          ) : null}
           {canApprove ? (
             <button
               type="button"
@@ -424,27 +380,6 @@ export function RunInvestorClient({
                 </>
               }
             />
-          ) : null}
-
-          {timingReportCardIds.length > 0 ? (
-            <Panel
-              title="择时报告入口"
-              description="这次工作流已经产出择时卡片。若要查看完整的价格结构图、证据引擎和复盘时间线，请进入对应报告页。"
-            >
-              <div className="flex flex-wrap gap-2">
-                {timingReportCardIds.map((cardId, index) => (
-                  <Link
-                    key={cardId}
-                    href={`/timing/reports/${cardId}`}
-                    className="app-button"
-                  >
-                    {timingReportCardIds.length === 1
-                      ? "查看单股报告"
-                      : `查看报告 ${index + 1}`}
-                  </Link>
-                ))}
-              </div>
-            </Panel>
           ) : null}
 
           {canApprove ? (

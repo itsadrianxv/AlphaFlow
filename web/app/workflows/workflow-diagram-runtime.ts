@@ -11,6 +11,7 @@ import { parseWorkflowNodeInsight } from "~/contracts/workflow-node-insight";
 type WorkflowNodeRunStatus =
   | "PENDING"
   | "RUNNING"
+  | "WAITING_FOR_INPUT"
   | "SUCCEEDED"
   | "SKIPPED"
   | "FAILED";
@@ -211,6 +212,8 @@ function getNodeStatus(params: {
   switch (params.nodeRun?.status) {
     case "RUNNING":
       return "active";
+    case "WAITING_FOR_INPUT":
+      return "paused";
     case "SUCCEEDED":
       return "done";
     case "SKIPPED":

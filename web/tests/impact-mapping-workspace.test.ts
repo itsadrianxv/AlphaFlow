@@ -15,6 +15,11 @@ const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
 }));
 
+const workspaceSource = readFileSync(
+  "app/_components/impact-mapping-workspace.tsx",
+  "utf8",
+);
+
 vi.mock("~/trpc/react", () => ({
   api: {
     useUtils: () => ({
@@ -57,7 +62,7 @@ vi.mock("~/trpc/react", () => ({
       },
     },
     timing: {
-      listPortfolioSnapshots: {
+      listPortfolioCompositions: {
         useQuery: () => ({
           data: [{ id: "portfolio-1", name: "主组合" }],
         }),
@@ -191,7 +196,7 @@ describe("ImpactMappingWorkspace", () => {
     expect(html).toBe("");
   });
 
-  it("自动展示 carousel 下方的影响分析与时间轴", () => {
+  it("自动展示 carousel 下方的横向时间轴与影响分析", () => {
     mocks.latest = { id: "run-overview-1", result: overviewResult };
     const html = renderToStaticMarkup(
       createElement(ImpactMappingWorkspace, { signedIn: true }),
@@ -199,10 +204,12 @@ describe("ImpactMappingWorkspace", () => {
 
     expect(html).toContain('data-testid="impact-news-carousel"');
     expect(html).toContain('data-testid="impact-news-analysis"');
+    expect(html).toContain('data-testid="impact-news-timeline"');
+    expect(html).toContain('data-testid="impact-timeline-tooltip"');
     expect(html).toContain("先进制程设备投资加速");
     expect(html).toContain("组合命中 1");
     expect(html).toContain("此前的产业链订单信号");
-    expect(html).not.toContain("订单与资本开支的变化为当前新闻提供背景。");
+    expect(html).toContain("订单与资本开支的变化为当前新闻提供背景。");
     expect(html).toContain("资本开支上修可能带动设备订单");
     expect(html).toContain("订单兑现");
     for (const removed of [
@@ -219,6 +226,15 @@ describe("ImpactMappingWorkspace", () => {
     ]) {
       expect(html).not.toContain(removed);
     }
+  });
+
+  it("所有尺寸使用同一条横向时间轴，并通过悬浮或聚焦展示摘要", () => {
+    expect(workspaceSource).toContain('data-testid="impact-news-timeline"');
+    expect(workspaceSource).toContain("h-[26rem] min-w-max");
+    expect(workspaceSource).toContain("group-hover:opacity-100");
+    expect(workspaceSource).toContain("group-focus-within:opacity-100");
+    expect(workspaceSource).not.toContain("md:hidden");
+    expect(workspaceSource).not.toContain("TimelineEventNode entry={entry} compact");
   });
 
   it("partial 快照不展示 warning 区域", () => {
@@ -281,7 +297,8 @@ describe("ImpactMappingWorkspace", () => {
 
     expect(html).toContain("旧快照历史新闻 4");
     expect(html).not.toContain("旧快照历史新闻 5");
-    expect(html).not.toContain("不应展示的摘要 0");
+    expect(html).toContain("不应展示的摘要 4");
+    expect(html).not.toContain("不应展示的摘要 5");
   });
 
   it("不接纳缺少自动分析的旧 radar 快照", () => {

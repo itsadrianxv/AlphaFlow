@@ -47,7 +47,7 @@ const codeMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   title: "AlphaFlow",
   description:
-    "把筛选、行业研究、公司判断和择时组合压缩成一条连续工作流的投资前端。",
+    "把筛选、行业研究、公司判断和择时研究压缩成一条连续工作流的研究前端。",
 };
 
 export default function RootLayout({

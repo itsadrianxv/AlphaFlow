@@ -14,7 +14,6 @@ import {
 } from "~/app/_components/ui";
 import {
   buildScreeningWorkspaceHistoryItems,
-  buildTimingReportHistoryItems,
   buildWorkflowRunHistoryItems,
 } from "~/app/_components/workspace-history";
 import { ResearchOpsPanels } from "~/app/workflows/research-ops-panels";
@@ -395,15 +394,6 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
       refetchOnWindowFocus: false,
     },
   );
-  const timingHistoryQuery = api.timing.listTimingCards.useQuery(
-    {
-      limit: 8,
-    },
-    {
-      enabled: shellContext.historyQueryKind === "timing",
-      refetchOnWindowFocus: false,
-    },
-  );
   const workflowHistoryQuery = api.workflow.listRuns.useQuery(
     {
       limit: 8,
@@ -419,19 +409,13 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
       ? buildScreeningWorkspaceHistoryItems(screeningHistoryQuery.data ?? [])
       : shellContext.historyQueryKind === "companyResearch"
         ? buildWorkflowRunHistoryItems(companyHistoryQuery.data?.items ?? [])
-        : shellContext.historyQueryKind === "timing"
-          ? buildTimingReportHistoryItems(timingHistoryQuery.data ?? [])
-          : buildWorkflowRunHistoryItems(
-              workflowHistoryQuery.data?.items ?? [],
-            );
+        : buildWorkflowRunHistoryItems(workflowHistoryQuery.data?.items ?? []);
   const historyLoading =
     shellContext.historyQueryKind === "screening"
       ? screeningHistoryQuery.isLoading
       : shellContext.historyQueryKind === "companyResearch"
         ? companyHistoryQuery.isLoading
-        : shellContext.historyQueryKind === "timing"
-          ? timingHistoryQuery.isLoading
-          : workflowHistoryQuery.isLoading;
+        : workflowHistoryQuery.isLoading;
   const latestPauseEvent = useMemo(
     () =>
       [...(run?.events ?? [])]
@@ -470,9 +454,7 @@ export function RunDetailClient({ runId }: RunDetailClientProps) {
       section={shellContext.section}
       historyItems={historyItems}
       historyHref={shellContext.historyHref}
-      activeHistoryId={
-        shellContext.historyQueryKind === "timing" ? undefined : runId
-      }
+      activeHistoryId={runId}
       historyLoading={historyLoading}
       title="研究任务详情"
       description="以运行视角查看状态、进度、节点、时间线和结果摘要。对进行中的任务，页面会自动接收事件并刷新。"

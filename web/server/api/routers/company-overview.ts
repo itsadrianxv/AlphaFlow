@@ -4,9 +4,21 @@ import {
   companyOverviewWithQuestionsSchema,
 } from "~/contracts/company-overview";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { KronosForecastQueryService } from "~/server/application/timing/kronos-forecast-query-service";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 import { PythonCompanyOverviewClient } from "~/server/infrastructure/intelligence/python-company-overview-client";
+import { KronosForecastClient } from "~/server/infrastructure/timing/kronos-forecast-client";
 import { PythonTimingDataClient } from "~/server/infrastructure/timing/python-timing-data-client";
+
+const timeframeSchema = z.enum([
+  "DAILY",
+  "WEEKLY",
+  "MONTHLY",
+  "MINUTE_60",
+  "MINUTE_30",
+  "MINUTE_15",
+  "MINUTE_1",
+]);
 
 const questionSchema = z
   .array(z.string().trim().min(8).max(80))
@@ -115,15 +127,7 @@ export const companyOverviewRouter = createTRPCRouter({
     .input(
       z.object({
         stockCode: z.string().regex(/^\d{6}$/),
-        timeframe: z.enum([
-          "DAILY",
-          "WEEKLY",
-          "MONTHLY",
-          "MINUTE_60",
-          "MINUTE_30",
-          "MINUTE_15",
-          "MINUTE_1",
-        ]),
+        timeframe: timeframeSchema,
         // 热力图预览使用 TuShare daily 的未复权原始行情；详情页沿用前复权。
         adjust: z.enum(["qfq", "hfq", ""]).optional().default("qfq"),
       }),
@@ -134,5 +138,19 @@ export const companyOverviewRouter = createTRPCRouter({
         timeframe: input.timeframe,
         adjust: input.adjust,
       }),
+    ),
+  forecast: protectedProcedure
+    .input(
+      z.object({
+        stockCode: z.string().regex(/^\d{6}$/),
+        timeframe: timeframeSchema,
+        adjust: z.enum(["qfq", "hfq", ""]).optional().default("qfq"),
+      }),
+    )
+    .query(({ input }) =>
+      new KronosForecastQueryService({
+        timingDataClient: new PythonTimingDataClient(),
+        kronosClient: new KronosForecastClient(),
+      }).getForecast(input),
     ),
 });

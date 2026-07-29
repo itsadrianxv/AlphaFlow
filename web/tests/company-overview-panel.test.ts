@@ -6,7 +6,15 @@ const source = readFileSync(
   "utf8",
 );
 
-describe("公司概况财务指标布局", () => {
+describe("公司概况财务与主营业务布局", () => {
+  it("按当前股票和周期加载模型预测并叠加到 K 线图", () => {
+    expect(source).toContain("api.companyOverview.forecast.useQuery(");
+    expect(source).toContain(
+      "forecast={kronosForecast.data?.forecast ?? undefined}",
+    );
+    expect(source).toContain("retry: false");
+  });
+
   it("按动态指标行和报告期列展示财务数据，并格式化报告期", () => {
     expect(source).toContain("defaultFinancialMetricIds");
     expect(source).toContain("data.financials.metrics.map((metric)");
@@ -30,12 +38,33 @@ describe("公司概况财务指标布局", () => {
     expect(source).toContain("source.slice(0, financialPeriodCount)");
   });
 
-  it("允许财务表按报告期升序或降序排列，且默认升序", () => {
+  it("20日低点不把零混入正常价格的最小值计算", () => {
+    expect(source).toContain("const recent20 = bars.slice(-20);");
+    expect(source).toContain(
+      "recent20.length > 0 ? Math.min(...recent20.map((bar) => bar.close)) : 0",
+    );
+    expect(source).not.toContain(
+      "Math.min(...bars.slice(-20).map((bar) => bar.close), 0)",
+    );
+  });
+
+  it("允许两张表按报告期升序或降序排列，且默认升序", () => {
     expect(source).toContain('useState<ReportPeriodOrder>("asc")');
     expect(source).toContain("sortByReportPeriod(");
     expect(source).toContain("financialPeriodOrder");
+    expect(source).toContain("businessPeriodOrder");
     expect(source).toContain('id="financial-period-order"');
+    expect(source).toContain('id="business-period-order"');
     expect(source).toContain("按报告期升序排列");
     expect(source).toContain("按报告期降序排列");
+  });
+
+  it("展开最近三年的九个主营业务指标，并直接显示角色文本", () => {
+    expect(source).toContain("{year}营收");
+    expect(source).toContain("{year}占营收比例");
+    expect(source).toContain("{year}毛利率");
+    expect(source).not.toContain("最近三年收入 / 占比 / 毛利率");
+    expect(source).not.toContain("<StatusPill label={business.role}");
+    expect(source).toContain("{business.role}");
   });
 });

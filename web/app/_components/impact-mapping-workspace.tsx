@@ -302,14 +302,19 @@ function NewsCard({
 
 function TimelineEventNode({
   entry,
-  compact = false,
+  current,
+  position,
 }: {
   entry: ImpactTimelineItem;
-  compact?: boolean;
+  current: boolean;
+  position: "above" | "below";
 }) {
+  const tooltipId = `impact-timeline-summary-${entry.id}`;
   const content = (
     <>
-      <time className="app-data text-[11px] text-[var(--app-text-subtle)]">
+      <time
+        className={`app-data text-[11px] ${current ? "text-[var(--app-brand)]" : "text-[var(--app-text-subtle)]"}`}
+      >
         {formatDate(entry.occurredAt)}
       </time>
       <span className="mt-1 block text-sm font-medium leading-5 text-[var(--app-text-strong)]">
@@ -319,20 +324,40 @@ function TimelineEventNode({
   );
 
   return (
-    <div className={compact ? "min-w-0" : "w-52 shrink-0"}>
-      {entry.url ? (
-        <a
-          href={entry.url}
-          target="_blank"
-          rel="noreferrer"
-          className="block cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--app-accent-strong)]"
-        >
-          {content}
-        </a>
-      ) : (
-        <div>{content}</div>
-      )}
-    </div>
+    <details className="group relative w-full max-w-52">
+      <summary className="block list-none cursor-help rounded-[6px] px-2 py-1 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent-strong)]">
+        {content}
+      </summary>
+      <div
+        id={tooltipId}
+        role="tooltip"
+        data-testid="impact-timeline-tooltip"
+        className={`pointer-events-none absolute left-1/2 z-30 w-64 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-[8px] border border-[var(--app-border)] bg-[var(--app-bg-elevated)] px-3 py-2.5 text-left opacity-0 shadow-[0_4px_8px_var(--app-shadow-tooltip)] transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-open:pointer-events-auto group-open:opacity-100 ${
+          position === "above"
+            ? "bottom-[calc(100%+0.75rem)]"
+            : "top-[calc(100%+0.75rem)]"
+        }`}
+      >
+        <p className="max-h-28 overflow-y-auto break-words text-xs leading-5 text-[var(--app-text-muted)]">
+          {entry.summary}
+        </p>
+        {entry.source ? (
+          <p className="mt-2 text-[11px] text-[var(--app-text-subtle)]">
+            {entry.source}
+          </p>
+        ) : null}
+        {entry.url ? (
+          <a
+            href={entry.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-block text-xs text-[var(--app-brand)] underline decoration-dotted underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--app-accent-strong)]"
+          >
+            打开原文
+          </a>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
@@ -486,88 +511,89 @@ function NewsAnalysis({
       data-testid="impact-news-analysis"
       className="mt-6 min-w-0 border-t border-[var(--app-border-soft)] pt-5"
     >
-      <div className="hidden max-w-full overflow-x-auto pb-3 md:block">
-        <div className="flex min-w-max items-start py-2">
-          <ol className="flex items-start pt-5">
-            {timeline.map((entry) => {
-              const current = entry.eventId === item.event.id;
-              return (
-                <li
-                  key={entry.id}
-                  className="relative border-t border-[var(--app-border-strong)] px-4 pt-5 first:pl-0"
-                >
+      <section
+        className="max-w-full overflow-x-auto overflow-y-visible pb-4"
+        aria-label="新闻影响时间轴"
+      >
+        <ol
+          data-testid="impact-news-timeline"
+          className="relative flex h-[26rem] min-w-max items-stretch px-6 py-2"
+        >
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-6 top-1/2 h-px bg-[var(--app-border-strong)]"
+          />
+          {timeline.map((entry, index) => {
+            const current = entry.eventId === item.event.id;
+            const position = index % 2 === 0 ? "above" : "below";
+            return (
+              <li
+                key={entry.id}
+                className="relative z-10 grid h-full w-56 min-w-56 grid-rows-[1fr_auto_1fr]"
+              >
+                <div className="relative flex min-h-0 items-end justify-center pb-4">
+                  {position === "above" ? (
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className="absolute bottom-0 left-1/2 h-4 w-px -translate-x-1/2 bg-[var(--app-border-strong)]"
+                      />
+                      <TimelineEventNode
+                        entry={entry}
+                        current={current}
+                        position={position}
+                      />
+                    </>
+                  ) : null}
+                </div>
+                <div className="relative z-20 flex h-5 items-center justify-center">
                   <span
-                    className={`absolute -top-[5px] left-4 h-2.5 w-2.5 rounded-full border-2 border-[var(--app-bg)] ${
+                    aria-hidden="true"
+                    className={`h-3.5 w-3.5 rounded-full border-2 border-[var(--app-bg)] ${
                       current
                         ? "bg-[var(--app-brand)]"
                         : "bg-[var(--app-accent-strong)]"
                     }`}
                   />
-                  <TimelineEventNode entry={entry} />
-                </li>
-              );
-            })}
-          </ol>
-          <section className="relative ml-4 min-w-[42rem] border-l border-[var(--app-brand)] pl-8 pt-4">
-            <span className="absolute -left-4 top-0 h-px w-4 bg-[var(--app-brand)]" />
-            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-              {edges.map((edge) => (
-                <ImpactBranch
-                  key={edge.id}
-                  edge={edge}
-                  scenarios={assigned.byEdge.get(edge.id) ?? []}
-                  ordinals={ordinals}
-                />
-              ))}
-              {assigned.unmatched.map((scenario) => (
-                <ScenarioBranch
-                  key={scenario.id}
-                  scenario={scenario}
-                  ordinals={ordinals}
-                />
-              ))}
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <div className="md:hidden">
-        <ol className="border-l border-[var(--app-border-strong)] pl-5">
-          {timeline.map((entry) => {
-            const current = entry.eventId === item.event.id;
-            return (
-              <li key={entry.id} className="relative pb-6 last:pb-4">
-                <span
-                  className={`absolute -left-[25px] top-1 h-2.5 w-2.5 rounded-full border-2 border-[var(--app-bg)] ${
-                    current
-                      ? "bg-[var(--app-brand)]"
-                      : "bg-[var(--app-accent-strong)]"
-                  }`}
-                />
-                <TimelineEventNode entry={entry} compact />
+                </div>
+                <div className="relative flex min-h-0 items-start justify-center pt-4">
+                  {position === "below" ? (
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-1/2 top-0 h-4 w-px -translate-x-1/2 bg-[var(--app-border-strong)]"
+                      />
+                      <TimelineEventNode
+                        entry={entry}
+                        current={current}
+                        position={position}
+                      />
+                    </>
+                  ) : null}
+                </div>
               </li>
             );
           })}
         </ol>
-        <section className="border-l border-[var(--app-brand)] pl-5">
-          <div className="grid gap-5">
-            {edges.map((edge) => (
-              <ImpactBranch
-                key={edge.id}
-                edge={edge}
-                scenarios={assigned.byEdge.get(edge.id) ?? []}
-                ordinals={ordinals}
-              />
-            ))}
-            {assigned.unmatched.map((scenario) => (
-              <ScenarioBranch
-                key={scenario.id}
-                scenario={scenario}
-                ordinals={ordinals}
-              />
-            ))}
-          </div>
-        </section>
+      </section>
+      <div className="border-t border-[var(--app-brand)] pt-5">
+        <div className="grid gap-5 md:grid-cols-2">
+          {edges.map((edge) => (
+            <ImpactBranch
+              key={edge.id}
+              edge={edge}
+              scenarios={assigned.byEdge.get(edge.id) ?? []}
+              ordinals={ordinals}
+            />
+          ))}
+          {assigned.unmatched.map((scenario) => (
+            <ScenarioBranch
+              key={scenario.id}
+              scenario={scenario}
+              ordinals={ordinals}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

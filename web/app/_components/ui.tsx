@@ -69,8 +69,8 @@ const navItems: Array<{
   {
     key: "timing",
     href: "/timing",
-    label: "择时组合",
-    detail: "组合建议与复盘闭环",
+    label: "择时研究",
+    detail: "技术结构与组合风险诊断",
   },
 ];
 
@@ -115,10 +115,10 @@ const sidebarNavItems: Array<{
   {
     key: "timing",
     href: "/timing",
-    label: "\u62e9\u65f6\u7ec4\u5408",
-    detail: "\u7ec4\u5408\u5efa\u8bae\u4e0e\u590d\u76d8\u95ed\u73af",
+    label: "择时研究",
+    detail: "技术结构与组合风险诊断",
     historyHref: "/timing/history",
-    historyLabel: "\u62e9\u65f6\u7ec4\u5408\u5386\u53f2",
+    historyLabel: "研究档案",
   },
 ];
 
@@ -408,7 +408,7 @@ export function LegacyWorkspaceShell(props: {
                 研究档案
               </Link>
               <Link href="/timing/history" className="app-button">
-                组合复盘
+                研究档案
               </Link>
               </div>
             ) : (
@@ -576,7 +576,7 @@ export function LegacyWorkspaceShell(props: {
                       href="/timing/history"
                       className="text-[var(--app-text-muted)] hover:text-[var(--app-text-strong)]"
                     >
-                      查看组合复盘
+                      查看研究档案
                     </Link>
                   </div>
                 </div>

@@ -99,7 +99,7 @@ const sidebarNavItems: Array<{
   {
     key: "timing",
     href: "/timing",
-    label: "择时组合",
+    label: "择时研究",
     icon: TimingIcon,
   },
   {

@@ -33,7 +33,7 @@ export const primaryWorkflowStages: PrimaryWorkflowStage[] = [
   {
     id: "timing",
     href: "/timing",
-    label: "择时组合",
+    label: "择时研究",
     summary: "",
   },
 ];

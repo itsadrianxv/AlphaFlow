@@ -106,16 +106,18 @@ function chartLevels(
         Math.min(index + 1, windowSize),
     }));
   const latest = bars.slice(-60);
+  const recent20 = bars.slice(-20);
   return {
     ema5: average(5),
     ema20: average(20),
     ema60: average(60),
     ema120: average(120),
     recentHigh60d: Math.max(...latest.map((bar) => bar.close), 0),
-    recentLow20d: Math.min(...bars.slice(-20).map((bar) => bar.close), 0),
+    recentLow20d:
+      recent20.length > 0 ? Math.min(...recent20.map((bar) => bar.close)) : 0,
     avgVolume20:
-      bars.slice(-20).reduce((sum, bar) => sum + bar.volume, 0) /
-      Math.max(1, bars.slice(-20).length),
+      recent20.reduce((sum, bar) => sum + bar.volume, 0) /
+      Math.max(1, recent20.length),
     volumeSpikeDates: [],
   };
 }
@@ -146,6 +148,8 @@ export function CompanyOverviewPanel(props: {
   const [financialMode, setFinancialMode] = useState<FinancialMode>("quarter");
   const [financialPeriodOrder, setFinancialPeriodOrder] =
     useState<ReportPeriodOrder>("asc");
+  const [businessPeriodOrder, setBusinessPeriodOrder] =
+    useState<ReportPeriodOrder>("asc");
   const [financialPeriodCount, setFinancialPeriodCount] = useState(8);
   const [financialMetricIds, setFinancialMetricIds] = useState(
     defaultFinancialMetricIds,
@@ -166,6 +170,14 @@ export function CompanyOverviewPanel(props: {
   const bars = api.companyOverview.bars.useQuery(
     { stockCode: props.stockCode ?? "000001", timeframe },
     { enabled: Boolean(props.stockCode), refetchOnWindowFocus: false },
+  );
+  const kronosForecast = api.companyOverview.forecast.useQuery(
+    { stockCode: props.stockCode ?? "000001", timeframe },
+    {
+      enabled: Boolean(props.stockCode),
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
   );
   const data = overview.data;
   const usableBars = bars.data?.bars ?? [];
@@ -225,6 +237,17 @@ export function CompanyOverviewPanel(props: {
       return number(value == null ? value : value * 100, "%");
     return number(value, metric.displayUnit ? ` ${metric.displayUnit}` : "");
   }
+  const businessYears = useMemo(() => {
+    const periodYears =
+      data?.businesses.flatMap((business) =>
+        business.history.map((item) => Number(item.year)),
+      ) ?? [];
+    const validYears = periodYears.filter((year) => Number.isFinite(year));
+    if (validYears.length === 0) return [];
+    const latestYear = Math.max(...validYears);
+    const years = [latestYear - 2, latestYear - 1, latestYear].map(String);
+    return businessPeriodOrder === "asc" ? years : years.reverse();
+  }, [businessPeriodOrder, data]);
 
   const chooseStock = (stock: { stockCode: string }) => {
     setKeyword("");
@@ -301,6 +324,22 @@ export function CompanyOverviewPanel(props: {
               <StatusPill label={data.exchange || "A股"} tone="info" />
               <StatusPill label={`数据更新 ${data.updatedAt.slice(0, 10)}`} />
             </div>
+          </Panel>
+          <Panel title="K线图">
+            {bars.isError ? (
+              <p className="text-sm text-[var(--app-danger)]">
+                {bars.error.message}
+              </p>
+            ) : (
+              <TimingReportChart
+                bars={usableBars}
+                chartLevels={levels}
+                forecast={kronosForecast.data?.forecast ?? undefined}
+                timeframe={timeframe}
+                onTimeframeChange={setTimeframe}
+                seriesLoading={bars.isLoading}
+              />
+            )}
           </Panel>
           <Panel title="公司简介">
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -501,40 +540,95 @@ export function CompanyOverviewPanel(props: {
           <Panel title="主营业务构成">
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
+                <div className="mb-4 flex justify-end border-b border-[var(--app-border-soft)] pb-4">
+                  <ReportPeriodOrderSelect
+                    id="business-period-order"
+                    value={businessPeriodOrder}
+                    onChange={setBusinessPeriodOrder}
+                  />
+                </div>
+                <table className="min-w-[1080px] text-sm">
                   <thead className="border-b border-[var(--app-border-soft)] text-left text-[var(--app-text-muted)]">
                     <tr>
-                      <th className="px-2 py-2">业务</th>
-                      <th className="px-2 py-2">角色</th>
-                      <th className="px-2 py-2">收入增速</th>
-                      <th className="px-2 py-2">
-                        最近三年收入 / 占比 / 毛利率
-                      </th>
+                      <th className="whitespace-nowrap px-2 py-2">业务</th>
+                      <th className="whitespace-nowrap px-2 py-2">角色</th>
+                      <th className="whitespace-nowrap px-2 py-2">收入增速</th>
+                      {businessYears.map((year) => (
+                        <th
+                          key={`${year}-revenue`}
+                          className="whitespace-nowrap px-2 py-2"
+                        >
+                          {year}营收
+                        </th>
+                      ))}
+                      {businessYears.map((year) => (
+                        <th
+                          key={`${year}-share`}
+                          className="whitespace-nowrap px-2 py-2"
+                        >
+                          {year}占营收比例
+                        </th>
+                      ))}
+                      {businessYears.map((year) => (
+                        <th
+                          key={`${year}-margin`}
+                          className="whitespace-nowrap px-2 py-2"
+                        >
+                          {year}毛利率
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {data.businesses.map((business) => (
-                      <tr
-                        key={business.name}
-                        className="border-b border-[var(--app-border-soft)]"
-                      >
-                        <td className="px-2 py-3">{business.name}</td>
-                        <td className="px-2 py-3">
-                          <StatusPill label={business.role} tone="info" />
-                        </td>
-                        <td className="px-2 py-3">
-                          {number(business.revenueGrowth, "%")}
-                        </td>
-                        <td className="px-2 py-3">
-                          {business.history
-                            .map(
-                              (item) =>
-                                `${item.year}: ${amount(item.revenue)} / ${number(item.revenueShare, "%")} / ${number(item.grossMargin, "%")}`,
-                            )
-                            .join("；")}
-                        </td>
-                      </tr>
-                    ))}
+                    {data.businesses.map((business) => {
+                      const historyByYear = new Map(
+                        business.history.map((item) => [item.year, item]),
+                      );
+                      return (
+                        <tr
+                          key={business.name}
+                          className="border-b border-[var(--app-border-soft)]"
+                        >
+                          <td className="px-2 py-3">{business.name}</td>
+                          <td className="whitespace-nowrap px-2 py-3 text-[var(--app-text)]">
+                            {business.role}
+                          </td>
+                          <td className="whitespace-nowrap px-2 py-3">
+                            {number(business.revenueGrowth, "%")}
+                          </td>
+                          {businessYears.map((year) => (
+                            <td
+                              key={`${business.name}-${year}-revenue`}
+                              className="app-data whitespace-nowrap px-2 py-3 text-[var(--app-text-muted)]"
+                            >
+                              {amount(historyByYear.get(year)?.revenue)}
+                            </td>
+                          ))}
+                          {businessYears.map((year) => (
+                            <td
+                              key={`${business.name}-${year}-share`}
+                              className="app-data whitespace-nowrap px-2 py-3 text-[var(--app-text-muted)]"
+                            >
+                              {number(
+                                historyByYear.get(year)?.revenueShare,
+                                "%",
+                              )}
+                            </td>
+                          ))}
+                          {businessYears.map((year) => (
+                            <td
+                              key={`${business.name}-${year}-margin`}
+                              className="app-data whitespace-nowrap px-2 py-3 text-[var(--app-text-muted)]"
+                            >
+                              {number(
+                                historyByYear.get(year)?.grossMargin,
+                                "%",
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -543,21 +637,6 @@ export function CompanyOverviewPanel(props: {
                 items={data.questions.businesses}
               />
             </div>
-          </Panel>
-          <Panel title="K线图">
-            {bars.isError ? (
-              <p className="text-sm text-[var(--app-danger)]">
-                {bars.error.message}
-              </p>
-            ) : (
-              <TimingReportChart
-                bars={usableBars}
-                chartLevels={levels}
-                timeframe={timeframe}
-                onTimeframeChange={setTimeframe}
-                seriesLoading={bars.isLoading}
-              />
-            )}
           </Panel>
         </>
       ) : null}
