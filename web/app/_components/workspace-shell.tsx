@@ -505,6 +505,7 @@ export function WorkspaceShell(props: {
   historyEmptyText?: string;
   initialDesktopCollapsed?: boolean;
   contentWidth?: "standard" | "wide";
+  contentMode?: "default" | "editor";
   titleSize?: "default" | "compact";
   children: ReactNode;
 }) {
@@ -526,6 +527,7 @@ export function WorkspaceShell(props: {
     showHistory = true,
     initialDesktopCollapsed,
     contentWidth = "standard",
+    contentMode = "default",
     titleSize = "default",
     children,
   } = props;
@@ -660,8 +662,12 @@ export function WorkspaceShell(props: {
 
         <div
           className={cn(
-            "mx-auto flex min-h-screen w-full flex-col gap-8 px-4 py-5 sm:px-6 lg:px-10 lg:py-8",
-            contentWidth === "wide" ? "max-w-[1560px]" : "max-w-[1280px]",
+            "mx-auto flex min-h-screen w-full flex-col",
+            contentMode === "editor"
+              ? "max-w-none gap-4 px-3 py-3 sm:px-4 lg:px-5 lg:py-4"
+              : "gap-8 px-4 py-5 sm:px-6 lg:px-10 lg:py-8",
+            contentMode !== "editor" &&
+              (contentWidth === "wide" ? "max-w-[1560px]" : "max-w-[1280px]"),
           )}
         >
           {shouldShowPageHeader ? (
@@ -705,7 +711,14 @@ export function WorkspaceShell(props: {
             </section>
           ) : null}
 
-          <div className="grid gap-6">{children}</div>
+          <div
+            className={cn(
+              "grid",
+              contentMode === "editor" ? "min-h-0 flex-1 gap-0" : "gap-6",
+            )}
+          >
+            {children}
+          </div>
         </div>
       </section>
     </main>
