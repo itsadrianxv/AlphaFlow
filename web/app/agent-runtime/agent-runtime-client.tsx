@@ -11,6 +11,7 @@ import {
   type WorkspaceHistoryItem,
   WorkspaceShell,
 } from "~/app/_components/ui";
+import { resolveAgentMessageText } from "~/app/agent-runtime/message-display";
 import {
   consumePiAgentSelectionDraft,
   PI_AGENT_SELECTION_DRAFT_QUERY,
@@ -27,6 +28,8 @@ type ConversationListItem =
   RouterOutputs["agentRuntime"]["listConversations"]["items"][number];
 type AgentRuntimeSkill =
   RouterOutputs["agentRuntime"]["listSkills"]["items"][number];
+type SetupDraft = NonNullable<RouterOutputs["scheduledTask"]["getSetupDraft"]>;
+type EditDraft = NonNullable<RouterOutputs["scheduledTask"]["getEditDraft"]>;
 type WorkflowStreamEvent = {
   runId: string;
   sequence: number;
@@ -40,6 +43,7 @@ type WorkflowStreamEvent = {
 const statusTone = {
   PENDING: "neutral",
   STREAMING: "info",
+  WAITING_FOR_INPUT: "warning",
   SUCCEEDED: "success",
   FAILED: "danger",
   CANCELLED: "warning",
@@ -48,6 +52,7 @@ const statusTone = {
 const statusLabel = {
   PENDING: "等待中",
   STREAMING: "生成中",
+  WAITING_FOR_INPUT: "等待你的回答",
   SUCCEEDED: "完成",
   FAILED: "失败",
   CANCELLED: "已取消",
@@ -92,6 +97,35 @@ function latestRunningRunId(conversation?: Conversation) {
     .at(-1)?.workflowRunId;
 }
 
+function getWaitingRequest(message: Message) {
+  if (message.status !== "WAITING_FOR_INPUT") {
+    return null;
+  }
+
+  const metadata = asRecord(message.metadata);
+  const inputRequest = asRecord(metadata.inputRequest);
+  const question =
+    typeof inputRequest.question === "string"
+      ? inputRequest.question
+      : typeof metadata.question === "string"
+        ? metadata.question
+        : message.content;
+  const options = Array.isArray(inputRequest.options)
+    ? inputRequest.options
+        .filter((option): option is { label: string; value: string } =>
+          Boolean(
+            option &&
+              typeof option === "object" &&
+              typeof (option as { label?: unknown }).label === "string" &&
+              typeof (option as { value?: unknown }).value === "string",
+          ),
+        )
+        .slice(0, 6)
+    : [];
+
+  return { question, options };
+}
+
 function buildConversationHistoryItems(
   conversations: ConversationListItem[],
 ): WorkspaceHistoryItem[] {
@@ -104,17 +138,255 @@ function buildConversationHistoryItems(
   }));
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function ScheduledTaskPreview(props: {
+  draft: SetupDraft;
+  busy: boolean;
+  error?: string;
+  onConfirm: () => void;
+}) {
+  const utils = api.useUtils();
+  const deterministic =
+    asRecord(props.draft.executionPlan).type === "deterministic_scoring";
+  const [planText, setPlanText] = useState(() =>
+    JSON.stringify(props.draft.executionPlan, null, 2),
+  );
+  const [planIssue, setPlanIssue] = useState<string>();
+  const updatePlan = api.scheduledTask.updateSetupDraftPlan.useMutation({
+    onSuccess: async (value) => {
+      setPlanText(JSON.stringify(value.normalizedPlan, null, 2));
+      setPlanIssue(undefined);
+      await utils.scheduledTask.getSetupDraft.invalidate();
+    },
+    onError: (error) => setPlanIssue(error.message),
+  });
+  const schedule = asRecord(props.draft.schedule);
+  const feasibility = asRecord(props.draft.feasibility);
+  const blockers = Array.isArray(feasibility.blockingIssues)
+    ? feasibility.blockingIssues.map(String)
+    : [];
+  const warnings = Array.isArray(feasibility.warnings)
+    ? feasibility.warnings.map(String)
+    : [];
+  const sources = Array.isArray(props.draft.dataSources)
+    ? props.draft.dataSources.map(asRecord)
+    : [];
+  const delivery = asRecord(props.draft.delivery);
+  const output = asRecord(props.draft.output);
+  const confirmable =
+    ["SUPPORTED", "SUPPORTED_WITH_LIMITS"].includes(
+      String(feasibility.status),
+    ) && blockers.length === 0;
+  return (
+    <section className="border-t border-[var(--app-border-soft)] pt-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
+          {props.draft.name}
+        </h2>
+        <StatusPill
+          tone={confirmable ? "success" : "warning"}
+          label={String(feasibility.status ?? "待验证")}
+        />
+      </div>
+      <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-[var(--app-text-muted)]">执行时间</dt>
+          <dd className="mt-1 text-[var(--app-text)]">
+            {String(schedule.type ?? "")} {String(schedule.time ?? "")}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[var(--app-text-muted)]">时区</dt>
+          <dd className="mt-1 text-[var(--app-text)]">
+            {String(schedule.timezone ?? "")}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[var(--app-text-muted)]">数据来源</dt>
+          <dd className="mt-1 text-[var(--app-text)]">
+            {sources
+              .map(
+                (source) =>
+                  `${String(source.provider ?? "")}: ${String(source.capability ?? "")}`,
+              )
+              .join("、")}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[var(--app-text-muted)]">输出</dt>
+          <dd className="mt-1 text-[var(--app-text)]">
+            {String(output.format ?? "结构化结果")}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[var(--app-text-muted)]">发送位置</dt>
+          <dd className="mt-1 text-[var(--app-text)]">
+            {delivery.type === "FEISHU"
+              ? `飞书 ${String(delivery.targetRef ?? "")}`
+              : "仅保存"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[var(--app-text-muted)]">下次执行</dt>
+          <dd className="mt-1 text-[var(--app-text)]">
+            {props.draft.nextRunAt
+              ? new Date(props.draft.nextRunAt).toLocaleString("zh-CN")
+              : "待确定"}
+          </dd>
+        </div>
+      </dl>
+      {[...warnings, ...blockers].length ? (
+        <div className="mt-4 space-y-1 text-sm text-[var(--app-text-muted)]">
+          {[...warnings, ...blockers].map((item) => (
+            <p key={item}>{item}</p>
+          ))}
+        </div>
+      ) : null}
+      {deterministic ? (
+        <div className="mt-5">
+          <label
+            htmlFor={`deterministic-plan-${props.draft.taskId}`}
+            className="text-sm font-medium text-[var(--app-text-strong)]"
+          >
+            评分规则 JSON
+          </label>
+          <textarea
+            id={`deterministic-plan-${props.draft.taskId}`}
+            className="mt-2 min-h-72 w-full resize-y border border-[var(--app-border-soft)] bg-[var(--app-bg-inset)] p-3 font-mono text-xs text-[var(--app-text)] outline-none focus:border-[var(--app-primary-border)]"
+            spellCheck={false}
+            value={planText}
+            onChange={(event) => setPlanText(event.target.value)}
+          />
+          {planIssue ? (
+            <div className="mt-2">
+              <InlineNotice tone="danger" description={planIssue} />
+            </div>
+          ) : null}
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              className="app-button"
+              disabled={updatePlan.isPending}
+              onClick={() => {
+                try {
+                  setPlanIssue(undefined);
+                  updatePlan.mutate({
+                    taskId: props.draft.taskId,
+                    expectedVersion: props.draft.version,
+                    plan: JSON.parse(planText) as unknown,
+                  });
+                } catch (error) {
+                  setPlanIssue(
+                    error instanceof Error ? error.message : "JSON 格式无效",
+                  );
+                }
+              }}
+            >
+              校验并更新
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {props.error ? (
+        <div className="mt-4">
+          <InlineNotice tone="danger" description={props.error} />
+        </div>
+      ) : null}
+      <div className="mt-5 flex justify-end">
+        <button
+          type="button"
+          className="app-button app-button-primary"
+          disabled={!confirmable || props.busy}
+          onClick={props.onConfirm}
+        >
+          确认创建
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ScheduledTaskEditPreview(props: {
+  draft: EditDraft;
+  busy: boolean;
+  error?: string;
+  onConfirm: () => void;
+}) {
+  const changes = Array.isArray(props.draft.changes)
+    ? props.draft.changes.map(asRecord)
+    : [];
+  return (
+    <section className="border-t border-[var(--app-border-soft)] pt-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
+          任务修改预览
+        </h2>
+        <StatusPill
+          tone="warning"
+          label={`版本 ${props.draft.baseVersion} → ${props.draft.baseVersion + 1}`}
+        />
+      </div>
+      <div className="mt-4 divide-y divide-[var(--app-border-soft)] border-y border-[var(--app-border-soft)]">
+        {changes.map((change) => (
+          <div
+            key={String(change.field)}
+            className="grid gap-2 py-3 text-sm sm:grid-cols-[120px_1fr]"
+          >
+            <div className="font-medium text-[var(--app-text-strong)]">
+              {String(change.label ?? change.field)}
+            </div>
+            <div className="min-w-0 text-[var(--app-text-muted)]">
+              已生成候选修改，确认后才会影响后续执行。
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 text-sm text-[var(--app-text-muted)]">
+        新的下次执行时间：
+        {props.draft.nextRunAt
+          ? new Date(props.draft.nextRunAt).toLocaleString("zh-CN")
+          : "待确定"}
+      </div>
+      {props.error ? (
+        <div className="mt-4">
+          <InlineNotice tone="danger" description={props.error} />
+        </div>
+      ) : null}
+      <div className="mt-5 flex justify-end">
+        <button
+          type="button"
+          className="app-button app-button-primary"
+          disabled={props.busy}
+          onClick={props.onConfirm}
+        >
+          确认修改并创建新版本
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ChatMessage(props: {
   message: Message;
   liveText?: string;
   lastTargetRef?: ResearchTargetRef | null;
   onLastTargetRefChange?: (targetRef: ResearchTargetRef | null) => void;
+  onAskOption?: (value: string) => void;
   piAgentHref: string;
 }) {
   const { message, liveText } = props;
   const isUser = message.role === "USER";
   const parsed = parseEvidenceTokens(
-    liveText !== undefined ? liveText : message.content,
+    resolveAgentMessageText({
+      persistedText: message.content,
+      status: message.status,
+      liveText,
+    }),
   );
   const content = parsed.text;
 
@@ -161,7 +433,7 @@ function ChatMessage(props: {
             正在准备回复
           </div>
         )}
-        {message.status !== "SUCCEEDED" ? (
+        {message.status !== "SUCCEEDED" && message.status !== "STREAMING" ? (
           <div className="mt-3">
             <StatusPill
               tone={statusTone[message.status]}
@@ -172,6 +444,20 @@ function ChatMessage(props: {
         {message.errorMessage ? (
           <div className="mt-3 text-sm text-[var(--app-danger)]">
             {message.errorMessage}
+          </div>
+        ) : null}
+        {getWaitingRequest(message)?.options.length ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {getWaitingRequest(message)?.options.map((option) => (
+              <button
+                key={`${message.id}:${option.value}`}
+                type="button"
+                className="rounded-[8px] border border-[var(--app-border-soft)] px-3 py-2 text-sm text-[var(--app-text-strong)] transition-colors hover:border-[var(--app-primary-border)] hover:bg-[var(--app-hover-surface)]"
+                onClick={() => props.onAskOption?.(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
         ) : null}
       </div>
@@ -223,8 +509,12 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
   const [prompt, setPrompt] = useState("");
   const [liveMessages, setLiveMessages] = useState<Record<string, string>>({});
   const [activeRunId, setActiveRunId] = useState("");
+  const [cancellingRunId, setCancellingRunId] = useState("");
   const [skillMenuOpen, setSkillMenuOpen] = useState(false);
   const [skillSelectionError, setSkillSelectionError] = useState("");
+  const [routingHint, setRoutingHint] = useState<
+    "SCHEDULED_TASK_SETUP" | undefined
+  >();
   const [activeSkillCategory, setActiveSkillCategory] =
     useState<string>("市场与题材");
   const [lastTargetRef, setLastTargetRef] = useState<ResearchTargetRef | null>(
@@ -233,7 +523,6 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
   const skillMenuRef = useRef<HTMLDivElement | null>(null);
   const promptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const migrationRequestedRef = useRef(false);
 
   const skillsQuery = api.agentRuntime.listSkills.useQuery();
   const conversationQuery = api.agentRuntime.getConversation.useQuery(
@@ -247,22 +536,6 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
     },
   );
 
-  const migrateMutation = api.agentRuntime.ensureLegacyRunsMigrated.useMutation(
-    {
-      onSuccess: async () => {
-        await utils.agentRuntime.listConversations.invalidate({ limit: 30 });
-      },
-    },
-  );
-
-  useEffect(() => {
-    if (migrationRequestedRef.current) {
-      return;
-    }
-    migrationRequestedRef.current = true;
-    migrateMutation.mutate();
-  }, [migrateMutation.mutate]);
-
   useEffect(() => {
     if (searchParams.get("draft") !== PI_AGENT_SELECTION_DRAFT_QUERY) {
       return;
@@ -273,6 +546,8 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
       setPrompt((current) =>
         current.trim() ? `${current.trimEnd()}\n\n${draft.text}` : draft.text,
       );
+      if (draft.source?.type === "scheduled-task")
+        setRoutingHint("SCHEDULED_TASK_SETUP");
       window.setTimeout(() => promptTextareaRef.current?.focus(), 0);
     }
 
@@ -293,6 +568,80 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
 
   const selectedConversation = conversationQuery.data;
   const runningRunId = latestRunningRunId(selectedConversation);
+
+  useEffect(() => {
+    const activeMessageIds = new Set(
+      selectedConversation?.messages
+        .filter(
+          (message) =>
+            message.role === "ASSISTANT" &&
+            (message.status === "PENDING" || message.status === "STREAMING"),
+        )
+        .map((message) => message.id) ?? [],
+    );
+
+    setLiveMessages((current) => {
+      let changed = false;
+      const next: Record<string, string> = {};
+
+      for (const [messageId, text] of Object.entries(current)) {
+        if (activeMessageIds.has(messageId)) {
+          next[messageId] = text;
+        } else {
+          changed = true;
+        }
+      }
+
+      return changed ? next : current;
+    });
+  }, [selectedConversation?.messages]);
+
+  const setupDraftQuery = api.scheduledTask.getSetupDraft.useQuery(
+    { conversationId: selectedConversationId },
+    {
+      enabled: Boolean(selectedConversationId),
+      refetchInterval: runningRunId ? 3000 : false,
+    },
+  );
+  const setupDraft = setupDraftQuery.data;
+  const editDraftQuery = api.scheduledTask.getEditDraft.useQuery(
+    { conversationId: selectedConversationId },
+    {
+      enabled:
+        Boolean(selectedConversationId) &&
+        selectedConversation?.routingMode === "SCHEDULED_TASK_EDIT",
+      refetchInterval: runningRunId ? 3000 : false,
+    },
+  );
+  const editDraft = editDraftQuery.data;
+  const activateDraft = api.scheduledTask.activateDraft.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.scheduledTask.getSetupDraft.invalidate({
+          conversationId: selectedConversationId,
+        }),
+        utils.scheduledTask.list.invalidate(),
+        utils.agentRuntime.getConversation.invalidate({
+          conversationId: selectedConversationId,
+        }),
+      ]);
+    },
+  });
+  const confirmEditDraft = api.scheduledTask.confirmEditDraft.useMutation({
+    onSuccess: async (result) => {
+      await Promise.all([
+        utils.scheduledTask.getEditDraft.invalidate({
+          conversationId: selectedConversationId,
+        }),
+        utils.scheduledTask.getDetail.invalidate({ id: result.taskId }),
+        utils.scheduledTask.list.invalidate(),
+        utils.agentRuntime.getConversation.invalidate({
+          conversationId: selectedConversationId,
+        }),
+      ]);
+      router.push(`/scheduled-tasks/${result.taskId}`);
+    },
+  });
 
   useEffect(() => {
     setActiveRunId(runningRunId ?? "");
@@ -343,6 +692,21 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
             conversationId: selectedConversationId,
           });
           void utils.agentRuntime.listConversations.invalidate({ limit: 30 });
+          void utils.scheduledTask.getSetupDraft.invalidate({
+            conversationId: selectedConversationId,
+          });
+          void utils.scheduledTask.getEditDraft.invalidate({
+            conversationId: selectedConversationId,
+          });
+        }
+
+        if (parsed.type === "RUN_PAUSED") {
+          void utils.agentRuntime.getConversation.invalidate({
+            conversationId: selectedConversationId,
+          });
+          void utils.agentRuntime.listConversations.invalidate({ limit: 30 });
+          setActiveRunId("");
+          eventSource.close();
         }
       } catch {
         // Ignore malformed event payloads.
@@ -357,6 +721,8 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
     selectedConversationId,
     utils.agentRuntime.getConversation,
     utils.agentRuntime.listConversations,
+    utils.scheduledTask.getEditDraft,
+    utils.scheduledTask.getSetupDraft,
   ]);
 
   useEffect(() => {
@@ -444,6 +810,7 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
   const sendMutation = api.agentRuntime.sendMessage.useMutation({
     onSuccess: async (result) => {
       setPrompt("");
+      setRoutingHint(undefined);
       setLiveMessages((current) => ({
         ...current,
         [result.assistantMessageId]: "",
@@ -466,12 +833,23 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
           conversationId: selectedConversationId,
         });
       }
+      setActiveRunId("");
+      setCancellingRunId("");
     },
+    onError: () => setCancellingRunId(""),
   });
 
   const activeGenerationRunId = runningRunId ?? activeRunId;
+  const setupMode =
+    routingHint === "SCHEDULED_TASK_SETUP" ||
+    selectedConversation?.routingMode === "SCHEDULED_TASK_SETUP";
+  const editMode = selectedConversation?.routingMode === "SCHEDULED_TASK_EDIT";
+  const reservedTaskMode = setupMode || editMode;
   const canSend = Boolean(
-    selectedSkillIds.length > 0 && prompt.trim() && !activeGenerationRunId,
+    (reservedTaskMode || selectedSkillIds.length > 0) &&
+      prompt.trim() &&
+      !activeGenerationRunId &&
+      !cancellingRunId,
   );
 
   const toggleSkill = (skillId: string) => {
@@ -497,27 +875,33 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
     );
   };
 
-  const handleSend = async () => {
-    if (!canSend) {
+  const handleSend = async (nextPrompt = prompt) => {
+    const normalizedPrompt = nextPrompt.trim();
+    if (!normalizedPrompt || activeGenerationRunId || cancellingRunId) {
       return;
     }
     const primarySkillId = selectedSkillIds[0];
-    if (!primarySkillId) {
+    if (!reservedTaskMode && !primarySkillId) {
       return;
     }
     await sendMutation.mutateAsync({
       conversationId: selectedConversationId || undefined,
-      skillId: primarySkillId,
-      skillIds: selectedSkillIds,
-      prompt,
-      title: prompt.trim().slice(0, 80),
+      skillId: reservedTaskMode ? undefined : primarySkillId,
+      skillIds: reservedTaskMode ? undefined : selectedSkillIds,
+      prompt: normalizedPrompt,
+      title: normalizedPrompt.slice(0, 80),
+      routingHint,
     });
   };
 
   const renderComposer = () => (
-    <div className="pi-agent-composer fixed pointer-events-none right-0 bottom-0 left-0 z-30 py-3">
-      <div className="pointer-events-auto mx-auto w-full max-w-[820px] px-1 sm:px-4">
-        {activeGenerationRunId ? (
+    <div className="pi-agent-composer fixed pointer-events-none right-0 bottom-0 left-0 z-30 bg-transparent py-3">
+      <div className="pointer-events-auto mx-auto w-full max-w-[820px] bg-transparent px-1 sm:px-4">
+        {cancellingRunId ? (
+          <div className="mb-2 flex justify-end">
+            <StatusPill tone="warning" label="正在停止" />
+          </div>
+        ) : activeGenerationRunId ? (
           <div className="mb-2 flex justify-end">
             <StatusPill tone="info" label="正在生成" />
           </div>
@@ -528,6 +912,7 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
             className="h-[93px] min-h-0 w-full resize-none overflow-y-auto rounded-[22px] border-0 bg-transparent pt-3 pr-16 pb-12 pl-4 text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
+            disabled={Boolean(cancellingRunId)}
             placeholder="询问任何投研问题"
             onKeyDown={(event) => {
               if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -540,117 +925,125 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
             ref={skillMenuRef}
             className="absolute bottom-3 left-3 flex max-w-[calc(100%-76px)] items-center gap-2"
           >
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={skillMenuOpen}
-              title="选择 skill"
-              className="inline-flex h-10 shrink-0 items-center rounded-full border border-[var(--app-border-soft)] bg-[var(--app-hover-surface)] px-3 text-xs font-medium text-[var(--app-text-subtle)] transition-colors hover:border-[var(--app-hover-border)] hover:bg-[var(--app-hover-surface)]"
-              onClick={() => setSkillMenuOpen((current) => !current)}
-            >
-              选择 Skill
-            </button>
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              {selectedSkills.map((skill) => (
+            {setupMode ? (
+              <span className="inline-flex h-10 items-center rounded-[8px] border border-[var(--app-border-soft)] bg-[var(--app-bg-raised)] px-3 text-xs font-medium text-[var(--app-text-strong)]">
+                定时任务设定
+              </span>
+            ) : (
+              <>
                 <button
-                  key={skill.id}
                   type="button"
-                  title={`移除 ${skill.name}`}
-                  className="inline-flex h-8 max-w-[180px] items-center rounded-[8px] border border-[var(--app-border-soft)] bg-[var(--app-bg-raised)] px-2.5 text-xs font-medium text-[var(--app-text-strong)] transition-colors hover:border-[var(--app-border-strong)]"
-                  onClick={() => removeSkill(skill.id)}
+                  aria-haspopup="menu"
+                  aria-expanded={skillMenuOpen}
+                  title="选择 skill"
+                  className="inline-flex h-10 shrink-0 items-center rounded-full border border-[var(--app-border-soft)] bg-[var(--app-hover-surface)] px-3 text-xs font-medium text-[var(--app-text-subtle)] transition-colors hover:border-[var(--app-hover-border)] hover:bg-[var(--app-hover-surface)]"
+                  onClick={() => setSkillMenuOpen((current) => !current)}
                 >
-                  <span className="truncate">{skill.name}</span>
+                  选择 Skill
                 </button>
-              ))}
-            </div>
-            <div
-              role="menu"
-              className={[
-                "absolute bottom-12 left-0 z-40 w-[min(560px,calc(100vw-40px))] origin-bottom-left rounded-[14px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-1 shadow-[var(--app-shadow-lg)] transition duration-160",
-                skillMenuOpen
-                  ? "scale-100 opacity-100"
-                  : "pointer-events-none scale-95 opacity-0",
-              ].join(" ")}
-            >
-              <div className="max-h-[300px] overflow-y-auto p-1">
-                <div className="grid gap-0.5">
-                  {(activeSkillGroup?.items ?? []).map((skill) => {
-                    const active = selectedSkillIds.includes(skill.id);
-
-                    return (
-                      <button
-                        key={skill.id}
-                        type="button"
-                        role="menuitemcheckbox"
-                        aria-checked={active}
-                        className={[
-                          "grid w-full gap-1 rounded-[10px] px-3 py-2.5 text-left text-sm transition-colors",
-                          active
-                            ? "bg-[var(--app-primary-surface)] text-[var(--app-on-primary)]"
-                            : "text-[var(--app-text-muted)] hover:bg-[var(--app-hover-surface)] hover:text-[var(--app-text-strong)]",
-                        ].join(" ")}
-                        onClick={() => toggleSkill(skill.id)}
-                      >
-                        <span className="flex min-w-0 items-center justify-between gap-3">
-                          <span className="min-w-0 truncate font-medium">
-                            {skill.name}
-                          </span>
-                          {active ? (
-                            <span className="shrink-0 text-xs font-medium">
-                              已选
-                            </span>
-                          ) : null}
-                        </span>
-                        <span
-                          className={[
-                            "line-clamp-2 text-xs leading-5",
-                            active
-                              ? "text-[var(--app-text-strong)]/68"
-                              : "text-[var(--app-text-subtle)]",
-                          ].join(" ")}
-                        >
-                          {skill.description}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-1 border-t border-[var(--app-border-soft)] p-1 sm:grid-cols-4">
-                {skillCategoryOrder.map((category) => {
-                  const group = groupedSkills.find(
-                    (item) => item.category === category,
-                  );
-                  const active = activeSkillGroup?.category === category;
-
-                  return (
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  {selectedSkills.map((skill) => (
                     <button
-                      key={category}
+                      key={skill.id}
                       type="button"
-                      role="tab"
-                      aria-selected={active}
-                      className={[
-                        "h-8 rounded-[8px] px-2 text-left text-xs font-medium transition-colors",
-                        active
-                          ? "bg-[var(--app-primary-surface)] text-[var(--app-on-primary)]"
-                          : "text-[var(--app-text-subtle)] hover:bg-[var(--app-hover-surface)] hover:text-[var(--app-text-strong)]",
-                      ].join(" ")}
-                      onClick={() => setActiveSkillCategory(category)}
+                      title={`移除 ${skill.name}`}
+                      className="inline-flex h-8 max-w-[180px] items-center rounded-[8px] border border-[var(--app-border-soft)] bg-[var(--app-bg-raised)] px-2.5 text-xs font-medium text-[var(--app-text-strong)] transition-colors hover:border-[var(--app-border-strong)]"
+                      onClick={() => removeSkill(skill.id)}
                     >
-                      <span className="block truncate">
-                        {category}
-                        {group ? ` ${group.items.length}` : ""}
-                      </span>
+                      <span className="truncate">{skill.name}</span>
                     </button>
-                  );
-                })}
-              </div>
-              {skillSelectionError ? (
-                <div className="border-t border-[var(--app-border-soft)] px-3 py-2 text-xs text-[var(--app-danger)]">
-                  {skillSelectionError}
+                  ))}
                 </div>
-              ) : null}
-            </div>
+                <div
+                  role="menu"
+                  className={[
+                    "absolute bottom-12 left-0 z-40 w-[min(560px,calc(100vw-40px))] origin-bottom-left rounded-[14px] border border-[var(--app-border)] bg-[var(--app-bg-floating)] p-1 shadow-[var(--app-shadow-lg)] transition duration-160",
+                    skillMenuOpen
+                      ? "scale-100 opacity-100"
+                      : "pointer-events-none scale-95 opacity-0",
+                  ].join(" ")}
+                >
+                  <div className="max-h-[300px] overflow-y-auto p-1">
+                    <div className="grid gap-0.5">
+                      {(activeSkillGroup?.items ?? []).map((skill) => {
+                        const active = selectedSkillIds.includes(skill.id);
+
+                        return (
+                          <button
+                            key={skill.id}
+                            type="button"
+                            role="menuitemcheckbox"
+                            aria-checked={active}
+                            className={[
+                              "grid w-full gap-1 rounded-[10px] px-3 py-2.5 text-left text-sm transition-colors",
+                              active
+                                ? "bg-[var(--app-primary-surface)] text-[var(--app-on-primary)]"
+                                : "text-[var(--app-text-muted)] hover:bg-[var(--app-hover-surface)] hover:text-[var(--app-text-strong)]",
+                            ].join(" ")}
+                            onClick={() => toggleSkill(skill.id)}
+                          >
+                            <span className="flex min-w-0 items-center justify-between gap-3">
+                              <span className="min-w-0 truncate font-medium">
+                                {skill.name}
+                              </span>
+                              {active ? (
+                                <span className="shrink-0 text-xs font-medium">
+                                  已选
+                                </span>
+                              ) : null}
+                            </span>
+                            <span
+                              className={[
+                                "line-clamp-2 text-xs leading-5",
+                                active
+                                  ? "text-[var(--app-text-strong)]/68"
+                                  : "text-[var(--app-text-subtle)]",
+                              ].join(" ")}
+                            >
+                              {skill.description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 border-t border-[var(--app-border-soft)] p-1 sm:grid-cols-4">
+                    {skillCategoryOrder.map((category) => {
+                      const group = groupedSkills.find(
+                        (item) => item.category === category,
+                      );
+                      const active = activeSkillGroup?.category === category;
+
+                      return (
+                        <button
+                          key={category}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          className={[
+                            "h-8 rounded-[8px] px-2 text-left text-xs font-medium transition-colors",
+                            active
+                              ? "bg-[var(--app-primary-surface)] text-[var(--app-on-primary)]"
+                              : "text-[var(--app-text-subtle)] hover:bg-[var(--app-hover-surface)] hover:text-[var(--app-text-strong)]",
+                          ].join(" ")}
+                          onClick={() => setActiveSkillCategory(category)}
+                        >
+                          <span className="block truncate">
+                            {category}
+                            {group ? ` ${group.items.length}` : ""}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {skillSelectionError ? (
+                    <div className="border-t border-[var(--app-border-soft)] px-3 py-2 text-xs text-[var(--app-danger)]">
+                      {skillSelectionError}
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            )}
           </div>
           {activeGenerationRunId ? (
             <button
@@ -659,9 +1052,13 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
               title="停止生成"
               className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-danger-border)] bg-[var(--app-danger)] text-white transition-colors hover:bg-[var(--app-danger-text-strong)] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={cancelMutation.isPending}
-              onClick={() =>
-                cancelMutation.mutate({ runId: activeGenerationRunId })
-              }
+              onClick={() => {
+                if (!activeGenerationRunId || cancellingRunId) return;
+                setCancellingRunId(activeGenerationRunId);
+                void cancelMutation
+                  .mutateAsync({ runId: activeGenerationRunId })
+                  .catch(() => undefined);
+              }}
             >
               <StopIcon className="h-5 w-5" />
             </button>
@@ -672,7 +1069,7 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
               title="发送"
               className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-primary-border)] bg-[var(--app-primary-surface)] text-[var(--app-on-primary)] transition-colors hover:bg-[var(--app-primary-surface-hover)] disabled:cursor-not-allowed disabled:border-[var(--app-border-soft)] disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
               disabled={!canSend || sendMutation.isPending}
-              onClick={handleSend}
+              onClick={() => void handleSend()}
             >
               <SendIcon className="h-5 w-5" />
             </button>
@@ -697,8 +1094,8 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
   return (
     <>
       {showConversation && selectedConversation ? (
-        <section className="pi-agent-conversation fixed right-0 bottom-[248px] left-0 z-20 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)]">
-          <div className="app-scroll mx-auto max-h-[min(42vh,460px)] w-full max-w-[820px] overflow-y-auto px-4 py-5">
+        <section className="pi-agent-conversation fixed top-16 right-0 bottom-[141px] left-0 z-20 bg-transparent lg:top-0">
+          <div className="app-scroll mx-auto h-full w-full max-w-[820px] overflow-y-auto px-4 py-6 sm:px-6">
             <div className="grid gap-6">
               {selectedConversation.messages.map((message) => (
                 <ChatMessage
@@ -707,11 +1104,41 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
                   liveText={liveMessages[message.id]}
                   lastTargetRef={lastTargetRef}
                   onLastTargetRefChange={setLastTargetRef}
+                  onAskOption={(value) => {
+                    setPrompt(value);
+                    void handleSend(value);
+                  }}
                   piAgentHref={`/agent-runtime?conversationId=${encodeURIComponent(
                     selectedConversationId,
                   )}&draft=selection`}
                 />
               ))}
+              {setupDraft ? (
+                <ScheduledTaskPreview
+                  draft={setupDraft}
+                  busy={activateDraft.isPending}
+                  error={activateDraft.error?.message}
+                  onConfirm={() =>
+                    activateDraft.mutate({
+                      taskId: setupDraft.taskId,
+                      expectedVersion: setupDraft.version,
+                    })
+                  }
+                />
+              ) : null}
+              {editDraft ? (
+                <ScheduledTaskEditPreview
+                  draft={editDraft}
+                  busy={confirmEditDraft.isPending}
+                  error={confirmEditDraft.error?.message}
+                  onConfirm={() =>
+                    confirmEditDraft.mutate({
+                      draftId: editDraft.id,
+                      expectedRevision: editDraft.revision,
+                    })
+                  }
+                />
+              ) : null}
               <div ref={messagesEndRef} />
             </div>
           </div>
@@ -719,7 +1146,7 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
       ) : showConversation &&
         selectedConversationId &&
         conversationQuery.isLoading ? (
-        <div className="pi-agent-conversation fixed right-0 bottom-[248px] left-0 z-20 border-t border-[var(--app-border-soft)] bg-[var(--app-bg)] px-4 py-5 text-center text-sm text-[var(--app-text-muted)]">
+        <div className="pi-agent-conversation fixed top-16 right-0 bottom-[141px] left-0 z-20 bg-transparent px-4 py-6 text-center text-sm text-[var(--app-text-muted)] lg:top-0">
           加载中
         </div>
       ) : null}
@@ -742,8 +1169,6 @@ export function AgentRuntimeClientPage() {
   return (
     <WorkspaceShell
       section="agentRuntime"
-      title="投研智能体"
-      titleSize="compact"
       contentWidth="wide"
       historyHeading="对话历史"
       historyItems={historyItems}

@@ -3,7 +3,9 @@ import type {
   AgentRuntimeEventType,
   AgentRunSnapshot,
   AgentRunStatus,
+  AgentRuntimeResumeRequest,
   StartRunRequest,
+  UserInputRequest,
 } from "./types";
 
 type Subscriber = (event: AgentRuntimeEvent) => void;
@@ -11,6 +13,8 @@ type Subscriber = (event: AgentRuntimeEvent) => void;
 type RunRecord = Omit<AgentRunSnapshot, "events"> & {
   events: AgentRuntimeEvent[];
   subscribers: Set<Subscriber>;
+  request: StartRunRequest;
+  turnGeneration: number;
   abortController?: AbortController;
   cleanupTimer?: NodeJS.Timeout;
 };
@@ -41,6 +45,8 @@ export class AgentRuntimeRunStore {
       createdAt: now,
       events: [],
       subscribers: new Set(),
+      request: { ...request },
+      turnGeneration: 0,
     };
 
     this.runs.set(run.id, run);
@@ -76,24 +82,112 @@ export class AgentRuntimeRunStore {
     }
   }
 
+  getRequest(runId: string) {
+    const run = this.runs.get(runId);
+    return run ? { ...run.request } : null;
+  }
+
+  getTurnGeneration(runId: string) {
+    return this.runs.get(runId)?.turnGeneration ?? null;
+  }
+
+  isCurrentTurn(runId: string, generation: number) {
+    return this.runs.get(runId)?.turnGeneration === generation;
+  }
+
   abort(runId: string) {
     const run = this.runs.get(runId);
     if (!run) {
       return false;
     }
 
-    run.abortController?.abort();
+    run.abortController?.abort(new Error("用户已请求取消"));
+    if (
+      run.status === "queued" ||
+      run.status === "running" ||
+      run.status === "waiting_for_input"
+    ) {
+      this.markCancelled(runId, "cancel_requested");
+    }
     return true;
   }
 
   markRunning(runId: string) {
+    const run = this.runs.get(runId);
+    if (!run || run.status !== "queued") {
+      return;
+    }
     this.updateStatus(runId, "running", { startedAt: true });
     this.appendEvent(runId, "run.started");
+  }
+
+  markWaitingForInput(runId: string, request: UserInputRequest) {
+    const run = this.runs.get(runId);
+    if (!run || (run.status !== "running" && run.status !== "waiting_for_input")) {
+      return false;
+    }
+
+    if (run.status === "waiting_for_input") {
+      return true;
+    }
+
+    run.waitingForInput = {
+      question: request.question,
+      ...(request.options ? { options: request.options.map((option) => ({ ...option })) } : {}),
+    };
+    run.completedAt = undefined;
+    run.status = "waiting_for_input";
+    this.appendEvent(runId, "user.input.requested", run.waitingForInput);
+    this.appendEvent(runId, "run.waiting_for_input", run.waitingForInput);
+    return true;
+  }
+
+  resume(runId: string, patch: AgentRuntimeResumeRequest) {
+    const run = this.runs.get(runId);
+    if (!run) {
+      return { kind: "not_found" as const };
+    }
+
+    if (run.status === "running") {
+      return { kind: "already_running" as const, request: { ...run.request } };
+    }
+
+    if (run.status !== "waiting_for_input") {
+      return { kind: "invalid_status" as const, status: run.status };
+    }
+
+    run.request = {
+      ...run.request,
+      prompt: patch.prompt,
+      userMessageId: patch.userMessageId,
+      assistantMessageId: patch.assistantMessageId,
+    };
+    run.turnGeneration += 1;
+    run.input = {
+      ...run.input,
+      prompt: patch.prompt,
+    };
+    run.waitingForInput = undefined;
+    run.status = "running";
+    this.appendEvent(runId, "run.resumed", {
+      userMessageId: patch.userMessageId,
+      assistantMessageId: patch.assistantMessageId,
+    });
+    return { kind: "resumed" as const, request: { ...run.request } };
   }
 
   markSucceeded(runId: string, finalOutput: Record<string, unknown>) {
     const run = this.runs.get(runId);
     if (!run) {
+      return;
+    }
+
+    if (
+      run.status === "cancelled" ||
+      run.status === "waiting_for_input" ||
+      run.status === "succeeded" ||
+      run.status === "failed"
+    ) {
       return;
     }
 
@@ -109,6 +203,15 @@ export class AgentRuntimeRunStore {
       return;
     }
 
+    if (
+      run.status === "cancelled" ||
+      run.status === "waiting_for_input" ||
+      run.status === "succeeded" ||
+      run.status === "failed"
+    ) {
+      return;
+    }
+
     run.errorCode = errorCode;
     run.errorMessage = errorMessage;
     this.updateStatus(runId, "failed", { completedAt: true });
@@ -119,6 +222,10 @@ export class AgentRuntimeRunStore {
   markCancelled(runId: string, reason: string) {
     const run = this.runs.get(runId);
     if (!run) {
+      return;
+    }
+
+    if (run.status === "cancelled" || run.status === "succeeded" || run.status === "failed") {
       return;
     }
 
@@ -225,6 +332,7 @@ export class AgentRuntimeRunStore {
       createdAt: run.createdAt,
       startedAt: run.startedAt,
       completedAt: run.completedAt,
+      waitingForInput: run.waitingForInput,
       events: [...run.events],
     };
   }

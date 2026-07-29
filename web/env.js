@@ -66,6 +66,11 @@ export const env = createEnv({
       .int()
       .positive()
       .default(300_000),
+    AGENT_RUNTIME_CANCEL_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(2_000),
     ALPHAFLOW_INTERNAL_API_SECRET: z.string().optional(),
     SELL_SIDE_REFRESH_SECRET: z.string().optional(),
     KRONOS_FORECAST_ENABLED: z.coerce.boolean().default(false),
@@ -94,6 +99,11 @@ export const env = createEnv({
       .positive()
       .default(2000),
     WORKFLOW_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(10),
+    WORKFLOW_NODE_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(600_000),
     SCREENING_WORKER_POLL_INTERVAL_MS: z.coerce
       .number()
       .int()
@@ -154,6 +164,10 @@ export const env = createEnv({
       process.env.AGENT_RUNTIME_TIMEOUT_MS,
       300_000,
     ),
+    AGENT_RUNTIME_CANCEL_TIMEOUT_MS: readPositiveNumberEnv(
+      process.env.AGENT_RUNTIME_CANCEL_TIMEOUT_MS,
+      2_000,
+    ),
     ALPHAFLOW_INTERNAL_API_SECRET: process.env.ALPHAFLOW_INTERNAL_API_SECRET,
     SELL_SIDE_REFRESH_SECRET:
       process.env.SELL_SIDE_REFRESH_SECRET ||
@@ -193,6 +207,10 @@ export const env = createEnv({
     WORKFLOW_WORKER_CONCURRENCY: readPositiveNumberEnv(
       process.env.WORKFLOW_WORKER_CONCURRENCY,
       10,
+    ),
+    WORKFLOW_NODE_TIMEOUT_MS: readPositiveNumberEnv(
+      process.env.WORKFLOW_NODE_TIMEOUT_MS,
+      600_000,
     ),
     SCREENING_WORKER_POLL_INTERVAL_MS: readPositiveNumberEnv(
       process.env.SCREENING_WORKER_POLL_INTERVAL_MS,

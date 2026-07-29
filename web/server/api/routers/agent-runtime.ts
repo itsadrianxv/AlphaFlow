@@ -8,12 +8,14 @@ import {
   MAX_SELECTED_SKILLS_MESSAGE,
   normalizeSelectedSkillIds,
 } from "~/server/application/agent-runtime/skill-selection";
+import { ScheduledTaskIntentRouter } from "~/server/application/scheduled-task/scheduled-task-intent-router";
 import { WorkflowCommandService } from "~/server/application/workflow/command-service";
 import { isWorkflowDomainError } from "~/server/domain/workflow/errors";
 import { AgentRuntimeClient } from "~/server/infrastructure/agent-runtime/agent-runtime-client";
 import { PrismaAgentConversationRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-conversation-repository";
 import { PrismaAgentRuntimeRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-runtime-repository";
 import { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
+import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
 
 function mapError(error: unknown): TRPCError {
   if (error instanceof TRPCError) {
@@ -90,22 +92,25 @@ const conversationIdInput = z.object({
   conversationId: z.string().cuid(),
 });
 
-const sendMessageInput = z
-  .object({
-    conversationId: z.string().cuid().optional(),
-    skillId: z.string().trim().min(1).optional(),
-    skillIds: z
-      .array(z.string().trim().min(1))
-      .max(3, MAX_SELECTED_SKILLS_MESSAGE)
-      .optional(),
-    prompt: z.string().trim().min(1),
-    title: z.string().trim().min(1).max(120).optional(),
-    context: z.record(z.unknown()).optional(),
-    idempotencyKey: z.string().min(8).max(128).optional(),
-  })
-  .refine((value) => value.skillId || (value.skillIds?.length ?? 0) > 0, {
-    message: "请选择 skill",
-  });
+const sendMessageInput = z.object({
+  conversationId: z.string().cuid().optional(),
+  skillId: z.string().trim().min(1).optional(),
+  skillIds: z
+    .array(z.string().trim().min(1))
+    .max(3, MAX_SELECTED_SKILLS_MESSAGE)
+    .optional(),
+  prompt: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(120).optional(),
+  context: z.record(z.unknown()).optional(),
+  idempotencyKey: z.string().min(8).max(128).optional(),
+  routingHint: z.enum(["SCHEDULED_TASK_SETUP"]).optional(),
+});
+
+const RESERVED_SKILLS = new Set([
+  "scheduled-task-setup",
+  "scheduled-task-edit",
+  "scheduled-task-execution",
+]);
 
 function assertSkillsExist(
   selectedSkillIds: string[],
@@ -185,13 +190,53 @@ export const agentRuntimeRouter = createTRPCRouter({
     .input(sendMessageInput)
     .mutation(async ({ ctx, input }) => {
       try {
-        const selectedSkills = normalizeSelectedSkillIds({
-          skillId: input.skillId,
-          skillIds: input.skillIds,
-        });
+        const conversation = input.conversationId
+          ? await ctx.db.agentConversation.findFirst({
+              where: { id: input.conversationId, userId: ctx.session.user.id },
+              select: { routingMode: true },
+            })
+          : null;
+        const routeToEdit = conversation?.routingMode === "SCHEDULED_TASK_EDIT";
+        const routeToSetup =
+          !routeToEdit &&
+          (input.routingHint === "SCHEDULED_TASK_SETUP" ||
+            conversation?.routingMode === "SCHEDULED_TASK_SETUP" ||
+            (await new ScheduledTaskIntentRouter().shouldEnterSetup(
+              input.prompt,
+            )));
+        const requestedIds = [
+          ...(input.skillIds ?? []),
+          ...(input.skillId ? [input.skillId] : []),
+        ];
+        if (
+          !routeToSetup &&
+          !routeToEdit &&
+          requestedIds.some((skillId) => RESERVED_SKILLS.has(skillId))
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "系统保留 Skill 不能手动选择",
+          });
+        }
+        const selectedSkills = routeToEdit
+          ? {
+              skillId: "scheduled-task-edit",
+              skillIds: ["scheduled-task-edit"],
+            }
+          : routeToSetup
+            ? {
+                skillId: "scheduled-task-setup",
+                skillIds: ["scheduled-task-setup"],
+              }
+            : normalizeSelectedSkillIds({
+                skillId: input.skillId,
+                skillIds: input.skillIds,
+              });
         const agentRuntimeClient = new AgentRuntimeClient();
-        const skills = await agentRuntimeClient.listSkills();
-        assertSkillsExist(selectedSkills.skillIds, skills);
+        if (!routeToSetup && !routeToEdit) {
+          const skills = await agentRuntimeClient.listSkills();
+          assertSkillsExist(selectedSkills.skillIds, skills);
+        }
 
         const workflowRepository = new PrismaWorkflowRunRepository(ctx.db);
         const conversationRepository = new PrismaAgentConversationRepository(
@@ -213,6 +258,11 @@ export const agentRuntimeRouter = createTRPCRouter({
           prompt: input.prompt,
           title: input.title,
           context: input.context,
+          routingMode: routeToEdit
+            ? "SCHEDULED_TASK_EDIT"
+            : routeToSetup
+              ? "SCHEDULED_TASK_SETUP"
+              : "AUTO",
           idempotencyKey: input.idempotencyKey,
         });
       } catch (error) {
@@ -220,19 +270,21 @@ export const agentRuntimeRouter = createTRPCRouter({
       }
     }),
 
-  ensureLegacyRunsMigrated: protectedProcedure.mutation(async ({ ctx }) => {
-    try {
-      const repository = new PrismaAgentConversationRepository(ctx.db);
-      return await repository.migrateLegacyRuns(ctx.session.user.id);
-    } catch (error) {
-      throw mapError(error);
-    }
-  }),
-
   startRun: protectedProcedure
     .input(startRunInput)
     .mutation(async ({ ctx, input }) => {
       try {
+        if (
+          [
+            ...(input.skillIds ?? []),
+            ...(input.skillId ? [input.skillId] : []),
+          ].some((skillId) => RESERVED_SKILLS.has(skillId))
+        ) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "系统保留 Skill 不能手动选择",
+          });
+        }
         const selectedSkills = normalizeSelectedSkillIds({
           skillId: input.skillId,
           skillIds: input.skillIds,
@@ -330,10 +382,21 @@ export const agentRuntimeRouter = createTRPCRouter({
           input.runId,
         );
 
-        await new AgentRuntimeClient().cancelRun(input.runId).catch(() => null);
+        const runtimeStore = new RedisWorkflowRuntimeStore();
+        await Promise.race([
+          runtimeStore.publishCancellation({
+            runId: input.runId,
+            reason: "user_requested",
+            requestedAt: new Date().toISOString(),
+          }),
+          new Promise<void>((resolve) => setTimeout(resolve, 500)),
+        ]).catch(() => undefined);
         await new PrismaAgentConversationRepository(
           ctx.db,
         ).markAssistantCancelledByRun(input.runId, "用户已请求取消");
+        void new AgentRuntimeClient()
+          .cancelRun(input.runId)
+          .catch(() => undefined);
         return result;
       } catch (error) {
         throw mapError(error);

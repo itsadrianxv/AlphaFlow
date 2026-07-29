@@ -1,11 +1,10 @@
 import {
-  type Prisma,
+  Prisma,
   type PrismaClient,
   WorkflowEventType,
   WorkflowNodeRunStatus,
   WorkflowRunStatus,
 } from "@prisma/client";
-import type { PortfolioSnapshotDraft } from "~/server/domain/timing/types";
 import { DEFAULT_RESEARCH_RUNTIME_CONFIG } from "~/server/domain/workflow/research";
 import {
   COMPANY_RESEARCH_NODE_KEYS,
@@ -21,17 +20,6 @@ import {
   PI_AGENT_RUN_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_NODE_KEYS,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
-  SCREENING_TO_TIMING_NODE_KEYS,
-  SCREENING_TO_TIMING_TEMPLATE_CODE,
-  TIMING_DECISION_PIPELINE_TEMPLATE_CODE,
-  TIMING_REVIEW_LOOP_NODE_KEYS,
-  TIMING_REVIEW_LOOP_TEMPLATE_CODE,
-  TIMING_SIGNAL_PIPELINE_NODE_KEYS,
-  TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
-  WATCHLIST_TIMING_CARDS_PIPELINE_NODE_KEYS,
-  WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
-  WATCHLIST_TIMING_PIPELINE_NODE_KEYS,
-  WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
 } from "~/server/domain/workflow/types";
 
 const toJson = (value: unknown): Prisma.InputJsonValue =>
@@ -345,240 +333,6 @@ export class PrismaWorkflowRunRepository {
     });
   }
 
-  async ensureTimingSignalPipelineTemplate() {
-    return this.prisma.workflowTemplate.upsert({
-      where: {
-        code_version: {
-          code: TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
-          version: 1,
-        },
-      },
-      create: {
-        code: TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
-        version: 1,
-        graphConfig: {
-          nodes: TIMING_SIGNAL_PIPELINE_NODE_KEYS,
-        },
-        inputSchema: {
-          type: "object",
-          required: ["stockCode"],
-          properties: {
-            stockCode: {
-              type: "string",
-            },
-            asOfDate: {
-              type: "string",
-            },
-            presetId: {
-              type: "string",
-            },
-          },
-        },
-        isActive: true,
-      },
-      update: {
-        graphConfig: {
-          nodes: TIMING_SIGNAL_PIPELINE_NODE_KEYS,
-        },
-        isActive: true,
-      },
-    });
-  }
-
-  async ensureWatchlistTimingCardsPipelineTemplate() {
-    return this.prisma.workflowTemplate.upsert({
-      where: {
-        code_version: {
-          code: WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
-          version: 1,
-        },
-      },
-      create: {
-        code: WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
-        version: 1,
-        graphConfig: {
-          nodes: WATCHLIST_TIMING_CARDS_PIPELINE_NODE_KEYS,
-        },
-        inputSchema: {
-          type: "object",
-          required: ["watchListId"],
-          properties: {
-            watchListId: {
-              type: "string",
-            },
-            asOfDate: {
-              type: "string",
-            },
-            presetId: {
-              type: "string",
-            },
-          },
-        },
-        isActive: true,
-      },
-      update: {
-        graphConfig: {
-          nodes: WATCHLIST_TIMING_CARDS_PIPELINE_NODE_KEYS,
-        },
-        isActive: true,
-      },
-    });
-  }
-
-  async ensureWatchlistTimingPipelineTemplate() {
-    return this.prisma.workflowTemplate.upsert({
-      where: {
-        code_version: {
-          code: WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
-          version: 1,
-        },
-      },
-      create: {
-        code: WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
-        version: 1,
-        graphConfig: {
-          nodes: WATCHLIST_TIMING_PIPELINE_NODE_KEYS,
-        },
-        inputSchema: {
-          type: "object",
-          required: ["watchListId", "portfolioSnapshotId"],
-          properties: {
-            watchListId: {
-              type: "string",
-            },
-            portfolioSnapshotId: {
-              type: "string",
-            },
-            asOfDate: {
-              type: "string",
-            },
-            presetId: {
-              type: "string",
-            },
-          },
-        },
-        isActive: true,
-      },
-      update: {
-        graphConfig: {
-          nodes: WATCHLIST_TIMING_PIPELINE_NODE_KEYS,
-        },
-        isActive: true,
-      },
-    });
-  }
-
-  async ensureTimingDecisionPipelineTemplate() {
-    return this.prisma.workflowTemplate.upsert({
-      where: {
-        code_version: {
-          code: TIMING_DECISION_PIPELINE_TEMPLATE_CODE,
-          version: 1,
-        },
-      },
-      create: {
-        code: TIMING_DECISION_PIPELINE_TEMPLATE_CODE,
-        version: 1,
-        graphConfig: { nodes: WATCHLIST_TIMING_PIPELINE_NODE_KEYS },
-        inputSchema: {
-          type: "object",
-          required: ["targets", "portfolioSnapshotId", "revisionId"],
-          properties: {
-            targets: { type: "array", minItems: 1 },
-            portfolioSnapshotId: { type: "string" },
-            revisionId: { type: "string" },
-            mode: { enum: ["SINGLE", "PORTFOLIO"] },
-            asOfDate: { type: "string" },
-          },
-        },
-        isActive: true,
-      },
-      update: {
-        graphConfig: { nodes: WATCHLIST_TIMING_PIPELINE_NODE_KEYS },
-        isActive: true,
-      },
-    });
-  }
-
-  async ensureScreeningToTimingPipelineTemplate() {
-    return this.prisma.workflowTemplate.upsert({
-      where: {
-        code_version: {
-          code: SCREENING_TO_TIMING_TEMPLATE_CODE,
-          version: 1,
-        },
-      },
-      create: {
-        code: SCREENING_TO_TIMING_TEMPLATE_CODE,
-        version: 1,
-        graphConfig: {
-          nodes: SCREENING_TO_TIMING_NODE_KEYS,
-        },
-        inputSchema: {
-          type: "object",
-          required: ["screeningSessionId"],
-          properties: {
-            screeningSessionId: {
-              type: "string",
-            },
-            candidateLimit: {
-              type: "integer",
-            },
-            asOfDate: {
-              type: "string",
-            },
-            presetId: {
-              type: "string",
-            },
-          },
-        },
-        isActive: true,
-      },
-      update: {
-        graphConfig: {
-          nodes: SCREENING_TO_TIMING_NODE_KEYS,
-        },
-        isActive: true,
-      },
-    });
-  }
-
-  async ensureTimingReviewLoopTemplate() {
-    return this.prisma.workflowTemplate.upsert({
-      where: {
-        code_version: {
-          code: TIMING_REVIEW_LOOP_TEMPLATE_CODE,
-          version: 1,
-        },
-      },
-      create: {
-        code: TIMING_REVIEW_LOOP_TEMPLATE_CODE,
-        version: 1,
-        graphConfig: {
-          nodes: TIMING_REVIEW_LOOP_NODE_KEYS,
-        },
-        inputSchema: {
-          type: "object",
-          properties: {
-            date: {
-              type: "string",
-            },
-            limit: {
-              type: "integer",
-            },
-          },
-        },
-        isActive: true,
-      },
-      update: {
-        graphConfig: {
-          nodes: TIMING_REVIEW_LOOP_NODE_KEYS,
-        },
-        isActive: true,
-      },
-    });
-  }
-
   async ensurePiAgentRunTemplate() {
     const inputSchema = {
       type: "object",
@@ -628,7 +382,7 @@ export class PrismaWorkflowRunRepository {
       required: ["mode"],
       properties: {
         mode: { enum: ["radar", "overview", "deep_dive", "trace"] },
-        portfolioSnapshotId: { type: "string" },
+        portfolioCompositionId: { type: "string" },
         watchListIds: { type: "array", items: { type: "string" }, maxItems: 5 },
         eventId: { type: "string" },
         baseRunId: { type: "string" },
@@ -686,35 +440,14 @@ export class PrismaWorkflowRunRepository {
     input: Record<string, unknown>;
     nodeKeys: string[];
     idempotencyKey?: string;
-    portfolioInputSnapshot?: PortfolioSnapshotDraft & { source: "RUN_INPUT" };
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const portfolio = params.portfolioInputSnapshot
-        ? await tx.portfolioSnapshot.create({
-            data: {
-              userId: params.portfolioInputSnapshot.userId,
-              name: params.portfolioInputSnapshot.name,
-              baseCurrency: params.portfolioInputSnapshot.baseCurrency,
-              cash: params.portfolioInputSnapshot.cash,
-              totalCapital: params.portfolioInputSnapshot.totalCapital,
-              positions: toJson(params.portfolioInputSnapshot.positions),
-              riskPreferences: toJson(
-                params.portfolioInputSnapshot.riskPreferences,
-              ),
-              source: "RUN_INPUT",
-            },
-          })
-        : null;
       const run = await tx.workflowRun.create({
         data: {
           templateId: params.templateId,
           userId: params.userId,
           query: params.query,
-          input: toJson({
-            ...params.input,
-            portfolioSnapshotId:
-              portfolio?.id ?? params.input.portfolioSnapshotId,
-          }),
+          input: toJson(params.input),
           status: WorkflowRunStatus.PENDING,
           progressPercent: 0,
           checkpointKey: "",
@@ -752,13 +485,6 @@ export class PrismaWorkflowRunRepository {
           occurredAt: new Date(),
         },
       });
-
-      if (portfolio) {
-        await tx.portfolioSnapshot.update({
-          where: { id: portfolio.id },
-          data: { workflowRunId: run.id },
-        });
-      }
 
       return run;
     });
@@ -972,24 +698,36 @@ export class PrismaWorkflowRunRepository {
 
   async claimNextPendingRun(workerId: string) {
     return this.prisma.$transaction(async (tx) => {
-      const candidate = await tx.workflowRun.findFirst({
-        where: {
-          status: WorkflowRunStatus.PENDING,
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
-      });
+      const candidates = await tx.$queryRaw<Array<{ id: string }>>(
+        Prisma.sql`
+          SELECT "id"
+          FROM "WorkflowRun"
+          WHERE "status" = CAST(${WorkflowRunStatus.PENDING} AS "WorkflowRunStatus")
+          ORDER BY "createdAt" ASC, "id" ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT 1
+        `,
+      );
+      const candidateId = candidates[0]?.id;
 
-      if (!candidate) {
+      if (!candidateId) {
         return null;
       }
 
       const now = new Date();
-      const claimResult = await tx.workflowRun.updateMany({
+      const candidate = await tx.workflowRun.findUnique({
+        where: {
+          id: candidateId,
+        },
+      });
+
+      if (!candidate || candidate.status !== WorkflowRunStatus.PENDING) {
+        return null;
+      }
+
+      await tx.workflowRun.update({
         where: {
           id: candidate.id,
-          status: WorkflowRunStatus.PENDING,
         },
         data: {
           status: WorkflowRunStatus.RUNNING,
@@ -997,10 +735,6 @@ export class PrismaWorkflowRunRepository {
           updatedAt: now,
         },
       });
-
-      if (claimResult.count === 0) {
-        return null;
-      }
 
       await this.createEventTx(tx, {
         runId: candidate.id,
@@ -1094,6 +828,48 @@ export class PrismaWorkflowRunRepository {
     });
   }
 
+  async markNodeWaitingForInput(params: {
+    runId: string;
+    nodeRunId: string;
+    nodeKey: string;
+    question: string;
+    options?: unknown[];
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.workflowNodeRun.updateMany({
+        where: {
+          id: params.nodeRunId,
+          runId: params.runId,
+          status: WorkflowNodeRunStatus.RUNNING,
+        },
+        data: {
+          status: WorkflowNodeRunStatus.WAITING_FOR_INPUT,
+          completedAt: null,
+          errorCode: null,
+          errorMessage: null,
+        },
+      });
+
+      if (updated.count === 0) {
+        return tx.workflowNodeRun.findUnique({ where: { id: params.nodeRunId } });
+      }
+
+      await this.createEventTx(tx, {
+        runId: params.runId,
+        nodeRunId: params.nodeRunId,
+        eventType: WorkflowEventType.NODE_PROGRESS,
+        payload: {
+          nodeKey: params.nodeKey,
+          waitingForInput: true,
+          question: params.question,
+          ...(params.options ? { options: params.options } : {}),
+        },
+      });
+
+      return tx.workflowNodeRun.findUnique({ where: { id: params.nodeRunId } });
+    });
+  }
+
   async addNodeProgressEvent(params: {
     runId: string;
     nodeRunId?: string;
@@ -1120,9 +896,11 @@ export class PrismaWorkflowRunRepository {
     eventPayload?: Record<string, unknown>;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const nodeRun = await tx.workflowNodeRun.update({
+      const updated = await tx.workflowNodeRun.updateMany({
         where: {
           id: params.nodeRunId,
+          runId: params.runId,
+          status: WorkflowNodeRunStatus.RUNNING,
         },
         data: {
           status: WorkflowNodeRunStatus.SUCCEEDED,
@@ -1131,6 +909,11 @@ export class PrismaWorkflowRunRepository {
           completedAt: new Date(),
         },
       });
+
+      const nodeRun = await tx.workflowNodeRun.findUnique({ where: { id: params.nodeRunId } });
+      if (updated.count === 0) {
+        return nodeRun;
+      }
 
       await this.createEventTx(tx, {
         runId: params.runId,
@@ -1197,9 +980,11 @@ export class PrismaWorkflowRunRepository {
     durationMs: number;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const nodeRun = await tx.workflowNodeRun.update({
+      const updated = await tx.workflowNodeRun.updateMany({
         where: {
           id: params.nodeRunId,
+          runId: params.runId,
+          status: WorkflowNodeRunStatus.RUNNING,
         },
         data: {
           status: WorkflowNodeRunStatus.FAILED,
@@ -1209,6 +994,11 @@ export class PrismaWorkflowRunRepository {
           completedAt: new Date(),
         },
       });
+
+      const nodeRun = await tx.workflowNodeRun.findUnique({ where: { id: params.nodeRunId } });
+      if (updated.count === 0) {
+        return nodeRun;
+      }
 
       await this.createEventTx(tx, {
         runId: params.runId,
@@ -1231,9 +1021,13 @@ export class PrismaWorkflowRunRepository {
   }) {
     return this.prisma.$transaction(async (tx) => {
       const now = new Date();
-      const run = await tx.workflowRun.update({
+      const updated = await tx.workflowRun.updateMany({
         where: {
           id: params.runId,
+          status: {
+            in: [WorkflowRunStatus.PENDING, WorkflowRunStatus.RUNNING],
+          },
+          cancellationRequestedAt: null,
         },
         data: {
           status: WorkflowRunStatus.SUCCEEDED,
@@ -1244,6 +1038,10 @@ export class PrismaWorkflowRunRepository {
           errorMessage: null,
         },
       });
+      const run = await tx.workflowRun.findUnique({ where: { id: params.runId } });
+      if (updated.count === 0) {
+        return run;
+      }
 
       await this.createEventTx(tx, {
         runId: params.runId,
@@ -1264,9 +1062,13 @@ export class PrismaWorkflowRunRepository {
   }) {
     return this.prisma.$transaction(async (tx) => {
       const now = new Date();
-      const run = await tx.workflowRun.update({
+      const updated = await tx.workflowRun.updateMany({
         where: {
           id: params.runId,
+          status: {
+            in: [WorkflowRunStatus.PENDING, WorkflowRunStatus.RUNNING],
+          },
+          cancellationRequestedAt: null,
         },
         data: {
           status: WorkflowRunStatus.FAILED,
@@ -1275,6 +1077,10 @@ export class PrismaWorkflowRunRepository {
           errorMessage: params.errorMessage,
         },
       });
+      const run = await tx.workflowRun.findUnique({ where: { id: params.runId } });
+      if (updated.count === 0) {
+        return run;
+      }
 
       await this.createEventTx(tx, {
         runId: params.runId,
@@ -1292,15 +1098,26 @@ export class PrismaWorkflowRunRepository {
   async markRunCancelled(params: { runId: string; reason: string }) {
     return this.prisma.$transaction(async (tx) => {
       const now = new Date();
-      const run = await tx.workflowRun.update({
+      const updated = await tx.workflowRun.updateMany({
         where: {
           id: params.runId,
+          status: {
+            in: [
+              WorkflowRunStatus.PENDING,
+              WorkflowRunStatus.RUNNING,
+              WorkflowRunStatus.PAUSED,
+            ],
+          },
         },
         data: {
           status: WorkflowRunStatus.CANCELLED,
           completedAt: now,
         },
       });
+      const run = await tx.workflowRun.findUnique({ where: { id: params.runId } });
+      if (updated.count === 0) {
+        return run;
+      }
 
       await this.createEventTx(tx, {
         runId: params.runId,
@@ -1322,9 +1139,11 @@ export class PrismaWorkflowRunRepository {
     eventPayload?: Record<string, unknown>;
   }) {
     return this.prisma.$transaction(async (tx) => {
-      const run = await tx.workflowRun.update({
+      const updated = await tx.workflowRun.updateMany({
         where: {
           id: params.runId,
+          status: WorkflowRunStatus.RUNNING,
+          cancellationRequestedAt: null,
         },
         data: {
           status: WorkflowRunStatus.PAUSED,
@@ -1335,6 +1154,10 @@ export class PrismaWorkflowRunRepository {
           errorMessage: null,
         },
       });
+      const run = await tx.workflowRun.findUnique({ where: { id: params.runId } });
+      if (updated.count === 0) {
+        return run;
+      }
 
       await this.createEventTx(tx, {
         runId: params.runId,

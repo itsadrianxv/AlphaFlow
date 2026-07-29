@@ -1,5 +1,6 @@
 import { WorkflowEventType, WorkflowNodeRunStatus } from "@prisma/client";
 import { attachWorkflowNodeInsight } from "~/contracts/workflow-node-insight";
+import { env } from "~/env";
 import { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
 import { CompanyResearchAgentService } from "~/server/application/intelligence/company-research-agent-service";
 import { CompanyResearchWorkflowService } from "~/server/application/intelligence/company-research-workflow-service";
@@ -8,14 +9,15 @@ import { ImpactMappingService } from "~/server/application/intelligence/impact-m
 import { IndustryResearchWorkflowService } from "~/server/application/intelligence/industry-research-workflow-service";
 import { InsightSynthesisService } from "~/server/application/intelligence/insight-synthesis-service";
 import { IntelligenceAgentService } from "~/server/application/intelligence/intelligence-agent-service";
-import { ReminderSchedulingService } from "~/server/application/intelligence/reminder-scheduling-service";
 import { ResearchToolRegistry } from "~/server/application/intelligence/research-tool-registry";
 import { SharedNewsLibraryService } from "~/server/application/intelligence/shared-news-library-service";
 import { InsightQualityService } from "~/server/domain/intelligence/services/insight-quality-service";
 import { ReviewPlanPolicy } from "~/server/domain/intelligence/services/review-plan-policy";
 import {
   WORKFLOW_ERROR_CODES,
+  RunCancelledError,
   WorkflowDomainError,
+  WorkflowNodeTimeoutError,
   WorkflowPauseError,
 } from "~/server/domain/workflow/errors";
 import type {
@@ -29,12 +31,9 @@ import { PrismaAgentRuntimeRepository } from "~/server/infrastructure/agent-runt
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import { PrismaEvidenceContextRepository } from "~/server/infrastructure/evidence-context/prisma-evidence-context-repository";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
-import { PrismaResearchReminderRepository } from "~/server/infrastructure/intelligence/prisma-research-reminder-repository";
-import { PrismaScreeningInsightRepository } from "~/server/infrastructure/intelligence/prisma-screening-insight-repository";
 import { PythonConfidenceAnalysisClient } from "~/server/infrastructure/intelligence/python-confidence-analysis-client";
 import { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
 import { PythonMarketContextClient } from "~/server/infrastructure/intelligence/python-market-context-client";
-import { PrismaScreeningSessionRepository } from "~/server/infrastructure/screening/prisma-screening-session-repository";
 import {
   CompanyResearchContractLangGraph,
   CompanyResearchLangGraph,
@@ -45,17 +44,9 @@ import { WorkflowGraphRegistry } from "~/server/infrastructure/workflow/langgrap
 import { ImpactMappingLangGraph } from "~/server/infrastructure/workflow/langgraph/impact-mapping-graph";
 import { IndustryResearchLangGraph } from "~/server/infrastructure/workflow/langgraph/industry-research-graph";
 import { PiAgentRuntimeLangGraph } from "~/server/infrastructure/workflow/langgraph/pi-agent-runtime-graph";
-import { ScreeningInsightPipelineLangGraph } from "~/server/infrastructure/workflow/langgraph/screening-insight-pipeline-graph";
 import type { WorkflowGraphRunner } from "~/server/infrastructure/workflow/langgraph/workflow-graph";
 import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
-
-class RunCancelledError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RunCancelledError";
-  }
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -131,6 +122,7 @@ export type WorkflowExecutionServiceDependencies = {
   repository: PrismaWorkflowRunRepository;
   runtimeStore: RedisWorkflowRuntimeStore;
   graphs: WorkflowGraphRunner[];
+  agentConversationRepository?: PrismaAgentConversationRepository;
 };
 
 export function createWorkflowExecutionService(
@@ -193,14 +185,10 @@ export function createWorkflowExecutionService(
     researchToolRegistry,
     evidenceContextWriter,
   });
-  const reminderRepository = new PrismaResearchReminderRepository(prisma);
   const agentRuntimeRepository = new PrismaAgentRuntimeRepository(prisma);
   const agentConversationRepository = new PrismaAgentConversationRepository(
     prisma,
   );
-  const reminderSchedulingService = new ReminderSchedulingService({
-    reminderRepository,
-  });
   const synthesisService = new InsightSynthesisService({
     completionClient: deepSeekClient,
     reviewPlanPolicy: new ReviewPlanPolicy(),
@@ -217,23 +205,13 @@ export function createWorkflowExecutionService(
       new CompanyResearchLangGraph(companyResearchService),
       new ODRCompanyResearchLangGraph(companyResearchWorkflowService),
       new CompanyResearchContractLangGraph(companyResearchWorkflowService),
-      new ScreeningInsightPipelineLangGraph({
-        screeningSessionRepository: new PrismaScreeningSessionRepository(
-          prisma,
-        ),
-        insightRepository: new PrismaScreeningInsightRepository(prisma),
-        dataClient: intelligenceDataClient,
-        synthesisService,
-        confidenceAnalysisService,
-        reminderSchedulingService,
-        evidenceContextWriter,
-      }),
       new PiAgentRuntimeLangGraph({
         agentRuntimeClient: new AgentRuntimeClient(),
         agentRuntimeRepository,
         agentConversationRepository,
       }),
     ],
+    agentConversationRepository,
   });
 }
 
@@ -241,11 +219,13 @@ export class WorkflowExecutionService {
   private readonly repository: PrismaWorkflowRunRepository;
   private readonly runtimeStore: RedisWorkflowRuntimeStore;
   private readonly graphRegistry: WorkflowGraphRegistry;
+  private readonly agentConversationRepository?: PrismaAgentConversationRepository;
 
   constructor(dependencies: WorkflowExecutionServiceDependencies) {
     this.repository = dependencies.repository;
     this.runtimeStore = dependencies.runtimeStore;
     this.graphRegistry = new WorkflowGraphRegistry(dependencies.graphs);
+    this.agentConversationRepository = dependencies.agentConversationRepository;
   }
 
   async executeRecoverableRunningRun(workerId: string) {
@@ -292,6 +272,22 @@ export class WorkflowExecutionService {
       run.template.version,
     );
 
+    const executionAbortController = new AbortController();
+    let closeCancellation: () => Promise<void> = async () => undefined;
+    try {
+      closeCancellation = await this.runtimeStore.subscribeToCancellation(
+        runId,
+        (payload) => {
+          executionAbortController.abort(
+            new RunCancelledError(payload.reason || "用户已请求取消"),
+          );
+        },
+        executionAbortController.signal,
+      );
+    } catch {
+      // Redis 订阅不可用时保留数据库边界检查和节点超时兜底。
+    }
+
     if (await this.repository.isCancellationRequested(runId)) {
       await this.repository.markRunCancelled({
         runId,
@@ -302,6 +298,7 @@ export class WorkflowExecutionService {
         run.progressPercent,
         run.currentNodeKey ?? undefined,
       );
+      await closeCancellation();
       return;
     }
 
@@ -319,14 +316,58 @@ export class WorkflowExecutionService {
 
     state = this.restoreStateFromCompletedNodeRuns(graph, state, run.nodeRuns);
 
+    if (graph.templateCode === "pi_agent_run" && isRecord(run.input)) {
+      const currentAgentInput = isRecord(
+        (state as Record<string, unknown>).agentInput,
+      )
+        ? ((state as Record<string, unknown>).agentInput as Record<string, unknown>)
+        : {};
+      state = {
+        ...state,
+        agentInput: {
+          ...currentAgentInput,
+          ...run.input,
+        },
+        ...(isRecord((state as Record<string, unknown>).preparedTask)
+          ? {
+              preparedTask: {
+                ...((state as Record<string, unknown>).preparedTask as Record<
+                  string,
+                  unknown
+                >),
+                ...(typeof run.input.skillId === "string"
+                  ? { skillId: run.input.skillId }
+                  : {}),
+                ...(Array.isArray(run.input.skillIds)
+                  ? { skillIds: run.input.skillIds }
+                  : {}),
+                ...(typeof run.input.prompt === "string"
+                  ? { prompt: run.input.prompt }
+                  : {}),
+                ...(typeof run.input.userMessageId === "string"
+                  ? { userMessageId: run.input.userMessageId }
+                  : {}),
+                ...(typeof run.input.assistantMessageId === "string"
+                  ? { assistantMessageId: run.input.assistantMessageId }
+                  : {}),
+              },
+            }
+          : {}),
+      };
+    }
+
     let startNodeIndex = 0;
-    const resumeNodeKey = state.lastCompletedNodeKey ?? state.currentNodeKey;
+    const waitingNode = run.nodeRuns.find(
+      (nodeRun) => nodeRun.status === WorkflowNodeRunStatus.WAITING_FOR_INPUT,
+    );
+    const resumeNodeKey =
+      waitingNode?.nodeKey ?? state.lastCompletedNodeKey ?? state.currentNodeKey;
 
     if (resumeNodeKey) {
       const checkpointNodeIndex = graph.getNodeOrder().indexOf(resumeNodeKey);
 
       if (checkpointNodeIndex >= 0) {
-        startNodeIndex = checkpointNodeIndex + 1;
+        startNodeIndex = waitingNode ? checkpointNodeIndex : checkpointNodeIndex + 1;
       }
     }
 
@@ -339,13 +380,75 @@ export class WorkflowExecutionService {
       typeof state.currentNodeKey === "string"
         ? state.currentNodeKey
         : undefined;
+    let nodeTimeoutTimer: ReturnType<typeof setTimeout> | undefined;
+    let timeoutError: WorkflowNodeTimeoutError | undefined;
+    let rejectNodeTimeout: ((reason: unknown) => void) | undefined;
+    const nodeTimeoutPromise = new Promise<never>((_, reject) => {
+      rejectNodeTimeout = reject;
+    });
+    const clearNodeTimeout = () => {
+      if (nodeTimeoutTimer !== undefined) {
+        clearTimeout(nodeTimeoutTimer);
+        nodeTimeoutTimer = undefined;
+      }
+    };
+    const assertNotTimedOut = () => {
+      if (timeoutError) {
+        throw timeoutError;
+      }
+    };
+    const startNodeTimeout = (nodeKey: WorkflowNodeKey) => {
+      clearNodeTimeout();
+      nodeTimeoutTimer = setTimeout(() => {
+        timeoutError = new WorkflowNodeTimeoutError(
+          nodeKey,
+          env.WORKFLOW_NODE_TIMEOUT_MS,
+        );
+        executionAbortController.abort(timeoutError);
+        rejectNodeTimeout?.(timeoutError);
+      }, env.WORKFLOW_NODE_TIMEOUT_MS);
+    };
+
+    const staleNodeRun = run.nodeRuns.find(
+      (nodeRun) =>
+        nodeRun.status === WorkflowNodeRunStatus.RUNNING &&
+        nodeRun.startedAt &&
+        Date.now() - nodeRun.startedAt.getTime() >=
+          env.WORKFLOW_NODE_TIMEOUT_MS,
+    );
+
+    if (staleNodeRun) {
+      activeNodeKey = staleNodeRun.nodeKey;
+      nodeRunIds.set(staleNodeRun.nodeKey, staleNodeRun.id);
+      nodeStartedAt.set(
+        staleNodeRun.nodeKey,
+        staleNodeRun.startedAt?.getTime() ?? Date.now(),
+      );
+    }
 
     try {
-      const executedState = await graph.execute({
+      if (staleNodeRun) {
+        throw new WorkflowNodeTimeoutError(
+          staleNodeRun.nodeKey,
+          env.WORKFLOW_NODE_TIMEOUT_MS,
+        );
+      }
+
+      const executionPromise = graph.execute({
         initialState: state,
         startNodeIndex,
+        signal: executionAbortController.signal,
         hooks: {
           onNodeStarted: async (nodeKey) => {
+            activeNodeKey = nodeKey;
+            nodeStartedAt.set(nodeKey, Date.now());
+            state = {
+              ...state,
+              currentNodeKey: nodeKey,
+            };
+            startNodeTimeout(nodeKey);
+            assertNotTimedOut();
+
             if (await this.repository.isCancellationRequested(runId)) {
               throw new RunCancelledError("用户已请求取消");
             }
@@ -366,12 +469,7 @@ export class WorkflowExecutionService {
 
             existingNodeRunIds.set(nodeKey, nodeRun.id);
             nodeRunIds.set(nodeKey, nodeRun.id);
-            nodeStartedAt.set(nodeKey, Date.now());
-            activeNodeKey = nodeKey;
-            state = {
-              ...state,
-              currentNodeKey: nodeKey,
-            };
+            assertNotTimedOut();
 
             await this.repository.updateRunProgress({
               runId,
@@ -386,6 +484,7 @@ export class WorkflowExecutionService {
             );
           },
           onNodeProgress: async (nodeKey, payload) => {
+            assertNotTimedOut();
             const nodeRunId =
               nodeRunIds.get(nodeKey) ?? existingNodeRunIds.get(nodeKey);
 
@@ -402,6 +501,7 @@ export class WorkflowExecutionService {
             );
           },
           onNodeSkipped: async (nodeKey, updatedState, payload) => {
+            assertNotTimedOut();
             const nodeRunId =
               existingNodeRunIds.get(nodeKey) ??
               (await this.repository.findNodeRun(runId, nodeKey, 1))?.id;
@@ -446,6 +546,8 @@ export class WorkflowExecutionService {
             state = updatedState;
           },
           onNodeSucceeded: async (nodeKey, updatedState) => {
+            clearNodeTimeout();
+            assertNotTimedOut();
             const startedAt = nodeStartedAt.get(nodeKey) ?? Date.now();
             const durationMs = Date.now() - startedAt;
             const nodeRunId =
@@ -495,6 +597,12 @@ export class WorkflowExecutionService {
           },
         },
       });
+      const executedState = await Promise.race([
+        executionPromise,
+        nodeTimeoutPromise,
+      ]);
+      clearNodeTimeout();
+      assertNotTimedOut();
 
       state = executedState;
 
@@ -510,6 +618,89 @@ export class WorkflowExecutionService {
       await this.runtimeStore.clearCheckpoint(runId);
       await this.publishLatestEvent(runId, 100, state.currentNodeKey);
     } catch (error) {
+      clearNodeTimeout();
+
+      const nodeTimeout =
+        timeoutError ??
+        (error instanceof WorkflowNodeTimeoutError ? error : undefined);
+
+      const cancellationRequested =
+        (!nodeTimeout && executionAbortController.signal.aborted) ||
+        (await this.repository.isCancellationRequested(runId));
+
+      if (cancellationRequested) {
+        const cancellationReason =
+          executionAbortController.signal.reason instanceof Error
+            ? executionAbortController.signal.reason.message
+            : error instanceof Error
+              ? error.message
+              : "用户已请求取消";
+        await this.repository.markRunCancelled({
+          runId,
+          reason: cancellationReason,
+        });
+        await this.publishLatestEvent(
+          runId,
+          state.progressPercent,
+          activeNodeKey ?? state.currentNodeKey,
+        );
+        return;
+      }
+
+      if (nodeTimeout) {
+        const failedNodeKey =
+          nodeTimeout.nodeKey ??
+          activeNodeKey ??
+          (typeof state.currentNodeKey === "string"
+            ? state.currentNodeKey
+            : undefined);
+        const timeoutMessage = nodeTimeout.message;
+        state = {
+          ...state,
+          currentNodeKey: failedNodeKey,
+          errors: [...(state.errors ?? []), timeoutMessage],
+        };
+        const nodeRunId = failedNodeKey
+          ? (nodeRunIds.get(failedNodeKey) ??
+            existingNodeRunIds.get(failedNodeKey))
+          : undefined;
+
+        if (failedNodeKey && nodeRunId) {
+          await this.repository.markNodeFailed({
+            runId,
+            nodeRunId,
+            nodeKey: failedNodeKey,
+            errorCode: WORKFLOW_ERROR_CODES.WORKFLOW_NODE_TIMEOUT,
+            errorMessage: timeoutMessage,
+            durationMs:
+              Date.now() - (nodeStartedAt.get(failedNodeKey) ?? Date.now()),
+          });
+        }
+
+        await this.runtimeStore.saveCheckpoint(runId, state);
+        await this.repository.markRunPaused({
+          runId,
+          currentNodeKey: failedNodeKey,
+          progressPercent: state.progressPercent,
+          reason: "node_timeout",
+          eventPayload: {
+            nodeKey: failedNodeKey,
+            timeoutMs: nodeTimeout.timeoutMs,
+            errorCode: WORKFLOW_ERROR_CODES.WORKFLOW_NODE_TIMEOUT,
+          },
+        });
+        await this.agentConversationRepository?.markAssistantFailedByRun(
+          runId,
+          "Pi agent 节点执行超时，已暂停等待用户指示",
+        );
+        await this.publishLatestEvent(
+          runId,
+          state.progressPercent,
+          failedNodeKey,
+        );
+        return;
+      }
+
       if (error instanceof RunCancelledError) {
         await this.repository.markRunCancelled({
           runId,
@@ -538,20 +729,85 @@ export class WorkflowExecutionService {
 
         state = pausedState;
 
+        const waitingForInput = isRecord(
+          (pausedState as Record<string, unknown>).waitingForInput,
+        )
+          ? ((pausedState as Record<string, unknown>).waitingForInput as Record<
+              string,
+              unknown
+            >)
+          : undefined;
+        const question =
+          typeof waitingForInput?.question === "string"
+            ? waitingForInput.question
+            : undefined;
+        const options = Array.isArray(waitingForInput?.options)
+          ? waitingForInput.options
+          : undefined;
+        const waitingNodeRunId = pausedNodeKey
+          ? nodeRunIds.get(pausedNodeKey) ?? existingNodeRunIds.get(pausedNodeKey)
+          : undefined;
+
+        if (
+          executionAbortController.signal.aborted ||
+          (await this.repository.isCancellationRequested(runId))
+        ) {
+          await this.repository.markRunCancelled({
+            runId,
+            reason: "用户已请求取消",
+          });
+          await this.publishLatestEvent(
+            runId,
+            pausedState.progressPercent,
+            pausedNodeKey,
+          );
+          return;
+        }
+
+        if (pausedNodeKey && waitingNodeRunId && question) {
+          await this.repository.markNodeWaitingForInput({
+            runId,
+            nodeRunId: waitingNodeRunId,
+            nodeKey: pausedNodeKey,
+            question,
+            options,
+          });
+        }
+
         await this.runtimeStore.saveCheckpoint(runId, pausedState);
         await this.repository.markRunPaused({
           runId,
           currentNodeKey: pausedNodeKey,
           progressPercent: pausedState.progressPercent,
           reason: error.reason,
-          eventPayload: pausedNodeKey
-            ? getPausedNodeEventPayload({
-                graph,
-                nodeKey: pausedNodeKey,
-                state: pausedState,
-              })
-            : {},
+          eventPayload: {
+            ...(pausedNodeKey
+              ? getPausedNodeEventPayload({
+                  graph,
+                  nodeKey: pausedNodeKey,
+                  state: pausedState,
+                })
+              : {}),
+            ...(question ? { question } : {}),
+            ...(options ? { options } : {}),
+          },
         });
+        if (question) {
+          await this.agentConversationRepository?.markAssistantWaitingByRun(
+            runId,
+            {
+              question,
+              ...(options
+                ? {
+                    options: options as Array<{
+                      label: string;
+                      value: string;
+                    }>,
+                  }
+                : {}),
+            },
+          );
+        }
         await this.publishLatestEvent(
           runId,
           pausedState.progressPercent,
@@ -606,6 +862,8 @@ export class WorkflowExecutionService {
         state.progressPercent,
         failedNodeKey,
       );
+    } finally {
+      await closeCancellation();
     }
   }
 

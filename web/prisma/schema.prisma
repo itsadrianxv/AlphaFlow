@@ -66,20 +66,15 @@ model User {
     screeningWorkspaces               ScreeningWorkspace[]
     screeningFormulas                 ScreeningFormula[]
     screeningRuns                     ScreeningRun[]
-    researchReminders                 ResearchReminder[]
     watchLists                        WatchList[]
     timingSignalSnapshots             TimingSignalSnapshot[]
     timingKronosForecastSnapshots     TimingKronosForecastSnapshot[]
-    timingAnalysisCards               TimingAnalysisCard[]
-    portfolioSnapshots                PortfolioSnapshot[]
-    timingRecommendations             TimingRecommendation[]
-    timingReviewRecords               TimingReviewRecord[]
+    timingResearchReports             TimingResearchReport[]
+    portfolioCompositions             PortfolioComposition[]
+    portfolioRiskDiagnostics          PortfolioRiskDiagnostic[]
     timingPresets                     TimingPreset[]
     timingPresetRevisions             TimingPresetRevision[]
-    timingBacktestRuns                TimingBacktestRun[]
-    timingExecutionRecords            TimingExecutionRecord[]
-    timingFeedbackObservations        TimingFeedbackObservation[]
-    timingPresetAdjustmentSuggestions TimingPresetAdjustmentSuggestion[]
+    timingRuleValidationRuns          TimingRuleValidationRun[]
     workflowRuns                      WorkflowRun[]
     agentConversations                AgentConversation[]
     savedCompanies                    SavedCompany[]
@@ -102,6 +97,28 @@ enum ScheduledTaskStatus {
     CANCELLED
 }
 
+enum AgentConversationRoutingMode {
+    AUTO
+    SCHEDULED_TASK_SETUP
+    SCHEDULED_TASK_EDIT
+}
+
+enum ScheduledTaskExecutionTrigger {
+    SCHEDULED
+    MANUAL
+}
+
+enum ScheduledTaskEditDraftSource {
+    STRUCTURED
+    AGENT
+}
+
+enum ScheduledTaskEditDraftStatus {
+    PENDING
+    CONFIRMED
+    DISCARDED
+}
+
 enum ScheduledTaskExecutionStatus {
     PENDING
     CLAIMED
@@ -115,9 +132,11 @@ enum ScheduledTaskExecutionStatus {
 
 enum ScheduledTaskDeliveryStatus {
     PENDING
+    SENDING
     SENT
     FAILED
     RETRYING
+    SKIPPED
 }
 
 enum CollectionType {
@@ -198,14 +217,48 @@ model ScheduledTask {
     currentVersion  Int                @default(1)
     timezone        String             @default("Asia/Shanghai")
     nextRunAt       DateTime?
+    setupConversationId String?
     createdAt       DateTime           @default(now())
     updatedAt       DateTime           @updatedAt
     user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
     versions        ScheduledTaskVersion[]
     executions      ScheduledTaskExecution[]
+    editDrafts      ScheduledTaskEditDraft[]
 
     @@index([status, nextRunAt])
     @@index([userId, status])
+    @@index([userId, status, setupConversationId])
+}
+
+model ScheduledTaskEditDraft {
+    id              String                       @id @default(cuid())
+    taskId          String
+    userId          String
+    conversationId  String?
+    source          ScheduledTaskEditDraftSource
+    status          ScheduledTaskEditDraftStatus @default(PENDING)
+    baseVersion     Int
+    revision        Int                          @default(1)
+    name            String
+    userPrompt      String
+    scheduleSpec    Json
+    dataSources     Json                         @default("[]")
+    executionPlan   Json
+    outputSpec      Json
+    deliverySpec    Json
+    feasibility     Json                         @default("{}")
+    changes         Json                         @default("[]")
+    nextRunAt       DateTime?
+    idempotencyKey  String?                      @unique
+    confirmedAt     DateTime?
+    discardedAt     DateTime?
+    createdAt       DateTime                     @default(now())
+    updatedAt       DateTime                     @updatedAt
+    task            ScheduledTask                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+    @@index([taskId, status, updatedAt])
+    @@index([userId, status, updatedAt])
+    @@index([conversationId, status])
 }
 
 model ScheduledTaskVersion {
@@ -214,9 +267,12 @@ model ScheduledTaskVersion {
     version        Int
     userPrompt     String
     scheduleSpec   Json
+    dataSources    Json          @default("[]")
     executionPlan  Json
     outputSpec     Json
     deliverySpec   Json
+    feasibility    Json          @default("{}")
+    idempotencyKey String?       @unique
     createdAt      DateTime      @default(now())
     task           ScheduledTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
     executions     ScheduledTaskExecution[]
@@ -231,7 +287,14 @@ model ScheduledTaskExecution {
     taskVersionId  String
     scheduledAt    DateTime
     status         ScheduledTaskExecutionStatus  @default(PENDING)
+    trigger        ScheduledTaskExecutionTrigger @default(SCHEDULED)
+    deliveryRequested Boolean                    @default(false)
+    idempotencyKey String?                       @unique
     workerId       String?
+    fencingToken   BigInt                         @default(0)
+    leaseExpiresAt DateTime?
+    heartbeatAt    DateTime?
+    nextAttemptAt  DateTime?
     agentRunId     String?
     result         Json?
     error          Json?
@@ -247,12 +310,34 @@ model ScheduledTaskExecution {
     taskVersion    ScheduledTaskVersion           @relation(fields: [taskVersionId], references: [id], onDelete: Cascade)
     evidence       ScheduledTaskEvidence[]
     deliveries     ScheduledTaskDelivery[]
+    scoreResults   ScheduledTaskScoreResult[]
 
     @@unique([taskId, taskVersionId, scheduledAt])
     @@index([status, scheduledAt])
     @@index([taskId, status])
     @@index([status, eventPublishedAt])
     @@index([completedAt, eventPublishedAt])
+    @@index([status, leaseExpiresAt])
+    @@index([status, nextAttemptAt])
+}
+
+model ScheduledTaskScoreResult {
+    id               String                 @id @default(cuid())
+    executionId      String
+    stockCode        String
+    stockName        String
+    rank             Int
+    selected         Boolean                @default(false)
+    evaluationStatus String
+    score            Float
+    maxScore         Float
+    ruleResults      Json
+    createdAt        DateTime               @default(now())
+    execution        ScheduledTaskExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+    @@unique([executionId, stockCode])
+    @@unique([executionId, rank])
+    @@index([executionId, selected, rank])
 }
 
 model ScheduledTaskEvidence {
@@ -401,8 +486,7 @@ model WatchList {
 
     userId                String
     user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    timingAnalysisCards   TimingAnalysisCard[]
-    timingRecommendations TimingRecommendation[]
+    timingResearchReports TimingResearchReport[]
 
     @@index([userId])
     @@index([name])
@@ -754,41 +838,6 @@ model ResearchClaimCitation {
     @@index([evidenceItemId])
 }
 
-enum ResearchReminderType {
-    REVIEW
-}
-
-enum ResearchReminderTargetType {
-    TIMING_REVIEW
-}
-
-enum ResearchReminderStatus {
-    PENDING
-    TRIGGERED
-    CANCELLED
-}
-
-model ResearchReminder {
-    id                   String                     @id @default(cuid())
-    userId               String
-    timingReviewRecordId String?
-    stockCode            String
-    reminderType         ResearchReminderType
-    targetType           ResearchReminderTargetType
-    scheduledAt          DateTime
-    status               ResearchReminderStatus     @default(PENDING)
-    payload              Json
-    triggeredAt          DateTime?
-    createdAt            DateTime                   @default(now())
-    updatedAt            DateTime                   @updatedAt
-    user                 User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-    timingReviewRecord   TimingReviewRecord?        @relation(fields: [timingReviewRecordId], references: [id], onDelete: Cascade)
-
-    @@unique([timingReviewRecordId, reminderType, scheduledAt])
-    @@index([userId, targetType, status, scheduledAt])
-    @@index([timingReviewRecordId])
-}
-
 model TimingSignalSnapshot {
     id           String    @id @default(cuid())
     userId       String
@@ -814,7 +863,7 @@ model TimingSignalSnapshot {
     user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
     workflowRun  WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
     presetRevision TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
-    analysisCards TimingAnalysisCard[]
+    researchReports TimingResearchReport[]
 
     @@index([userId, createdAt])
     @@index([workflowRunId])
@@ -824,7 +873,7 @@ model TimingSignalSnapshot {
     @@index([inputHash])
 }
 
-model TimingAnalysisCard {
+model TimingResearchReport {
     id                String    @id @default(cuid())
     userId            String
     workflowRunId     String?
@@ -836,17 +885,19 @@ model TimingAnalysisCard {
     sourceType        String
     sourceId          String
     signalSnapshotId  String
-    actionBias        String
+    researchState     String
+    trendState        String
     confidence        Float
     marketState       String?
     marketTransition  String?
     summary           String
-    triggerNotes      String[]
-    invalidationNotes String[]
+    dimensions        Json
+    observationConditions Json
+    dataCompleteness  Json
+    modelOutlook      Json?
     riskFlags         String[]
     reasoning         Json
-    decisionStatus    String?
-    decisionAudit     Json?
+    ruleAudit         Json
     createdAt         DateTime  @default(now())
     updatedAt         DateTime  @updatedAt
 
@@ -856,8 +907,6 @@ model TimingAnalysisCard {
     preset           TimingPreset?        @relation(fields: [presetId], references: [id], onDelete: SetNull)
     presetRevision   TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
     signalSnapshot   TimingSignalSnapshot @relation(fields: [signalSnapshotId], references: [id], onDelete: Cascade)
-    reviewRecords    TimingReviewRecord[]
-    executionRecords TimingExecutionRecord[]
 
     @@index([userId, createdAt])
     @@index([workflowRunId])
@@ -869,113 +918,46 @@ model TimingAnalysisCard {
     @@index([sourceType, sourceId])
 }
 
-model PortfolioSnapshot {
+model PortfolioComposition {
     id              String   @id @default(cuid())
     userId          String
     name            String
-    baseCurrency    String   @default("CNY")
-    cash            Float
-    totalCapital    Float
     positions       Json
-    riskPreferences Json
     source          String   @default("SAVED")
     workflowRunId   String?  @unique
     createdAt       DateTime @default(now())
     updatedAt       DateTime @updatedAt
 
     user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    timingRecommendations  TimingRecommendation[]
-    workflowRun            WorkflowRun?           @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+    workflowRun            WorkflowRun?             @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+    diagnostics            PortfolioRiskDiagnostic[]
 
     @@index([userId, updatedAt])
     @@index([userId, name])
 }
 
-model TimingRecommendation {
-    id                  String   @id @default(cuid())
-    userId              String
-    workflowRunId       String?
-    portfolioSnapshotId String
-    watchListId         String?
-    presetId            String?
-    presetRevisionId    String?
-    stockCode           String
-    stockName           String
-    action              String
-    priority            Int
-    confidence          Float
-    suggestedMinPct     Float
-    suggestedMaxPct     Float
-    riskBudgetPct       Float
-    marketState         String
-    marketTransition    String
-    riskFlags           String[]
-    reasoning           Json
-    decisionStatus      String?
-    decisionAudit       Json?
-    createdAt           DateTime @default(now())
-    updatedAt           DateTime @updatedAt
+model PortfolioRiskDiagnostic {
+    id                    String   @id @default(cuid())
+    userId                String
+    workflowRunId         String?
+    portfolioCompositionId String
+    asOfDate              DateTime
+    concentration         Json
+    exposures             Json
+    correlation           Json
+    volatility            Json
+    liquidity             Json
+    scenarios             Json
+    dataQuality           Json
+    createdAt             DateTime @default(now())
 
-    user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-    workflowRun       WorkflowRun?      @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
-    portfolioSnapshot PortfolioSnapshot @relation(fields: [portfolioSnapshotId], references: [id], onDelete: Cascade)
-    watchList         WatchList?        @relation(fields: [watchListId], references: [id], onDelete: SetNull)
-    preset            TimingPreset?     @relation(fields: [presetId], references: [id], onDelete: SetNull)
-    presetRevision    TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
-    reviewRecords     TimingReviewRecord[]
-    feedbackObservations TimingFeedbackObservation[]
-    executionRecords  TimingExecutionRecord[]
+    user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+    workflowRun           WorkflowRun?         @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+    portfolioComposition  PortfolioComposition @relation(fields: [portfolioCompositionId], references: [id], onDelete: Cascade)
 
     @@index([userId, createdAt])
     @@index([workflowRunId])
-    @@index([portfolioSnapshotId, createdAt])
-    @@index([watchListId, createdAt])
-    @@index([presetId])
-    @@index([presetRevisionId])
-    @@index([userId, stockCode, createdAt])
-}
-
-enum TimingReviewHorizon {
-    T5
-    T10
-    T20
-}
-
-model TimingReviewRecord {
-    id                        String               @id @default(cuid())
-    userId                    String
-    analysisCardId            String?
-    recommendationId          String?
-    stockCode                 String
-    stockName                 String
-    sourceAsOfDate            DateTime
-    reviewHorizon             TimingReviewHorizon
-    reviewTradingDays         Int                  @default(5)
-    scheduledAt               DateTime
-    completedAt               DateTime?
-    expectedAction            String
-    actualReturnPct           Float?
-    benchmarkReturnPct        Float?
-    excessReturnPct           Float?
-    maxFavorableExcursionPct  Float?
-    maxAdverseExcursionPct    Float?
-    verdict                   String?
-    reviewSummary             String?
-    invalidationTriggered     Boolean?
-    executionDeviationPct     Float?
-    createdAt                 DateTime             @default(now())
-    updatedAt                 DateTime             @updatedAt
-
-    user                      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-    analysisCard              TimingAnalysisCard?  @relation(fields: [analysisCardId], references: [id], onDelete: Cascade)
-    recommendation            TimingRecommendation? @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
-    reminders                 ResearchReminder[]
-    feedbackObservation       TimingFeedbackObservation?
-
-    @@index([userId, scheduledAt, completedAt])
-    @@index([analysisCardId])
-    @@index([recommendationId])
-    @@index([stockCode, scheduledAt])
+    @@index([portfolioCompositionId, createdAt])
 }
 
 model TimingPreset {
@@ -991,10 +973,7 @@ model TimingPreset {
     updatedAt             DateTime               @updatedAt
 
     user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    timingAnalysisCards   TimingAnalysisCard[]
-    timingRecommendations TimingRecommendation[]
-    feedbackObservations  TimingFeedbackObservation[]
-    adjustmentSuggestions TimingPresetAdjustmentSuggestion[]
+    timingResearchReports TimingResearchReport[]
     revisions             TimingPresetRevision[] @relation("TimingPresetRevisions")
     activeRevision        TimingPresetRevision?  @relation("ActiveTimingPresetRevision", fields: [activeRevisionId], references: [id], onDelete: SetNull)
 
@@ -1025,28 +1004,23 @@ model TimingPresetRevision {
     preset            TimingPreset            @relation("TimingPresetRevisions", fields: [presetId], references: [id], onDelete: Cascade)
     activeForPreset   TimingPreset?            @relation("ActiveTimingPresetRevision")
     signalSnapshots   TimingSignalSnapshot[]
-    analysisCards     TimingAnalysisCard[]
-    recommendations   TimingRecommendation[]
-    backtestRuns      TimingBacktestRun[]
-    executionRecords  TimingExecutionRecord[]
+    researchReports   TimingResearchReport[]
+    validationRuns    TimingRuleValidationRun[]
 
     @@unique([presetId, revisionNumber])
     @@index([presetId, configHash])
     @@index([userId, status, updatedAt])
 }
 
-model TimingBacktestRun {
+model TimingRuleValidationRun {
     id                         String   @id @default(cuid())
     userId                     String
     presetRevisionId           String
     watchListId                String?
     status                     String   @default("PENDING")
     configHash                 String
-    universeSnapshot           Json
-    executionAssumptions       Json
+    sampleSnapshot             Json
     qualityMetrics             Json?
-    performanceMetrics         Json?
-    eventSnapshot              Json?
     warnings                   String[] @default([])
     errorMessage               String?
     startedAt                  DateTime?
@@ -1062,32 +1036,6 @@ model TimingBacktestRun {
     @@index([watchListId, createdAt])
 }
 
-model TimingExecutionRecord {
-    id                  String   @id @default(cuid())
-    userId              String
-    presetRevisionId    String
-    analysisCardId      String?
-    recommendationId    String?
-    decision            String
-    executedAt          DateTime?
-    price               Float?
-    quantity            Float?
-    fees                Float?
-    notes               String?
-    createdAt           DateTime @default(now())
-    updatedAt           DateTime @updatedAt
-
-    user                User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-    presetRevision      TimingPresetRevision  @relation(fields: [presetRevisionId], references: [id], onDelete: Cascade)
-    analysisCard        TimingAnalysisCard?   @relation(fields: [analysisCardId], references: [id], onDelete: SetNull)
-    recommendation      TimingRecommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
-
-    @@index([userId, createdAt])
-    @@index([presetRevisionId, createdAt])
-    @@index([analysisCardId])
-    @@index([recommendationId])
-}
-
 model TimingMarketContextSnapshot {
     id             String   @id @default(cuid())
     asOfDate       DateTime @unique
@@ -1101,60 +1049,6 @@ model TimingMarketContextSnapshot {
 
     @@index([asOfDate])
     @@index([state, updatedAt])
-}
-
-model TimingFeedbackObservation {
-    id                       String   @id @default(cuid())
-    userId                   String
-    reviewRecordId           String   @unique
-    recommendationId         String?
-    presetId                 String?
-    stockCode                String
-    stockName                String
-    observedAt               DateTime
-    sourceAsOfDate           DateTime
-    reviewHorizon            TimingReviewHorizon
-    expectedAction           String
-    signalContext            Json
-    marketContext            Json?
-    positionContext          Json?
-    actualReturnPct          Float
-    maxFavorableExcursionPct Float
-    maxAdverseExcursionPct   Float
-    verdict                  String
-    createdAt                DateTime @default(now())
-    updatedAt                DateTime @updatedAt
-
-    user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-    reviewRecord    TimingReviewRecord    @relation(fields: [reviewRecordId], references: [id], onDelete: Cascade)
-    recommendation  TimingRecommendation? @relation(fields: [recommendationId], references: [id], onDelete: SetNull)
-    preset          TimingPreset?         @relation(fields: [presetId], references: [id], onDelete: SetNull)
-
-    @@index([userId, createdAt])
-    @@index([presetId, createdAt])
-    @@index([recommendationId])
-}
-
-model TimingPresetAdjustmentSuggestion {
-    id          String   @id @default(cuid())
-    userId      String
-    presetId    String?
-    kind        String
-    status      String
-    title       String
-    summary     String
-    patch       Json
-    metrics     Json
-    appliedAt   DateTime?
-    dismissedAt DateTime?
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
-
-    user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-    preset      TimingPreset? @relation(fields: [presetId], references: [id], onDelete: SetNull)
-
-    @@index([userId, createdAt])
-    @@index([presetId, status, createdAt])
 }
 
 enum WorkflowRunStatus {
@@ -1179,6 +1073,7 @@ enum AgentConversationMessageRole {
 enum AgentConversationMessageStatus {
     PENDING
     STREAMING
+    WAITING_FOR_INPUT
     SUCCEEDED
     FAILED
     CANCELLED
@@ -1187,6 +1082,7 @@ enum AgentConversationMessageStatus {
 enum WorkflowNodeRunStatus {
     PENDING
     RUNNING
+    WAITING_FOR_INPUT
     SUCCEEDED
     FAILED
     SKIPPED
@@ -1246,14 +1142,13 @@ model WorkflowRun {
     nodeRuns                WorkflowNodeRun[]
     events                  WorkflowEvent[]
     timingSignalSnapshots   TimingSignalSnapshot[]
-    timingAnalysisCards     TimingAnalysisCard[]
-    timingRecommendations   TimingRecommendation[]
-    portfolioInputSnapshot  PortfolioSnapshot?
+    timingResearchReports   TimingResearchReport[]
+    portfolioComposition    PortfolioComposition?
+    portfolioRiskDiagnostics PortfolioRiskDiagnostic[]
     timingKronosForecastSnapshots TimingKronosForecastSnapshot[]
     agentToolCalls          AgentToolCall[]
     agentArtifacts          AgentArtifact[]
     agentConversationMessages AgentConversationMessage[]
-    legacyAgentConversation AgentConversation? @relation("LegacyAgentConversationRun")
     evidenceContexts        EvidenceContext[]
     researchContextSnapshots ResearchContextSnapshot[]
 
@@ -1374,15 +1269,16 @@ model AgentConversation {
     userId              String
     title               String
     status              AgentConversationStatus @default(ACTIVE)
+    routingMode         AgentConversationRoutingMode @default(AUTO)
+    activeScheduledTaskDraftId String?
+    activeScheduledTaskEditTaskId String?
     piSessionId         String                  @unique
-    legacyWorkflowRunId String?                 @unique
     lastMessageAt       DateTime                @default(now())
     createdAt           DateTime                @default(now())
     updatedAt           DateTime                @updatedAt
 
-    user              User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-    legacyWorkflowRun WorkflowRun?                @relation("LegacyAgentConversationRun", fields: [legacyWorkflowRunId], references: [id], onDelete: SetNull)
-    messages          AgentConversationMessage[]
+    user     User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+    messages AgentConversationMessage[]
 
     @@index([userId, lastMessageAt])
     @@index([userId, status])
@@ -1395,7 +1291,7 @@ model AgentConversationMessage {
     content        String
     skillId        String?
     status         AgentConversationMessageStatus @default(SUCCEEDED)
-    workflowRunId  String?
+    workflowRunId  String?                        @unique
     sequence       Int
     metadata       Json?
     errorCode      String?

@@ -63,6 +63,34 @@ export class WebInternalClient {
     }
   }
 
+  async postScheduledTaskSetupOperation(
+    body: {
+      operation: string;
+      runId: string;
+      userId: string;
+      conversationId: string;
+      idempotencyKey: string;
+      params: Record<string, unknown>;
+    },
+    signal?: AbortSignal,
+  ) {
+    if (!this.apiSecret) throw new Error("缺少 ALPHAFLOW_INTERNAL_API_SECRET");
+    const response = await fetch(`${this.baseUrl}/api/internal/agent/scheduled-task-tools`, {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Alphaflow-Internal-Secret": this.apiSecret,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      throw new Error(`Scheduled task setup tool failed: ${response.status}${detail ? ` - ${detail}` : ""}`);
+    }
+    return response.json() as Promise<unknown>;
+  }
+
   async persistScheduledTaskResult(executionId: string, body: Record<string, unknown>) {
     if (!this.apiSecret) throw new Error("缺少 ALPHAFLOW_INTERNAL_API_SECRET");
     const response = await fetch(`${this.baseUrl}/api/internal/scheduled-task-runs/${encodeURIComponent(executionId)}/result`, { method: "POST", headers: { "Content-Type": "application/json", "X-Alphaflow-Internal-Secret": this.apiSecret }, body: JSON.stringify(body) });

@@ -9,6 +9,11 @@ const runtimeDir = path.resolve(
   "..",
 );
 const defaultSkillsRoot = path.resolve(runtimeDir, "skills");
+const RESERVED_SKILL_IDS = new Set([
+  "scheduled-task-setup",
+  "scheduled-task-edit",
+  "scheduled-task-execution",
+]);
 
 const SKILL_CATEGORY_BY_ID = new Map<string, string>([
   ["a-share-primary-theme-identification", "市场与题材"],
@@ -129,7 +134,7 @@ export class SkillRegistry {
   }
 
   list(): SkillSummary[] {
-    return [...this.skillsById.values()].map((skill) => ({
+    return [...this.skillsById.values()].filter((skill) => !RESERVED_SKILL_IDS.has(skill.name)).map((skill) => ({
       id: skill.name,
       name: skill.name,
       description: skill.description,

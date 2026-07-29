@@ -10,7 +10,6 @@ CREATE TABLE "AgentConversation" (
     "title" TEXT NOT NULL,
     "status" "AgentConversationStatus" NOT NULL DEFAULT 'ACTIVE',
     "piSessionId" TEXT NOT NULL,
-    "legacyWorkflowRunId" TEXT,
     "lastMessageAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -38,8 +37,6 @@ CREATE TABLE "AgentConversationMessage" (
 
 CREATE UNIQUE INDEX "AgentConversation_piSessionId_key" ON "AgentConversation"("piSessionId");
 
-CREATE UNIQUE INDEX "AgentConversation_legacyWorkflowRunId_key" ON "AgentConversation"("legacyWorkflowRunId");
-
 CREATE INDEX "AgentConversation_userId_lastMessageAt_idx" ON "AgentConversation"("userId", "lastMessageAt");
 
 CREATE INDEX "AgentConversation_userId_status_idx" ON "AgentConversation"("userId", "status");
@@ -48,11 +45,9 @@ CREATE UNIQUE INDEX "AgentConversationMessage_conversationId_sequence_key" ON "A
 
 CREATE INDEX "AgentConversationMessage_conversationId_createdAt_idx" ON "AgentConversationMessage"("conversationId", "createdAt");
 
-CREATE INDEX "AgentConversationMessage_workflowRunId_idx" ON "AgentConversationMessage"("workflowRunId");
+CREATE UNIQUE INDEX "AgentConversationMessage_workflowRunId_key" ON "AgentConversationMessage"("workflowRunId");
 
 ALTER TABLE "AgentConversation" ADD CONSTRAINT "AgentConversation_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE "AgentConversation" ADD CONSTRAINT "AgentConversation_legacyWorkflowRunId_fkey" FOREIGN KEY ("legacyWorkflowRunId") REFERENCES "WorkflowRun"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE "AgentConversationMessage" ADD CONSTRAINT "AgentConversationMessage_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "AgentConversation"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

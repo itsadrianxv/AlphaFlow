@@ -6,29 +6,6 @@ import type {
   ThemeNewsItem,
 } from "~/server/domain/intelligence/types";
 import type {
-  MarketContextAnalysis,
-  MarketContextSnapshot,
-  PortfolioRiskPlan,
-  PortfolioSnapshotRecord,
-  TechnicalAssessment,
-  TimingAnalysisCardRecord,
-  TimingCardDraft,
-  TimingEvidenceData,
-  TimingFeedbackContext,
-  TimingPresetAdjustmentSuggestionRecord,
-  TimingPresetConfig,
-  TimingPresetConfigV2,
-  TimingPresetRecord,
-  TimingPresetRevisionRecord,
-  TimingRecommendationDraft,
-  TimingRecommendationRecord,
-  TimingReviewCompletionDraft,
-  TimingReviewRecord,
-  TimingSignalBatchError,
-  TimingSignalData,
-  TimingSignalSnapshotRecord,
-} from "~/server/domain/timing/types";
-import type {
   CompressedFindings,
   ResearchAnalysisDepth,
   ResearchBriefV2,
@@ -52,15 +29,6 @@ export const INDUSTRY_RESEARCH_TEMPLATE_CODE = "industry_research";
 export const COMPANY_RESEARCH_TEMPLATE_CODE = "company_research_center";
 export const SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE =
   "screening_insight_pipeline_v1";
-export const TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE = "timing_signal_pipeline_v1";
-export const WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE =
-  "watchlist_timing_cards_pipeline_v1";
-export const WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE =
-  "watchlist_timing_pipeline_v1";
-export const TIMING_DECISION_PIPELINE_TEMPLATE_CODE =
-  "watchlist_timing_pipeline_v2";
-export const SCREENING_TO_TIMING_TEMPLATE_CODE = "screening_to_timing_v1";
-export const TIMING_REVIEW_LOOP_TEMPLATE_CODE = "timing_review_loop_v1";
 export const PI_AGENT_RUN_TEMPLATE_CODE = "pi_agent_run_v1";
 export const IMPACT_MAPPING_TEMPLATE_CODE = "impact_mapping_v1";
 
@@ -138,50 +106,6 @@ export const SCREENING_INSIGHT_PIPELINE_NODE_KEYS = [
   "notify_user",
 ] as const;
 
-export const TIMING_SIGNAL_PIPELINE_NODE_KEYS = [
-  "load_targets",
-  "fetch_signal_snapshots",
-  "technical_signal_agent",
-  "timing_synthesis_agent",
-  "kronos_forecast_agent",
-  "persist_cards",
-] as const;
-
-export const WATCHLIST_TIMING_CARDS_PIPELINE_NODE_KEYS = [
-  "load_watchlist_context",
-  "fetch_signal_snapshots_batch",
-  "technical_signal_agent",
-  "timing_synthesis_agent",
-  "persist_cards",
-] as const;
-
-export const WATCHLIST_TIMING_PIPELINE_NODE_KEYS = [
-  "load_watchlist_context",
-  "fetch_signal_snapshots_batch",
-  "technical_signal_agent",
-  "timing_synthesis_agent",
-  "kronos_forecast_agent",
-  "market_regime_agent",
-  "watchlist_risk_manager",
-  "watchlist_portfolio_manager",
-  "persist_recommendations",
-] as const;
-
-export const SCREENING_TO_TIMING_NODE_KEYS = [
-  "load_screening_results",
-  "select_top_candidates",
-  "run_timing_pipeline",
-  "archive_results",
-] as const;
-
-export const TIMING_REVIEW_LOOP_NODE_KEYS = [
-  "load_due_reviews",
-  "evaluate_outcomes",
-  "review_agent",
-  "persist_reviews",
-  "schedule_next_review",
-] as const;
-
 export const PI_AGENT_RUN_NODE_KEYS = [
   "prepare_agent_task",
   "execute_agent_runtime",
@@ -207,27 +131,12 @@ export type CompanyResearchNodeKey =
   | (typeof COMPANY_RESEARCH_V4_NODE_KEYS)[number];
 export type ScreeningInsightPipelineNodeKey =
   (typeof SCREENING_INSIGHT_PIPELINE_NODE_KEYS)[number];
-export type TimingSignalPipelineNodeKey =
-  (typeof TIMING_SIGNAL_PIPELINE_NODE_KEYS)[number];
-export type WatchlistTimingCardsPipelineNodeKey =
-  (typeof WATCHLIST_TIMING_CARDS_PIPELINE_NODE_KEYS)[number];
-export type WatchlistTimingPipelineNodeKey =
-  (typeof WATCHLIST_TIMING_PIPELINE_NODE_KEYS)[number];
-export type ScreeningToTimingNodeKey =
-  (typeof SCREENING_TO_TIMING_NODE_KEYS)[number];
-export type TimingReviewLoopNodeKey =
-  (typeof TIMING_REVIEW_LOOP_NODE_KEYS)[number];
 export type PiAgentRunNodeKey = (typeof PI_AGENT_RUN_NODE_KEYS)[number];
 export type ImpactMappingNodeKey = (typeof IMPACT_MAPPING_NODE_KEYS)[number];
 export type WorkflowNodeKey =
   | IndustryResearchNodeKey
   | CompanyResearchNodeKey
   | ScreeningInsightPipelineNodeKey
-  | TimingSignalPipelineNodeKey
-  | WatchlistTimingCardsPipelineNodeKey
-  | WatchlistTimingPipelineNodeKey
-  | ScreeningToTimingNodeKey
-  | TimingReviewLoopNodeKey
   | PiAgentRunNodeKey
   | ImpactMappingNodeKey
   | string;
@@ -279,11 +188,6 @@ export type WorkflowTemplateCode =
   | typeof INDUSTRY_RESEARCH_TEMPLATE_CODE
   | typeof COMPANY_RESEARCH_TEMPLATE_CODE
   | typeof SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE
-  | typeof TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE
-  | typeof WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE
-  | typeof WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE
-  | typeof SCREENING_TO_TIMING_TEMPLATE_CODE
-  | typeof TIMING_REVIEW_LOOP_TEMPLATE_CODE
   | typeof PI_AGENT_RUN_TEMPLATE_CODE;
 
 export type WorkflowEventStreamType =
@@ -604,43 +508,6 @@ export type ScreeningInsightPipelineInput = {
   maxInsightsPerSession?: number;
 };
 
-export type TimingSignalPipelineInput = {
-  stockCode: string;
-  revisionId: string;
-  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
-  asOfDate?: string;
-};
-
-export type WatchlistTimingCardsPipelineInput = {
-  watchListId: string;
-  revisionId: string;
-  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
-  asOfDate?: string;
-};
-
-export type WatchlistTimingPipelineInput = {
-  watchListId?: string;
-  sourceWatchListId?: string;
-  targets?: TimingPipelineTarget[];
-  mode?: "SINGLE" | "PORTFOLIO";
-  portfolioSnapshotId: string;
-  revisionId: string;
-  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
-  asOfDate?: string;
-};
-
-export type ScreeningToTimingPipelineInput = {
-  screeningSessionId: string;
-  candidateLimit?: number;
-  asOfDate?: string;
-  presetId?: string;
-};
-
-export type TimingReviewLoopInput = {
-  date?: string;
-  limit?: number;
-};
-
 export type PiAgentRunInput = {
   skillId: string;
   skillIds?: string[];
@@ -650,17 +517,6 @@ export type PiAgentRunInput = {
   userMessageId?: string;
   assistantMessageId?: string;
   context?: Record<string, unknown>;
-};
-
-export type TimingPipelineTarget = {
-  stockCode: string;
-  stockName?: string;
-};
-
-export type TimingWatchlistContext = {
-  id?: string;
-  name: string;
-  stockCount: number;
 };
 
 export type ScreeningInsightPipelineSessionSnapshot = {
@@ -755,105 +611,6 @@ export type ScreeningInsightPipelineGraphState = WorkflowGraphState & {
   notificationPayload?: ScreeningInsightPipelineNotificationPayload;
 };
 
-export type TimingSignalPipelineGraphState = WorkflowGraphState & {
-  currentNodeKey?: TimingSignalPipelineNodeKey;
-  lastCompletedNodeKey?: TimingSignalPipelineNodeKey;
-  timingInput: TimingSignalPipelineInput;
-  revision?: TimingPresetRevisionRecord;
-  presetConfig?: TimingPresetConfigV2;
-  targets: TimingPipelineTarget[];
-  signalSnapshots: TimingEvidenceData[];
-  technicalAssessments: TechnicalAssessment[];
-  cards: TimingCardDraft[];
-  persistedSignalSnapshots: TimingSignalSnapshotRecord[];
-  persistedCards: TimingAnalysisCardRecord[];
-  batchErrors: TimingSignalBatchError[];
-};
-
-export type WatchlistTimingCardsPipelineGraphState = WorkflowGraphState & {
-  currentNodeKey?: WatchlistTimingCardsPipelineNodeKey;
-  lastCompletedNodeKey?: WatchlistTimingCardsPipelineNodeKey;
-  timingInput: WatchlistTimingCardsPipelineInput;
-  revision?: TimingPresetRevisionRecord;
-  presetConfig?: TimingPresetConfigV2;
-  watchlist?: TimingWatchlistContext;
-  targets: TimingPipelineTarget[];
-  signalSnapshots: TimingEvidenceData[];
-  technicalAssessments: TechnicalAssessment[];
-  cards: TimingCardDraft[];
-  persistedSignalSnapshots: TimingSignalSnapshotRecord[];
-  persistedCards: TimingAnalysisCardRecord[];
-  batchErrors: TimingSignalBatchError[];
-};
-
-export type WatchlistTimingPipelineGraphState = WorkflowGraphState & {
-  currentNodeKey?: WatchlistTimingPipelineNodeKey;
-  lastCompletedNodeKey?: WatchlistTimingPipelineNodeKey;
-  timingInput: WatchlistTimingPipelineInput;
-  revision?: TimingPresetRevisionRecord;
-  presetConfig?: TimingPresetConfigV2;
-  watchlist?: TimingWatchlistContext;
-  portfolioSnapshot?: PortfolioSnapshotRecord;
-  targets: TimingPipelineTarget[];
-  signalSnapshots: TimingEvidenceData[];
-  technicalAssessments: TechnicalAssessment[];
-  cards: TimingCardDraft[];
-  marketContextSnapshot?: MarketContextSnapshot;
-  marketContextAnalysis?: MarketContextAnalysis;
-  riskPlan?: PortfolioRiskPlan;
-  feedbackContext?: TimingFeedbackContext;
-  feedbackSuggestions: TimingPresetAdjustmentSuggestionRecord[];
-  recommendations: TimingRecommendationDraft[];
-  persistedRecommendations: TimingRecommendationRecord[];
-  reviewRecords: TimingReviewRecord[];
-  scheduledReminderIds: string[];
-  batchErrors: TimingSignalBatchError[];
-};
-
-export type ScreeningToTimingSessionSnapshot = {
-  id: string;
-  strategyName: string;
-  executedAt: string;
-  completedAt?: string;
-  matchedCount: number;
-};
-
-export type ScreeningToTimingGraphState = WorkflowGraphState & {
-  currentNodeKey?: ScreeningToTimingNodeKey;
-  lastCompletedNodeKey?: ScreeningToTimingNodeKey;
-  timingInput: ScreeningToTimingPipelineInput;
-  screeningSession?: ScreeningToTimingSessionSnapshot;
-  preset?: TimingPresetRecord;
-  presetConfig?: TimingPresetConfig;
-  targets: TimingPipelineTarget[];
-  selectedTargets: TimingPipelineTarget[];
-  signalSnapshots: TimingSignalData[];
-  technicalAssessments: TechnicalAssessment[];
-  cards: TimingCardDraft[];
-  persistedSignalSnapshots: TimingSignalSnapshotRecord[];
-  persistedCards: TimingAnalysisCardRecord[];
-  reviewRecords: TimingReviewRecord[];
-  scheduledReminderIds: string[];
-  batchErrors: TimingSignalBatchError[];
-};
-
-export type TimingReviewOutcome = TimingReviewCompletionDraft & {
-  stockCode: string;
-  reviewHorizon: TimingReviewRecord["reviewHorizon"];
-  expectedAction: TimingReviewRecord["expectedAction"];
-};
-
-export type TimingReviewLoopGraphState = WorkflowGraphState & {
-  currentNodeKey?: TimingReviewLoopNodeKey;
-  lastCompletedNodeKey?: TimingReviewLoopNodeKey;
-  timingInput: TimingReviewLoopInput;
-  dueReviews: TimingReviewRecord[];
-  evaluatedReviews: TimingReviewOutcome[];
-  persistedReviews: TimingReviewRecord[];
-  feedbackSuggestions: TimingPresetAdjustmentSuggestionRecord[];
-  consumedReminderIds: string[];
-};
-
 export type PiAgentRuntimeEvent = {
   runId: string;
   sequence: number;
@@ -875,6 +632,10 @@ export type PiAgentRunGraphState = WorkflowGraphState & {
     conversationId?: string;
     userMessageId?: string;
     assistantMessageId?: string;
+  };
+  waitingForInput?: {
+    question: string;
+    options?: Array<{ label: string; value: string }>;
   };
   runtimeEvents: PiAgentRuntimeEvent[];
   finalOutput?: Record<string, unknown>;

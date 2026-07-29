@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import {
@@ -93,11 +94,19 @@ function TaskActions(props: {
   onPause: () => void;
   onResume: () => void;
   onCancel: () => void;
+  detailHref: string;
 }) {
-  const { task, busy, onPause, onResume, onCancel } = props;
-  if (task.status === "CANCELLED") return null;
+  const { task, busy, onPause, onResume, onCancel, detailHref } = props;
   return (
     <div className="flex flex-wrap justify-end gap-2">
+      <Link className="app-button" href={detailHref}>
+        详情
+      </Link>
+      {task.status !== "CANCELLED" ? (
+        <Link className="app-button" href={`${detailHref}#edit`}>
+          编辑
+        </Link>
+      ) : null}
       {task.status === "ACTIVE" ? (
         <button
           type="button"
@@ -107,7 +116,7 @@ function TaskActions(props: {
         >
           暂停
         </button>
-      ) : (
+      ) : task.status === "PAUSED" ? (
         <button
           type="button"
           className="app-button"
@@ -116,15 +125,17 @@ function TaskActions(props: {
         >
           恢复
         </button>
-      )}
-      <button
-        type="button"
-        className="app-button app-button-danger"
-        disabled={busy}
-        onClick={onCancel}
-      >
-        取消
-      </button>
+      ) : null}
+      {task.status !== "CANCELLED" ? (
+        <button
+          type="button"
+          className="app-button app-button-danger"
+          disabled={busy}
+          onClick={onCancel}
+        >
+          取消
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -299,6 +310,7 @@ export function ScheduledTasksClient() {
                             onPause={() => pause.mutate({ id: task.id })}
                             onResume={() => resume.mutate({ id: task.id })}
                             onCancel={() => cancel.mutate({ id: task.id })}
+                            detailHref={`/scheduled-tasks/${task.id}`}
                           />
                         </td>
                       </tr>
@@ -350,6 +362,7 @@ export function ScheduledTasksClient() {
                         onPause={() => pause.mutate({ id: task.id })}
                         onResume={() => resume.mutate({ id: task.id })}
                         onCancel={() => cancel.mutate({ id: task.id })}
+                        detailHref={`/scheduled-tasks/${task.id}`}
                       />
                     </div>
                   </article>

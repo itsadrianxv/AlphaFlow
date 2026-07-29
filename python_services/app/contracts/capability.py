@@ -168,3 +168,7 @@ class MacroRatesCapabilityRequest(BaseModel):
     startDate: str | None = None
     endDate: str | None = None
     include: list[str] = Field(default_factory=lambda: ["shibor", "lpr", "libor", "hibor"])
+class TushareDatasetCapabilityRequest(BaseModel):
+    dataset: str = Field(min_length=1)
+    params: dict[str, Any] = Field(default_factory=dict)
+    maxRows: int = Field(default=500, ge=1, le=500)

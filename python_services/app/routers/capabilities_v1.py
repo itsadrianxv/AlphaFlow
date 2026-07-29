@@ -35,6 +35,7 @@ from app.contracts.capability import (
     StockSearchCapabilityRequest,
     WebFetchCapabilityRequest,
     WebSearchCapabilityRequest,
+    TushareDatasetCapabilityRequest,
 )
 from app.gateway.external_capability_gateway import (
     CapabilityError,
@@ -42,8 +43,34 @@ from app.gateway.external_capability_gateway import (
     external_capability_gateway,
 )
 from app.infrastructure.replay.capability_replay import record_replay_artifact
+from app.services.schedule_capability_catalog import (
+    inspect_schedule_capability,
+    list_schedule_capabilities,
+    query_tushare_dataset,
+)
 
 router = APIRouter(prefix="/api/v1/capabilities", tags=["capabilities-v1"])
+
+
+@router.get("/catalog")
+def get_capability_catalog():
+    return {"items": list_schedule_capabilities(), "liveProbe": False}
+
+
+@router.get("/catalog/{capability}")
+def get_capability_detail(capability: str):
+    item = inspect_schedule_capability(capability)
+    if item is None:
+        return JSONResponse(status_code=404, content={"error": "CAPABILITY_NOT_FOUND"})
+    return item
+
+
+@router.post("/tushare/query-dataset")
+def query_scheduled_tushare_dataset(body: TushareDatasetCapabilityRequest):
+    try:
+        return query_tushare_dataset(body.dataset, body.params, body.maxRows)
+    except ValueError as error:
+        return JSONResponse(status_code=400, content={"error": "INVALID_DATASET_REQUEST", "message": str(error)})
 
 
 def _build_environment_fingerprint() -> str:

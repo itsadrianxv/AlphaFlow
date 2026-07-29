@@ -24,6 +24,19 @@ type StreamChunk = {
   payload: unknown;
 };
 
+function throwIfAborted(signal?: AbortSignal) {
+  if (!signal?.aborted) {
+    return;
+  }
+
+  const reason = signal.reason;
+  if (reason instanceof Error) {
+    throw reason;
+  }
+
+  throw new Error("工作流执行已中止");
+}
+
 export type WorkflowGraphSkip<NodeKey extends string> = {
   nodeKey: NodeKey;
   reason: string;
@@ -145,6 +158,7 @@ export abstract class BaseWorkflowLangGraph<
     initialState: WorkflowGraphState;
     startNodeIndex?: number;
     hooks?: WorkflowGraphExecutionHooks;
+    signal?: AbortSignal;
   }): Promise<WorkflowGraphState> {
     let state = {
       ...(params.initialState as State),
@@ -154,6 +168,8 @@ export abstract class BaseWorkflowLangGraph<
     if (this.nodeOrder.length === 0) {
       return state;
     }
+
+    throwIfAborted(params.signal);
 
     const resumeFromNodeKey = this.getResumeNodeKey(params.startNodeIndex);
     if (resumeFromNodeKey) {
@@ -165,6 +181,7 @@ export abstract class BaseWorkflowLangGraph<
 
     const stream = await this.graph.stream(state, {
       streamMode: ["tasks", "values"],
+      signal: params.signal,
     });
 
     const pendingNodes: NodeKey[] = [];
@@ -200,6 +217,7 @@ export abstract class BaseWorkflowLangGraph<
 
     try {
       for await (const chunk of stream) {
+        throwIfAborted(params.signal);
         const parsed = parseStreamChunk(chunk);
         if (!parsed) {
           continue;

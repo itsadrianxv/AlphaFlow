@@ -11,7 +11,19 @@ type ToolFactoryOptions = {
   userId: string;
   maxToolCalls: number;
   toolTimeoutMs: number;
+  capabilityConstraints?: Record<string, unknown>;
 };
+
+export const STANDARD_INTERNAL_TOOL_NAMES = [
+  "ask_user",
+  "internal_web_search", "internal_web_fetch", "internal_concept_match", "internal_screening_query",
+  "internal_research_targets_list", "internal_research_target_detail", "internal_research_notes_list",
+  "internal_research_artifacts_list", "internal_watchlist_detail", "internal_stock_search", "internal_stock_profile",
+  "internal_stock_bars", "internal_stock_daily_basic", "internal_index_market", "internal_index_constituents",
+  "internal_moneyflow", "internal_market_events", "internal_shareholder_events", "internal_financial_statements",
+  "internal_financial_indicators", "internal_earnings_events", "internal_fund_market", "internal_convertible_bond_market",
+  "internal_macro_rates",
+] as const;
 
 function asTextResult(details: Record<string, unknown>): AgentToolResult<Record<string, unknown>> {
   return {
@@ -113,6 +125,95 @@ export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
   const includeList = () => Type.Optional(Type.Any());
 
   return [
+    {
+      name: "ask_user",
+      label: "向用户提问",
+      description: "当继续执行必须依赖用户补充的信息时，向用户提出一个明确问题并等待回答。调用后立即结束本次运行。",
+      parameters: Type.Object({
+        question: Type.String({ minLength: 1, maxLength: 2000 }),
+        options: Type.Optional(
+          Type.Array(
+            Type.Object({
+              label: Type.String({ minLength: 1 }),
+              value: Type.String({ minLength: 1 }),
+            }),
+            { maxItems: 6 },
+          ),
+        ),
+      }),
+      execute: async (_toolCallId, params) => {
+        const input = params as {
+          question: string;
+          options?: Array<{ label: string; value: string }>;
+        };
+        const question = input.question.trim();
+        const options = input.options
+          ?.map((option) => ({
+            label: option.label.trim(),
+            value: option.value.trim(),
+          }))
+          .filter((option) => option.label && option.value);
+
+        if (question.length < 1 || question.length > 2000) {
+          throw new Error("ask_user 的 question 长度必须为 1～2000 个字符");
+        }
+        if (options && options.length > 6) {
+          throw new Error("ask_user 最多只能提供 6 个选项");
+        }
+
+        const details = {
+          question,
+          ...(options && options.length > 0 ? { options } : {}),
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(details) }],
+          details,
+          terminate: true,
+        };
+      },
+    },
+    {
+      name: "internal_tushare_dataset",
+      label: "受限 TuShare 数据集",
+      description: "按定时执行计划中的数据集白名单查询 TuShare，不能访问计划外数据集。",
+      parameters: Type.Object({
+        dataset: Type.String({ minLength: 1 }),
+        params: Type.Optional(Type.Record(Type.String(), Type.Any())),
+        maxRows: Type.Optional(Type.Number({ minimum: 1, maximum: 500 })),
+      }),
+      execute: async (_toolCallId, params, signal) => {
+        const input = params as { dataset: string; params?: Record<string, unknown>; maxRows?: number };
+        const raw = options.capabilityConstraints?.internal_tushare_dataset;
+        const constraints = raw && typeof raw === "object" && !Array.isArray(raw)
+          ? raw as Record<string, unknown>
+          : {};
+        const allowedDatasets = Array.isArray(constraints.allowedDatasets)
+          ? constraints.allowedDatasets.filter((item): item is string => typeof item === "string")
+          : [];
+        if (!allowedDatasets.includes(input.dataset)) {
+          throw new Error(`执行计划未授权 TuShare 数据集: ${input.dataset}`);
+        }
+        const tsCode = input.params?.ts_code;
+        if (tsCode !== undefined &&
+          (typeof tsCode !== "string" || !/^\d{6}\.(SH|SZ|BJ)$/.test(tsCode))) {
+          throw new Error("INVALID_TUSHARE_TS_CODE: ts_code 必须是完整 TuShare 代码，例如 601138.SH、000001.SZ 或 920001.BJ");
+        }
+        const configuredMaxRows = typeof constraints.maxRows === "number" ? constraints.maxRows : 500;
+        const maxLookbackDays = typeof constraints.maxLookbackDays === "number" ? constraints.maxLookbackDays : 365;
+        const startText = typeof input.params?.start_date === "string" ? input.params.start_date.replaceAll("-", "") : "";
+        const endText = typeof input.params?.end_date === "string" ? input.params.end_date.replaceAll("-", "") : "";
+        if (/^\d{8}$/.test(startText) && /^\d{8}$/.test(endText)) {
+          const start = Date.UTC(Number(startText.slice(0, 4)), Number(startText.slice(4, 6)) - 1, Number(startText.slice(6, 8)));
+          const end = Date.UTC(Number(endText.slice(0, 4)), Number(endText.slice(4, 6)) - 1, Number(endText.slice(6, 8)));
+          if ((end - start) / 86_400_000 > maxLookbackDays) throw new Error("TuShare 查询超过执行计划允许的回看窗口");
+        }
+        return callPython("internal_tushare_dataset", "/api/v1/capabilities/tushare/query-dataset", {
+          dataset: input.dataset,
+          params: input.params ?? {},
+          maxRows: Math.min(input.maxRows ?? configuredMaxRows, configuredMaxRows, 500),
+        }, signal);
+      },
+    },
     {
       name: "internal_web_search",
       label: "内部网页检索",

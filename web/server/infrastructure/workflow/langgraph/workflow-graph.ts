@@ -54,5 +54,6 @@ export interface WorkflowGraphRunner {
     initialState: WorkflowGraphState;
     startNodeIndex?: number;
     hooks?: WorkflowGraphExecutionHooks;
+    signal?: AbortSignal;
   }): Promise<WorkflowGraphState>;
 }

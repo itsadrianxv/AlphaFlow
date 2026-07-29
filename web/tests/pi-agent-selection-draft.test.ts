@@ -66,4 +66,25 @@ describe("Pi Agent selection draft handoff", () => {
     expect(agentRuntimePageSource).toContain("/agent-runtime");
     expect(existsSync("app/agent-runtime/page.tsx")).toBe(true);
   });
+
+  it("uses the full workspace for agent messages", () => {
+    expect(agentRuntimeSource).toContain(
+      "top-16 right-0 bottom-[141px] left-0 z-20",
+    );
+    expect(agentRuntimeSource).toContain("h-full w-full max-w-[820px]");
+    expect(agentRuntimeSource).toContain('message.status !== "STREAMING"');
+    expect(agentRuntimeSource).not.toContain('title="投研智能体"');
+  });
+
+  it("keeps the fixed agent layers transparent around the composer", () => {
+    expect(agentRuntimeSource).toContain(
+      "pi-agent-composer fixed pointer-events-none right-0 bottom-0 left-0 z-30 bg-transparent",
+    );
+    expect(agentRuntimeSource).toContain(
+      "pi-agent-conversation fixed top-16 right-0 bottom-[141px] left-0 z-20 bg-transparent",
+    );
+    expect(agentRuntimeSource).not.toContain(
+      "pi-agent-conversation fixed top-16 right-0 bottom-[141px] left-0 z-20 bg-[var(--app-bg)]",
+    );
+  });
 });

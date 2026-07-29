@@ -123,6 +123,17 @@ class DataProvider(Protocol):
     ) -> list[DailyBar]:
         """返回指定周期的个股行情。"""
 
+    def get_bars_many(
+        self,
+        stock_codes: list[str],
+        timeframe: Timeframe = "DAILY",
+        start_date: str | None = None,
+        end_date: str | None = None,
+        adjust: str = "qfq",
+        limit_bars: int = 120,
+    ) -> dict[str, list[DailyBar]]:
+        """批量返回多个股票的指定周期行情。"""
+
     def get_market_snapshot(self, as_of_date: str | None = None) -> list[MarketSnapshotRow]:
         """返回指定日期附近的全市场行情快照。"""
 

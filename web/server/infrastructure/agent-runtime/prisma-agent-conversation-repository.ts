@@ -1,5 +1,10 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
-import { PI_AGENT_RUN_TEMPLATE_CODE } from "~/server/domain/workflow/types";
+import {
+  Prisma,
+  type PrismaClient,
+  WorkflowEventType,
+  WorkflowNodeRunStatus,
+  WorkflowRunStatus,
+} from "@prisma/client";
 
 const toJson = (value: unknown): Prisma.InputJsonValue =>
   value as Prisma.InputJsonValue;
@@ -13,28 +18,17 @@ const AgentConversationMessageRole = {
 const AgentConversationMessageStatus = {
   PENDING: "PENDING",
   STREAMING: "STREAMING",
+  WAITING_FOR_INPUT: "WAITING_FOR_INPUT",
   SUCCEEDED: "SUCCEEDED",
   FAILED: "FAILED",
   CANCELLED: "CANCELLED",
 } as const;
-const WorkflowRunStatus = {
-  FAILED: "FAILED",
-  CANCELLED: "CANCELLED",
-} as const;
 
-function readTextPayload(value: unknown) {
-  if (!value || typeof value !== "object") {
-    return "";
-  }
-
-  const payload = value as Record<string, unknown>;
-  if (typeof payload.text === "string") {
-    return payload.text.trim();
-  }
-
-  return "";
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
-
 export class PrismaAgentConversationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -91,18 +85,13 @@ export class PrismaAgentConversationRepository {
     });
   }
 
-  async createConversation(params: {
-    userId: string;
-    title: string;
-    legacyWorkflowRunId?: string;
-  }) {
+  async createConversation(params: { userId: string; title: string }) {
     return this.prisma.agentConversation
       .create({
         data: {
           userId: params.userId,
           title: params.title,
           piSessionId: "",
-          legacyWorkflowRunId: params.legacyWorkflowRunId,
         },
       })
       .then((conversation) =>
@@ -122,6 +111,7 @@ export class PrismaAgentConversationRepository {
           in: [
             AgentConversationMessageStatus.SUCCEEDED,
             AgentConversationMessageStatus.STREAMING,
+            AgentConversationMessageStatus.WAITING_FOR_INPUT,
           ],
         },
       },
@@ -146,6 +136,7 @@ export class PrismaAgentConversationRepository {
     prompt: string;
     skillId: string;
     title?: string;
+    routingMode?: "AUTO" | "SCHEDULED_TASK_SETUP" | "SCHEDULED_TASK_EDIT";
   }) {
     return this.prisma.$transaction(async (tx) => {
       let conversation = params.conversationId
@@ -164,6 +155,7 @@ export class PrismaAgentConversationRepository {
             title: params.title ?? params.prompt.slice(0, 80),
             piSessionId: "",
             lastMessageAt: new Date(),
+            routingMode: params.routingMode ?? "AUTO",
           },
         });
         conversation = await tx.agentConversation.update({
@@ -171,6 +163,10 @@ export class PrismaAgentConversationRepository {
           data: { piSessionId: created.id },
         });
       }
+
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "AgentConversation" WHERE "id" = ${conversation.id} AND "userId" = ${params.userId} FOR UPDATE`,
+      );
 
       const runningAssistant = await tx.agentConversationMessage.findFirst({
         where: {
@@ -196,6 +192,16 @@ export class PrismaAgentConversationRepository {
       const userSequence = (lastMessage?.sequence ?? 0) + 1;
       const assistantSequence = userSequence + 1;
       const now = new Date();
+
+      if (
+        params.routingMode &&
+        conversation.routingMode !== params.routingMode
+      ) {
+        conversation = await tx.agentConversation.update({
+          where: { id: conversation.id },
+          data: { routingMode: params.routingMode },
+        });
+      }
 
       const userMessage = await tx.agentConversationMessage.create({
         data: {
@@ -230,17 +236,216 @@ export class PrismaAgentConversationRepository {
     });
   }
 
+  async bindScheduledTaskEdit(params: {
+    userId: string;
+    conversationId: string;
+    taskId: string;
+  }) {
+    const updated = await this.prisma.agentConversation.updateMany({
+      where: { id: params.conversationId, userId: params.userId },
+      data: {
+        routingMode: "SCHEDULED_TASK_EDIT",
+        activeScheduledTaskEditTaskId: params.taskId,
+      },
+    });
+    if (updated.count !== 1) throw new Error("AGENT_CONVERSATION_NOT_FOUND");
+  }
+
+  async resumeWaitingForInput(params: {
+    userId: string;
+    conversationId: string;
+    prompt: string;
+    skillId: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "AgentConversation" WHERE "id" = ${params.conversationId} AND "userId" = ${params.userId} FOR UPDATE`,
+      );
+
+      const waitingMessage = await tx.agentConversationMessage.findFirst({
+        where: {
+          conversationId: params.conversationId,
+          role: AgentConversationMessageRole.ASSISTANT,
+          status: AgentConversationMessageStatus.WAITING_FOR_INPUT,
+        },
+        orderBy: { sequence: "desc" },
+      });
+
+      if (!waitingMessage?.workflowRunId) {
+        return null;
+      }
+
+      const latestMessage = await tx.agentConversationMessage.findFirst({
+        where: { conversationId: params.conversationId },
+        orderBy: { sequence: "desc" },
+        select: { id: true },
+      });
+      if (latestMessage?.id !== waitingMessage.id) {
+        return null;
+      }
+
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "WorkflowRun" WHERE "id" = ${waitingMessage.workflowRunId} FOR UPDATE`,
+      );
+      const run = await tx.workflowRun.findUnique({
+        where: { id: waitingMessage.workflowRunId },
+      });
+
+      if (
+        !run ||
+        run.status !== WorkflowRunStatus.PAUSED ||
+        run.cancellationRequestedAt
+      ) {
+        throw new Error("AGENT_WAITING_RUN_NOT_RESUMABLE");
+      }
+
+      const pausedEvent = await tx.workflowEvent.findFirst({
+        where: {
+          runId: run.id,
+          eventType: WorkflowEventType.RUN_PAUSED,
+        },
+        orderBy: { sequence: "desc" },
+      });
+      const pausedPayload = asRecord(pausedEvent?.payload);
+      if (pausedPayload.reason !== "user_input_required") {
+        throw new Error("AGENT_WAITING_RUN_NOT_RESUMABLE");
+      }
+
+      const lastMessage = await tx.agentConversationMessage.findFirst({
+        where: { conversationId: params.conversationId },
+        orderBy: { sequence: "desc" },
+      });
+      const userSequence = (lastMessage?.sequence ?? 0) + 1;
+      const assistantSequence = userSequence + 1;
+      const now = new Date();
+      const input = asRecord(run.input);
+
+      const userMessage = await tx.agentConversationMessage.create({
+        data: {
+          conversationId: params.conversationId,
+          role: AgentConversationMessageRole.USER,
+          content: params.prompt,
+          skillId: waitingMessage.skillId ?? params.skillId,
+          status: "SUCCEEDED",
+          sequence: userSequence,
+        },
+      });
+      await tx.agentConversationMessage.update({
+        where: { id: waitingMessage.id },
+        data: { workflowRunId: null },
+      });
+      const assistantMessage = await tx.agentConversationMessage.create({
+        data: {
+          conversationId: params.conversationId,
+          role: AgentConversationMessageRole.ASSISTANT,
+          content: "",
+          skillId: waitingMessage.skillId ?? params.skillId,
+          status: "PENDING",
+          workflowRunId: run.id,
+          sequence: assistantSequence,
+        },
+      });
+
+      await tx.workflowRun.update({
+        where: { id: run.id },
+        data: {
+          status: WorkflowRunStatus.PENDING,
+          input: toJson({
+            ...input,
+            prompt: params.prompt,
+            userMessageId: userMessage.id,
+            assistantMessageId: assistantMessage.id,
+          }),
+          cancellationRequestedAt: null,
+          completedAt: null,
+          errorCode: null,
+          errorMessage: null,
+        },
+      });
+
+      await tx.workflowNodeRun.updateMany({
+        where: {
+          runId: run.id,
+          ...(run.currentNodeKey ? { nodeKey: run.currentNodeKey } : {}),
+          status: WorkflowNodeRunStatus.WAITING_FOR_INPUT,
+        },
+        data: {
+          status: WorkflowNodeRunStatus.PENDING,
+          completedAt: null,
+          errorCode: null,
+          errorMessage: null,
+        },
+      });
+
+      await this.createWorkflowEventTx(tx, {
+        runId: run.id,
+        eventType: WorkflowEventType.RUN_RESUMED,
+        payload: {
+          reason: "user_input_required",
+          nodeKey: run.currentNodeKey,
+          userMessageId: userMessage.id,
+          assistantMessageId: assistantMessage.id,
+        },
+      });
+
+      const conversation = await tx.agentConversation.update({
+        where: { id: params.conversationId },
+        data: { lastMessageAt: now },
+      });
+
+      return { conversation, userMessage, assistantMessage, run };
+    });
+  }
+
   async markAssistantStreaming(messageId: string) {
-    return this.prisma.agentConversationMessage.update({
-      where: { id: messageId },
+    return this.prisma.agentConversationMessage.updateMany({
+      where: {
+        id: messageId,
+        status: {
+          in: [
+            AgentConversationMessageStatus.PENDING,
+            AgentConversationMessageStatus.STREAMING,
+          ],
+        },
+      },
       data: { status: AgentConversationMessageStatus.STREAMING },
     });
   }
 
   async bindAssistantRun(params: { messageId: string; runId: string }) {
-    return this.prisma.agentConversationMessage.update({
-      where: { id: params.messageId },
-      data: { workflowRunId: params.runId },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw(
+        Prisma.sql`SELECT "id" FROM "WorkflowRun" WHERE "id" = ${params.runId} FOR UPDATE`,
+      );
+
+      const message = await tx.agentConversationMessage.findUnique({
+        where: { id: params.messageId },
+      });
+
+      if (!message) {
+        throw new Error("AGENT_MESSAGE_NOT_FOUND");
+      }
+
+      if (message.workflowRunId && message.workflowRunId !== params.runId) {
+        throw new Error("AGENT_MESSAGE_ALREADY_BOUND");
+      }
+
+      const existingBinding = await tx.agentConversationMessage.findFirst({
+        where: {
+          workflowRunId: params.runId,
+          role: AgentConversationMessageRole.ASSISTANT,
+        },
+        select: { id: true },
+      });
+
+      if (existingBinding && existingBinding.id !== params.messageId) {
+        throw new Error("AGENT_WORKFLOW_RUN_ALREADY_BOUND");
+      }
+
+      return tx.agentConversationMessage.update({
+        where: { id: params.messageId },
+        data: { workflowRunId: params.runId },
+      });
     });
   }
 
@@ -254,6 +459,13 @@ export class PrismaAgentConversationRepository {
         where: { id: messageId },
       });
       if (!message) {
+        return null;
+      }
+
+      if (
+        message.status !== AgentConversationMessageStatus.PENDING &&
+        message.status !== AgentConversationMessageStatus.STREAMING
+      ) {
         return null;
       }
 
@@ -272,8 +484,16 @@ export class PrismaAgentConversationRepository {
     content: string;
     metadata?: Record<string, unknown>;
   }) {
-    return this.prisma.agentConversationMessage.update({
-      where: { id: params.messageId },
+    return this.prisma.agentConversationMessage.updateMany({
+      where: {
+        id: params.messageId,
+        status: {
+          in: [
+            AgentConversationMessageStatus.PENDING,
+            AgentConversationMessageStatus.STREAMING,
+          ],
+        },
+      },
       data: {
         content: params.content,
         status: AgentConversationMessageStatus.SUCCEEDED,
@@ -290,8 +510,16 @@ export class PrismaAgentConversationRepository {
     errorCode?: string;
     errorMessage?: string;
   }) {
-    return this.prisma.agentConversationMessage.update({
-      where: { id: params.messageId },
+    return this.prisma.agentConversationMessage.updateMany({
+      where: {
+        id: params.messageId,
+        status: {
+          in: [
+            AgentConversationMessageStatus.PENDING,
+            AgentConversationMessageStatus.STREAMING,
+          ],
+        },
+      },
       data: {
         status:
           params.status === "CANCELLED"
@@ -299,6 +527,38 @@ export class PrismaAgentConversationRepository {
             : AgentConversationMessageStatus.FAILED,
         errorCode: params.errorCode,
         errorMessage: params.errorMessage,
+      },
+    });
+  }
+
+  async markAssistantWaitingByRun(
+    runId: string,
+    request: {
+      question: string;
+      options?: Array<{ label: string; value: string }>;
+    },
+  ) {
+    return this.prisma.agentConversationMessage.updateMany({
+      where: {
+        workflowRunId: runId,
+        role: AgentConversationMessageRole.ASSISTANT,
+        status: {
+          in: [
+            AgentConversationMessageStatus.PENDING,
+            AgentConversationMessageStatus.STREAMING,
+          ],
+        },
+      },
+      data: {
+        content: request.question,
+        status: AgentConversationMessageStatus.WAITING_FOR_INPUT,
+        metadata: toJson({
+          inputRequest: request,
+          question: request.question,
+          options: request.options ?? [],
+        }),
+        errorCode: null,
+        errorMessage: null,
       },
     });
   }
@@ -312,6 +572,7 @@ export class PrismaAgentConversationRepository {
           in: [
             AgentConversationMessageStatus.PENDING,
             AgentConversationMessageStatus.STREAMING,
+            AgentConversationMessageStatus.WAITING_FOR_INPUT,
           ],
         },
       },
@@ -323,92 +584,48 @@ export class PrismaAgentConversationRepository {
     });
   }
 
-  async migrateLegacyRuns(userId: string, limit = 50) {
-    const runs = await this.prisma.workflowRun.findMany({
+  async markAssistantFailedByRun(runId: string, reason: string) {
+    return this.prisma.agentConversationMessage.updateMany({
       where: {
-        userId,
-        template: { code: PI_AGENT_RUN_TEMPLATE_CODE },
-        legacyAgentConversation: null,
-      },
-      orderBy: { createdAt: "asc" },
-      take: limit,
-      include: {
-        agentArtifacts: {
-          orderBy: { createdAt: "desc" },
+        workflowRunId: runId,
+        role: AgentConversationMessageRole.ASSISTANT,
+        status: {
+          in: [
+            AgentConversationMessageStatus.PENDING,
+            AgentConversationMessageStatus.STREAMING,
+          ],
         },
       },
+      data: {
+        status: AgentConversationMessageStatus.FAILED,
+        errorCode: "WORKFLOW_NODE_TIMEOUT",
+        errorMessage: reason,
+      },
+    });
+  }
+
+  private async createWorkflowEventTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      runId: string;
+      eventType: WorkflowEventType;
+      payload: Record<string, unknown>;
+    },
+  ) {
+    const latest = await tx.workflowEvent.findFirst({
+      where: { runId: params.runId },
+      select: { sequence: true },
+      orderBy: { sequence: "desc" },
     });
 
-    let migrated = 0;
-    for (const run of runs) {
-      const input =
-        run.input && typeof run.input === "object"
-          ? (run.input as Record<string, unknown>)
-          : {};
-      const prompt =
-        typeof input.prompt === "string" ? input.prompt : run.query;
-      const skillId =
-        typeof input.skillId === "string" ? input.skillId : undefined;
-      const artifact = run.agentArtifacts.find(
-        (item) => item.kind === "report" && item.payload,
-      );
-      const assistantText =
-        readTextPayload(artifact?.payload) ||
-        readTextPayload(
-          run.result && typeof run.result === "object"
-            ? (run.result as Record<string, unknown>).finalOutput
-            : undefined,
-        );
-      const title = run.query.replace(/^Pi Agent - /, "").slice(0, 120);
-
-      await this.prisma.$transaction(async (tx) => {
-        const created = await tx.agentConversation.create({
-          data: {
-            userId,
-            title,
-            piSessionId: "",
-            legacyWorkflowRunId: run.id,
-            lastMessageAt: run.completedAt ?? run.createdAt,
-          },
-        });
-        const conversation = await tx.agentConversation.update({
-          where: { id: created.id },
-          data: { piSessionId: created.id },
-        });
-        await tx.agentConversationMessage.create({
-          data: {
-            conversationId: conversation.id,
-            role: AgentConversationMessageRole.USER,
-            content: prompt,
-            skillId,
-            status: AgentConversationMessageStatus.SUCCEEDED,
-            sequence: 1,
-            createdAt: run.createdAt,
-          },
-        });
-        await tx.agentConversationMessage.create({
-          data: {
-            conversationId: conversation.id,
-            role: AgentConversationMessageRole.ASSISTANT,
-            content: assistantText,
-            skillId,
-            status:
-              run.status === WorkflowRunStatus.CANCELLED
-                ? AgentConversationMessageStatus.CANCELLED
-                : run.status === WorkflowRunStatus.FAILED
-                  ? AgentConversationMessageStatus.FAILED
-                  : AgentConversationMessageStatus.SUCCEEDED,
-            workflowRunId: run.id,
-            sequence: 2,
-            errorCode: run.errorCode,
-            errorMessage: run.errorMessage,
-            createdAt: run.completedAt ?? run.createdAt,
-          },
-        });
-      });
-      migrated += 1;
-    }
-
-    return { migrated };
+    return tx.workflowEvent.create({
+      data: {
+        runId: params.runId,
+        sequence: (latest?.sequence ?? 0) + 1,
+        eventType: params.eventType,
+        payload: toJson(params.payload),
+        occurredAt: new Date(),
+      },
+    });
   }
 }

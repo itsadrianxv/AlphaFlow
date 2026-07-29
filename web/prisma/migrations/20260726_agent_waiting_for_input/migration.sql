@@ -1,0 +1,3 @@
+ALTER TYPE "AgentConversationMessageStatus" ADD VALUE 'WAITING_FOR_INPUT';
+
+ALTER TYPE "WorkflowNodeRunStatus" ADD VALUE 'WAITING_FOR_INPUT';

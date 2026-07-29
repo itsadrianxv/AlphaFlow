@@ -1,6 +1,5 @@
 import { WorkflowEventType, WorkflowRunStatus } from "@prisma/client";
 import type { ImpactMappingInput } from "~/server/domain/intelligence/impact-mapping";
-import type { PortfolioSnapshotDraft } from "~/server/domain/timing/types";
 import {
   WORKFLOW_ERROR_CODES,
   WorkflowDomainError,
@@ -16,12 +15,6 @@ import {
   INDUSTRY_RESEARCH_TEMPLATE_CODE,
   PI_AGENT_RUN_TEMPLATE_CODE,
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
-  SCREENING_TO_TIMING_TEMPLATE_CODE,
-  TIMING_DECISION_PIPELINE_TEMPLATE_CODE,
-  TIMING_REVIEW_LOOP_TEMPLATE_CODE,
-  TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
-  WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
-  WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
   type WorkflowEventStreamType,
   type WorkflowGraphState,
 } from "~/server/domain/workflow/types";
@@ -63,68 +56,6 @@ export type StartScreeningInsightPipelineCommand = {
   idempotencyKey?: string;
 };
 
-export type StartTimingSignalPipelineCommand = {
-  userId: string;
-  stockCode: string;
-  targetRef?: { type: string; id: string };
-  asOfDate?: string;
-  revisionId: string;
-  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
-  templateVersion?: number;
-  idempotencyKey?: string;
-};
-
-export type StartWatchlistTimingCardsPipelineCommand = {
-  userId: string;
-  watchListId: string;
-  targetRef?: { type: string; id: string };
-  asOfDate?: string;
-  revisionId: string;
-  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
-  watchListName?: string;
-  templateVersion?: number;
-  idempotencyKey?: string;
-};
-
-export type StartWatchlistTimingPipelineCommand = {
-  userId: string;
-  watchListId?: string;
-  sourceWatchListId?: string;
-  targets?: Array<{ stockCode: string; stockName?: string }>;
-  mode?: "SINGLE" | "PORTFOLIO";
-  decisionInput?: Record<string, unknown>;
-  portfolioSnapshotId?: string;
-  portfolioInputSnapshot?: PortfolioSnapshotDraft & { source: "RUN_INPUT" };
-  targetRef?: { type: string; id: string };
-  asOfDate?: string;
-  revisionId: string;
-  analysisDateMode: "LATEST_COMPLETE" | "CURRENT_PARTIAL" | "EXPLICIT";
-  watchListName?: string;
-  portfolioSnapshotName?: string;
-  templateCode?: string;
-  templateVersion?: number;
-  idempotencyKey?: string;
-};
-
-export type StartScreeningToTimingPipelineCommand = {
-  userId: string;
-  screeningSessionId: string;
-  strategyName?: string;
-  candidateLimit?: number;
-  asOfDate?: string;
-  presetId?: string;
-  templateVersion?: number;
-  idempotencyKey?: string;
-};
-
-export type StartTimingReviewLoopCommand = {
-  userId: string;
-  date?: string;
-  limit?: number;
-  templateVersion?: number;
-  idempotencyKey?: string;
-};
-
 export type StartPiAgentRunCommand = {
   userId: string;
   skillId: string;
@@ -158,7 +89,6 @@ type StartWorkflowCommand = {
   templateVersion?: number;
   input: Record<string, unknown>;
   idempotencyKey?: string;
-  portfolioInputSnapshot?: PortfolioSnapshotDraft & { source: "RUN_INPUT" };
 };
 
 function buildCompanyResearchQuery(command: StartCompanyResearchCommand) {
@@ -205,6 +135,10 @@ function mapEventType(
     default:
       return null;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 export class WorkflowCommandService {
@@ -270,117 +204,6 @@ export class WorkflowCommandService {
     });
   }
 
-  async startTimingSignalPipeline(command: StartTimingSignalPipelineCommand) {
-    return this.startWorkflow({
-      userId: command.userId,
-      query: `择时信号卡 - ${command.stockCode}`,
-      templateCode: TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE,
-      templateVersion: command.templateVersion,
-      input: {
-        stockCode: command.stockCode,
-        targetRef: command.targetRef,
-        asOfDate: command.asOfDate,
-        revisionId: command.revisionId,
-        analysisDateMode: command.analysisDateMode,
-      },
-      idempotencyKey:
-        command.idempotencyKey ??
-        `timing-signal:${command.userId}:${command.stockCode}:${command.analysisDateMode}:${command.asOfDate ?? "latest"}:${command.revisionId}`,
-    });
-  }
-
-  async startWatchlistTimingCardsPipeline(
-    command: StartWatchlistTimingCardsPipelineCommand,
-  ) {
-    return this.startWorkflow({
-      userId: command.userId,
-      query: command.watchListName
-        ? `自选股择时卡 - ${command.watchListName}`
-        : `自选股择时卡 - ${command.watchListId}`,
-      templateCode: WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE,
-      templateVersion: command.templateVersion,
-      input: {
-        watchListId: command.watchListId,
-        targetRef: command.targetRef,
-        asOfDate: command.asOfDate,
-        revisionId: command.revisionId,
-        analysisDateMode: command.analysisDateMode,
-      },
-      idempotencyKey:
-        command.idempotencyKey ??
-        `watchlist-timing-cards:${command.userId}:${command.watchListId}:${command.analysisDateMode}:${command.asOfDate ?? "latest"}:${command.revisionId}`,
-    });
-  }
-
-  async startWatchlistTimingPipeline(
-    command: StartWatchlistTimingPipelineCommand,
-  ) {
-    return this.startWorkflow({
-      userId: command.userId,
-      query:
-        command.watchListName && command.portfolioSnapshotName
-          ? `自选股组合建议 - ${command.watchListName} / ${command.portfolioSnapshotName}`
-          : `自选股组合建议 - ${command.watchListId}`,
-      templateCode:
-        command.templateCode ?? WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE,
-      templateVersion: command.templateVersion,
-      input: {
-        watchListId: command.watchListId,
-        sourceWatchListId: command.sourceWatchListId,
-        targets: command.targets,
-        mode: command.mode,
-        decisionInput: command.decisionInput,
-        targetRef: command.targetRef,
-        portfolioSnapshotId: command.portfolioSnapshotId,
-        asOfDate: command.asOfDate,
-        revisionId: command.revisionId,
-        analysisDateMode: command.analysisDateMode,
-      },
-      portfolioInputSnapshot: command.portfolioInputSnapshot,
-      idempotencyKey:
-        command.idempotencyKey ??
-        `watchlist-timing:${command.userId}:${command.watchListId ?? command.sourceWatchListId ?? "direct"}:${command.portfolioSnapshotId}:${command.analysisDateMode}:${command.asOfDate ?? "latest"}:${command.revisionId}`,
-    });
-  }
-
-  async startScreeningToTimingPipeline(
-    command: StartScreeningToTimingPipelineCommand,
-  ) {
-    return this.startWorkflow({
-      userId: command.userId,
-      query: command.strategyName
-        ? `筛选联动择时 - ${command.strategyName}`
-        : `筛选联动择时 - ${command.screeningSessionId}`,
-      templateCode: SCREENING_TO_TIMING_TEMPLATE_CODE,
-      templateVersion: command.templateVersion,
-      input: {
-        screeningSessionId: command.screeningSessionId,
-        candidateLimit: command.candidateLimit,
-        asOfDate: command.asOfDate,
-        presetId: command.presetId,
-      },
-      idempotencyKey:
-        command.idempotencyKey ??
-        `screening-to-timing:${command.screeningSessionId}${command.presetId ? `:${command.presetId}` : ""}`,
-    });
-  }
-
-  async startTimingReviewLoop(command: StartTimingReviewLoopCommand) {
-    return this.startWorkflow({
-      userId: command.userId,
-      query: `择时复盘 - ${command.date ?? "today"}`,
-      templateCode: TIMING_REVIEW_LOOP_TEMPLATE_CODE,
-      templateVersion: command.templateVersion,
-      input: {
-        date: command.date,
-        limit: command.limit,
-      },
-      idempotencyKey:
-        command.idempotencyKey ??
-        `timing-review:${command.date ?? new Date().toISOString().slice(0, 10)}`,
-    });
-  }
-
   async startPiAgentRun(command: StartPiAgentRunCommand) {
     const title = command.title?.trim() || command.prompt.trim().slice(0, 80);
 
@@ -401,7 +224,9 @@ export class WorkflowCommandService {
       },
       idempotencyKey:
         command.idempotencyKey ??
-        `pi-agent:${command.userId}:${command.skillIds.join(",")}:${title}`,
+        (command.assistantMessageId
+          ? `pi-agent-message:${command.userId}:${command.assistantMessageId}`
+          : undefined),
     });
   }
 
@@ -538,7 +363,24 @@ export class WorkflowCommandService {
         command.idempotencyKey,
       );
 
-      if (existing) {
+      const requestedAssistantMessageId =
+        command.templateCode === PI_AGENT_RUN_TEMPLATE_CODE &&
+        isRecord(command.input) &&
+        typeof command.input.assistantMessageId === "string"
+          ? command.input.assistantMessageId
+          : undefined;
+      const existingAssistantMessageId =
+        existing &&
+        isRecord(existing.input) &&
+        typeof existing.input.assistantMessageId === "string"
+          ? existing.input.assistantMessageId
+          : undefined;
+      const idempotencyMatchesMessage =
+        command.templateCode !== PI_AGENT_RUN_TEMPLATE_CODE ||
+        !requestedAssistantMessageId ||
+        existingAssistantMessageId === requestedAssistantMessageId;
+
+      if (existing && idempotencyMatchesMessage) {
         return {
           runId: existing.id,
           status: existing.status,
@@ -583,63 +425,6 @@ export class WorkflowCommandService {
       template = await this.repository.ensureScreeningInsightPipelineTemplate();
     }
 
-    if (
-      !template &&
-      command.templateCode === TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE
-    ) {
-      template = await this.repository.ensureTimingSignalPipelineTemplate();
-    }
-
-    if (
-      template &&
-      command.templateCode === TIMING_SIGNAL_PIPELINE_TEMPLATE_CODE &&
-      (command.templateVersion === undefined || command.templateVersion === 1)
-    ) {
-      const timingSignalNodeKeys = getWorkflowNodeKeysFromGraphConfig(
-        template.graphConfig,
-      );
-      if (!timingSignalNodeKeys.includes("kronos_forecast_agent")) {
-        template = await this.repository.ensureTimingSignalPipelineTemplate();
-      }
-    }
-
-    if (
-      !template &&
-      command.templateCode === WATCHLIST_TIMING_CARDS_PIPELINE_TEMPLATE_CODE
-    ) {
-      template =
-        await this.repository.ensureWatchlistTimingCardsPipelineTemplate();
-    }
-
-    if (
-      !template &&
-      command.templateCode === WATCHLIST_TIMING_PIPELINE_TEMPLATE_CODE
-    ) {
-      template = await this.repository.ensureWatchlistTimingPipelineTemplate();
-    }
-
-    if (
-      !template &&
-      command.templateCode === TIMING_DECISION_PIPELINE_TEMPLATE_CODE
-    ) {
-      template = await this.repository.ensureTimingDecisionPipelineTemplate();
-    }
-
-    if (
-      !template &&
-      command.templateCode === SCREENING_TO_TIMING_TEMPLATE_CODE
-    ) {
-      template =
-        await this.repository.ensureScreeningToTimingPipelineTemplate();
-    }
-
-    if (
-      !template &&
-      command.templateCode === TIMING_REVIEW_LOOP_TEMPLATE_CODE
-    ) {
-      template = await this.repository.ensureTimingReviewLoopTemplate();
-    }
-
     if (!template && command.templateCode === PI_AGENT_RUN_TEMPLATE_CODE) {
       template = await this.repository.ensurePiAgentRunTemplate();
     }
@@ -671,7 +456,6 @@ export class WorkflowCommandService {
       input: command.input,
       nodeKeys,
       idempotencyKey: command.idempotencyKey,
-      portfolioInputSnapshot: command.portfolioInputSnapshot,
     });
 
     return {

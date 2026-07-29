@@ -25,7 +25,14 @@ const agentRuntimeEventSchema = z.object({
 
 const agentRuntimeRunSchema = z.object({
   id: z.string(),
-  status: z.enum(["queued", "running", "succeeded", "failed", "cancelled"]),
+  status: z.enum([
+    "queued",
+    "running",
+    "waiting_for_input",
+    "succeeded",
+    "failed",
+    "cancelled",
+  ]),
   skillId: z.string(),
   skillIds: z.array(z.string()).optional(),
   title: z.string(),
@@ -40,6 +47,15 @@ const agentRuntimeRunSchema = z.object({
   createdAt: z.string(),
   startedAt: z.string().optional(),
   completedAt: z.string().optional(),
+  waitingForInput: z
+    .object({
+      question: z.string(),
+      options: z
+        .array(z.object({ label: z.string(), value: z.string() }))
+        .max(6)
+        .optional(),
+    })
+    .optional(),
   events: z.array(agentRuntimeEventSchema),
 });
 
@@ -69,6 +85,12 @@ export type StartAgentRuntimeRunInput = {
     content: string;
     skillId?: string;
   }>;
+};
+
+export type ResumeAgentRuntimeRunInput = {
+  prompt: string;
+  userMessageId: string;
+  assistantMessageId: string;
 };
 
 function normalizeBaseUrl(rawBaseUrl: string) {
@@ -104,28 +126,56 @@ function parseSseChunk(chunk: string) {
 export class AgentRuntimeClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+  private readonly cancelTimeoutMs: number;
 
-  constructor(config?: { baseUrl?: string; timeoutMs?: number }) {
+  constructor(config?: {
+    baseUrl?: string;
+    timeoutMs?: number;
+    cancelTimeoutMs?: number;
+  }) {
     this.baseUrl = normalizeBaseUrl(config?.baseUrl ?? env.AGENT_RUNTIME_URL);
     this.timeoutMs = config?.timeoutMs ?? env.AGENT_RUNTIME_TIMEOUT_MS;
+    this.cancelTimeoutMs =
+      config?.cancelTimeoutMs ?? env.AGENT_RUNTIME_CANCEL_TIMEOUT_MS;
   }
 
   async listSkills() {
     return listSkillsResponseSchema.parse(await this.requestJson("/skills"));
   }
 
-  async startRun(input: StartAgentRuntimeRunInput) {
+  async startRun(input: StartAgentRuntimeRunInput, signal?: AbortSignal) {
     return agentRuntimeRunSchema.parse(
-      await this.requestJson("/runs", {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
+      await this.requestJson(
+        "/runs",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        signal,
+      ),
     );
   }
 
-  async getRun(runId: string) {
+  async getRun(runId: string, signal?: AbortSignal) {
     return agentRuntimeRunSchema.parse(
-      await this.requestJson(`/runs/${runId}`),
+      await this.requestJson(`/runs/${runId}`, undefined, signal),
+    );
+  }
+
+  async resumeRun(
+    runId: string,
+    input: ResumeAgentRuntimeRunInput,
+    signal?: AbortSignal,
+  ) {
+    return agentRuntimeRunSchema.parse(
+      await this.requestJson(
+        `/runs/${runId}/resume`,
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        },
+        signal,
+      ),
     );
   }
 
@@ -133,7 +183,7 @@ export class AgentRuntimeClient {
     await this.requestJson(`/runs/${runId}/cancel`, {
       method: "POST",
       body: JSON.stringify({}),
-    });
+    }, undefined, this.cancelTimeoutMs);
   }
 
   async *streamRunEvents(params: {
@@ -192,9 +242,23 @@ export class AgentRuntimeClient {
     }
   }
 
-  private async requestJson(path: string, init?: RequestInit) {
+  private async requestJson(
+    path: string,
+    init?: RequestInit,
+    parentSignal?: AbortSignal,
+    timeoutMs = this.timeoutMs,
+  ) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const abortFromParent = () => controller.abort(parentSignal?.reason);
+
+    if (parentSignal?.aborted) {
+      abortFromParent();
+    } else {
+      parentSignal?.addEventListener("abort", abortFromParent, {
+        once: true,
+      });
+    }
 
     try {
       const response = await fetch(`${this.baseUrl}${path}`, {
@@ -219,6 +283,7 @@ export class AgentRuntimeClient {
       throw toWorkflowError(error);
     } finally {
       clearTimeout(timeout);
+      parentSignal?.removeEventListener("abort", abortFromParent);
     }
   }
 }

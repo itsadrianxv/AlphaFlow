@@ -13,6 +13,10 @@ function getRunEventChannel(runId: string) {
   return `workflow:run:${runId}:events`;
 }
 
+function getCancellationChannel(runId: string) {
+  return `workflow:run:${runId}:cancel`;
+}
+
 let publisherSingleton: Redis | null = null;
 
 function getPublisherClient() {
@@ -64,6 +68,81 @@ export class RedisWorkflowRuntimeStore {
       getRunEventChannel(event.runId),
       JSON.stringify(event),
     );
+  }
+
+  async publishCancellation(payload: {
+    runId: string;
+    reason: string;
+    requestedAt: string;
+  }) {
+    await this.publisher.publish(
+      getCancellationChannel(payload.runId),
+      JSON.stringify(payload),
+    );
+  }
+
+  async subscribeToCancellation(
+    runId: string,
+    onCancel: (payload: { runId: string; reason: string; requestedAt: string }) => void,
+    signal?: AbortSignal,
+  ) {
+    const subscriber = new Redis(env.REDIS_URL, {
+      maxRetriesPerRequest: null,
+      lazyConnect: true,
+      connectTimeout: 1000,
+      retryStrategy: () => null,
+    });
+    const channel = getCancellationChannel(runId);
+    let closed = false;
+    const onMessage = (_receivedChannel: string, message: string) => {
+      try {
+        const payload = JSON.parse(message) as {
+          runId?: unknown;
+          reason?: unknown;
+          requestedAt?: unknown;
+        };
+        if (
+          payload.runId === runId &&
+          typeof payload.reason === "string" &&
+          typeof payload.requestedAt === "string"
+        ) {
+          onCancel({
+            runId,
+            reason: payload.reason,
+            requestedAt: payload.requestedAt,
+          });
+        }
+      } catch {
+        // 忽略无法解析的外部消息。
+      }
+    };
+    subscriber.on("message", onMessage);
+
+    try {
+      await subscriber.subscribe(channel);
+    } catch (error) {
+      subscriber.removeListener("message", onMessage);
+      await subscriber.quit().catch(() => undefined);
+      throw error;
+    }
+
+    const close = async () => {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      subscriber.removeListener("message", onMessage);
+      await subscriber.unsubscribe(channel).catch(() => undefined);
+      await subscriber.quit().catch(() => undefined);
+    };
+
+    if (signal) {
+      signal.addEventListener("abort", () => {
+        void close();
+      }, { once: true });
+    }
+
+    return close;
   }
 
   async subscribeToRunEvents(

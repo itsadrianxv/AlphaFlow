@@ -26,6 +26,18 @@ class RefreshScreeningStockUniverseJob:
     def run(self):
         started_at = iso_now()
         trading_date = self._today_fn()
+        if not self._provider.is_a_share_trading_day(trading_date):
+            return build_job_summary(
+                job_name="refresh-screening-stock-universe",
+                started_at=started_at,
+                stats={
+                    "tradingDate": trading_date.isoformat(),
+                    "recordCount": 0,
+                    "file": str(self._store.path),
+                    "skipped": True,
+                    "reason": "non_trading_day",
+                },
+            )
         records = self._provider.get_stock_search_universe()
         self._store.replace(
             records=records,

@@ -27,6 +27,7 @@ from app.data_providers.errors import (
     InvalidSymbolError,
     UnsupportedDatasetError,
 )
+from app.data_adapters.tushare import map_bar_request
 
 _UNIVERSE_CACHE_TTL_SECONDS = 86_400
 _FRAME_CACHE_TTL_SECONDS = 3_600
@@ -50,6 +51,7 @@ INDEX_PROXY_NAMES = {
 }
 
 RAW_DATASET_FIELDS: dict[str, str] = {
+    "trade_cal": "exchange,cal_date,is_open,pretrade_date",
     "stock_basic": "ts_code,symbol,name,area,industry,cnspell,market,exchange,list_status,list_date,delist_date,is_hs,act_name,act_ent_type",
     "stock_company": "ts_code,exchange,chairman,manager,secretary,reg_capital,setup_date,province,city,website,email,employees,main_business,business_scope",
     "daily": "ts_code,trade_date,open,high,low,close,pre_close,change,pct_chg,vol,amount",
@@ -443,6 +445,124 @@ class TushareProvider:
         snapshot = self._load_market_snapshot(as_of_date)
         self._market_snapshot_cache[cache_key] = (_now_timestamp(), snapshot)
         return snapshot
+
+    def get_bars_many(
+        self,
+        stock_codes: list[str],
+        timeframe: Timeframe = "DAILY",
+        start_date: str | None = None,
+        end_date: str | None = None,
+        adjust: str = "qfq",
+        limit_bars: int = 120,
+    ) -> dict[str, list[DailyBar]]:
+        """使用多代码或交易日截面策略批量获取 K 线。"""
+        codes = self._normalize_stock_codes(stock_codes)
+        if not codes:
+            return {}
+        mapping = map_bar_request(str(timeframe))
+        normalized_adjust = adjust.strip().lower()
+        if normalized_adjust not in {"", "qfq", "hfq"}:
+            raise UnsupportedDatasetError(
+                f"Unsupported adjust mode: {adjust}", provider=self.provider_name
+            )
+        profiles = {code: self.get_stock_profile(code) for code in codes}
+        ts_to_code = {profile.tsCode: code for code, profile in profiles.items()}
+        if len(codes) >= 500:
+            frame = self._load_market_periods_by_date(
+                mapping.dataset,
+                mapping.fields,
+                ts_to_code,
+                start_date=start_date,
+                end_date=end_date,
+                limit_bars=limit_bars,
+            )
+        else:
+            chunks: list[pd.DataFrame] = []
+            ts_codes = list(ts_to_code)
+            for index in range(0, len(ts_codes), 30):
+                joined = ",".join(ts_codes[index : index + 30])
+                chunks.append(
+                    self._load_cached_frame(
+                        mapping.dataset,
+                        ts_code=joined,
+                        start_date=start_date,
+                        end_date=end_date,
+                        fields=mapping.fields,
+                    )
+                )
+            frame = pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
+        if frame.empty:
+            return {code: [] for code in codes}
+        frame["trade_date"] = frame["trade_date"].astype(str)
+        if normalized_adjust:
+            factors = self._load_adjustment_factors_for_frame(frame)
+            frame = frame.merge(factors, on=["ts_code", "trade_date"], how="left")
+            frame = self._apply_grouped_adjustment(frame, normalized_adjust)
+        results: dict[str, list[DailyBar]] = {code: [] for code in codes}
+        for ts_code, group in frame.groupby("ts_code"):
+            code = ts_to_code.get(str(ts_code))
+            if code:
+                results[code] = self._frame_to_daily_bars(group.tail(limit_bars), code)
+        return results
+
+    def _load_market_periods_by_date(
+        self,
+        dataset: str,
+        fields: str,
+        ts_to_code: dict[str, str],
+        *,
+        start_date: str | None,
+        end_date: str | None,
+        limit_bars: int,
+    ) -> pd.DataFrame:
+        client = self._get_client()
+        calendar = self._ensure_frame(
+            client.trade_cal(
+                exchange="",
+                start_date=self._normalize_market_datetime(start_date or "19900101"),
+                end_date=self._normalize_market_datetime(end_date or date.today().strftime("%Y%m%d")),
+                is_open="1",
+                fields="cal_date,is_open",
+            )
+        )
+        if calendar.empty:
+            return pd.DataFrame()
+        dates = pd.to_datetime(calendar["cal_date"].astype(str)).sort_values()
+        if dataset == "weekly":
+            dates = dates.groupby(dates.dt.to_period("W-FRI")).max()
+        elif dataset == "monthly":
+            dates = dates.groupby(dates.dt.to_period("M")).max()
+        selected_dates = [value.strftime("%Y%m%d") for value in dates.tail(limit_bars)]
+        allowed = set(ts_to_code)
+        frames: list[pd.DataFrame] = []
+        loader = getattr(client, dataset)
+        for trade_date in selected_dates:
+            value = self._ensure_frame(loader(trade_date=trade_date, fields=fields))
+            if not value.empty and "ts_code" in value:
+                frames.append(value[value["ts_code"].astype(str).isin(allowed)])
+        return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+    def _load_adjustment_factors_for_frame(self, frame: pd.DataFrame) -> pd.DataFrame:
+        client = self._get_client()
+        factors: list[pd.DataFrame] = []
+        for trade_date in sorted(set(frame["trade_date"].astype(str))):
+            value = self._ensure_frame(
+                client.adj_factor(
+                    trade_date=trade_date,
+                    fields="ts_code,trade_date,adj_factor",
+                )
+            )
+            if not value.empty:
+                factors.append(value)
+        return pd.concat(factors, ignore_index=True) if factors else pd.DataFrame(
+            columns=["ts_code", "trade_date", "adj_factor"]
+        )
+
+    def _apply_grouped_adjustment(self, frame: pd.DataFrame, adjust: str) -> pd.DataFrame:
+        groups: list[pd.DataFrame] = []
+        for _, group in frame.groupby("ts_code"):
+            groups.append(self._apply_adjustment(group.sort_values("trade_date"), adjust))
+        return pd.concat(groups, ignore_index=True) if groups else frame
 
     def get_latest_metrics(
         self,

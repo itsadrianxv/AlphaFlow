@@ -214,6 +214,38 @@ services:
       timeout: 5s
       retries: 10
 
+  definitive-task-worker:
+    build:
+      context: ..
+      dockerfile: docker/definitive-task-worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-service:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PYTHON_SERVICE_URL: ${PYTHON_SERVICE_URL:-http://python-service:8000}
+      DEFINITIVE_TASK_WORKER_THREADS: ${DEFINITIVE_TASK_WORKER_THREADS:-4}
+      DEFINITIVE_TASK_WORKER_QUEUE_CAPACITY: ${DEFINITIVE_TASK_WORKER_QUEUE_CAPACITY:-8}
+      DEFINITIVE_TASK_WORKER_LEASE_SECONDS: ${DEFINITIVE_TASK_WORKER_LEASE_SECONDS:-90}
+      DEFINITIVE_TASK_WORKER_HEARTBEAT_SECONDS: ${DEFINITIVE_TASK_WORKER_HEARTBEAT_SECONDS:-30}
+      DEFINITIVE_TASK_WORKER_CLAIM_IDLE_MS: ${DEFINITIVE_TASK_WORKER_CLAIM_IDLE_MS:-120000}
+      DEFINITIVE_TASK_WORKER_PYTHON_TIMEOUT_MS: ${DEFINITIVE_TASK_WORKER_PYTHON_TIMEOUT_MS:-900000}
+      DEFINITIVE_TASK_WORKER_HEALTH_PORT: ${DEFINITIVE_TASK_WORKER_HEALTH_PORT:-8040}
+      DEFINITIVE_TASK_RUN_STREAM: ${DEFINITIVE_TASK_RUN_STREAM:-definitive-task:runs}
+      DEFINITIVE_TASK_RUN_GROUP: ${DEFINITIVE_TASK_RUN_GROUP:-definitive-task-worker}
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8040/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   web:
     build:
       context: ..
@@ -260,6 +292,7 @@ services:
       AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL:-http://agent-runtime:8020}
       AGENT_RUNTIME_TIMEOUT_MS: ${AGENT_RUNTIME_TIMEOUT_MS:-300000}
       ALPHAFLOW_INTERNAL_API_SECRET: ${ALPHAFLOW_INTERNAL_API_SECRET:-dev-internal-secret}
+      SCHEDULED_TASK_DELIVERY_TARGETS_JSON: ${SCHEDULED_TASK_DELIVERY_TARGETS_JSON:-[]}
       SELL_SIDE_REFRESH_SECRET: ${SELL_SIDE_REFRESH_SECRET:-}
       KRONOS_FORECAST_ENABLED: ${KRONOS_FORECAST_ENABLED:-false}
       KRONOS_DEFAULT_PREDICTION_LENGTH: ${KRONOS_DEFAULT_PREDICTION_LENGTH:-60}
@@ -319,6 +352,7 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       WORKFLOW_WORKER_POLL_INTERVAL_MS: ${WORKFLOW_WORKER_POLL_INTERVAL_MS:-2000}
       WORKFLOW_WORKER_CONCURRENCY: ${WORKFLOW_WORKER_CONCURRENCY:-10}
+      WORKFLOW_NODE_TIMEOUT_MS: ${WORKFLOW_NODE_TIMEOUT_MS:-600000}
     volumes:
       - ../web:/repo/web
       - ../data:/repo/data:ro
@@ -341,10 +375,13 @@ services:
         condition: service_healthy
       agent-runtime:
         condition: service_healthy
+      python-service:
+        condition: service_healthy
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
       AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL:-http://agent-runtime:8020}
+      PYTHON_SERVICE_URL: ${PYTHON_SERVICE_URL:-http://python-service:8000}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       ALPHAFLOW_INTERNAL_API_SECRET: ${ALPHAFLOW_INTERNAL_API_SECRET:-dev-internal-secret}
       SCHEDULED_TASK_EVENT_STREAM: ${SCHEDULED_TASK_EVENT_STREAM:-scheduled-task:events}
@@ -354,7 +391,9 @@ services:
       SCHEDULED_TASK_EVENT_BATCH_SIZE: ${SCHEDULED_TASK_EVENT_BATCH_SIZE:-20}
       SCHEDULER_POLL_INTERVAL_MS: ${SCHEDULER_POLL_INTERVAL_MS:-5000}
       SCHEDULER_CONCURRENCY: ${SCHEDULER_CONCURRENCY:-4}
-      FEISHU_WEBHOOK_URL: ${FEISHU_WEBHOOK_URL:-}
+      SCHEDULED_TASK_DELIVERY_TARGETS_JSON: ${SCHEDULED_TASK_DELIVERY_TARGETS_JSON:-[]}
+      FEISHU_WEBHOOK_URL_RESEARCH_ALERTS: ${FEISHU_WEBHOOK_URL_RESEARCH_ALERTS:-}
+      SCHEDULED_TASK_DELIVERY_STUCK_MS: ${SCHEDULED_TASK_DELIVERY_STUCK_MS:-300000}
     volumes:
       - ../web:/repo/web
       - web_node_modules:/repo/web/node_modules

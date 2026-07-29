@@ -1,6 +1,8 @@
 import {
   WORKFLOW_ERROR_CODES,
   WorkflowDomainError,
+  WorkflowPauseError,
+  RunCancelledError,
 } from "~/server/domain/workflow/errors";
 import type {
   PiAgentRunGraphState,
@@ -30,9 +32,45 @@ function isTerminalRuntimeEvent(type: string) {
   );
 }
 
+function parseUserInputRequest(payload: Record<string, unknown> | undefined) {
+  if (!payload || typeof payload.question !== "string" || !payload.question.trim()) {
+    return undefined;
+  }
+
+  const options = Array.isArray(payload.options)
+    ? payload.options.filter(
+        (option): option is { label: string; value: string } =>
+          Boolean(
+            option &&
+              typeof option === "object" &&
+              typeof (option as { label?: unknown }).label === "string" &&
+              typeof (option as { value?: unknown }).value === "string",
+          ),
+      )
+    : undefined;
+
+  return {
+    question: payload.question.trim(),
+    ...(options && options.length > 0 ? { options } : {}),
+  };
+}
+
 function progressForNode(nodeKey: PiAgentRunNodeKey) {
   const index = PI_AGENT_RUN_NODE_KEYS.indexOf(nodeKey);
   return Math.round(((index + 1) / PI_AGENT_RUN_NODE_KEYS.length) * 100);
+}
+
+function throwIfAborted(signal?: AbortSignal) {
+  if (!signal?.aborted) {
+    return;
+  }
+
+  const reason = signal.reason;
+  if (reason instanceof Error) {
+    throw reason;
+  }
+
+  throw new Error("工作流执行已中止");
 }
 
 export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
@@ -75,6 +113,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
     initialState: WorkflowGraphState;
     startNodeIndex?: number;
     hooks?: WorkflowGraphExecutionHooks;
+    signal?: AbortSignal;
   }): Promise<WorkflowGraphState> {
     let state = params.initialState as PiAgentRunGraphState;
     const startNodeIndex = params.startNodeIndex ?? 0;
@@ -84,6 +123,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
       index < PI_AGENT_RUN_NODE_KEYS.length;
       index += 1
     ) {
+      throwIfAborted(params.signal);
       const nodeKey = PI_AGENT_RUN_NODE_KEYS[index];
       if (!nodeKey) {
         continue;
@@ -98,7 +138,11 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
       if (nodeKey === "prepare_agent_task") {
         state = await this.prepareAgentTask(state, params.hooks);
       } else if (nodeKey === "execute_agent_runtime") {
-        state = await this.executeAgentRuntime(state, params.hooks);
+        state = await this.executeAgentRuntime(
+          state,
+          params.hooks,
+          params.signal,
+        );
       } else {
         state = await this.persistAgentResult(state, params.hooks);
       }
@@ -218,6 +262,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
   private async executeAgentRuntime(
     state: PiAgentRunGraphState,
     hooks?: WorkflowGraphExecutionHooks,
+    signal?: AbortSignal,
   ) {
     const task = state.preparedTask;
     if (!task) {
@@ -227,29 +272,51 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
       );
     }
 
-    await this.deps.agentRuntimeClient.startRun({
-      runId: state.runId,
-      userId: state.userId,
-      sessionId: task.conversationId,
-      conversationId: task.conversationId,
-      userMessageId: task.userMessageId,
-      assistantMessageId: task.assistantMessageId,
-      skillId: task.skillId,
-      skillIds: task.skillIds,
-      prompt: task.prompt,
-      title: task.title,
-      context: state.agentInput.context,
-      sessionSeed: task.conversationId
-        ? await this.deps.agentConversationRepository?.getSeedMessages(
-            task.conversationId,
-          )
-        : undefined,
-    });
+    const startedRuntimeRun = await this.deps.agentRuntimeClient.startRun(
+      {
+        runId: state.runId,
+        userId: state.userId,
+        sessionId: task.conversationId,
+        conversationId: task.conversationId,
+        userMessageId: task.userMessageId,
+        assistantMessageId: task.assistantMessageId,
+        skillId: task.skillId,
+        skillIds: task.skillIds,
+        prompt: task.prompt,
+        title: task.title,
+        context: state.agentInput.context,
+        sessionSeed: task.conversationId
+          ? await this.deps.agentConversationRepository?.getSeedMessages(
+              task.conversationId,
+            )
+          : undefined,
+      },
+      signal,
+    );
+
+    if (startedRuntimeRun.status === "waiting_for_input") {
+      await this.deps.agentRuntimeClient.resumeRun(
+        state.runId,
+        {
+          prompt: task.prompt,
+          userMessageId: task.userMessageId ?? "",
+          assistantMessageId: task.assistantMessageId ?? "",
+        },
+        signal,
+      );
+    }
 
     const streamAbort = new AbortController();
+    const abortStream = () => streamAbort.abort(signal?.reason);
+    if (signal?.aborted) {
+      abortStream();
+    } else {
+      signal?.addEventListener("abort", abortStream, { once: true });
+    }
     let runtimeEvents = [...state.runtimeEvents];
     let toolCallCount = state.toolCallCount;
     let terminalEventType: string | undefined;
+    let waitingForInput = state.waitingForInput;
 
     try {
       for await (const event of this.deps.agentRuntimeClient.streamRunEvents({
@@ -284,12 +351,38 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
           );
         }
 
+        if (event.type === "user.input.requested") {
+          waitingForInput = parseUserInputRequest(event.payload);
+          if (waitingForInput) {
+            await this.deps.agentConversationRepository?.markAssistantWaitingByRun(
+              state.runId,
+              waitingForInput,
+            );
+          }
+        }
+
         await hooks?.onNodeProgress?.("execute_agent_runtime", {
           piEventType: event.type,
           piSequence: event.sequence,
           message: event.message,
           payload: event.payload ?? {},
         });
+
+        if (event.type === "run.waiting_for_input") {
+          const request = parseUserInputRequest(event.payload) ?? waitingForInput;
+          if (request) {
+            throw new WorkflowPauseError(
+              "Pi agent 正在等待用户补充信息",
+              "user_input_required",
+              {
+                currentNodeKey: "execute_agent_runtime",
+                waitingForInput: request,
+                runtimeEvents,
+                toolCallCount,
+              },
+            );
+          }
+        }
 
         if (isTerminalRuntimeEvent(event.type)) {
           terminalEventType = event.type;
@@ -298,9 +391,33 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
       }
     } finally {
       streamAbort.abort();
+      signal?.removeEventListener("abort", abortStream);
     }
 
-    const runtimeRun = await this.deps.agentRuntimeClient.getRun(state.runId);
+    throwIfAborted(signal);
+    const runtimeRun = await this.deps.agentRuntimeClient.getRun(
+      state.runId,
+      signal,
+    );
+
+    if (runtimeRun.status === "waiting_for_input") {
+      const request =
+        runtimeRun.waitingForInput ??
+        parseUserInputRequest(runtimeEvents.at(-1)?.payload) ??
+        waitingForInput;
+      if (request) {
+        throw new WorkflowPauseError(
+          "Pi agent 正在等待用户补充信息",
+          "user_input_required",
+          {
+            currentNodeKey: "execute_agent_runtime",
+            waitingForInput: request,
+            runtimeEvents,
+            toolCallCount,
+          },
+        );
+      }
+    }
 
     if (runtimeRun.status === "failed") {
       if (task.assistantMessageId) {
@@ -317,10 +434,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
       );
     }
 
-    if (
-      runtimeRun.status === "cancelled" &&
-      terminalEventType !== "run.cancelled"
-    ) {
+    if (runtimeRun.status === "cancelled") {
       if (task.assistantMessageId) {
         await this.deps.agentConversationRepository?.markAssistantFailed({
           messageId: task.assistantMessageId,
@@ -329,10 +443,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
           errorMessage: "Pi agent-runtime 已取消",
         });
       }
-      throw new WorkflowDomainError(
-        WORKFLOW_ERROR_CODES.WORKFLOW_NODE_EXECUTION_FAILED,
-        "Pi agent-runtime 已取消",
-      );
+      throw new RunCancelledError("Pi agent-runtime 已取消");
     }
 
     if (task.assistantMessageId) {
@@ -360,6 +471,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
     return {
       ...state,
       runtimeEvents,
+      waitingForInput,
       finalOutput: runtimeRun.finalOutput,
       toolCallCount,
     };

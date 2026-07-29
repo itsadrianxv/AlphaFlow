@@ -1,6 +1,7 @@
 export type AgentRunStatus =
   | "queued"
   | "running"
+  | "waiting_for_input"
   | "succeeded"
   | "failed"
   | "cancelled";
@@ -14,8 +15,11 @@ export type AgentRuntimeEventType =
   | "tool.call.started"
   | "tool.call.completed"
   | "tool.call.failed"
+  | "user.input.requested"
   | "artifact.created"
   | "session.compacted"
+  | "run.waiting_for_input"
+  | "run.resumed"
   | "run.succeeded"
   | "run.failed"
   | "run.cancelled";
@@ -52,6 +56,7 @@ export type StartRunRequest = {
   context?: Record<string, unknown>;
   sessionSeed?: AgentRuntimeSeedMessage[];
   allowedCapabilities?: string[];
+  capabilityConstraints?: Record<string, unknown>;
 };
 
 export type ScheduledTaskRunRequest = {
@@ -71,6 +76,20 @@ export type AgentRuntimeSeedMessage = {
   skillId?: string;
 };
 
+export type UserInputRequest = {
+  question: string;
+  options?: Array<{
+    label: string;
+    value: string;
+  }>;
+};
+
+export type AgentRuntimeResumeRequest = {
+  prompt: string;
+  userMessageId: string;
+  assistantMessageId: string;
+};
+
 export type AgentRunSnapshot = {
   id: string;
   status: AgentRunStatus;
@@ -88,6 +107,7 @@ export type AgentRunSnapshot = {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
+  waitingForInput?: UserInputRequest;
   events: AgentRuntimeEvent[];
 };
 

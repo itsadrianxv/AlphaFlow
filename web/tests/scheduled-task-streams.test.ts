@@ -42,4 +42,15 @@ describe("定时任务 Redis Streams", () => {
     expect(scheduler).toContain("deliverScheduledTask");
     expect(agent).not.toContain("webhook");
   });
+
+  it("外部投递使用 SENDING 原子认领且仅确认结果后写入 SENT", async () => {
+    const scheduler = await readFile(
+      path.join(root, "tooling/workers/scheduled-task-scheduler.ts"),
+      "utf8",
+    );
+    expect(scheduler).toContain('data: { status: "SENDING"');
+    expect(scheduler).toContain('if (result.outcome !== "SENT")');
+    expect(scheduler).toContain('spec?.type === "FEISHU"');
+    expect(scheduler).not.toContain("skipped: true");
+  });
 });

@@ -18,8 +18,13 @@ import { asJsonObject, summarizeValue } from "./json";
 import { PythonGatewayClient } from "./python-gateway-client";
 import { RestrictedExecutionEnv } from "./restricted-env";
 import type { SkillRegistry } from "./skill-registry";
-import { createInternalTools } from "./tool-policy";
-import type { AgentRuntimeConfig, StartRunRequest } from "./types";
+import { createInternalTools, STANDARD_INTERNAL_TOOL_NAMES } from "./tool-policy";
+import { createScheduledTaskSetupTools, SCHEDULED_TASK_SETUP_TOOL_NAMES } from "./scheduled-task-setup-tools";
+import type {
+  AgentRuntimeConfig,
+  StartRunRequest,
+  UserInputRequest,
+} from "./types";
 import type { AgentRuntimeRunStore } from "./run-store";
 import { WebInternalClient } from "./web-internal-client";
 import { ScheduledTaskEventPublisher } from "./scheduled-task-events";
@@ -109,6 +114,9 @@ function resolveSystemPrompt(now = new Date()) {
     "回答涉及新闻、价格、政策、法规、公司信息、人物任职、产品版本、API 文档、市场行情、财报、公告、排名等可能变化的信息时，必须基于上述当前时间判断资料是否过期。",
     "如果搜索结果、网页或工具返回内容缺少发布时间、更新时间或数据日期，必须降低其证据权重，并在回答中说明不确定性。",
     "只能使用已注册工具，不要尝试访问本地项目文件、环境变量或任意 shell。",
+    "如果缺少用户必须补充的信息，必须调用 ask_user 工具；不得先输出问题后继续检索或猜测关键参数。",
+    "调用 ask_user 后立即结束本次运行，等待用户回答，不得继续调用工具或发起下一轮模型请求。",
+    "不得只用普通文本要求用户回复、确认或同意后再继续；需要阻塞等待时必须调用 ask_user。",
     "当用户提到“我的收藏”“我的行业”“我的公司”“我的自选股”“已有笔记”或“已保存报告”时，优先使用内部投研对象工具读取当前用户授权范围内的对象。",
     "仅在用户明确提出分析、比较、补充、风险、催化、跟踪指标或类似请求时，才基于投研对象继续调用行情、财务、事件、资金流等市场数据工具；普通列举或查看请求不要主动补行情财务。",
     "内部投研对象工具是只读工具，不得声称已经保存、修改、删除或加入收藏；如果用户要求保存，只输出可保存的文本草稿并说明当前运行不会写入收藏。",
@@ -158,11 +166,18 @@ function buildMergedSkill(skills: Skill[]): Skill {
   };
 }
 
-function mapHarnessEvent(
+export type HarnessEventState = {
+  lastAssistantText: string;
+  waitingForInput?: UserInputRequest;
+  scheduledDraftBuilt: boolean;
+  scheduleValidationStatus?: string;
+};
+
+export function mapHarnessEvent(
   store: AgentRuntimeRunStore,
   request: StartRunRequest,
   event: AgentHarnessEvent<Skill>,
-  state: { lastAssistantText: string },
+  state: HarnessEventState,
 ) {
   if (event.type === "message_start" && event.message.role === "assistant") {
     state.lastAssistantText = "";
@@ -247,7 +262,102 @@ function mapHarnessEvent(
       event.isError ? "tool.call.failed" : "tool.call.completed",
       payload,
     );
+
+    if (
+      !event.isError &&
+      (event.toolName === "build_scheduled_task_draft" ||
+        event.toolName === "build_scheduled_task_edit_draft")
+    ) {
+      state.scheduledDraftBuilt = true;
+    }
+
+    if (
+      !event.isError &&
+      event.toolName === "validate_schedule" &&
+      event.details &&
+      typeof event.details === "object"
+    ) {
+      const feasibility = (event.details as { feasibility?: unknown }).feasibility;
+      if (feasibility && typeof feasibility === "object") {
+        const status = (feasibility as { status?: unknown }).status;
+        if (typeof status === "string") {
+          state.scheduleValidationStatus = status;
+        }
+      }
+    }
+
+    if (
+      event.toolName === "ask_user" &&
+      !event.isError &&
+      event.details &&
+      typeof event.details === "object"
+    ) {
+      const details = event.details as {
+        question?: unknown;
+        options?: unknown;
+      };
+      if (typeof details.question === "string" && details.question.trim()) {
+        const options = Array.isArray(details.options)
+          ? details.options
+              .filter(
+                (option): option is { label: string; value: string } =>
+                  Boolean(
+                    option &&
+                      typeof option === "object" &&
+                      typeof (option as { label?: unknown }).label === "string" &&
+                      typeof (option as { value?: unknown }).value === "string",
+                  ),
+              )
+              .map((option) => ({
+                label: option.label,
+                value: option.value,
+              }))
+          : undefined;
+        const inputRequest: UserInputRequest = {
+          question: details.question.trim(),
+          ...(options && options.length > 0 ? { options } : {}),
+        };
+        state.waitingForInput = inputRequest;
+        if (store.markWaitingForInput(request.runId, inputRequest)) {
+          return inputRequest;
+        }
+      }
+    }
   }
+
+  return undefined;
+}
+
+export function registerHarnessEventHandlers(params: {
+  harness: AgentHarness;
+  store: AgentRuntimeRunStore;
+  request: StartRunRequest;
+  state: HarnessEventState;
+}) {
+  const { harness, store, request, state } = params;
+  harness.subscribe((event) => {
+    mapHarnessEvent(store, request, event, state);
+  });
+  harness.on("tool_call", (event) => {
+    mapHarnessEvent(store, request, event, state);
+    return undefined;
+  });
+  harness.on("tool_result", (event) => {
+    const waitingRequest = mapHarnessEvent(store, request, event, state);
+    if (!waitingRequest) {
+      return undefined;
+    }
+
+    // abort() 会同步触发内部 AbortSignal，阻止同批工具完成后继续请求模型。
+    void harness.abort().catch(() => undefined);
+    return { terminate: true };
+  });
+}
+
+export function isScheduledTaskFlowComplete(state: HarnessEventState) {
+  return (
+    state.scheduledDraftBuilt || state.scheduleValidationStatus === "UNSUPPORTED"
+  );
 }
 
 export class PiAdapter {
@@ -255,6 +365,7 @@ export class PiAdapter {
   private readonly webInternalClient: WebInternalClient;
   private readonly sessionRepo: JsonlSessionRepo;
   private readonly scheduledEvents: ScheduledTaskEventPublisher;
+  private readonly executions = new Map<string, Promise<void>>();
 
   constructor(
     private readonly config: AgentRuntimeConfig,
@@ -358,7 +469,38 @@ export class PiAdapter {
     }
   }
 
-  async start(request: StartRunRequest) {
+  start(request: StartRunRequest) {
+    const existing = this.executions.get(request.runId);
+    if (existing) {
+      return existing;
+    }
+
+    const turnGeneration = this.store.getTurnGeneration(request.runId) ?? 0;
+
+    const execution = this.runTurn(request, turnGeneration).finally(() => {
+      this.executions.delete(request.runId);
+    });
+    this.executions.set(request.runId, execution);
+    return execution;
+  }
+
+  async resume(runId: string) {
+    const request = this.store.getRequest(runId);
+    if (!request) {
+      return;
+    }
+    const existing = this.executions.get(runId);
+    if (existing) {
+      await existing.catch(() => undefined);
+    }
+
+    const resumedRequest = this.store.getRequest(runId);
+    if (resumedRequest && this.store.snapshot(runId)?.status === "running") {
+      await this.start(resumedRequest);
+    }
+  }
+
+  private async runTurn(request: StartRunRequest, turnGeneration: number) {
     const skillIds = resolveSkillIds(request);
     const skills = skillIds
       .map((skillId) => this.skillRegistry.get(skillId))
@@ -385,6 +527,9 @@ export class PiAdapter {
 
     const abortController = new AbortController();
     this.store.attachAbortController(request.runId, abortController);
+    if (this.store.snapshot(request.runId)?.status === "cancelled") {
+      return;
+    }
     this.store.markRunning(request.runId);
     const scheduledContext = request.context as Record<string, unknown> | undefined;
     const executionId = typeof scheduledContext?.executionId === "string" ? scheduledContext.executionId : undefined;
@@ -420,17 +565,37 @@ export class PiAdapter {
       return;
     }
 
-    const allToolNames = [
-        "internal_web_search", "internal_web_fetch", "internal_concept_match", "internal_screening_query",
-        "internal_research_targets_list", "internal_research_target_detail", "internal_research_notes_list",
-        "internal_research_artifacts_list", "internal_watchlist_detail", "internal_stock_search", "internal_stock_profile",
-        "internal_stock_bars", "internal_stock_daily_basic", "internal_index_market", "internal_index_constituents",
-        "internal_moneyflow", "internal_market_events", "internal_shareholder_events", "internal_financial_statements",
-        "internal_financial_indicators", "internal_earnings_events", "internal_fund_market", "internal_convertible_bond_market", "internal_macro_rates",
-      ];
-    const activeToolNames = request.allowedCapabilities?.length
-      ? allToolNames.filter((name) => request.allowedCapabilities?.includes(name))
-      : allToolNames;
+    const isSetup = request.skillId === "scheduled-task-setup";
+    const isEdit = request.skillId === "scheduled-task-edit";
+    const isScheduledExecution = request.skillId === "scheduled-task-execution";
+    const executionToolNames = [
+      ...STANDARD_INTERNAL_TOOL_NAMES.filter((name) => name !== "ask_user"),
+      "internal_tushare_dataset",
+    ];
+    const activeToolNames = isSetup || isEdit
+      ? [...SCHEDULED_TASK_SETUP_TOOL_NAMES, "ask_user"]
+      : isScheduledExecution
+        ? executionToolNames.filter((name) => request.allowedCapabilities?.includes(name))
+        : [...STANDARD_INTERNAL_TOOL_NAMES];
+    const standardTools = createInternalTools({
+      pythonGatewayClient: this.pythonGatewayClient,
+      webInternalClient: this.webInternalClient,
+      runId: request.runId,
+      userId: request.userId,
+      maxToolCalls: this.config.maxToolCallsPerRun,
+      toolTimeoutMs: this.config.toolTimeoutMs,
+      capabilityConstraints: request.capabilityConstraints,
+    });
+    const setupTools = request.conversationId
+      ? createScheduledTaskSetupTools({
+          webInternalClient: this.webInternalClient,
+          runId: request.runId,
+          userId: request.userId,
+          conversationId: request.conversationId,
+          timeoutMs: Math.min(this.config.toolTimeoutMs, 30_000),
+        })
+      : [];
+    const scheduledTaskInteractive = isSetup || isEdit;
     const harness = new AgentHarness({
       env,
       session,
@@ -438,20 +603,15 @@ export class PiAdapter {
       model,
       systemPrompt: resolveSystemPrompt(),
       streamOptions: {
-        timeoutMs: this.config.modelTimeoutMs,
-        maxRetries: this.config.modelMaxRetries,
+        timeoutMs: scheduledTaskInteractive
+          ? Math.min(this.config.modelTimeoutMs, 60_000)
+          : this.config.modelTimeoutMs,
+        maxRetries: scheduledTaskInteractive ? 0 : this.config.modelMaxRetries,
       },
       resources: {
         skills: [runtimeSkill],
       },
-      tools: createInternalTools({
-        pythonGatewayClient: this.pythonGatewayClient,
-        webInternalClient: this.webInternalClient,
-        runId: request.runId,
-        userId: request.userId,
-        maxToolCalls: this.config.maxToolCallsPerRun,
-        toolTimeoutMs: this.config.toolTimeoutMs,
-      }),
+      tools: [...standardTools, ...setupTools],
       activeToolNames,
     });
 
@@ -463,9 +623,15 @@ export class PiAdapter {
       { once: true },
     );
 
-    const eventState = { lastAssistantText: "" };
-    harness.subscribe((event) => {
-      mapHarnessEvent(this.store, request, event, eventState);
+    const eventState: HarnessEventState = {
+      lastAssistantText: "",
+      scheduledDraftBuilt: false,
+    };
+    registerHarnessEventHandlers({
+      harness,
+      store: this.store,
+      request,
+      state: eventState,
     });
 
     try {
@@ -479,8 +645,39 @@ export class PiAdapter {
         runtimeSkill.name,
         `${request.prompt}${context}`,
       );
+      const postTurnSnapshot = this.store.snapshot(request.runId);
+      if (
+        !this.store.isCurrentTurn(request.runId, turnGeneration) ||
+        abortController.signal.aborted ||
+        postTurnSnapshot?.status === "cancelled"
+      ) {
+        this.store.markCancelled(request.runId, "cancel_requested");
+        return;
+      }
+      if (postTurnSnapshot?.status === "waiting_for_input") {
+        return;
+      }
+      if (
+        scheduledTaskInteractive &&
+        !isScheduledTaskFlowComplete(eventState)
+      ) {
+        this.store.markFailed(
+          request.runId,
+          "SCHEDULED_TASK_FLOW_INCOMPLETE",
+          "定时任务未进入等待状态，也未生成可确认草稿",
+        );
+        return;
+      }
       if (request.sessionId) {
         await this.compactIfNeeded(harness, request.runId, "after");
+      }
+      if (
+        !this.store.isCurrentTurn(request.runId, turnGeneration) ||
+        abortController.signal.aborted ||
+        this.store.snapshot(request.runId)?.status === "cancelled"
+      ) {
+        this.store.markCancelled(request.runId, "cancel_requested");
+        return;
       }
       const text = extractMessageText(assistantMessage);
       const finalOutput = {
