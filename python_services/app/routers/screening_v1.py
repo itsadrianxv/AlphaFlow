@@ -17,6 +17,8 @@ from app.services.screening_stock_universe_store import (
     ScreeningStockUniverseStore,
     StockUniverseUnavailableError,
 )
+from app.financial_metrics.service import get_financial_metric_service
+from app.services.screening_run_executor import ScreeningRunExecutor
 
 router = APIRouter(prefix="/api/v1/screening", tags=["screening-v1"])
 
@@ -35,6 +37,11 @@ class ScreeningQueryRequest(BaseModel):
 
 class StockMentionsRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=20_000)
+
+
+class ScreeningRunExecutionRequest(BaseModel):
+    runId: str = Field(..., min_length=1)
+    config: dict[str, object]
 
 
 @lru_cache(maxsize=1)
@@ -76,6 +83,21 @@ def list_indicator_categories():
 @router.get("/indicators")
 def list_indicators():
     return load_indicator_catalog()["items"]
+
+
+@router.get("/financial-metrics/search")
+def search_financial_metrics(q: str = Query(..., min_length=1), company_type: str | None = None, limit: int = Query(50, ge=1, le=100)):
+    return [metric.to_dict() for metric in get_financial_metric_service().search_metrics(q, company_type=company_type, limit=limit)]
+
+
+@router.post("/execute-run")
+def execute_screening_run(request: ScreeningRunExecutionRequest):
+    try:
+        return ScreeningRunExecutor().execute(request.runId, request.config)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.post("/formulas/validate")

@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useDeferredValue, useMemo, useState } from "react";
-import { Panel, StatusPill } from "~/app/_components/ui";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { cn, Panel, StatusPill } from "~/app/_components/ui";
 import { companyOverviewHref } from "~/app/company-research/company-overview-link";
 import { TimingReportChart } from "~/app/timing/reports/[cardId]/timing-report-chart";
 import type { TimingTimeframe } from "~/server/domain/timing/types";
@@ -17,6 +17,79 @@ function number(value: number | null | undefined, suffix = "") {
 function amount(value: number | null | undefined) {
   if (value === null || value === undefined) return "暂无数据";
   return `${number(value / 100_000_000)} 亿`;
+}
+
+type FinancialMode = "quarter" | "annual";
+type ReportPeriodOrder = "asc" | "desc";
+const defaultFinancialMetricIds = [
+  "income.total_revenue",
+  "income.n_income_attr_p",
+  "income.basic_eps",
+  "balancesheet.total_assets",
+  "balancesheet.total_liab",
+  "cashflow.n_cashflow_act",
+];
+const financialMetricPreferenceKey = "company-overview.financial-metrics.v1";
+
+function reportPeriodLabel(endDate: string, mode: FinancialMode) {
+  const quarterMatch = /^(\d{4})Q([1-4])$/.exec(endDate);
+  if (quarterMatch) return `${quarterMatch[1]?.slice(-2)}Q${quarterMatch[2]}`;
+  if (/^\d{4}$/.test(endDate)) return `${endDate.slice(-2)}年报`;
+  const normalized = endDate.replaceAll("-", "");
+  const match = /^(\d{4})(\d{2})/.exec(normalized);
+  const year = match?.[1];
+  const month = match?.[2];
+  if (!year || !month) return endDate;
+  if (mode === "annual") return `${year.slice(-2)}年报`;
+
+  const quarter = { "03": "Q1", "06": "Q2", "09": "Q3", "12": "Q4" }[month];
+  return quarter ? `${year.slice(-2)}${quarter}` : endDate;
+}
+
+function compareReportPeriods(left: string, right: string) {
+  const normalize = (period: string) => {
+    const trimmed = period.trim().toUpperCase();
+    const quarterMatch = /^(\d{4})Q([1-4])$/.exec(trimmed);
+    if (quarterMatch) return `${quarterMatch[1]}-${quarterMatch[2]}`;
+    return trimmed.replaceAll("-", "").replaceAll("/", "");
+  };
+
+  return normalize(left).localeCompare(normalize(right), "en", {
+    numeric: true,
+  });
+}
+
+function sortByReportPeriod<T extends { endDate: string }>(
+  items: T[],
+  order: ReportPeriodOrder,
+) {
+  return [...items].sort((left, right) => {
+    const comparison = compareReportPeriods(left.endDate, right.endDate);
+    return order === "asc" ? comparison : -comparison;
+  });
+}
+
+function ReportPeriodOrderSelect(props: {
+  id: string;
+  value: ReportPeriodOrder;
+  onChange: (value: ReportPeriodOrder) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-[var(--app-text-muted)]">
+      <span>报告期排序</span>
+      <select
+        id={props.id}
+        value={props.value}
+        onChange={(event) =>
+          props.onChange(event.target.value as ReportPeriodOrder)
+        }
+        className="app-input w-auto min-w-[172px] py-1.5"
+      >
+        <option value="asc">按报告期升序排列</option>
+        <option value="desc">按报告期降序排列</option>
+      </select>
+    </label>
+  );
 }
 
 function chartLevels(
@@ -70,13 +143,25 @@ export function CompanyOverviewPanel(props: {
   const [keyword, setKeyword] = useState("");
   const deferredKeyword = useDeferredValue(keyword.trim());
   const [timeframe, setTimeframe] = useState<TimingTimeframe>("DAILY");
+  const [financialMode, setFinancialMode] = useState<FinancialMode>("quarter");
+  const [financialPeriodOrder, setFinancialPeriodOrder] =
+    useState<ReportPeriodOrder>("asc");
+  const [financialPeriodCount, setFinancialPeriodCount] = useState(8);
+  const [financialMetricIds, setFinancialMetricIds] = useState(
+    defaultFinancialMetricIds,
+  );
+  const [financialMetricSearch, setFinancialMetricSearch] = useState("");
   const stockSearch = api.screening.searchStocks.useQuery(
     { keyword: deferredKeyword, limit: 8 },
     { enabled: deferredKeyword.length > 0, refetchOnWindowFocus: false },
   );
   const overview = api.companyOverview.get.useQuery(
-    { stockCode: props.stockCode ?? "000001" },
+    { stockCode: props.stockCode ?? "000001", metricIds: financialMetricIds },
     { enabled: Boolean(props.stockCode), refetchOnWindowFocus: false },
+  );
+  const financialCatalog = api.screening.listIndicatorCatalog.useQuery(
+    undefined,
+    { refetchOnWindowFocus: false },
   );
   const bars = api.companyOverview.bars.useQuery(
     { stockCode: props.stockCode ?? "000001", timeframe },
@@ -85,6 +170,61 @@ export function CompanyOverviewPanel(props: {
   const data = overview.data;
   const usableBars = bars.data?.bars ?? [];
   const levels = useMemo(() => chartLevels(usableBars), [usableBars]);
+  const visibleFinancials = useMemo(() => {
+    const source =
+      financialMode === "quarter"
+        ? (data?.financials.quarters ?? [])
+        : (data?.financials.annuals ?? []);
+    return sortByReportPeriod(
+      source.slice(0, financialPeriodCount),
+      financialPeriodOrder,
+    );
+  }, [data, financialMode, financialPeriodCount, financialPeriodOrder]);
+  const financialMetricOptions = useMemo(() => {
+    const query = financialMetricSearch.trim().toLocaleLowerCase("zh-CN");
+    if (!query) return [];
+    return (financialCatalog.data?.items ?? [])
+      .filter((item) =>
+        [item.name, item.id, ...item.keywords]
+          .join(" ")
+          .toLocaleLowerCase("zh-CN")
+          .includes(query),
+      )
+      .slice(0, 12);
+  }, [financialCatalog.data, financialMetricSearch]);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(
+        window.localStorage.getItem(financialMetricPreferenceKey) ?? "null",
+      ) as unknown;
+      if (Array.isArray(stored)) {
+        const ids = stored
+          .filter((item): item is string => typeof item === "string")
+          .slice(0, 30);
+        if (ids.length > 0) setFinancialMetricIds(ids);
+      }
+    } catch {
+      window.localStorage.removeItem(financialMetricPreferenceKey);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      financialMetricPreferenceKey,
+      JSON.stringify(financialMetricIds),
+    );
+  }, [financialMetricIds]);
+
+  function formatFinancialValue(
+    value: number | null | undefined,
+    metric: NonNullable<typeof data>["financials"]["metrics"][number],
+  ) {
+    if (metric.valueKind === "currency") return amount(value);
+    if (metric.valueKind === "ratio")
+      return number(value == null ? value : value * 100, "%");
+    return number(value, metric.displayUnit ? ` ${metric.displayUnit}` : "");
+  }
 
   const chooseStock = (stock: { stockCode: string }) => {
     setKeyword("");
@@ -199,62 +339,157 @@ export function CompanyOverviewPanel(props: {
           <Panel title="财务指标">
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--app-border-soft)] pb-4">
+                  <div className="flex items-center">
+                    {(
+                      [
+                        ["quarter", "季报"],
+                        ["annual", "年报"],
+                      ] as const
+                    ).map(([mode, label]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-pressed={financialMode === mode}
+                        onClick={() => setFinancialMode(mode)}
+                        className={cn(
+                          "border border-[var(--app-border-soft)] px-3 py-1.5 text-sm transition-colors first:rounded-l-[6px] last:-ml-px last:rounded-r-[6px]",
+                          financialMode === mode
+                            ? "bg-[var(--app-text-strong)] text-[var(--app-bg)]"
+                            : "text-[var(--app-text-muted)] hover:bg-[var(--app-panel-soft)] hover:text-[var(--app-text)]",
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-[var(--app-text-muted)]">
+                    <label htmlFor="financial-period-count">报告期数</label>
+                    <select
+                      id="financial-period-count"
+                      aria-label="报告期数"
+                      value={financialPeriodCount}
+                      onChange={(event) =>
+                        setFinancialPeriodCount(Number(event.target.value))
+                      }
+                      className="app-input w-auto min-w-[84px] py-1.5"
+                    >
+                      <option value={4}>4 期</option>
+                      <option value={8}>8 期</option>
+                    </select>
+                    <span className="text-xs text-[var(--app-text-subtle)]">
+                      {visibleFinancials.length} / {financialPeriodCount} 期
+                    </span>
+                  </div>
+                  <ReportPeriodOrderSelect
+                    id="financial-period-order"
+                    value={financialPeriodOrder}
+                    onChange={setFinancialPeriodOrder}
+                  />
+                </div>
+                <div className="mb-4 border-b border-[var(--app-border-soft)] pb-4">
+                  <input
+                    value={financialMetricSearch}
+                    onChange={(event) =>
+                      setFinancialMetricSearch(event.target.value)
+                    }
+                    className="app-input"
+                    placeholder="搜索财务指标"
+                  />
+                  {financialMetricOptions.length > 0 ? (
+                    <div className="mt-2 grid gap-1 border border-[var(--app-border-soft)] p-2 sm:grid-cols-2">
+                      {financialMetricOptions.map((metric) => {
+                        const checked = financialMetricIds.includes(metric.id);
+                        return (
+                          <label
+                            key={metric.id}
+                            className="flex items-start gap-2 px-2 py-1.5 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setFinancialMetricIds((current) =>
+                                  checked
+                                    ? current.filter((id) => id !== metric.id)
+                                    : current.length < 30
+                                      ? [...current, metric.id]
+                                      : current,
+                                )
+                              }
+                            />
+                            <span>
+                              <span className="block text-[var(--app-text)]">
+                                {metric.name}
+                              </span>
+                              <span className="font-mono text-xs text-[var(--app-text-subtle)]">
+                                {metric.id}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+                <table className="min-w-[720px] text-sm">
                   <thead className="border-b border-[var(--app-border-soft)] text-left text-[var(--app-text-muted)]">
                     <tr>
-                      <th className="px-2 py-2">报告期</th>
-                      <th className="px-2 py-2">营收</th>
-                      <th className="px-2 py-2">归母净利</th>
-                      <th className="px-2 py-2">扣非净利</th>
-                      <th className="px-2 py-2">毛利率</th>
-                      <th className="px-2 py-2">净利率</th>
-                      <th className="px-2 py-2">经营现金流</th>
-                      <th className="px-2 py-2">自由现金流</th>
-                      <th className="px-2 py-2">ROE</th>
+                      <th className="sticky left-0 bg-[var(--app-panel)] px-2 py-2">
+                        指标
+                      </th>
+                      {visibleFinancials.map((item) => (
+                        <th
+                          key={item.endDate}
+                          className="app-data whitespace-nowrap px-2 py-2 text-right"
+                        >
+                          {reportPeriodLabel(item.endDate, financialMode)}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {data.financials.quarters.map((item) => (
+                    {data.financials.metrics.map((metric) => (
                       <tr
-                        key={item.endDate}
+                        key={metric.id}
                         className="border-b border-[var(--app-border-soft)]"
                       >
-                        <td className="px-2 py-2">{item.endDate}</td>
-                        <td className="px-2 py-2">{amount(item.revenue)}</td>
-                        <td className="px-2 py-2">{amount(item.netProfit)}</td>
-                        <td className="px-2 py-2">
-                          {amount(item.deductedNetProfit)}
-                        </td>
-                        <td className="px-2 py-2">
-                          {number(item.grossMargin, "%")}
-                        </td>
-                        <td className="px-2 py-2">
-                          {number(item.netMargin, "%")}
-                        </td>
-                        <td className="px-2 py-2">
-                          {amount(item.operatingCashflow)}
-                        </td>
-                        <td className="px-2 py-2">
-                          {amount(item.freeCashflow)}
-                        </td>
-                        <td className="px-2 py-2">{number(item.roe, "%")}</td>
+                        <th
+                          scope="row"
+                          className="sticky left-0 bg-[var(--app-panel)] px-2 py-2 text-left font-medium text-[var(--app-text)]"
+                        >
+                          {metric.name}
+                        </th>
+                        {visibleFinancials.map((item) => (
+                          <td
+                            key={`${metric.id}-${item.endDate}`}
+                            className="app-data whitespace-nowrap px-2 py-2 text-right text-[var(--app-text-muted)]"
+                          >
+                            {formatFinancialValue(
+                              item.values[metric.id],
+                              metric,
+                            )}
+                          </td>
+                        ))}
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <p className="mt-3 text-xs text-[var(--app-text-subtle)]">
-                  自由现金流 = 经营活动现金流量净额 - 购建长期资产支付的现金。
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <StatusPill
-                    label={`PE ${number(data.financials.valuation.pe)}`}
-                  />
-                  <StatusPill
-                    label={`PB ${number(data.financials.valuation.pb)}`}
-                  />
-                  <StatusPill
-                    label={`PS ${number(data.financials.valuation.ps)}`}
-                  />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {data.financials.metrics.map((metric) => (
+                    <button
+                      key={metric.id}
+                      type="button"
+                      className="app-button"
+                      onClick={() =>
+                        setFinancialMetricIds((current) =>
+                          current.filter((id) => id !== metric.id),
+                        )
+                      }
+                    >
+                      {metric.name} ×
+                    </button>
+                  ))}
                 </div>
               </div>
               <QuestionList

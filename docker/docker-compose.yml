@@ -182,6 +182,38 @@ services:
       timeout: 5s
       retries: 10
 
+  screening-worker:
+    build:
+      context: ..
+      dockerfile: docker/screening-worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-service:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PYTHON_SERVICE_URL: ${PYTHON_SERVICE_URL:-http://python-service:8000}
+      SCREENING_WORKER_THREADS: ${SCREENING_WORKER_THREADS:-4}
+      SCREENING_WORKER_QUEUE_CAPACITY: ${SCREENING_WORKER_QUEUE_CAPACITY:-8}
+      SCREENING_WORKER_LEASE_SECONDS: ${SCREENING_WORKER_LEASE_SECONDS:-90}
+      SCREENING_WORKER_HEARTBEAT_SECONDS: ${SCREENING_WORKER_HEARTBEAT_SECONDS:-30}
+      SCREENING_WORKER_CLAIM_IDLE_MS: ${SCREENING_WORKER_CLAIM_IDLE_MS:-120000}
+      SCREENING_WORKER_PYTHON_TIMEOUT_MS: ${SCREENING_WORKER_PYTHON_TIMEOUT_MS:-900000}
+      SCREENING_WORKER_HEALTH_PORT: ${SCREENING_WORKER_HEALTH_PORT:-8030}
+      SCREENING_RUN_STREAM: ${SCREENING_RUN_STREAM:-screening:runs}
+      SCREENING_RUN_GROUP: ${SCREENING_RUN_GROUP:-screening-worker}
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8030/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
   web:
     build:
       context: ..

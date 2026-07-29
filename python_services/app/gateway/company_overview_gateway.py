@@ -9,6 +9,8 @@ from typing import Any
 import pandas as pd
 
 from app.data_providers import get_default_data_provider
+from app.financial_metrics.models import MetricSeriesResult, SeriesQuery
+from app.financial_metrics.service import FinancialMetricService, get_financial_metric_service
 from app.gateway.common import GatewayError, build_meta, execute_cached, gateway_cache
 from app.policies.cache_policy import get_cache_policy
 from app.policies.retry_policy import RetryPolicy
@@ -31,18 +33,29 @@ def _text(value: Any) -> str | None:
 
 
 class CompanyOverviewGateway:
-    def __init__(self, provider: Any | None = None) -> None:
+    DEFAULT_METRIC_IDS = (
+        "income.total_revenue",
+        "income.n_income_attr_p",
+        "income.basic_eps",
+        "balancesheet.total_assets",
+        "balancesheet.total_liab",
+        "cashflow.n_cashflow_act",
+    )
+
+    def __init__(self, provider: Any | None = None, financial_service: FinancialMetricService | None = None) -> None:
         self._provider = provider or get_default_data_provider()
+        self._financial = financial_service or get_financial_metric_service()
         self._cache = gateway_cache
         self._retry_policy = RetryPolicy()
 
-    def get_overview(self, *, request_id: str, stock_code: str) -> dict[str, Any]:
+    def get_overview(self, *, request_id: str, stock_code: str, metric_ids: tuple[str, ...] | None = None) -> dict[str, Any]:
+        selected_metrics = metric_ids or self.DEFAULT_METRIC_IDS
         started_at = time.perf_counter()
         result = execute_cached(
             dataset="company_overview",
             provider=getattr(self._provider, "provider_name", "tushare"),
-            params={"stockCode": stock_code},
-            fetcher=lambda: self._build(stock_code),
+            params={"stockCode": stock_code, "metricIds": list(selected_metrics)},
+            fetcher=lambda: self._build(stock_code, selected_metrics),
             cache_policy=get_cache_policy("company_overview"),
             retry_policy=self._retry_policy,
             cache=self._cache,
@@ -67,24 +80,13 @@ class CompanyOverviewGateway:
         frame = loader(dataset, **params)
         return frame.copy() if isinstance(frame, pd.DataFrame) else pd.DataFrame()
 
-    def _build(self, stock_code: str) -> dict[str, Any]:
+    def _build(self, stock_code: str, metric_ids: tuple[str, ...] | None = None) -> dict[str, Any]:
         profile = self._provider.get_stock_profile(stock_code)
         ts_code = profile.tsCode
         company = self._raw("stock_company", ts_code=ts_code)
         company_row = company.iloc[0] if not company.empty else {}
-        income = self._dedupe_reports(self._raw("income", ts_code=ts_code))
-        cashflow = self._dedupe_reports(self._raw("cashflow", ts_code=ts_code))
-        self._dedupe_reports(self._raw("balancesheet", ts_code=ts_code))
-        indicator = self._dedupe_reports(self._raw("fina_indicator", ts_code=ts_code))
-        daily_basic = self._raw("daily_basic", ts_code=ts_code)
         main_business = self._raw("fina_mainbz", ts_code=ts_code, type="P")
-        quarters = self._quarters(income, cashflow, indicator)
-        annuals = self._annuals(income, cashflow, indicator)
-        latest_basic = (
-            daily_basic.sort_values("trade_date", ascending=False).iloc[0]
-            if not daily_basic.empty and "trade_date" in daily_basic.columns
-            else {}
-        )
+        financials = self._financial_series(stock_code, metric_ids or self.DEFAULT_METRIC_IDS)
         return {
             "stockCode": stock_code,
             "tsCode": ts_code,
@@ -96,80 +98,48 @@ class CompanyOverviewGateway:
                 "mainBusiness": _text(company_row.get("main_business")),
                 "businessScope": _text(company_row.get("business_scope")),
             },
-            "financials": {
-                "quarters": quarters,
-                "annuals": annuals,
-                "valuation": {
-                    "asOfDate": _text(latest_basic.get("trade_date")),
-                    "pe": _number(latest_basic.get("pe_ttm")) or _number(latest_basic.get("pe")),
-                    "pb": _number(latest_basic.get("pb")),
-                    "ps": _number(latest_basic.get("ps_ttm")) or _number(latest_basic.get("ps")),
-                },
-            },
+            "financials": financials,
             "businesses": self._businesses(main_business),
         }
 
-    def _dedupe_reports(self, frame: pd.DataFrame) -> pd.DataFrame:
-        if frame.empty or "end_date" not in frame.columns:
-            return pd.DataFrame()
-        normalized = frame.copy()
-        if "ann_date" in normalized.columns:
-            normalized = normalized.sort_values(["end_date", "ann_date"], ascending=False)
-        return normalized.drop_duplicates("end_date", keep="first")
-
-    def _point(self, end_date: str, income: pd.Series, cashflow: pd.Series, indicator: pd.Series) -> dict[str, Any]:
-        revenue = _number(income.get("revenue")) or _number(income.get("total_revenue"))
-        operating_cashflow = _number(cashflow.get("n_cashflow_act"))
-        capex = _number(cashflow.get("c_pay_acq_const_fiolta"))
+    def _financial_series(self, stock_code: str, metric_ids: tuple[str, ...]) -> dict[str, Any]:
+        today = datetime.now()
+        annual_periods = tuple(str(year) for year in range(today.year - 5, today.year + 1))
+        quarter_periods: list[str] = []
+        year, quarter = today.year, (today.month - 1) // 3 + 1
+        for offset in range(11, -1, -1):
+            absolute = year * 4 + quarter - 1 - offset
+            quarter_periods.append(f"{absolute // 4}Q{absolute % 4 + 1}")
+        annual = self._financial.get_series(SeriesQuery(
+            stock_codes=(stock_code,), metric_ids=metric_ids, periods=annual_periods,
+            period_type="ANNUAL", use_case="COMPANY_OVERVIEW",
+        ))
+        quarterly = self._financial.get_series(SeriesQuery(
+            stock_codes=(stock_code,), metric_ids=metric_ids, periods=tuple(quarter_periods),
+            period_type="QUARTERLY", use_case="COMPANY_OVERVIEW",
+        ))
         return {
-            "endDate": end_date,
-            "revenue": revenue,
-            "netProfit": _number(income.get("n_income_attr_p")),
-            "deductedNetProfit": _number(income.get("net_after_nr_lp_correct")),
-            "grossMargin": _number(indicator.get("grossprofit_margin")) or _number(indicator.get("gross_margin")),
-            "netMargin": _number(indicator.get("netprofit_margin")),
-            "operatingCashflow": operating_cashflow,
-            "freeCashflow": operating_cashflow - capex if operating_cashflow is not None and capex is not None else None,
-            "roe": _number(indicator.get("roe")) or _number(indicator.get("roe_waa")),
-            "roic": _number(indicator.get("roic")),
+            "metrics": [definition.to_dict() for definition in annual.definitions],
+            "quarters": self._series_points(quarterly),
+            "annuals": self._series_points(annual),
+            "warnings": [warning.to_dict() for warning in [*annual.warnings, *quarterly.warnings]],
         }
 
-    def _quarters(self, income: pd.DataFrame, cashflow: pd.DataFrame, indicator: pd.DataFrame) -> list[dict[str, Any]]:
-        income = self._to_single_quarter(
-            income,
-            ["revenue", "total_revenue", "n_income_attr_p", "net_after_nr_lp_correct"],
-        )
-        cashflow = self._to_single_quarter(
-            cashflow,
-            ["n_cashflow_act", "c_pay_acq_const_fiolta"],
-        )
-        dates = sorted(set(income.get("end_date", pd.Series(dtype=str)).astype(str)), reverse=True)[:8]
-        return [self._point(date, self._row(income, date), self._row(cashflow, date), self._row(indicator, date)) for date in dates]
-
     @staticmethod
-    def _to_single_quarter(frame: pd.DataFrame, fields: list[str]) -> pd.DataFrame:
-        """TuShare interim statements are cumulative; convert each fiscal year to single quarters."""
-        if frame.empty or "end_date" not in frame.columns:
-            return frame
-        result = frame.copy().sort_values("end_date")
-        result["_year"] = result["end_date"].astype(str).str[:4]
-        for field in fields:
-            if field not in result.columns:
+    def _series_points(result: MetricSeriesResult) -> list[dict[str, Any]]:
+        if result.frame.empty:
+            return []
+        pivot = result.frame.pivot_table(index="period", columns="metric_id", values="value", aggfunc="first", dropna=False)
+        points = []
+        for period in reversed(result.periods):
+            if period not in pivot.index:
                 continue
-            values = pd.to_numeric(result[field], errors="coerce")
-            result[field] = values.groupby(result["_year"]).diff().fillna(values)
-        return result.drop(columns=["_year"])
-
-    def _annuals(self, income: pd.DataFrame, cashflow: pd.DataFrame, indicator: pd.DataFrame) -> list[dict[str, Any]]:
-        dates = [date for date in income.get("end_date", pd.Series(dtype=str)).astype(str).tolist() if date.endswith("1231")]
-        return [self._point(date, self._row(income, date), self._row(cashflow, date), self._row(indicator, date)) for date in sorted(set(dates), reverse=True)[:5]]
-
-    @staticmethod
-    def _row(frame: pd.DataFrame, end_date: str) -> pd.Series:
-        if frame.empty or "end_date" not in frame.columns:
-            return pd.Series(dtype=object)
-        rows = frame[frame["end_date"].astype(str) == end_date]
-        return rows.iloc[0] if not rows.empty else pd.Series(dtype=object)
+            values = {
+                definition.id: _number(pivot.loc[period].get(definition.id))
+                for definition in result.definitions
+            }
+            points.append({"endDate": period, "values": values})
+        return points
 
     def _businesses(self, frame: pd.DataFrame) -> list[dict[str, Any]]:
         if frame.empty or "end_date" not in frame.columns:

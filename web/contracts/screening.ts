@@ -37,12 +37,9 @@ export const indicatorRetrievalModeSchema = z.enum([
 ]);
 
 export const indicatorSourceDatasetSchema = z.enum([
-  "daily_basic",
-  "fina_indicator",
   "income",
   "cashflow",
   "balancesheet",
-  "derived",
 ]);
 
 export const indicatorCatalogItemSchema = z.object({
@@ -55,7 +52,23 @@ export const indicatorCatalogItemSchema = z.object({
   description: z.string().optional(),
   sortOrder: z.number().int().nonnegative().default(0),
   keywords: z.array(z.string().min(1)).default([]),
-  sourceDataset: indicatorSourceDatasetSchema.default("derived"),
+  sourceDataset: indicatorSourceDatasetSchema,
+  dataset: indicatorSourceDatasetSchema,
+  field: z.string().min(1),
+  statementName: z.string().min(1),
+  subcategory: z.string().min(1),
+  valueKind: z.enum(["currency", "ratio", "per_share", "shares", "number"]),
+  canonicalUnit: z.string().min(1),
+  displayUnit: z.string().min(1),
+  quarterTransform: z.enum([
+    "cumulative",
+    "point_in_time",
+    "already_single",
+    "reported_cumulative",
+  ]),
+  periodSemantics: z.string().min(1),
+  applicableCompanyTypes: z.array(z.string()).default([]),
+  defaultVisible: z.boolean().default(false),
 });
 
 export const indicatorCategorySchema = z.object({
@@ -173,12 +186,39 @@ export const workspaceTimeConfigSchema = z
     }
   });
 
+export const screeningUniverseSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("ALL_A_SHARES") }),
+  z.object({
+    type: z.literal("INDUSTRY"),
+    industryNames: z.array(z.string().trim().min(1)).min(1),
+  }),
+  z.object({
+    type: z.literal("STOCKS"),
+    stockCodes: z.array(stockCodeSchema).min(1).max(500),
+  }),
+]);
+
 export const workspaceQuerySchema = z.object({
   stockCodes: z.array(stockCodeSchema).min(1).max(20),
   indicatorIds: z.array(z.string().min(1)),
   formulaIds: z.array(z.string().min(1)).default([]),
   timeConfig: workspaceTimeConfigSchema,
 });
+
+export const createScreeningRunInputSchema = z
+  .object({
+    workspaceId: z.string().min(1),
+    universe: screeningUniverseSchema,
+    indicatorIds: z.array(z.string().min(1)).max(30),
+    formulaIds: z.array(z.string().min(1)).default([]),
+    timeConfig: workspaceTimeConfigSchema,
+    filterRules: z.array(z.lazy(() => workspaceFilterRuleSchema)).default([]),
+    sortState: z.lazy(() => workspaceSortStateSchema).nullable().optional(),
+  })
+  .refine(
+    (value) => value.indicatorIds.length + value.formulaIds.length > 0,
+    "请至少选择一个指标或公式",
+  );
 
 export const workspaceFilterOperatorSchema = z.enum([
   ">",
@@ -264,6 +304,7 @@ export const workspacePersistedStateSchema = z.object({
   }),
   resultSnapshot: workspaceResultSchema.nullable().optional(),
   lastFetchedAt: z.string().optional(),
+  universe: screeningUniverseSchema.optional(),
 });
 
 export const createWorkspaceInputSchema = z.object({
@@ -281,6 +322,7 @@ export const createWorkspaceInputSchema = z.object({
   }),
   resultSnapshot: workspaceResultSchema.nullable().optional(),
   lastFetchedAt: z.string().optional(),
+  universe: screeningUniverseSchema.optional(),
 });
 
 export const updateWorkspaceInputSchema = createWorkspaceInputSchema
@@ -300,7 +342,8 @@ export const updateWorkspaceInputSchema = createWorkspaceInputSchema
       value.sortState !== undefined ||
       value.columnState !== undefined ||
       value.resultSnapshot !== undefined ||
-      value.lastFetchedAt !== undefined,
+      value.lastFetchedAt !== undefined ||
+      value.universe !== undefined,
     "至少需要提供一个待更新字段",
   );
 
@@ -351,3 +394,5 @@ export type CreateWorkspaceInput = z.infer<typeof createWorkspaceInputSchema>;
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceInputSchema>;
 export type CreateFormulaInput = z.infer<typeof createFormulaInputSchema>;
 export type UpdateFormulaInput = z.infer<typeof updateFormulaInputSchema>;
+export type ScreeningUniverse = z.infer<typeof screeningUniverseSchema>;
+export type CreateScreeningRunInput = z.infer<typeof createScreeningRunInputSchema>;

@@ -17,9 +17,9 @@ from app.services.screening_universe import ScreeningStockSearcher
 
 def _records() -> list[dict[str, str]]:
     return [
-        {"stockCode": "600519", "stockName": "贵州茅台", "market": "SH"},
-        {"stockCode": "000001", "stockName": "平安银行", "market": "SZ"},
-        {"stockCode": "920001", "stockName": "北交样本", "market": "BJ"},
+        {"stockCode": "600519", "stockName": "贵州茅台", "market": "SH", "industry": "白酒"},
+        {"stockCode": "000001", "stockName": "平安银行", "market": "SZ", "industry": "银行"},
+        {"stockCode": "920001", "stockName": "北交样本", "market": "BJ", "industry": "专精特新"},
     ]
 
 
@@ -43,11 +43,12 @@ def test_refresh_writes_valid_snapshot_atomically(tmp_path) -> None:
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert result.stats["recordCount"] == 3
-    assert payload["schemaVersion"] == 1
+    assert payload["schemaVersion"] == 2
     assert payload["provider"] == "tushare"
     assert payload["tradingDate"] == "2026-07-24"
     assert payload["recordCount"] == 3
     assert payload["records"][0]["stockCode"] == "000001"
+    assert payload["records"][0]["industry"] == "银行"
     assert not list(tmp_path.glob("*.tmp"))
 
 

@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   type CreateWorkspaceInput,
   createFormulaInputSchema,
+  createScreeningRunInputSchema,
   createWorkspaceInputSchema,
   customFormulaSpecSchema,
   deleteWorkspaceInputSchema,
@@ -21,6 +22,7 @@ import {
 } from "~/contracts/screening";
 import { normalizeFormulaExpression } from "~/server/api/routers/screening-formula-normalizer";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { publishScreeningRun } from "~/server/application/screening/screening-run-stream";
 import { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import { PythonScreeningWorkbenchClient } from "~/server/infrastructure/screening/python-screening-workbench-client";
 
@@ -49,6 +51,7 @@ type ScreeningWorkspaceRecord = {
   sortState: unknown;
   columnState: unknown;
   resultSnapshot: unknown;
+  universe: unknown;
   lastFetchedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -92,6 +95,7 @@ function mapPersistedWorkspaceState(input: CreateWorkspaceInput): {
   columnState: WorkspacePersistedState["columnState"];
   resultSnapshot: WorkspaceResult | null;
   lastFetchedAt: Date | null;
+  universe: WorkspacePersistedState["universe"];
 } {
   return {
     stockCodes: input.stockCodes,
@@ -103,6 +107,10 @@ function mapPersistedWorkspaceState(input: CreateWorkspaceInput): {
     columnState: input.columnState,
     resultSnapshot: input.resultSnapshot ?? null,
     lastFetchedAt: input.lastFetchedAt ? new Date(input.lastFetchedAt) : null,
+    universe: input.universe ?? {
+      type: "STOCKS",
+      stockCodes: input.stockCodes,
+    },
   };
 }
 
@@ -115,6 +123,7 @@ function parseWorkspaceState(record: {
   sortState: unknown;
   columnState: unknown;
   resultSnapshot: unknown;
+  universe: unknown;
   lastFetchedAt: Date | null;
 }) {
   return workspacePersistedStateSchema.parse({
@@ -127,6 +136,7 @@ function parseWorkspaceState(record: {
     columnState: record.columnState,
     resultSnapshot: record.resultSnapshot,
     lastFetchedAt: record.lastFetchedAt?.toISOString(),
+    universe: record.universe,
   });
 }
 
@@ -166,6 +176,7 @@ function buildWorkspaceDetail(record: {
   sortState: unknown;
   columnState: unknown;
   resultSnapshot: unknown;
+  universe: unknown;
   lastFetchedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -461,6 +472,7 @@ export const screeningRouter = createTRPCRouter({
           columnState: payload.columnState,
           resultSnapshot: payload.resultSnapshot,
           lastFetchedAt: payload.lastFetchedAt,
+          universe: payload.universe,
         },
       });
 
@@ -503,6 +515,7 @@ export const screeningRouter = createTRPCRouter({
             : input.lastFetchedAt === undefined
               ? undefined
               : null,
+          universe: input.universe,
         },
       });
 
@@ -569,5 +582,127 @@ export const screeningRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+
+  createRun: protectedProcedure
+    .input(createScreeningRunInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const workspace = await ctx.db.screeningWorkspace.findFirst({
+        where: { id: input.workspaceId, userId: ctx.session.user.id },
+      });
+      if (!workspace) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "筛选工作区不存在" });
+      }
+
+      const formulas = input.formulaIds.length
+        ? await ctx.db.screeningFormula.findMany({
+            where: { userId: ctx.session.user.id, id: { in: input.formulaIds } },
+          })
+        : [];
+      if (formulas.length !== input.formulaIds.length) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "部分公式不存在或无权访问" });
+      }
+
+      const config = {
+        universe: input.universe,
+        indicatorIds: input.indicatorIds,
+        formulas: formulas.map(buildFormula),
+        timeConfig: input.timeConfig,
+        filterRules: input.filterRules,
+        sortState: input.sortState ?? null,
+      };
+      const run = await ctx.db.screeningRun.create({
+        data: {
+          workspaceId: workspace.id,
+          userId: ctx.session.user.id,
+          config,
+        },
+      });
+      try {
+        await publishScreeningRun(run.id);
+      } catch (error) {
+        await ctx.db.screeningRun.update({
+          where: { id: run.id },
+          data: {
+            status: "FAILED",
+            completedAt: new Date(),
+            errorCode: "STREAM_PUBLISH_FAILED",
+            errorMessage: error instanceof Error ? error.message : String(error),
+          },
+        });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "筛选任务发布失败" });
+      }
+      return { id: run.id, status: run.status, createdAt: run.createdAt.toISOString() };
+    }),
+
+  getRun: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .query(async ({ ctx, input }) => {
+      const run = await ctx.db.screeningRun.findFirst({
+        where: { id: input.id, userId: ctx.session.user.id },
+      });
+      if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "筛选运行不存在" });
+      return {
+        ...run,
+        fencingToken: run.fencingToken.toString(),
+        createdAt: run.createdAt.toISOString(),
+        updatedAt: run.updatedAt.toISOString(),
+        startedAt: run.startedAt?.toISOString() ?? null,
+        completedAt: run.completedAt?.toISOString() ?? null,
+        leaseExpiresAt: run.leaseExpiresAt?.toISOString() ?? null,
+      };
+    }),
+
+  listRuns: protectedProcedure
+    .input(z.object({ workspaceId: z.string().min(1), limit: z.number().int().min(1).max(100).default(20) }))
+    .query(async ({ ctx, input }) => {
+      const runs = await ctx.db.screeningRun.findMany({
+        where: { workspaceId: input.workspaceId, userId: ctx.session.user.id },
+        orderBy: { createdAt: "desc" },
+        take: input.limit,
+      });
+      return runs.map((run) => ({
+        id: run.id, status: run.status, totalCount: run.totalCount,
+        universeCount: run.universeCount, attempts: run.attempts,
+        createdAt: run.createdAt.toISOString(), completedAt: run.completedAt?.toISOString() ?? null,
+        errorCode: run.errorCode, errorMessage: run.errorMessage,
+      }));
+    }),
+
+  listRunResults: protectedProcedure
+    .input(z.object({ runId: z.string().min(1), cursor: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const run = await ctx.db.screeningRun.findFirst({
+        where: { id: input.runId, userId: ctx.session.user.id },
+      });
+      if (!run) throw new TRPCError({ code: "NOT_FOUND", message: "筛选运行不存在" });
+      let afterRank = 0;
+      if (input.cursor) {
+        try {
+          const decoded = JSON.parse(Buffer.from(input.cursor, "base64url").toString("utf8")) as { runId: string; rank: number };
+          if (decoded.runId !== run.id || !Number.isInteger(decoded.rank)) throw new Error("invalid cursor");
+          afterRank = decoded.rank;
+        } catch {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "无效的结果游标" });
+        }
+      }
+      const rows = await ctx.db.screeningRunResult.findMany({
+        where: { runId: run.id, rank: { gt: afterRank } },
+        orderBy: { rank: "asc" },
+        take: 101,
+      });
+      const page = rows.slice(0, 100);
+      const last = page.at(-1);
+      return {
+        runId: run.id,
+        status: run.status,
+        totalCount: run.totalCount ?? 0,
+        items: page.map((row) => ({ stockCode: row.stockCode, rank: row.rank })),
+        nextCursor: rows.length > 100 && last
+          ? Buffer.from(JSON.stringify({ runId: run.id, rank: last.rank }), "utf8").toString("base64url")
+          : null,
+        warnings: run.warnings,
+        currentDataNotice: "名单来自运行时结果，指标值按当前最新财报数据加载，财报更正后可能与当时判定不同。",
+      };
     }),
 });

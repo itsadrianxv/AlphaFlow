@@ -317,7 +317,7 @@ def test_load_indicator_catalog_returns_non_empty_snapshot():
     assert catalog["items"]
 
 
-def test_indicator_catalog_uses_tushare_business_ids():
+def test_indicator_catalog_uses_statement_qualified_ids():
     from app.services.screening_catalog import load_indicator_catalog
 
     load_indicator_catalog.cache_clear()
@@ -325,18 +325,13 @@ def test_indicator_catalog_uses_tushare_business_ids():
     item_ids = {item["id"] for item in catalog["items"]}
 
     assert {
-        "pe_ttm",
-        "pb",
-        "market_cap",
-        "float_market_cap",
-        "total_shares",
-        "float_a_shares",
-        "roe_report",
-        "eps_report",
-        "revenue",
-        "net_profit_parent",
-        "asset_liability_ratio",
+        "income.total_revenue",
+        "income.n_income_attr_p",
+        "balancesheet.total_assets",
+        "balancesheet.total_liab",
+        "cashflow.n_cashflow_act",
     }.issubset(item_ids)
+    assert not {"pe_ttm", "pb", "roe_report"}.intersection(item_ids)
 
 
 def test_indicator_catalog_exposes_sorting_keywords_and_source_metadata():
@@ -346,20 +341,15 @@ def test_indicator_catalog_exposes_sorting_keywords_and_source_metadata():
     catalog = load_indicator_catalog()
 
     category_ids = [category["id"] for category in catalog["categories"]]
-    assert category_ids == [
-        "valuation_capital",
-        "profit_quality",
-        "growth_quality",
-        "solvency",
-        "cashflow_quality",
-        "operating_efficiency",
-    ]
+    assert len(category_ids) == 9
+    assert category_ids[0].startswith("income.")
+    assert any(category_id.startswith("balancesheet.") for category_id in category_ids)
+    assert any(category_id.startswith("cashflow.") for category_id in category_ids)
     assert all("sortOrder" in category for category in catalog["categories"])
 
     items_by_id = {item["id"]: item for item in catalog["items"]}
-    assert items_by_id["ps_ttm"]["sourceDataset"] == "daily_basic"
-    assert "市销率" in items_by_id["ps_ttm"]["keywords"]
-    assert items_by_id["grossprofit_margin"]["sourceDataset"] == "fina_indicator"
-    assert items_by_id["n_cashflow_act"]["sourceDataset"] == "cashflow"
-    assert items_by_id["free_cashflow"]["sourceDataset"] == "cashflow"
+    assert items_by_id["income.total_revenue"]["sourceDataset"] == "income"
+    assert "营业总收入" in items_by_id["income.total_revenue"]["keywords"]
+    assert items_by_id["balancesheet.total_assets"]["sourceDataset"] == "balancesheet"
+    assert items_by_id["cashflow.n_cashflow_act"]["sourceDataset"] == "cashflow"
     assert all("sortOrder" in item for item in catalog["items"])

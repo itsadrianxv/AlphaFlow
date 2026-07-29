@@ -32,6 +32,7 @@ import {
 } from "~/app/screening/screening-ui";
 import type { ResearchTargetRef } from "~/contracts/research-target";
 import type {
+  ScreeningUniverse,
   WorkspaceFilterRule,
   WorkspaceResult,
   WorkspaceTimeConfig,
@@ -142,6 +143,12 @@ export function ScreeningStudioClient() {
     () => draftDescriptionFromUrl?.trim() ?? "",
   );
   const [selectedStocks, setSelectedStocks] = useState<SelectedStock[]>([]);
+  const [universe, setUniverse] = useState<ScreeningUniverse>({
+    type: "STOCKS",
+    stockCodes: [],
+  });
+  const [industryNamesInput, setIndustryNamesInput] = useState("");
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [selectedIndicatorIds, setSelectedIndicatorIds] = useState<string[]>(
     [],
   );
@@ -206,6 +213,30 @@ export function ScreeningStudioClient() {
       enabled: selectedWorkspaceId !== null,
       refetchOnWindowFocus: false,
     },
+  );
+  const runQuery = api.screening.getRun.useQuery(
+    { id: activeRunId ?? "" },
+    {
+      enabled: activeRunId !== null,
+      refetchInterval: 1500,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const runIsTerminal =
+    runQuery.data?.status === "SUCCEEDED" ||
+    runQuery.data?.status === "PARTIAL" ||
+    runQuery.data?.status === "FAILED";
+  const runResultsQuery = api.screening.listRunResults.useInfiniteQuery(
+    { runId: activeRunId ?? "" },
+    {
+      enabled: activeRunId !== null && runIsTerminal,
+      refetchOnWindowFocus: false,
+      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    },
+  );
+  const runResultItems = useMemo(
+    () => runResultsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [runResultsQuery.data],
   );
   const watchListSeedQuery = api.watchlist.getDetail.useQuery(
     { id: watchListIdFromUrl ?? "" },
@@ -365,6 +396,14 @@ export function ScreeningStudioClient() {
     },
     onError: (error) => setNotice({ tone: "error", text: error.message }),
   });
+  const createRunMutation = api.screening.createRun.useMutation({
+    onSuccess: (run) => {
+      setActiveRunId(run.id);
+      setActiveTabId("results");
+      setNotice({ tone: "info", text: "筛选任务已进入执行队列" });
+    },
+    onError: (error) => setNotice({ tone: "error", text: error.message }),
+  });
   const createFormulaMutation = api.screening.createFormula.useMutation({
     onSuccess: async (formula) => {
       setSelectedFormulaIds((current) =>
@@ -482,6 +521,16 @@ export function ScreeningStudioClient() {
     setWorkspaceName(detail.name);
     setWorkspaceDescription(detail.description ?? "");
     setSelectedStocks(toSelectedStocks(detail));
+    const savedUniverse = detail.state.universe ?? {
+      type: "STOCKS" as const,
+      stockCodes: detail.state.stockCodes,
+    };
+    setUniverse(savedUniverse);
+    setIndustryNamesInput(
+      savedUniverse.type === "INDUSTRY"
+        ? savedUniverse.industryNames.join("、")
+        : "",
+    );
     setSelectedIndicatorIds(detail.state.indicatorIds);
     setSelectedFormulaIds(detail.state.formulaIds);
     setTimeConfig(detail.state.timeConfig);
@@ -791,6 +840,13 @@ export function ScreeningStudioClient() {
       columnState,
       resultSnapshot: resultSnapshot ?? undefined,
       lastFetchedAt,
+      universe:
+        universe.type === "STOCKS"
+          ? {
+              type: "STOCKS" as const,
+              stockCodes: selectedStocks.map((stock) => stock.stockCode),
+            }
+          : universe,
     }),
     [
       appliedFilterRules,
@@ -802,6 +858,7 @@ export function ScreeningStudioClient() {
       selectedStocks,
       sortState,
       timeConfig,
+      universe,
       workspaceDescription,
       workspaceName,
     ],
@@ -846,8 +903,12 @@ export function ScreeningStudioClient() {
   ]);
 
   async function handleFetchDataset() {
-    if (selectedStocks.length === 0) {
+    if (universe.type === "STOCKS" && selectedStocks.length === 0) {
       setNotice({ tone: "error", text: "请先选择股票" });
+      return;
+    }
+    if (universe.type === "INDUSTRY" && universe.industryNames.length === 0) {
+      setNotice({ tone: "error", text: "请至少填写一个行业" });
       return;
     }
     if (selectedIndicatorIds.length === 0 && selectedFormulaIds.length === 0) {
@@ -855,19 +916,32 @@ export function ScreeningStudioClient() {
       return;
     }
 
-    if (!selectedWorkspaceId) {
+    let workspaceId = selectedWorkspaceId;
+    if (!workspaceId) {
       const workspace = await createWorkspace(workspacePayload);
+      workspaceId = workspace.id;
       lastAutoSavedKeyRef.current = JSON.stringify({
         id: workspace.id,
         ...workspacePayload,
       });
     }
 
-    await queryDatasetMutation.mutateAsync({
-      stockCodes: selectedStocks.map((stock) => stock.stockCode),
+    await createRunMutation.mutateAsync({
+      workspaceId,
+      universe:
+        universe.type === "STOCKS"
+          ? {
+              type: "STOCKS",
+              stockCodes: selectedStocks.map((stock) => stock.stockCode),
+            }
+          : universe,
       indicatorIds: selectedIndicatorIds,
       formulaIds: selectedFormulaIds,
       timeConfig,
+      filterRules: appliedFilterRules.map(
+        ({ clientId: _clientId, ...rule }) => rule,
+      ),
+      sortState,
     });
   }
 
@@ -1059,14 +1133,54 @@ export function ScreeningStudioClient() {
 
       <div className="grid gap-6 xl:grid-cols-12">
         <SectionCard
-          title="股票搜索多选"
+          title="筛选股票池"
           className={
             activeTabId === "stocks"
               ? `xl:col-span-12 ${stockSearchCanvasClassName}`
               : "hidden"
           }
         >
-          <StockSearchPicker
+          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="股票池范围">
+            {([
+              ["ALL_A_SHARES", "全部 A 股"],
+              ["INDUSTRY", "按行业"],
+              ["STOCKS", "自选股票"],
+            ] as const).map(([type, label]) => (
+              <button
+                key={type}
+                type="button"
+                className={universe.type === type ? "app-button app-button-primary" : "app-button"}
+                onClick={() => {
+                  if (type === "ALL_A_SHARES") setUniverse({ type });
+                  if (type === "INDUSTRY") {
+                    const industryNames = industryNamesInput.split(/[、,，]/).map((item) => item.trim()).filter(Boolean);
+                    setUniverse({ type, industryNames });
+                  }
+                  if (type === "STOCKS") {
+                    setUniverse({ type, stockCodes: selectedStocks.map((stock) => stock.stockCode) });
+                  }
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {universe.type === "INDUSTRY" ? (
+            <input
+              value={industryNamesInput}
+              onChange={(event) => {
+                const value = event.target.value;
+                setIndustryNamesInput(value);
+                setUniverse({
+                  type: "INDUSTRY",
+                  industryNames: value.split(/[、,，]/).map((item) => item.trim()).filter(Boolean),
+                });
+              }}
+              className="app-input"
+              placeholder="输入行业名称，多个行业用逗号分隔"
+            />
+          ) : universe.type === "STOCKS" ? (
+            <StockSearchPicker
             label="搜索股票"
             keyword={stockSearchKeyword}
             onKeywordChange={setStockSearchKeyword}
@@ -1075,7 +1189,10 @@ export function ScreeningStudioClient() {
             maxSelection={20}
             className="mt-1"
             emptyHint="输入关键词后从本地股票列表搜索，最多选择 20 只。"
-          />
+            />
+          ) : (
+            <InlineNotice tone="info" description="将对当前股票池快照中的全部 A 股执行筛选。" />
+          )}
         </SectionCard>
 
         <SectionCard
@@ -1365,17 +1482,17 @@ export function ScreeningStudioClient() {
                 className="app-button app-button-primary"
                 disabled={
                   createWorkspaceMutation.isPending ||
-                  queryDatasetMutation.isPending
+                  createRunMutation.isPending
                 }
               >
                 {createWorkspaceMutation.isPending ||
-                queryDatasetMutation.isPending
-                  ? "获取中..."
-                  : "获取"}
+                createRunMutation.isPending
+                  ? "提交中..."
+                  : "开始筛选"}
               </button>
               <StatusPill
-                label={`股票 ${selectedStocks.length}/20`}
-                tone={selectedStocks.length > 0 ? "success" : "neutral"}
+                label={universe.type === "ALL_A_SHARES" ? "全部 A 股" : universe.type === "INDUSTRY" ? `行业 ${universe.industryNames.length}` : `股票 ${selectedStocks.length}/20`}
+                tone={universe.type !== "STOCKS" || selectedStocks.length > 0 ? "success" : "neutral"}
               />
               <StatusPill
                 label={`指标 ${selectedIndicatorIds.length + selectedFormulaIds.length}`}
@@ -1535,7 +1652,49 @@ export function ScreeningStudioClient() {
               : "hidden"
           }
         >
-          {!resultSnapshot ? (
+          {activeRunId ? (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <StatusPill label={`运行 ${runQuery.data?.status ?? "PENDING"}`} tone={runQuery.data?.status === "FAILED" ? "danger" : runIsTerminal ? "success" : "info"} />
+                <StatusPill label={`命中 ${runQuery.data?.totalCount ?? 0}`} tone="neutral" />
+                <StatusPill label={`股票池 ${runQuery.data?.universeCount ?? 0}`} tone="neutral" />
+              </div>
+              {runQuery.data?.status === "FAILED" ? (
+                <InlineNotice tone="danger" description={runQuery.data.errorMessage ?? runQuery.data.errorCode ?? "筛选执行失败"} />
+              ) : null}
+              {runResultItems.length ? (
+                <div className="overflow-x-auto border border-[var(--app-border-soft)]">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-[var(--app-neutral-surface)] text-left text-[var(--app-text-muted)]">
+                      <tr><th className="px-3 py-2">排名</th><th className="px-3 py-2">股票代码</th></tr>
+                    </thead>
+                    <tbody>
+                      {runResultItems.map((item) => (
+                        <tr key={item.stockCode} className="border-t border-[var(--app-border-soft)]">
+                          <td className="px-3 py-2 font-mono">{item.rank}</td>
+                          <td className="px-3 py-2 font-mono">{item.stockCode}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : runIsTerminal && runQuery.data?.status !== "FAILED" ? (
+                <EmptyState title="没有命中股票" description="当前股票池中没有股票满足全部筛选条件。" />
+              ) : (
+                <InlineNotice tone="info" description="worker 正在获取财报并执行筛选。" />
+              )}
+              {runResultsQuery.hasNextPage ? (
+                <button
+                  type="button"
+                  className="app-button"
+                  disabled={runResultsQuery.isFetchingNextPage}
+                  onClick={() => void runResultsQuery.fetchNextPage()}
+                >
+                  {runResultsQuery.isFetchingNextPage ? "加载中..." : "加载更多"}
+                </button>
+              ) : null}
+            </div>
+          ) : !resultSnapshot ? (
             <EmptyState
               title="还没有加载结果"
               description="先完成股票、指标与期间选择，再点击“获取”拉取数据。"

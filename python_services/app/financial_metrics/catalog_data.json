@@ -1,0 +1,8478 @@
+[
+  {
+    "id": "income.basic_eps",
+    "name": "基本每股收益",
+    "description": "基本每股收益",
+    "dataset": "income",
+    "field": "basic_eps",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "per_share",
+    "canonicalUnit": "元/股",
+    "displayUnit": "元/股",
+    "quarterTransform": "reported_cumulative",
+    "periodSemantics": "reported_cumulative",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "basic_eps",
+      "基本每股收益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.diluted_eps",
+    "name": "稀释每股收益",
+    "description": "稀释每股收益",
+    "dataset": "income",
+    "field": "diluted_eps",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "per_share",
+    "canonicalUnit": "元/股",
+    "displayUnit": "元/股",
+    "quarterTransform": "reported_cumulative",
+    "periodSemantics": "reported_cumulative",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "diluted_eps",
+      "稀释每股收益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.total_revenue",
+    "name": "营业总收入",
+    "description": "营业总收入",
+    "dataset": "income",
+    "field": "total_revenue",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_revenue",
+      "营业总收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.revenue",
+    "name": "营业收入",
+    "description": "营业收入",
+    "dataset": "income",
+    "field": "revenue",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "revenue",
+      "营业收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.int_income",
+    "name": "利息收入",
+    "description": "利息收入",
+    "dataset": "income",
+    "field": "int_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "int_income",
+      "利息收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.prem_earned",
+    "name": "已赚保费",
+    "description": "已赚保费",
+    "dataset": "income",
+    "field": "prem_earned",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "prem_earned",
+      "已赚保费",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.comm_income",
+    "name": "手续费及佣金收入",
+    "description": "手续费及佣金收入",
+    "dataset": "income",
+    "field": "comm_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "comm_income",
+      "手续费及佣金收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.n_commis_income",
+    "name": "手续费及佣金净收入",
+    "description": "手续费及佣金净收入",
+    "dataset": "income",
+    "field": "n_commis_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_commis_income",
+      "手续费及佣金净收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.n_oth_income",
+    "name": "其他经营净收益",
+    "description": "其他经营净收益",
+    "dataset": "income",
+    "field": "n_oth_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_oth_income",
+      "其他经营净收益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.n_oth_b_income",
+    "name": "加:其他业务净收益",
+    "description": "加:其他业务净收益",
+    "dataset": "income",
+    "field": "n_oth_b_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_oth_b_income",
+      "加:其他业务净收益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.prem_income",
+    "name": "保险业务收入",
+    "description": "保险业务收入",
+    "dataset": "income",
+    "field": "prem_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "prem_income",
+      "保险业务收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.out_prem",
+    "name": "减:分出保费",
+    "description": "减:分出保费",
+    "dataset": "income",
+    "field": "out_prem",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "out_prem",
+      "减:分出保费",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.une_prem_reser",
+    "name": "提取未到期责任准备金",
+    "description": "提取未到期责任准备金",
+    "dataset": "income",
+    "field": "une_prem_reser",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "une_prem_reser",
+      "提取未到期责任准备金",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.reins_income",
+    "name": "其中:分保费收入",
+    "description": "其中:分保费收入",
+    "dataset": "income",
+    "field": "reins_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reins_income",
+      "其中:分保费收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.n_sec_tb_income",
+    "name": "代理买卖证券业务净收入",
+    "description": "代理买卖证券业务净收入",
+    "dataset": "income",
+    "field": "n_sec_tb_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_sec_tb_income",
+      "代理买卖证券业务净收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.n_sec_uw_income",
+    "name": "证券承销业务净收入",
+    "description": "证券承销业务净收入",
+    "dataset": "income",
+    "field": "n_sec_uw_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_sec_uw_income",
+      "证券承销业务净收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.n_asset_mg_income",
+    "name": "受托客户资产管理业务净收入",
+    "description": "受托客户资产管理业务净收入",
+    "dataset": "income",
+    "field": "n_asset_mg_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_asset_mg_income",
+      "受托客户资产管理业务净收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.oth_b_income",
+    "name": "其他业务收入",
+    "description": "其他业务收入",
+    "dataset": "income",
+    "field": "oth_b_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_b_income",
+      "其他业务收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.fv_value_chg_gain",
+    "name": "加:公允价值变动净收益",
+    "description": "加:公允价值变动净收益",
+    "dataset": "income",
+    "field": "fv_value_chg_gain",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fv_value_chg_gain",
+      "加:公允价值变动净收益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.invest_income",
+    "name": "加:投资净收益",
+    "description": "加:投资净收益",
+    "dataset": "income",
+    "field": "invest_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "invest_income",
+      "加:投资净收益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.ass_invest_income",
+    "name": "其中:对联营企业和合营企业的投资收益",
+    "description": "其中:对联营企业和合营企业的投资收益",
+    "dataset": "income",
+    "field": "ass_invest_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "ass_invest_income",
+      "其中:对联营企业和合营企业的投资收益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.forex_gain",
+    "name": "加:汇兑净收益",
+    "description": "加:汇兑净收益",
+    "dataset": "income",
+    "field": "forex_gain",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "forex_gain",
+      "加:汇兑净收益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.total_cogs",
+    "name": "营业总成本",
+    "description": "营业总成本",
+    "dataset": "income",
+    "field": "total_cogs",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_cogs",
+      "营业总成本",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.oper_cost",
+    "name": "减:营业成本",
+    "description": "减:营业成本",
+    "dataset": "income",
+    "field": "oper_cost",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oper_cost",
+      "减:营业成本",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.int_exp",
+    "name": "减:利息支出",
+    "description": "减:利息支出",
+    "dataset": "income",
+    "field": "int_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "int_exp",
+      "减:利息支出",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.comm_exp",
+    "name": "减:手续费及佣金支出",
+    "description": "减:手续费及佣金支出",
+    "dataset": "income",
+    "field": "comm_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "comm_exp",
+      "减:手续费及佣金支出",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.biz_tax_surchg",
+    "name": "减:营业税金及附加",
+    "description": "减:营业税金及附加",
+    "dataset": "income",
+    "field": "biz_tax_surchg",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "biz_tax_surchg",
+      "减:营业税金及附加",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.sell_exp",
+    "name": "减:销售费用",
+    "description": "减:销售费用",
+    "dataset": "income",
+    "field": "sell_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "sell_exp",
+      "减:销售费用",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.admin_exp",
+    "name": "减:管理费用",
+    "description": "减:管理费用",
+    "dataset": "income",
+    "field": "admin_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "admin_exp",
+      "减:管理费用",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.fin_exp",
+    "name": "减:财务费用",
+    "description": "减:财务费用",
+    "dataset": "income",
+    "field": "fin_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fin_exp",
+      "减:财务费用",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.assets_impair_loss",
+    "name": "减:资产减值损失",
+    "description": "减:资产减值损失",
+    "dataset": "income",
+    "field": "assets_impair_loss",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "assets_impair_loss",
+      "减:资产减值损失",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.prem_refund",
+    "name": "退保金",
+    "description": "退保金",
+    "dataset": "income",
+    "field": "prem_refund",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "prem_refund",
+      "退保金",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.compens_payout",
+    "name": "赔付总支出",
+    "description": "赔付总支出",
+    "dataset": "income",
+    "field": "compens_payout",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "compens_payout",
+      "赔付总支出",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.reser_insur_liab",
+    "name": "提取保险责任准备金",
+    "description": "提取保险责任准备金",
+    "dataset": "income",
+    "field": "reser_insur_liab",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reser_insur_liab",
+      "提取保险责任准备金",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.div_payt",
+    "name": "保户红利支出",
+    "description": "保户红利支出",
+    "dataset": "income",
+    "field": "div_payt",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "div_payt",
+      "保户红利支出",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.reins_exp",
+    "name": "分保费用",
+    "description": "分保费用",
+    "dataset": "income",
+    "field": "reins_exp",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reins_exp",
+      "分保费用",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.oper_exp",
+    "name": "营业支出",
+    "description": "营业支出",
+    "dataset": "income",
+    "field": "oper_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oper_exp",
+      "营业支出",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.compens_payout_refu",
+    "name": "减:摊回赔付支出",
+    "description": "减:摊回赔付支出",
+    "dataset": "income",
+    "field": "compens_payout_refu",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "compens_payout_refu",
+      "减:摊回赔付支出",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.insur_reser_refu",
+    "name": "减:摊回保险责任准备金",
+    "description": "减:摊回保险责任准备金",
+    "dataset": "income",
+    "field": "insur_reser_refu",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "insur_reser_refu",
+      "减:摊回保险责任准备金",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.reins_cost_refund",
+    "name": "减:摊回分保费用",
+    "description": "减:摊回分保费用",
+    "dataset": "income",
+    "field": "reins_cost_refund",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reins_cost_refund",
+      "减:摊回分保费用",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.other_bus_cost",
+    "name": "其他业务成本",
+    "description": "其他业务成本",
+    "dataset": "income",
+    "field": "other_bus_cost",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "other_bus_cost",
+      "其他业务成本",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.operate_profit",
+    "name": "营业利润",
+    "description": "营业利润",
+    "dataset": "income",
+    "field": "operate_profit",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "operate_profit",
+      "营业利润",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.non_oper_income",
+    "name": "加:营业外收入",
+    "description": "加:营业外收入",
+    "dataset": "income",
+    "field": "non_oper_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "non_oper_income",
+      "加:营业外收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.non_oper_exp",
+    "name": "减:营业外支出",
+    "description": "减:营业外支出",
+    "dataset": "income",
+    "field": "non_oper_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "non_oper_exp",
+      "减:营业外支出",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.nca_disploss",
+    "name": "其中:减:非流动资产处置净损失",
+    "description": "其中:减:非流动资产处置净损失",
+    "dataset": "income",
+    "field": "nca_disploss",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "nca_disploss",
+      "其中:减:非流动资产处置净损失",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.total_profit",
+    "name": "利润总额",
+    "description": "利润总额",
+    "dataset": "income",
+    "field": "total_profit",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_profit",
+      "利润总额",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.income_tax",
+    "name": "所得税费用",
+    "description": "所得税费用",
+    "dataset": "income",
+    "field": "income_tax",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "income_tax",
+      "所得税费用",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.n_income",
+    "name": "净利润(含少数股东损益)",
+    "description": "净利润(含少数股东损益)",
+    "dataset": "income",
+    "field": "n_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_income",
+      "净利润(含少数股东损益)",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.n_income_attr_p",
+    "name": "净利润(不含少数股东损益)",
+    "description": "净利润(不含少数股东损益)",
+    "dataset": "income",
+    "field": "n_income_attr_p",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_income_attr_p",
+      "净利润(不含少数股东损益)",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.minority_gain",
+    "name": "少数股东损益",
+    "description": "少数股东损益",
+    "dataset": "income",
+    "field": "minority_gain",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "minority_gain",
+      "少数股东损益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.oth_compr_income",
+    "name": "其他综合收益",
+    "description": "其他综合收益",
+    "dataset": "income",
+    "field": "oth_compr_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_compr_income",
+      "其他综合收益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.t_compr_income",
+    "name": "综合收益总额",
+    "description": "综合收益总额",
+    "dataset": "income",
+    "field": "t_compr_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "t_compr_income",
+      "综合收益总额",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.compr_inc_attr_p",
+    "name": "归属于母公司(或股东)的综合收益总额",
+    "description": "归属于母公司(或股东)的综合收益总额",
+    "dataset": "income",
+    "field": "compr_inc_attr_p",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "compr_inc_attr_p",
+      "归属于母公司(或股东)的综合收益总额",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.compr_inc_attr_m_s",
+    "name": "归属于少数股东的综合收益总额",
+    "description": "归属于少数股东的综合收益总额",
+    "dataset": "income",
+    "field": "compr_inc_attr_m_s",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "compr_inc_attr_m_s",
+      "归属于少数股东的综合收益总额",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.ebit",
+    "name": "息税前利润",
+    "description": "息税前利润",
+    "dataset": "income",
+    "field": "ebit",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "ebit",
+      "息税前利润",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.ebitda",
+    "name": "息税折旧摊销前利润",
+    "description": "息税折旧摊销前利润",
+    "dataset": "income",
+    "field": "ebitda",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "ebitda",
+      "息税折旧摊销前利润",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.insurance_exp",
+    "name": "保险业务支出",
+    "description": "保险业务支出",
+    "dataset": "income",
+    "field": "insurance_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "insurance_exp",
+      "保险业务支出",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.undist_profit",
+    "name": "年初未分配利润",
+    "description": "年初未分配利润",
+    "dataset": "income",
+    "field": "undist_profit",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "undist_profit",
+      "年初未分配利润",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.distable_profit",
+    "name": "可分配利润",
+    "description": "可分配利润",
+    "dataset": "income",
+    "field": "distable_profit",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "distable_profit",
+      "可分配利润",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.rd_exp",
+    "name": "研发费用",
+    "description": "研发费用",
+    "dataset": "income",
+    "field": "rd_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "rd_exp",
+      "研发费用",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.fin_exp_int_exp",
+    "name": "财务费用:利息费用",
+    "description": "财务费用:利息费用",
+    "dataset": "income",
+    "field": "fin_exp_int_exp",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fin_exp_int_exp",
+      "财务费用:利息费用",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.fin_exp_int_inc",
+    "name": "财务费用:利息收入",
+    "description": "财务费用:利息收入",
+    "dataset": "income",
+    "field": "fin_exp_int_inc",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fin_exp_int_inc",
+      "财务费用:利息收入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.transfer_surplus_rese",
+    "name": "盈余公积转入",
+    "description": "盈余公积转入",
+    "dataset": "income",
+    "field": "transfer_surplus_rese",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "transfer_surplus_rese",
+      "盈余公积转入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.transfer_housing_imprest",
+    "name": "住房周转金转入",
+    "description": "住房周转金转入",
+    "dataset": "income",
+    "field": "transfer_housing_imprest",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "transfer_housing_imprest",
+      "住房周转金转入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.transfer_oth",
+    "name": "其他转入",
+    "description": "其他转入",
+    "dataset": "income",
+    "field": "transfer_oth",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "transfer_oth",
+      "其他转入",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.adj_lossgain",
+    "name": "调整以前年度损益",
+    "description": "调整以前年度损益",
+    "dataset": "income",
+    "field": "adj_lossgain",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "adj_lossgain",
+      "调整以前年度损益",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.withdra_legal_surplus",
+    "name": "提取法定盈余公积",
+    "description": "提取法定盈余公积",
+    "dataset": "income",
+    "field": "withdra_legal_surplus",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "withdra_legal_surplus",
+      "提取法定盈余公积",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.withdra_legal_pubfund",
+    "name": "提取法定公益金",
+    "description": "提取法定公益金",
+    "dataset": "income",
+    "field": "withdra_legal_pubfund",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "withdra_legal_pubfund",
+      "提取法定公益金",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.withdra_biz_devfund",
+    "name": "提取企业发展基金",
+    "description": "提取企业发展基金",
+    "dataset": "income",
+    "field": "withdra_biz_devfund",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "withdra_biz_devfund",
+      "提取企业发展基金",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.withdra_rese_fund",
+    "name": "提取储备基金",
+    "description": "提取储备基金",
+    "dataset": "income",
+    "field": "withdra_rese_fund",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "withdra_rese_fund",
+      "提取储备基金",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.withdra_oth_ersu",
+    "name": "提取任意盈余公积金",
+    "description": "提取任意盈余公积金",
+    "dataset": "income",
+    "field": "withdra_oth_ersu",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "withdra_oth_ersu",
+      "提取任意盈余公积金",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.workers_welfare",
+    "name": "职工奖金福利",
+    "description": "职工奖金福利",
+    "dataset": "income",
+    "field": "workers_welfare",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "workers_welfare",
+      "职工奖金福利",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.distr_profit_shrhder",
+    "name": "可供股东分配的利润",
+    "description": "可供股东分配的利润",
+    "dataset": "income",
+    "field": "distr_profit_shrhder",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "distr_profit_shrhder",
+      "可供股东分配的利润",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.prfshare_payable_dvd",
+    "name": "应付优先股股利",
+    "description": "应付优先股股利",
+    "dataset": "income",
+    "field": "prfshare_payable_dvd",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "prfshare_payable_dvd",
+      "应付优先股股利",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.comshare_payable_dvd",
+    "name": "应付普通股股利",
+    "description": "应付普通股股利",
+    "dataset": "income",
+    "field": "comshare_payable_dvd",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "comshare_payable_dvd",
+      "应付普通股股利",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.capit_comstock_div",
+    "name": "转作股本的普通股股利",
+    "description": "转作股本的普通股股利",
+    "dataset": "income",
+    "field": "capit_comstock_div",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "shares",
+    "canonicalUnit": "股",
+    "displayUnit": "股",
+    "quarterTransform": "reported_cumulative",
+    "periodSemantics": "reported_cumulative",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "capit_comstock_div",
+      "转作股本的普通股股利",
+      "利润表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "income.net_after_nr_lp_correct",
+    "name": "扣除非经常性损益后的净利润（更正前）",
+    "description": "扣除非经常性损益后的净利润（更正前）",
+    "dataset": "income",
+    "field": "net_after_nr_lp_correct",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "net_after_nr_lp_correct",
+      "扣除非经常性损益后的净利润（更正前）",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "income.credit_impa_loss",
+    "name": "信用减值损失",
+    "description": "信用减值损失",
+    "dataset": "income",
+    "field": "credit_impa_loss",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "credit_impa_loss",
+      "信用减值损失",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "income.net_expo_hedging_benefits",
+    "name": "净敞口套期收益",
+    "description": "净敞口套期收益",
+    "dataset": "income",
+    "field": "net_expo_hedging_benefits",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "net_expo_hedging_benefits",
+      "净敞口套期收益",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "income.oth_impair_loss_assets",
+    "name": "其他资产减值损失",
+    "description": "其他资产减值损失",
+    "dataset": "income",
+    "field": "oth_impair_loss_assets",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_impair_loss_assets",
+      "其他资产减值损失",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "income.total_opcost",
+    "name": "营业总成本（二）",
+    "description": "营业总成本（二）",
+    "dataset": "income",
+    "field": "total_opcost",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_opcost",
+      "营业总成本（二）",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "income.amodcost_fin_assets",
+    "name": "以摊余成本计量的金融资产终止确认收益",
+    "description": "以摊余成本计量的金融资产终止确认收益",
+    "dataset": "income",
+    "field": "amodcost_fin_assets",
+    "statementName": "利润表",
+    "subcategory": "成本与费用",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "amodcost_fin_assets",
+      "以摊余成本计量的金融资产终止确认收益",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "income.oth_income",
+    "name": "其他收益",
+    "description": "其他收益",
+    "dataset": "income",
+    "field": "oth_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_income",
+      "其他收益",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "income.asset_disp_income",
+    "name": "资产处置收益",
+    "description": "资产处置收益",
+    "dataset": "income",
+    "field": "asset_disp_income",
+    "statementName": "利润表",
+    "subcategory": "收入",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "asset_disp_income",
+      "资产处置收益",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "income.continued_net_profit",
+    "name": "持续经营净利润",
+    "description": "持续经营净利润",
+    "dataset": "income",
+    "field": "continued_net_profit",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "continued_net_profit",
+      "持续经营净利润",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "income.end_net_profit",
+    "name": "终止经营净利润",
+    "description": "终止经营净利润",
+    "dataset": "income",
+    "field": "end_net_profit",
+    "statementName": "利润表",
+    "subcategory": "利润与综合收益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "end_net_profit",
+      "终止经营净利润",
+      "利润表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "balancesheet.total_share",
+    "name": "期末总股本",
+    "description": "期末总股本",
+    "dataset": "balancesheet",
+    "field": "total_share",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "shares",
+    "canonicalUnit": "股",
+    "displayUnit": "股",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_share",
+      "期末总股本",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.cap_rese",
+    "name": "资本公积金",
+    "description": "资本公积金",
+    "dataset": "balancesheet",
+    "field": "cap_rese",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "cap_rese",
+      "资本公积金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.undistr_porfit",
+    "name": "未分配利润",
+    "description": "未分配利润",
+    "dataset": "balancesheet",
+    "field": "undistr_porfit",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "undistr_porfit",
+      "未分配利润",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.surplus_rese",
+    "name": "盈余公积金",
+    "description": "盈余公积金",
+    "dataset": "balancesheet",
+    "field": "surplus_rese",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "surplus_rese",
+      "盈余公积金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.special_rese",
+    "name": "专项储备",
+    "description": "专项储备",
+    "dataset": "balancesheet",
+    "field": "special_rese",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "special_rese",
+      "专项储备",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.money_cap",
+    "name": "货币资金",
+    "description": "货币资金",
+    "dataset": "balancesheet",
+    "field": "money_cap",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "money_cap",
+      "货币资金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.trad_asset",
+    "name": "交易性金融资产",
+    "description": "交易性金融资产",
+    "dataset": "balancesheet",
+    "field": "trad_asset",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "trad_asset",
+      "交易性金融资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.notes_receiv",
+    "name": "应收票据",
+    "description": "应收票据",
+    "dataset": "balancesheet",
+    "field": "notes_receiv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "notes_receiv",
+      "应收票据",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.accounts_receiv",
+    "name": "应收账款",
+    "description": "应收账款",
+    "dataset": "balancesheet",
+    "field": "accounts_receiv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "accounts_receiv",
+      "应收账款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_receiv",
+    "name": "其他应收款",
+    "description": "其他应收款",
+    "dataset": "balancesheet",
+    "field": "oth_receiv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_receiv",
+      "其他应收款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.prepayment",
+    "name": "预付款项",
+    "description": "预付款项",
+    "dataset": "balancesheet",
+    "field": "prepayment",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "prepayment",
+      "预付款项",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.div_receiv",
+    "name": "应收股利",
+    "description": "应收股利",
+    "dataset": "balancesheet",
+    "field": "div_receiv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "div_receiv",
+      "应收股利",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.int_receiv",
+    "name": "应收利息",
+    "description": "应收利息",
+    "dataset": "balancesheet",
+    "field": "int_receiv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "int_receiv",
+      "应收利息",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.inventories",
+    "name": "存货",
+    "description": "存货",
+    "dataset": "balancesheet",
+    "field": "inventories",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "inventories",
+      "存货",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.amor_exp",
+    "name": "待摊费用",
+    "description": "待摊费用",
+    "dataset": "balancesheet",
+    "field": "amor_exp",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "amor_exp",
+      "待摊费用",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.nca_within_1y",
+    "name": "一年内到期的非流动资产",
+    "description": "一年内到期的非流动资产",
+    "dataset": "balancesheet",
+    "field": "nca_within_1y",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "nca_within_1y",
+      "一年内到期的非流动资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.sett_rsrv",
+    "name": "结算备付金",
+    "description": "结算备付金",
+    "dataset": "balancesheet",
+    "field": "sett_rsrv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "sett_rsrv",
+      "结算备付金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.loanto_oth_bank_fi",
+    "name": "拆出资金",
+    "description": "拆出资金",
+    "dataset": "balancesheet",
+    "field": "loanto_oth_bank_fi",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "loanto_oth_bank_fi",
+      "拆出资金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.premium_receiv",
+    "name": "应收保费",
+    "description": "应收保费",
+    "dataset": "balancesheet",
+    "field": "premium_receiv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "premium_receiv",
+      "应收保费",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.reinsur_receiv",
+    "name": "应收分保账款",
+    "description": "应收分保账款",
+    "dataset": "balancesheet",
+    "field": "reinsur_receiv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reinsur_receiv",
+      "应收分保账款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.reinsur_res_receiv",
+    "name": "应收分保合同准备金",
+    "description": "应收分保合同准备金",
+    "dataset": "balancesheet",
+    "field": "reinsur_res_receiv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reinsur_res_receiv",
+      "应收分保合同准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.pur_resale_fa",
+    "name": "买入返售金融资产",
+    "description": "买入返售金融资产",
+    "dataset": "balancesheet",
+    "field": "pur_resale_fa",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "pur_resale_fa",
+      "买入返售金融资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_cur_assets",
+    "name": "其他流动资产",
+    "description": "其他流动资产",
+    "dataset": "balancesheet",
+    "field": "oth_cur_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_cur_assets",
+      "其他流动资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.total_cur_assets",
+    "name": "流动资产合计",
+    "description": "流动资产合计",
+    "dataset": "balancesheet",
+    "field": "total_cur_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_cur_assets",
+      "流动资产合计",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.fa_avail_for_sale",
+    "name": "可供出售金融资产",
+    "description": "可供出售金融资产",
+    "dataset": "balancesheet",
+    "field": "fa_avail_for_sale",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fa_avail_for_sale",
+      "可供出售金融资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.htm_invest",
+    "name": "持有至到期投资",
+    "description": "持有至到期投资",
+    "dataset": "balancesheet",
+    "field": "htm_invest",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "htm_invest",
+      "持有至到期投资",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.lt_eqt_invest",
+    "name": "长期股权投资",
+    "description": "长期股权投资",
+    "dataset": "balancesheet",
+    "field": "lt_eqt_invest",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "lt_eqt_invest",
+      "长期股权投资",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.invest_real_estate",
+    "name": "投资性房地产",
+    "description": "投资性房地产",
+    "dataset": "balancesheet",
+    "field": "invest_real_estate",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "invest_real_estate",
+      "投资性房地产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.time_deposits",
+    "name": "定期存款",
+    "description": "定期存款",
+    "dataset": "balancesheet",
+    "field": "time_deposits",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "time_deposits",
+      "定期存款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_assets",
+    "name": "其他资产",
+    "description": "其他资产",
+    "dataset": "balancesheet",
+    "field": "oth_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_assets",
+      "其他资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.lt_rec",
+    "name": "长期应收款",
+    "description": "长期应收款",
+    "dataset": "balancesheet",
+    "field": "lt_rec",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "lt_rec",
+      "长期应收款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.fix_assets",
+    "name": "固定资产",
+    "description": "固定资产",
+    "dataset": "balancesheet",
+    "field": "fix_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fix_assets",
+      "固定资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.cip",
+    "name": "在建工程",
+    "description": "在建工程",
+    "dataset": "balancesheet",
+    "field": "cip",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "cip",
+      "在建工程",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.const_materials",
+    "name": "工程物资",
+    "description": "工程物资",
+    "dataset": "balancesheet",
+    "field": "const_materials",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "const_materials",
+      "工程物资",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.fixed_assets_disp",
+    "name": "固定资产清理",
+    "description": "固定资产清理",
+    "dataset": "balancesheet",
+    "field": "fixed_assets_disp",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fixed_assets_disp",
+      "固定资产清理",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.produc_bio_assets",
+    "name": "生产性生物资产",
+    "description": "生产性生物资产",
+    "dataset": "balancesheet",
+    "field": "produc_bio_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "produc_bio_assets",
+      "生产性生物资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oil_and_gas_assets",
+    "name": "油气资产",
+    "description": "油气资产",
+    "dataset": "balancesheet",
+    "field": "oil_and_gas_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oil_and_gas_assets",
+      "油气资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.intan_assets",
+    "name": "无形资产",
+    "description": "无形资产",
+    "dataset": "balancesheet",
+    "field": "intan_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "intan_assets",
+      "无形资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.r_and_d",
+    "name": "研发支出",
+    "description": "研发支出",
+    "dataset": "balancesheet",
+    "field": "r_and_d",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "r_and_d",
+      "研发支出",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.goodwill",
+    "name": "商誉",
+    "description": "商誉",
+    "dataset": "balancesheet",
+    "field": "goodwill",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "goodwill",
+      "商誉",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.lt_amor_exp",
+    "name": "长期待摊费用",
+    "description": "长期待摊费用",
+    "dataset": "balancesheet",
+    "field": "lt_amor_exp",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "lt_amor_exp",
+      "长期待摊费用",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.defer_tax_assets",
+    "name": "递延所得税资产",
+    "description": "递延所得税资产",
+    "dataset": "balancesheet",
+    "field": "defer_tax_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "defer_tax_assets",
+      "递延所得税资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.decr_in_disbur",
+    "name": "发放贷款及垫款",
+    "description": "发放贷款及垫款",
+    "dataset": "balancesheet",
+    "field": "decr_in_disbur",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "decr_in_disbur",
+      "发放贷款及垫款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_nca",
+    "name": "其他非流动资产",
+    "description": "其他非流动资产",
+    "dataset": "balancesheet",
+    "field": "oth_nca",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_nca",
+      "其他非流动资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.total_nca",
+    "name": "非流动资产合计",
+    "description": "非流动资产合计",
+    "dataset": "balancesheet",
+    "field": "total_nca",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_nca",
+      "非流动资产合计",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.cash_reser_cb",
+    "name": "现金及存放中央银行款项",
+    "description": "现金及存放中央银行款项",
+    "dataset": "balancesheet",
+    "field": "cash_reser_cb",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "cash_reser_cb",
+      "现金及存放中央银行款项",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.depos_in_oth_bfi",
+    "name": "存放同业和其它金融机构款项",
+    "description": "存放同业和其它金融机构款项",
+    "dataset": "balancesheet",
+    "field": "depos_in_oth_bfi",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "depos_in_oth_bfi",
+      "存放同业和其它金融机构款项",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.prec_metals",
+    "name": "贵金属",
+    "description": "贵金属",
+    "dataset": "balancesheet",
+    "field": "prec_metals",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "prec_metals",
+      "贵金属",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.deriv_assets",
+    "name": "衍生金融资产",
+    "description": "衍生金融资产",
+    "dataset": "balancesheet",
+    "field": "deriv_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "deriv_assets",
+      "衍生金融资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.rr_reins_une_prem",
+    "name": "应收分保未到期责任准备金",
+    "description": "应收分保未到期责任准备金",
+    "dataset": "balancesheet",
+    "field": "rr_reins_une_prem",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "rr_reins_une_prem",
+      "应收分保未到期责任准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.rr_reins_outstd_cla",
+    "name": "应收分保未决赔款准备金",
+    "description": "应收分保未决赔款准备金",
+    "dataset": "balancesheet",
+    "field": "rr_reins_outstd_cla",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "rr_reins_outstd_cla",
+      "应收分保未决赔款准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.rr_reins_lins_liab",
+    "name": "应收分保寿险责任准备金",
+    "description": "应收分保寿险责任准备金",
+    "dataset": "balancesheet",
+    "field": "rr_reins_lins_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "rr_reins_lins_liab",
+      "应收分保寿险责任准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.rr_reins_lthins_liab",
+    "name": "应收分保长期健康险责任准备金",
+    "description": "应收分保长期健康险责任准备金",
+    "dataset": "balancesheet",
+    "field": "rr_reins_lthins_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "rr_reins_lthins_liab",
+      "应收分保长期健康险责任准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.refund_depos",
+    "name": "存出保证金",
+    "description": "存出保证金",
+    "dataset": "balancesheet",
+    "field": "refund_depos",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "refund_depos",
+      "存出保证金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.ph_pledge_loans",
+    "name": "保户质押贷款",
+    "description": "保户质押贷款",
+    "dataset": "balancesheet",
+    "field": "ph_pledge_loans",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "ph_pledge_loans",
+      "保户质押贷款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.refund_cap_depos",
+    "name": "存出资本保证金",
+    "description": "存出资本保证金",
+    "dataset": "balancesheet",
+    "field": "refund_cap_depos",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "refund_cap_depos",
+      "存出资本保证金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.indep_acct_assets",
+    "name": "独立账户资产",
+    "description": "独立账户资产",
+    "dataset": "balancesheet",
+    "field": "indep_acct_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "indep_acct_assets",
+      "独立账户资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.client_depos",
+    "name": "其中：客户资金存款",
+    "description": "其中：客户资金存款",
+    "dataset": "balancesheet",
+    "field": "client_depos",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "client_depos",
+      "其中：客户资金存款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.client_prov",
+    "name": "其中：客户备付金",
+    "description": "其中：客户备付金",
+    "dataset": "balancesheet",
+    "field": "client_prov",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "client_prov",
+      "其中：客户备付金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.transac_seat_fee",
+    "name": "其中:交易席位费",
+    "description": "其中:交易席位费",
+    "dataset": "balancesheet",
+    "field": "transac_seat_fee",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "transac_seat_fee",
+      "其中:交易席位费",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.invest_as_receiv",
+    "name": "应收款项类投资",
+    "description": "应收款项类投资",
+    "dataset": "balancesheet",
+    "field": "invest_as_receiv",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "invest_as_receiv",
+      "应收款项类投资",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.total_assets",
+    "name": "资产总计",
+    "description": "资产总计",
+    "dataset": "balancesheet",
+    "field": "total_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_assets",
+      "资产总计",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.lt_borr",
+    "name": "长期借款",
+    "description": "长期借款",
+    "dataset": "balancesheet",
+    "field": "lt_borr",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "lt_borr",
+      "长期借款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.st_borr",
+    "name": "短期借款",
+    "description": "短期借款",
+    "dataset": "balancesheet",
+    "field": "st_borr",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "st_borr",
+      "短期借款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.cb_borr",
+    "name": "向中央银行借款",
+    "description": "向中央银行借款",
+    "dataset": "balancesheet",
+    "field": "cb_borr",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "cb_borr",
+      "向中央银行借款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.depos_ib_deposits",
+    "name": "吸收存款及同业存放",
+    "description": "吸收存款及同业存放",
+    "dataset": "balancesheet",
+    "field": "depos_ib_deposits",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "depos_ib_deposits",
+      "吸收存款及同业存放",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.loan_oth_bank",
+    "name": "拆入资金",
+    "description": "拆入资金",
+    "dataset": "balancesheet",
+    "field": "loan_oth_bank",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "loan_oth_bank",
+      "拆入资金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.trading_fl",
+    "name": "交易性金融负债",
+    "description": "交易性金融负债",
+    "dataset": "balancesheet",
+    "field": "trading_fl",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "trading_fl",
+      "交易性金融负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.notes_payable",
+    "name": "应付票据",
+    "description": "应付票据",
+    "dataset": "balancesheet",
+    "field": "notes_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "notes_payable",
+      "应付票据",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.acct_payable",
+    "name": "应付账款",
+    "description": "应付账款",
+    "dataset": "balancesheet",
+    "field": "acct_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "acct_payable",
+      "应付账款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.adv_receipts",
+    "name": "预收款项",
+    "description": "预收款项",
+    "dataset": "balancesheet",
+    "field": "adv_receipts",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "adv_receipts",
+      "预收款项",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.sold_for_repur_fa",
+    "name": "卖出回购金融资产款",
+    "description": "卖出回购金融资产款",
+    "dataset": "balancesheet",
+    "field": "sold_for_repur_fa",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "sold_for_repur_fa",
+      "卖出回购金融资产款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.comm_payable",
+    "name": "应付手续费及佣金",
+    "description": "应付手续费及佣金",
+    "dataset": "balancesheet",
+    "field": "comm_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "comm_payable",
+      "应付手续费及佣金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.payroll_payable",
+    "name": "应付职工薪酬",
+    "description": "应付职工薪酬",
+    "dataset": "balancesheet",
+    "field": "payroll_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "payroll_payable",
+      "应付职工薪酬",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.taxes_payable",
+    "name": "应交税费",
+    "description": "应交税费",
+    "dataset": "balancesheet",
+    "field": "taxes_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "taxes_payable",
+      "应交税费",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.int_payable",
+    "name": "应付利息",
+    "description": "应付利息",
+    "dataset": "balancesheet",
+    "field": "int_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "int_payable",
+      "应付利息",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.div_payable",
+    "name": "应付股利",
+    "description": "应付股利",
+    "dataset": "balancesheet",
+    "field": "div_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "div_payable",
+      "应付股利",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_payable",
+    "name": "其他应付款",
+    "description": "其他应付款",
+    "dataset": "balancesheet",
+    "field": "oth_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_payable",
+      "其他应付款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.acc_exp",
+    "name": "预提费用",
+    "description": "预提费用",
+    "dataset": "balancesheet",
+    "field": "acc_exp",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "acc_exp",
+      "预提费用",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.deferred_inc",
+    "name": "递延收益",
+    "description": "递延收益",
+    "dataset": "balancesheet",
+    "field": "deferred_inc",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "deferred_inc",
+      "递延收益",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.st_bonds_payable",
+    "name": "应付短期债券",
+    "description": "应付短期债券",
+    "dataset": "balancesheet",
+    "field": "st_bonds_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "st_bonds_payable",
+      "应付短期债券",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.payable_to_reinsurer",
+    "name": "应付分保账款",
+    "description": "应付分保账款",
+    "dataset": "balancesheet",
+    "field": "payable_to_reinsurer",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "payable_to_reinsurer",
+      "应付分保账款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.rsrv_insur_cont",
+    "name": "保险合同准备金",
+    "description": "保险合同准备金",
+    "dataset": "balancesheet",
+    "field": "rsrv_insur_cont",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "rsrv_insur_cont",
+      "保险合同准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.acting_trading_sec",
+    "name": "代理买卖证券款",
+    "description": "代理买卖证券款",
+    "dataset": "balancesheet",
+    "field": "acting_trading_sec",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "acting_trading_sec",
+      "代理买卖证券款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.acting_uw_sec",
+    "name": "代理承销证券款",
+    "description": "代理承销证券款",
+    "dataset": "balancesheet",
+    "field": "acting_uw_sec",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "acting_uw_sec",
+      "代理承销证券款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.non_cur_liab_due_1y",
+    "name": "一年内到期的非流动负债",
+    "description": "一年内到期的非流动负债",
+    "dataset": "balancesheet",
+    "field": "non_cur_liab_due_1y",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "non_cur_liab_due_1y",
+      "一年内到期的非流动负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_cur_liab",
+    "name": "其他流动负债",
+    "description": "其他流动负债",
+    "dataset": "balancesheet",
+    "field": "oth_cur_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_cur_liab",
+      "其他流动负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.total_cur_liab",
+    "name": "流动负债合计",
+    "description": "流动负债合计",
+    "dataset": "balancesheet",
+    "field": "total_cur_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_cur_liab",
+      "流动负债合计",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.bond_payable",
+    "name": "应付债券",
+    "description": "应付债券",
+    "dataset": "balancesheet",
+    "field": "bond_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "bond_payable",
+      "应付债券",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.lt_payable",
+    "name": "长期应付款",
+    "description": "长期应付款",
+    "dataset": "balancesheet",
+    "field": "lt_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "lt_payable",
+      "长期应付款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.specific_payables",
+    "name": "专项应付款",
+    "description": "专项应付款",
+    "dataset": "balancesheet",
+    "field": "specific_payables",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "specific_payables",
+      "专项应付款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.estimated_liab",
+    "name": "预计负债",
+    "description": "预计负债",
+    "dataset": "balancesheet",
+    "field": "estimated_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "estimated_liab",
+      "预计负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.defer_tax_liab",
+    "name": "递延所得税负债",
+    "description": "递延所得税负债",
+    "dataset": "balancesheet",
+    "field": "defer_tax_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "defer_tax_liab",
+      "递延所得税负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.defer_inc_non_cur_liab",
+    "name": "递延收益-非流动负债",
+    "description": "递延收益-非流动负债",
+    "dataset": "balancesheet",
+    "field": "defer_inc_non_cur_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "defer_inc_non_cur_liab",
+      "递延收益-非流动负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_ncl",
+    "name": "其他非流动负债",
+    "description": "其他非流动负债",
+    "dataset": "balancesheet",
+    "field": "oth_ncl",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_ncl",
+      "其他非流动负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.total_ncl",
+    "name": "非流动负债合计",
+    "description": "非流动负债合计",
+    "dataset": "balancesheet",
+    "field": "total_ncl",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_ncl",
+      "非流动负债合计",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.depos_oth_bfi",
+    "name": "同业和其它金融机构存放款项",
+    "description": "同业和其它金融机构存放款项",
+    "dataset": "balancesheet",
+    "field": "depos_oth_bfi",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "depos_oth_bfi",
+      "同业和其它金融机构存放款项",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.deriv_liab",
+    "name": "衍生金融负债",
+    "description": "衍生金融负债",
+    "dataset": "balancesheet",
+    "field": "deriv_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "deriv_liab",
+      "衍生金融负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.depos",
+    "name": "吸收存款",
+    "description": "吸收存款",
+    "dataset": "balancesheet",
+    "field": "depos",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "depos",
+      "吸收存款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.agency_bus_liab",
+    "name": "代理业务负债",
+    "description": "代理业务负债",
+    "dataset": "balancesheet",
+    "field": "agency_bus_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "agency_bus_liab",
+      "代理业务负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_liab",
+    "name": "其他负债",
+    "description": "其他负债",
+    "dataset": "balancesheet",
+    "field": "oth_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_liab",
+      "其他负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.prem_receiv_adva",
+    "name": "预收保费",
+    "description": "预收保费",
+    "dataset": "balancesheet",
+    "field": "prem_receiv_adva",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "prem_receiv_adva",
+      "预收保费",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.depos_received",
+    "name": "存入保证金",
+    "description": "存入保证金",
+    "dataset": "balancesheet",
+    "field": "depos_received",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "depos_received",
+      "存入保证金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.ph_invest",
+    "name": "保户储金及投资款",
+    "description": "保户储金及投资款",
+    "dataset": "balancesheet",
+    "field": "ph_invest",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "ph_invest",
+      "保户储金及投资款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.reser_une_prem",
+    "name": "未到期责任准备金",
+    "description": "未到期责任准备金",
+    "dataset": "balancesheet",
+    "field": "reser_une_prem",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reser_une_prem",
+      "未到期责任准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.reser_outstd_claims",
+    "name": "未决赔款准备金",
+    "description": "未决赔款准备金",
+    "dataset": "balancesheet",
+    "field": "reser_outstd_claims",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reser_outstd_claims",
+      "未决赔款准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.reser_lins_liab",
+    "name": "寿险责任准备金",
+    "description": "寿险责任准备金",
+    "dataset": "balancesheet",
+    "field": "reser_lins_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reser_lins_liab",
+      "寿险责任准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.reser_lthins_liab",
+    "name": "长期健康险责任准备金",
+    "description": "长期健康险责任准备金",
+    "dataset": "balancesheet",
+    "field": "reser_lthins_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "reser_lthins_liab",
+      "长期健康险责任准备金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.indept_acc_liab",
+    "name": "独立账户负债",
+    "description": "独立账户负债",
+    "dataset": "balancesheet",
+    "field": "indept_acc_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "indept_acc_liab",
+      "独立账户负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.pledge_borr",
+    "name": "其中:质押借款",
+    "description": "其中:质押借款",
+    "dataset": "balancesheet",
+    "field": "pledge_borr",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "pledge_borr",
+      "其中:质押借款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.indem_payable",
+    "name": "应付赔付款",
+    "description": "应付赔付款",
+    "dataset": "balancesheet",
+    "field": "indem_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "indem_payable",
+      "应付赔付款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.policy_div_payable",
+    "name": "应付保单红利",
+    "description": "应付保单红利",
+    "dataset": "balancesheet",
+    "field": "policy_div_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "policy_div_payable",
+      "应付保单红利",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.total_liab",
+    "name": "负债合计",
+    "description": "负债合计",
+    "dataset": "balancesheet",
+    "field": "total_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_liab",
+      "负债合计",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.treasury_share",
+    "name": "减:库存股",
+    "description": "减:库存股",
+    "dataset": "balancesheet",
+    "field": "treasury_share",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "treasury_share",
+      "减:库存股",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.ordin_risk_reser",
+    "name": "一般风险准备",
+    "description": "一般风险准备",
+    "dataset": "balancesheet",
+    "field": "ordin_risk_reser",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "ordin_risk_reser",
+      "一般风险准备",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.forex_differ",
+    "name": "外币报表折算差额",
+    "description": "外币报表折算差额",
+    "dataset": "balancesheet",
+    "field": "forex_differ",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "forex_differ",
+      "外币报表折算差额",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.invest_loss_unconf",
+    "name": "未确认的投资损失",
+    "description": "未确认的投资损失",
+    "dataset": "balancesheet",
+    "field": "invest_loss_unconf",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "invest_loss_unconf",
+      "未确认的投资损失",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.minority_int",
+    "name": "少数股东权益",
+    "description": "少数股东权益",
+    "dataset": "balancesheet",
+    "field": "minority_int",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "minority_int",
+      "少数股东权益",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.total_hldr_eqy_exc_min_int",
+    "name": "股东权益合计(不含少数股东权益)",
+    "description": "股东权益合计(不含少数股东权益)",
+    "dataset": "balancesheet",
+    "field": "total_hldr_eqy_exc_min_int",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_hldr_eqy_exc_min_int",
+      "股东权益合计(不含少数股东权益)",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.total_hldr_eqy_inc_min_int",
+    "name": "股东权益合计(含少数股东权益)",
+    "description": "股东权益合计(含少数股东权益)",
+    "dataset": "balancesheet",
+    "field": "total_hldr_eqy_inc_min_int",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_hldr_eqy_inc_min_int",
+      "股东权益合计(含少数股东权益)",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.total_liab_hldr_eqy",
+    "name": "负债及股东权益总计",
+    "description": "负债及股东权益总计",
+    "dataset": "balancesheet",
+    "field": "total_liab_hldr_eqy",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "total_liab_hldr_eqy",
+      "负债及股东权益总计",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.lt_payroll_payable",
+    "name": "长期应付职工薪酬",
+    "description": "长期应付职工薪酬",
+    "dataset": "balancesheet",
+    "field": "lt_payroll_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "lt_payroll_payable",
+      "长期应付职工薪酬",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_comp_income",
+    "name": "其他综合收益",
+    "description": "其他综合收益",
+    "dataset": "balancesheet",
+    "field": "oth_comp_income",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_comp_income",
+      "其他综合收益",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_eqt_tools",
+    "name": "其他权益工具",
+    "description": "其他权益工具",
+    "dataset": "balancesheet",
+    "field": "oth_eqt_tools",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_eqt_tools",
+      "其他权益工具",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_eqt_tools_p_shr",
+    "name": "其他权益工具(优先股)",
+    "description": "其他权益工具(优先股)",
+    "dataset": "balancesheet",
+    "field": "oth_eqt_tools_p_shr",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_eqt_tools_p_shr",
+      "其他权益工具(优先股)",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.lending_funds",
+    "name": "融出资金",
+    "description": "融出资金",
+    "dataset": "balancesheet",
+    "field": "lending_funds",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "lending_funds",
+      "融出资金",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.acc_receivable",
+    "name": "应收款项",
+    "description": "应收款项",
+    "dataset": "balancesheet",
+    "field": "acc_receivable",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "acc_receivable",
+      "应收款项",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.st_fin_payable",
+    "name": "应付短期融资款",
+    "description": "应付短期融资款",
+    "dataset": "balancesheet",
+    "field": "st_fin_payable",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "st_fin_payable",
+      "应付短期融资款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.payables",
+    "name": "应付款项",
+    "description": "应付款项",
+    "dataset": "balancesheet",
+    "field": "payables",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "payables",
+      "应付款项",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.hfs_assets",
+    "name": "持有待售的资产",
+    "description": "持有待售的资产",
+    "dataset": "balancesheet",
+    "field": "hfs_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "hfs_assets",
+      "持有待售的资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.hfs_sales",
+    "name": "持有待售的负债",
+    "description": "持有待售的负债",
+    "dataset": "balancesheet",
+    "field": "hfs_sales",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "hfs_sales",
+      "持有待售的负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.cost_fin_assets",
+    "name": "以摊余成本计量的金融资产",
+    "description": "以摊余成本计量的金融资产",
+    "dataset": "balancesheet",
+    "field": "cost_fin_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "cost_fin_assets",
+      "以摊余成本计量的金融资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.fair_value_fin_assets",
+    "name": "以公允价值计量且其变动计入其他综合收益的金融资产",
+    "description": "以公允价值计量且其变动计入其他综合收益的金融资产",
+    "dataset": "balancesheet",
+    "field": "fair_value_fin_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fair_value_fin_assets",
+      "以公允价值计量且其变动计入其他综合收益的金融资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.cip_total",
+    "name": "在建工程(合计)(元)",
+    "description": "在建工程(合计)(元)",
+    "dataset": "balancesheet",
+    "field": "cip_total",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "cip_total",
+      "在建工程(合计)(元)",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_pay_total",
+    "name": "其他应付款(合计)(元)",
+    "description": "其他应付款(合计)(元)",
+    "dataset": "balancesheet",
+    "field": "oth_pay_total",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_pay_total",
+      "其他应付款(合计)(元)",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.long_pay_total",
+    "name": "长期应付款(合计)(元)",
+    "description": "长期应付款(合计)(元)",
+    "dataset": "balancesheet",
+    "field": "long_pay_total",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "long_pay_total",
+      "长期应付款(合计)(元)",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.debt_invest",
+    "name": "债权投资(元)",
+    "description": "债权投资(元)",
+    "dataset": "balancesheet",
+    "field": "debt_invest",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "debt_invest",
+      "债权投资(元)",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_debt_invest",
+    "name": "其他债权投资(元)",
+    "description": "其他债权投资(元)",
+    "dataset": "balancesheet",
+    "field": "oth_debt_invest",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_debt_invest",
+      "其他债权投资(元)",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_eq_invest",
+    "name": "其他权益工具投资(元)",
+    "description": "其他权益工具投资(元)",
+    "dataset": "balancesheet",
+    "field": "oth_eq_invest",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_eq_invest",
+      "其他权益工具投资(元)",
+      "资产负债表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "balancesheet.oth_illiq_fin_assets",
+    "name": "其他非流动金融资产(元)",
+    "description": "其他非流动金融资产(元)",
+    "dataset": "balancesheet",
+    "field": "oth_illiq_fin_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_illiq_fin_assets",
+      "其他非流动金融资产(元)",
+      "资产负债表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "balancesheet.oth_eq_ppbond",
+    "name": "其他权益工具:永续债(元)",
+    "description": "其他权益工具:永续债(元)",
+    "dataset": "balancesheet",
+    "field": "oth_eq_ppbond",
+    "statementName": "资产负债表",
+    "subcategory": "权益",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_eq_ppbond",
+      "其他权益工具:永续债(元)",
+      "资产负债表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "balancesheet.receiv_financing",
+    "name": "应收款项融资",
+    "description": "应收款项融资",
+    "dataset": "balancesheet",
+    "field": "receiv_financing",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "receiv_financing",
+      "应收款项融资",
+      "资产负债表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "balancesheet.use_right_assets",
+    "name": "使用权资产",
+    "description": "使用权资产",
+    "dataset": "balancesheet",
+    "field": "use_right_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "use_right_assets",
+      "使用权资产",
+      "资产负债表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "balancesheet.lease_liab",
+    "name": "租赁负债",
+    "description": "租赁负债",
+    "dataset": "balancesheet",
+    "field": "lease_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "lease_liab",
+      "租赁负债",
+      "资产负债表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "balancesheet.contract_assets",
+    "name": "合同资产",
+    "description": "合同资产",
+    "dataset": "balancesheet",
+    "field": "contract_assets",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "contract_assets",
+      "合同资产",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.contract_liab",
+    "name": "合同负债",
+    "description": "合同负债",
+    "dataset": "balancesheet",
+    "field": "contract_liab",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "contract_liab",
+      "合同负债",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.accounts_receiv_bill",
+    "name": "应收票据及应收账款",
+    "description": "应收票据及应收账款",
+    "dataset": "balancesheet",
+    "field": "accounts_receiv_bill",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "accounts_receiv_bill",
+      "应收票据及应收账款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.accounts_pay",
+    "name": "应付票据及应付账款",
+    "description": "应付票据及应付账款",
+    "dataset": "balancesheet",
+    "field": "accounts_pay",
+    "statementName": "资产负债表",
+    "subcategory": "负债",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "accounts_pay",
+      "应付票据及应付账款",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.oth_rcv_total",
+    "name": "其他应收款(合计)（元）",
+    "description": "其他应收款(合计)（元）",
+    "dataset": "balancesheet",
+    "field": "oth_rcv_total",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_rcv_total",
+      "其他应收款(合计)（元）",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "balancesheet.fix_assets_total",
+    "name": "固定资产(合计)(元)",
+    "description": "固定资产(合计)(元)",
+    "dataset": "balancesheet",
+    "field": "fix_assets_total",
+    "statementName": "资产负债表",
+    "subcategory": "资产",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "point_in_time",
+    "periodSemantics": "point_in_time",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fix_assets_total",
+      "固定资产(合计)(元)",
+      "资产负债表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.is_calc",
+    "name": "是否计算报表",
+    "description": "是否计算报表",
+    "dataset": "cashflow",
+    "field": "is_calc",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "is_calc",
+      "是否计算报表",
+      "现金流量表"
+    ],
+    "defaultVisible": false
+  },
+  {
+    "id": "cashflow.net_profit",
+    "name": "净利润",
+    "description": "净利润",
+    "dataset": "cashflow",
+    "field": "net_profit",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "net_profit",
+      "净利润",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.finan_exp",
+    "name": "财务费用",
+    "description": "财务费用",
+    "dataset": "cashflow",
+    "field": "finan_exp",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "finan_exp",
+      "财务费用",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_fr_sale_sg",
+    "name": "销售商品、提供劳务收到的现金",
+    "description": "销售商品、提供劳务收到的现金",
+    "dataset": "cashflow",
+    "field": "c_fr_sale_sg",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_fr_sale_sg",
+      "销售商品、提供劳务收到的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.recp_tax_rends",
+    "name": "收到的税费返还",
+    "description": "收到的税费返还",
+    "dataset": "cashflow",
+    "field": "recp_tax_rends",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "recp_tax_rends",
+      "收到的税费返还",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_depos_incr_fi",
+    "name": "客户存款和同业存放款项净增加额",
+    "description": "客户存款和同业存放款项净增加额",
+    "dataset": "cashflow",
+    "field": "n_depos_incr_fi",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_depos_incr_fi",
+      "客户存款和同业存放款项净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_incr_loans_cb",
+    "name": "向中央银行借款净增加额",
+    "description": "向中央银行借款净增加额",
+    "dataset": "cashflow",
+    "field": "n_incr_loans_cb",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_incr_loans_cb",
+      "向中央银行借款净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_inc_borr_oth_fi",
+    "name": "向其他金融机构拆入资金净增加额",
+    "description": "向其他金融机构拆入资金净增加额",
+    "dataset": "cashflow",
+    "field": "n_inc_borr_oth_fi",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_inc_borr_oth_fi",
+      "向其他金融机构拆入资金净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.prem_fr_orig_contr",
+    "name": "收到原保险合同保费取得的现金",
+    "description": "收到原保险合同保费取得的现金",
+    "dataset": "cashflow",
+    "field": "prem_fr_orig_contr",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "prem_fr_orig_contr",
+      "收到原保险合同保费取得的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_incr_insured_dep",
+    "name": "保户储金净增加额",
+    "description": "保户储金净增加额",
+    "dataset": "cashflow",
+    "field": "n_incr_insured_dep",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_incr_insured_dep",
+      "保户储金净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_reinsur_prem",
+    "name": "收到再保业务现金净额",
+    "description": "收到再保业务现金净额",
+    "dataset": "cashflow",
+    "field": "n_reinsur_prem",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_reinsur_prem",
+      "收到再保业务现金净额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_incr_disp_tfa",
+    "name": "处置交易性金融资产净增加额",
+    "description": "处置交易性金融资产净增加额",
+    "dataset": "cashflow",
+    "field": "n_incr_disp_tfa",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_incr_disp_tfa",
+      "处置交易性金融资产净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.ifc_cash_incr",
+    "name": "收取利息和手续费净增加额",
+    "description": "收取利息和手续费净增加额",
+    "dataset": "cashflow",
+    "field": "ifc_cash_incr",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "ifc_cash_incr",
+      "收取利息和手续费净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_incr_disp_faas",
+    "name": "处置可供出售金融资产净增加额",
+    "description": "处置可供出售金融资产净增加额",
+    "dataset": "cashflow",
+    "field": "n_incr_disp_faas",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_incr_disp_faas",
+      "处置可供出售金融资产净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_incr_loans_oth_bank",
+    "name": "拆入资金净增加额",
+    "description": "拆入资金净增加额",
+    "dataset": "cashflow",
+    "field": "n_incr_loans_oth_bank",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_incr_loans_oth_bank",
+      "拆入资金净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_cap_incr_repur",
+    "name": "回购业务资金净增加额",
+    "description": "回购业务资金净增加额",
+    "dataset": "cashflow",
+    "field": "n_cap_incr_repur",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_cap_incr_repur",
+      "回购业务资金净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_fr_oth_operate_a",
+    "name": "收到其他与经营活动有关的现金",
+    "description": "收到其他与经营活动有关的现金",
+    "dataset": "cashflow",
+    "field": "c_fr_oth_operate_a",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_fr_oth_operate_a",
+      "收到其他与经营活动有关的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_inf_fr_operate_a",
+    "name": "经营活动现金流入小计",
+    "description": "经营活动现金流入小计",
+    "dataset": "cashflow",
+    "field": "c_inf_fr_operate_a",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_inf_fr_operate_a",
+      "经营活动现金流入小计",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_paid_goods_s",
+    "name": "购买商品、接受劳务支付的现金",
+    "description": "购买商品、接受劳务支付的现金",
+    "dataset": "cashflow",
+    "field": "c_paid_goods_s",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_paid_goods_s",
+      "购买商品、接受劳务支付的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_paid_to_for_empl",
+    "name": "支付给职工以及为职工支付的现金",
+    "description": "支付给职工以及为职工支付的现金",
+    "dataset": "cashflow",
+    "field": "c_paid_to_for_empl",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_paid_to_for_empl",
+      "支付给职工以及为职工支付的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_paid_for_taxes",
+    "name": "支付的各项税费",
+    "description": "支付的各项税费",
+    "dataset": "cashflow",
+    "field": "c_paid_for_taxes",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_paid_for_taxes",
+      "支付的各项税费",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_incr_clt_loan_adv",
+    "name": "客户贷款及垫款净增加额",
+    "description": "客户贷款及垫款净增加额",
+    "dataset": "cashflow",
+    "field": "n_incr_clt_loan_adv",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_incr_clt_loan_adv",
+      "客户贷款及垫款净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_incr_dep_cbob",
+    "name": "存放央行和同业款项净增加额",
+    "description": "存放央行和同业款项净增加额",
+    "dataset": "cashflow",
+    "field": "n_incr_dep_cbob",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_incr_dep_cbob",
+      "存放央行和同业款项净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_pay_claims_orig_inco",
+    "name": "支付原保险合同赔付款项的现金",
+    "description": "支付原保险合同赔付款项的现金",
+    "dataset": "cashflow",
+    "field": "c_pay_claims_orig_inco",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_pay_claims_orig_inco",
+      "支付原保险合同赔付款项的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.pay_handling_chrg",
+    "name": "支付手续费的现金",
+    "description": "支付手续费的现金",
+    "dataset": "cashflow",
+    "field": "pay_handling_chrg",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "pay_handling_chrg",
+      "支付手续费的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.pay_comm_insur_plcy",
+    "name": "支付保单红利的现金",
+    "description": "支付保单红利的现金",
+    "dataset": "cashflow",
+    "field": "pay_comm_insur_plcy",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "pay_comm_insur_plcy",
+      "支付保单红利的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.oth_cash_pay_oper_act",
+    "name": "支付其他与经营活动有关的现金",
+    "description": "支付其他与经营活动有关的现金",
+    "dataset": "cashflow",
+    "field": "oth_cash_pay_oper_act",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_cash_pay_oper_act",
+      "支付其他与经营活动有关的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.st_cash_out_act",
+    "name": "经营活动现金流出小计",
+    "description": "经营活动现金流出小计",
+    "dataset": "cashflow",
+    "field": "st_cash_out_act",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "st_cash_out_act",
+      "经营活动现金流出小计",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_cashflow_act",
+    "name": "经营活动产生的现金流量净额",
+    "description": "经营活动产生的现金流量净额",
+    "dataset": "cashflow",
+    "field": "n_cashflow_act",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_cashflow_act",
+      "经营活动产生的现金流量净额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.oth_recp_ral_inv_act",
+    "name": "收到其他与投资活动有关的现金",
+    "description": "收到其他与投资活动有关的现金",
+    "dataset": "cashflow",
+    "field": "oth_recp_ral_inv_act",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_recp_ral_inv_act",
+      "收到其他与投资活动有关的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_disp_withdrwl_invest",
+    "name": "收回投资收到的现金",
+    "description": "收回投资收到的现金",
+    "dataset": "cashflow",
+    "field": "c_disp_withdrwl_invest",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_disp_withdrwl_invest",
+      "收回投资收到的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_recp_return_invest",
+    "name": "取得投资收益收到的现金",
+    "description": "取得投资收益收到的现金",
+    "dataset": "cashflow",
+    "field": "c_recp_return_invest",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_recp_return_invest",
+      "取得投资收益收到的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_recp_disp_fiolta",
+    "name": "处置固定资产、无形资产和其他长期资产收回的现金净额",
+    "description": "处置固定资产、无形资产和其他长期资产收回的现金净额",
+    "dataset": "cashflow",
+    "field": "n_recp_disp_fiolta",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_recp_disp_fiolta",
+      "处置固定资产、无形资产和其他长期资产收回的现金净额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_recp_disp_sobu",
+    "name": "处置子公司及其他营业单位收到的现金净额",
+    "description": "处置子公司及其他营业单位收到的现金净额",
+    "dataset": "cashflow",
+    "field": "n_recp_disp_sobu",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_recp_disp_sobu",
+      "处置子公司及其他营业单位收到的现金净额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.stot_inflows_inv_act",
+    "name": "投资活动现金流入小计",
+    "description": "投资活动现金流入小计",
+    "dataset": "cashflow",
+    "field": "stot_inflows_inv_act",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "stot_inflows_inv_act",
+      "投资活动现金流入小计",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_pay_acq_const_fiolta",
+    "name": "购建固定资产、无形资产和其他长期资产支付的现金",
+    "description": "购建固定资产、无形资产和其他长期资产支付的现金",
+    "dataset": "cashflow",
+    "field": "c_pay_acq_const_fiolta",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_pay_acq_const_fiolta",
+      "购建固定资产、无形资产和其他长期资产支付的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_paid_invest",
+    "name": "投资支付的现金",
+    "description": "投资支付的现金",
+    "dataset": "cashflow",
+    "field": "c_paid_invest",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_paid_invest",
+      "投资支付的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_disp_subs_oth_biz",
+    "name": "取得子公司及其他营业单位支付的现金净额",
+    "description": "取得子公司及其他营业单位支付的现金净额",
+    "dataset": "cashflow",
+    "field": "n_disp_subs_oth_biz",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_disp_subs_oth_biz",
+      "取得子公司及其他营业单位支付的现金净额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.oth_pay_ral_inv_act",
+    "name": "支付其他与投资活动有关的现金",
+    "description": "支付其他与投资活动有关的现金",
+    "dataset": "cashflow",
+    "field": "oth_pay_ral_inv_act",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_pay_ral_inv_act",
+      "支付其他与投资活动有关的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_incr_pledge_loan",
+    "name": "质押贷款净增加额",
+    "description": "质押贷款净增加额",
+    "dataset": "cashflow",
+    "field": "n_incr_pledge_loan",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_incr_pledge_loan",
+      "质押贷款净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.stot_out_inv_act",
+    "name": "投资活动现金流出小计",
+    "description": "投资活动现金流出小计",
+    "dataset": "cashflow",
+    "field": "stot_out_inv_act",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "stot_out_inv_act",
+      "投资活动现金流出小计",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_cashflow_inv_act",
+    "name": "投资活动产生的现金流量净额",
+    "description": "投资活动产生的现金流量净额",
+    "dataset": "cashflow",
+    "field": "n_cashflow_inv_act",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_cashflow_inv_act",
+      "投资活动产生的现金流量净额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_recp_borrow",
+    "name": "取得借款收到的现金",
+    "description": "取得借款收到的现金",
+    "dataset": "cashflow",
+    "field": "c_recp_borrow",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_recp_borrow",
+      "取得借款收到的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.proc_issue_bonds",
+    "name": "发行债券收到的现金",
+    "description": "发行债券收到的现金",
+    "dataset": "cashflow",
+    "field": "proc_issue_bonds",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "proc_issue_bonds",
+      "发行债券收到的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.oth_cash_recp_ral_fnc_act",
+    "name": "收到其他与筹资活动有关的现金",
+    "description": "收到其他与筹资活动有关的现金",
+    "dataset": "cashflow",
+    "field": "oth_cash_recp_ral_fnc_act",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_cash_recp_ral_fnc_act",
+      "收到其他与筹资活动有关的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.stot_cash_in_fnc_act",
+    "name": "筹资活动现金流入小计",
+    "description": "筹资活动现金流入小计",
+    "dataset": "cashflow",
+    "field": "stot_cash_in_fnc_act",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "stot_cash_in_fnc_act",
+      "筹资活动现金流入小计",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.free_cashflow",
+    "name": "企业自由现金流量",
+    "description": "企业自由现金流量",
+    "dataset": "cashflow",
+    "field": "free_cashflow",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "free_cashflow",
+      "企业自由现金流量",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_prepay_amt_borr",
+    "name": "偿还债务支付的现金",
+    "description": "偿还债务支付的现金",
+    "dataset": "cashflow",
+    "field": "c_prepay_amt_borr",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_prepay_amt_borr",
+      "偿还债务支付的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_pay_dist_dpcp_int_exp",
+    "name": "分配股利、利润或偿付利息支付的现金",
+    "description": "分配股利、利润或偿付利息支付的现金",
+    "dataset": "cashflow",
+    "field": "c_pay_dist_dpcp_int_exp",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_pay_dist_dpcp_int_exp",
+      "分配股利、利润或偿付利息支付的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.incl_dvd_profit_paid_sc_ms",
+    "name": "其中:子公司支付给少数股东的股利、利润",
+    "description": "其中:子公司支付给少数股东的股利、利润",
+    "dataset": "cashflow",
+    "field": "incl_dvd_profit_paid_sc_ms",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "incl_dvd_profit_paid_sc_ms",
+      "其中:子公司支付给少数股东的股利、利润",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.oth_cashpay_ral_fnc_act",
+    "name": "支付其他与筹资活动有关的现金",
+    "description": "支付其他与筹资活动有关的现金",
+    "dataset": "cashflow",
+    "field": "oth_cashpay_ral_fnc_act",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_cashpay_ral_fnc_act",
+      "支付其他与筹资活动有关的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.stot_cashout_fnc_act",
+    "name": "筹资活动现金流出小计",
+    "description": "筹资活动现金流出小计",
+    "dataset": "cashflow",
+    "field": "stot_cashout_fnc_act",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "stot_cashout_fnc_act",
+      "筹资活动现金流出小计",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_cash_flows_fnc_act",
+    "name": "筹资活动产生的现金流量净额",
+    "description": "筹资活动产生的现金流量净额",
+    "dataset": "cashflow",
+    "field": "n_cash_flows_fnc_act",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_cash_flows_fnc_act",
+      "筹资活动产生的现金流量净额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.eff_fx_flu_cash",
+    "name": "汇率变动对现金的影响",
+    "description": "汇率变动对现金的影响",
+    "dataset": "cashflow",
+    "field": "eff_fx_flu_cash",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "eff_fx_flu_cash",
+      "汇率变动对现金的影响",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.n_incr_cash_cash_equ",
+    "name": "现金及现金等价物净增加额",
+    "description": "现金及现金等价物净增加额",
+    "dataset": "cashflow",
+    "field": "n_incr_cash_cash_equ",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "n_incr_cash_cash_equ",
+      "现金及现金等价物净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_cash_equ_beg_period",
+    "name": "期初现金及现金等价物余额",
+    "description": "期初现金及现金等价物余额",
+    "dataset": "cashflow",
+    "field": "c_cash_equ_beg_period",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_cash_equ_beg_period",
+      "期初现金及现金等价物余额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_cash_equ_end_period",
+    "name": "期末现金及现金等价物余额",
+    "description": "期末现金及现金等价物余额",
+    "dataset": "cashflow",
+    "field": "c_cash_equ_end_period",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_cash_equ_end_period",
+      "期末现金及现金等价物余额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.c_recp_cap_contrib",
+    "name": "吸收投资收到的现金",
+    "description": "吸收投资收到的现金",
+    "dataset": "cashflow",
+    "field": "c_recp_cap_contrib",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "c_recp_cap_contrib",
+      "吸收投资收到的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.incl_cash_rec_saims",
+    "name": "其中:子公司吸收少数股东投资收到的现金",
+    "description": "其中:子公司吸收少数股东投资收到的现金",
+    "dataset": "cashflow",
+    "field": "incl_cash_rec_saims",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "incl_cash_rec_saims",
+      "其中:子公司吸收少数股东投资收到的现金",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.uncon_invest_loss",
+    "name": "未确认投资损失",
+    "description": "未确认投资损失",
+    "dataset": "cashflow",
+    "field": "uncon_invest_loss",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "uncon_invest_loss",
+      "未确认投资损失",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.prov_depr_assets",
+    "name": "加:资产减值准备",
+    "description": "加:资产减值准备",
+    "dataset": "cashflow",
+    "field": "prov_depr_assets",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "prov_depr_assets",
+      "加:资产减值准备",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.depr_fa_coga_dpba",
+    "name": "固定资产折旧、油气资产折耗、生产性生物资产折旧",
+    "description": "固定资产折旧、油气资产折耗、生产性生物资产折旧",
+    "dataset": "cashflow",
+    "field": "depr_fa_coga_dpba",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "depr_fa_coga_dpba",
+      "固定资产折旧、油气资产折耗、生产性生物资产折旧",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.amort_intang_assets",
+    "name": "无形资产摊销",
+    "description": "无形资产摊销",
+    "dataset": "cashflow",
+    "field": "amort_intang_assets",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "amort_intang_assets",
+      "无形资产摊销",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.lt_amort_deferred_exp",
+    "name": "长期待摊费用摊销",
+    "description": "长期待摊费用摊销",
+    "dataset": "cashflow",
+    "field": "lt_amort_deferred_exp",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "lt_amort_deferred_exp",
+      "长期待摊费用摊销",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.decr_deferred_exp",
+    "name": "待摊费用减少",
+    "description": "待摊费用减少",
+    "dataset": "cashflow",
+    "field": "decr_deferred_exp",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "decr_deferred_exp",
+      "待摊费用减少",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.incr_acc_exp",
+    "name": "预提费用增加",
+    "description": "预提费用增加",
+    "dataset": "cashflow",
+    "field": "incr_acc_exp",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "incr_acc_exp",
+      "预提费用增加",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.loss_disp_fiolta",
+    "name": "处置固定、无形资产和其他长期资产的损失",
+    "description": "处置固定、无形资产和其他长期资产的损失",
+    "dataset": "cashflow",
+    "field": "loss_disp_fiolta",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "loss_disp_fiolta",
+      "处置固定、无形资产和其他长期资产的损失",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.loss_scr_fa",
+    "name": "固定资产报废损失",
+    "description": "固定资产报废损失",
+    "dataset": "cashflow",
+    "field": "loss_scr_fa",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "loss_scr_fa",
+      "固定资产报废损失",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.loss_fv_chg",
+    "name": "公允价值变动损失",
+    "description": "公允价值变动损失",
+    "dataset": "cashflow",
+    "field": "loss_fv_chg",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "loss_fv_chg",
+      "公允价值变动损失",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.invest_loss",
+    "name": "投资损失",
+    "description": "投资损失",
+    "dataset": "cashflow",
+    "field": "invest_loss",
+    "statementName": "现金流量表",
+    "subcategory": "投资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "invest_loss",
+      "投资损失",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.decr_def_inc_tax_assets",
+    "name": "递延所得税资产减少",
+    "description": "递延所得税资产减少",
+    "dataset": "cashflow",
+    "field": "decr_def_inc_tax_assets",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "decr_def_inc_tax_assets",
+      "递延所得税资产减少",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.incr_def_inc_tax_liab",
+    "name": "递延所得税负债增加",
+    "description": "递延所得税负债增加",
+    "dataset": "cashflow",
+    "field": "incr_def_inc_tax_liab",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "incr_def_inc_tax_liab",
+      "递延所得税负债增加",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.decr_inventories",
+    "name": "存货的减少",
+    "description": "存货的减少",
+    "dataset": "cashflow",
+    "field": "decr_inventories",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "decr_inventories",
+      "存货的减少",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.decr_oper_payable",
+    "name": "经营性应收项目的减少",
+    "description": "经营性应收项目的减少",
+    "dataset": "cashflow",
+    "field": "decr_oper_payable",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "decr_oper_payable",
+      "经营性应收项目的减少",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.incr_oper_payable",
+    "name": "经营性应付项目的增加",
+    "description": "经营性应付项目的增加",
+    "dataset": "cashflow",
+    "field": "incr_oper_payable",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "incr_oper_payable",
+      "经营性应付项目的增加",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.others",
+    "name": "其他",
+    "description": "其他",
+    "dataset": "cashflow",
+    "field": "others",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "others",
+      "其他",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.im_net_cashflow_oper_act",
+    "name": "经营活动产生的现金流量净额(间接法)",
+    "description": "经营活动产生的现金流量净额(间接法)",
+    "dataset": "cashflow",
+    "field": "im_net_cashflow_oper_act",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "im_net_cashflow_oper_act",
+      "经营活动产生的现金流量净额(间接法)",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.conv_debt_into_cap",
+    "name": "债务转为资本",
+    "description": "债务转为资本",
+    "dataset": "cashflow",
+    "field": "conv_debt_into_cap",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "conv_debt_into_cap",
+      "债务转为资本",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.conv_copbonds_due_within_1y",
+    "name": "一年内到期的可转换公司债券",
+    "description": "一年内到期的可转换公司债券",
+    "dataset": "cashflow",
+    "field": "conv_copbonds_due_within_1y",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "conv_copbonds_due_within_1y",
+      "一年内到期的可转换公司债券",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.fa_fnc_leases",
+    "name": "融资租入固定资产",
+    "description": "融资租入固定资产",
+    "dataset": "cashflow",
+    "field": "fa_fnc_leases",
+    "statementName": "现金流量表",
+    "subcategory": "筹资活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "fa_fnc_leases",
+      "融资租入固定资产",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.im_n_incr_cash_equ",
+    "name": "现金及现金等价物净增加额(间接法)",
+    "description": "现金及现金等价物净增加额(间接法)",
+    "dataset": "cashflow",
+    "field": "im_n_incr_cash_equ",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "im_n_incr_cash_equ",
+      "现金及现金等价物净增加额(间接法)",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.net_dism_capital_add",
+    "name": "拆出资金净增加额",
+    "description": "拆出资金净增加额",
+    "dataset": "cashflow",
+    "field": "net_dism_capital_add",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "net_dism_capital_add",
+      "拆出资金净增加额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.net_cash_rece_sec",
+    "name": "代理买卖证券收到的现金净额(元)",
+    "description": "代理买卖证券收到的现金净额(元)",
+    "dataset": "cashflow",
+    "field": "net_cash_rece_sec",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "net_cash_rece_sec",
+      "代理买卖证券收到的现金净额(元)",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.credit_impa_loss",
+    "name": "信用减值损失",
+    "description": "信用减值损失",
+    "dataset": "cashflow",
+    "field": "credit_impa_loss",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "credit_impa_loss",
+      "信用减值损失",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.use_right_asset_dep",
+    "name": "使用权资产折旧",
+    "description": "使用权资产折旧",
+    "dataset": "cashflow",
+    "field": "use_right_asset_dep",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "use_right_asset_dep",
+      "使用权资产折旧",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.oth_loss_asset",
+    "name": "其他资产减值损失",
+    "description": "其他资产减值损失",
+    "dataset": "cashflow",
+    "field": "oth_loss_asset",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "oth_loss_asset",
+      "其他资产减值损失",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.end_bal_cash",
+    "name": "现金的期末余额",
+    "description": "现金的期末余额",
+    "dataset": "cashflow",
+    "field": "end_bal_cash",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "end_bal_cash",
+      "现金的期末余额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.beg_bal_cash",
+    "name": "减:现金的期初余额",
+    "description": "减:现金的期初余额",
+    "dataset": "cashflow",
+    "field": "beg_bal_cash",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "beg_bal_cash",
+      "减:现金的期初余额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.end_bal_cash_equ",
+    "name": "加:现金等价物的期末余额",
+    "description": "加:现金等价物的期末余额",
+    "dataset": "cashflow",
+    "field": "end_bal_cash_equ",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "end_bal_cash_equ",
+      "加:现金等价物的期末余额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  },
+  {
+    "id": "cashflow.beg_bal_cash_equ",
+    "name": "减:现金等价物的期初余额",
+    "description": "减:现金等价物的期初余额",
+    "dataset": "cashflow",
+    "field": "beg_bal_cash_equ",
+    "statementName": "现金流量表",
+    "subcategory": "经营活动现金流",
+    "valueKind": "currency",
+    "canonicalUnit": "CNY",
+    "displayUnit": "亿元",
+    "quarterTransform": "cumulative",
+    "periodSemantics": "single_quarter",
+    "applicableCompanyTypes": [
+      "1",
+      "2",
+      "3",
+      "4"
+    ],
+    "keywords": [
+      "beg_bal_cash_equ",
+      "减:现金等价物的期初余额",
+      "现金流量表"
+    ],
+    "defaultVisible": true
+  }
+]

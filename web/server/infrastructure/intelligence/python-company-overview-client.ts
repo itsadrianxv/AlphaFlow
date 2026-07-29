@@ -6,15 +6,17 @@ import {
 } from "~/server/domain/workflow/errors";
 
 export class PythonCompanyOverviewClient {
-  async getOverview(stockCode: string) {
+  async getOverview(stockCode: string, metricIds: string[] = []) {
     const controller = new AbortController();
     const timer = setTimeout(
       () => controller.abort(),
       env.PYTHON_SERVICE_TIMEOUT_MS,
     );
     try {
+      const query = new URLSearchParams();
+      for (const metricId of metricIds) query.append("metric_ids", metricId);
       const response = await fetch(
-        `${env.PYTHON_SERVICE_URL.replace(/\/$/, "")}/api/v1/company-overview/stocks/${stockCode}`,
+        `${env.PYTHON_SERVICE_URL.replace(/\/$/, "")}/api/v1/company-overview/stocks/${stockCode}${query.size ? `?${query}` : ""}`,
         { signal: controller.signal },
       );
       if (!response.ok) {

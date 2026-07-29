@@ -4,15 +4,17 @@ const nullableNumber = z.number().nullable();
 
 export const companyFinancialPointSchema = z.object({
   endDate: z.string(),
-  revenue: nullableNumber,
-  netProfit: nullableNumber,
-  deductedNetProfit: nullableNumber,
-  grossMargin: nullableNumber,
-  netMargin: nullableNumber,
-  operatingCashflow: nullableNumber,
-  freeCashflow: nullableNumber,
-  roe: nullableNumber,
-  roic: nullableNumber,
+  values: z.record(z.string(), nullableNumber),
+});
+
+export const companyFinancialMetricSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  dataset: z.enum(["income", "balancesheet", "cashflow"]),
+  field: z.string(),
+  displayUnit: z.string(),
+  valueKind: z.enum(["currency", "ratio", "per_share", "shares", "number"]),
+  periodSemantics: z.string(),
 });
 
 export const companyOverviewSchema = z.object({
@@ -27,14 +29,10 @@ export const companyOverviewSchema = z.object({
     businessScope: z.string().nullable(),
   }),
   financials: z.object({
+    metrics: z.array(companyFinancialMetricSchema),
     quarters: z.array(companyFinancialPointSchema),
     annuals: z.array(companyFinancialPointSchema),
-    valuation: z.object({
-      asOfDate: z.string().nullable(),
-      pe: nullableNumber,
-      pb: nullableNumber,
-      ps: nullableNumber,
-    }),
+    warnings: z.array(z.unknown()).default([]),
   }),
   businesses: z.array(
     z.object({

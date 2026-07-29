@@ -283,7 +283,7 @@ class TushareProvider:
             self._get_client().stock_basic(
                 exchange="",
                 list_status="L",
-                fields="ts_code,symbol,name,exchange,list_status",
+                fields="ts_code,symbol,name,exchange,list_status,industry",
             )
         )
         market_by_exchange = {"SSE": "SH", "SZSE": "SZ", "BSE": "BJ"}
@@ -301,6 +301,7 @@ class TushareProvider:
                     "stockCode": stock_code,
                     "stockName": stock_name,
                     "market": market,
+                    "industry": str(row.get("industry") or "").strip(),
                 }
             )
         return sorted(records, key=lambda item: item["stockCode"])
@@ -532,6 +533,9 @@ class TushareProvider:
     def get_raw_frame(self, dataset: str, **params: str) -> pd.DataFrame:
         supported_datasets = {
             *RAW_DATASET_FIELDS.keys(),
+            "income_vip",
+            "balancesheet_vip",
+            "cashflow_vip",
             "adj_factor",
             "cn_gdp",
             "cn_m",

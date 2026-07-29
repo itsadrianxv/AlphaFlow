@@ -32,10 +32,10 @@ function fallbackQuestions(
   if (section === "financials") {
     const latest = overview.financials.quarters[0];
     return [
-      `${name}最近一期收入${latest?.revenue === null ? "" : "变化"}的核心驱动是什么？`,
-      `${name}的利润率变化来自产品结构、价格还是成本？`,
-      `${name}经营现金流与归母净利润是否匹配，差异来自哪里？`,
-      `${name}当前估值隐含了怎样的增长和盈利预期？`,
+      `${name}${latest ? "最近一期" : "后续"}财务指标变化的核心驱动是什么？`,
+      `${name}利润表各指标的变化来自产品结构、价格还是成本？`,
+      `${name}经营现金流与利润表现是否匹配，差异来自哪里？`,
+      `${name}资产负债结构中最值得持续跟踪的变化是什么？`,
     ];
   }
   const leading = overview.businesses[0]?.name ?? "主营业务";
@@ -92,10 +92,14 @@ async function buildQuestions(
 
 export const companyOverviewRouter = createTRPCRouter({
   get: protectedProcedure
-    .input(z.object({ stockCode: z.string().regex(/^\d{6}$/) }))
+    .input(z.object({
+      stockCode: z.string().regex(/^\d{6}$/),
+      metricIds: z.array(z.string().min(1)).max(30).default([]),
+    }))
     .query(async ({ input }) => {
       const overview = await new PythonCompanyOverviewClient().getOverview(
         input.stockCode,
+        input.metricIds,
       );
       const [profile, financials, businesses] = await Promise.all([
         buildQuestions("profile", overview),

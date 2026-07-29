@@ -123,3 +123,12 @@ npm run dev
 npm run validate:runtime
 npm run worker:workflow
 ```
+# 独立筛选执行服务
+
+`screening-worker` 是独立的 C++20 服务，只依赖 PostgreSQL、Redis 和 `python-service`。它不依赖 Web、workflow worker、agent runtime 或 Kronos；任务成功写入 Redis Stream 后，即使 Web 停止也会继续执行。
+
+```bash
+docker compose up -d --build postgres redis python-service screening-worker
+```
+
+健康检查位于容器内 `8030` 端口：`/health/live` 检查 worker 主循环，`/health/ready` 额外检查 PostgreSQL、Redis 和 Python。服务终止时不确认未完成消息，消息会在 lease 到期后通过 Redis PEL 恢复。

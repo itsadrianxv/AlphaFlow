@@ -70,7 +70,7 @@ class ScreeningStockUniverseStore:
 
         generated_at = refreshed_at or datetime.now(UTC)
         payload = {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "provider": provider,
             "tradingDate": trading_date.isoformat(),
             "refreshedAt": generated_at.astimezone(UTC).isoformat(),
@@ -100,7 +100,7 @@ class ScreeningStockUniverseStore:
     def _validate_payload(self, payload: Any) -> list[dict[str, str]]:
         if not isinstance(payload, dict):
             raise StockUniverseUnavailableError("筛选股票池文件格式无效")
-        if payload.get("schemaVersion") != 1:
+        if payload.get("schemaVersion") != 2:
             raise StockUniverseUnavailableError("筛选股票池文件版本不受支持")
         records = payload.get("records")
         if not isinstance(records, list):
@@ -122,6 +122,7 @@ class ScreeningStockUniverseStore:
             stock_code = str(record.get("stockCode") or "").strip()
             stock_name = str(record.get("stockName") or "").strip()
             market = str(record.get("market") or "").strip().upper()
+            industry = str(record.get("industry") or "").strip()
             if (
                 len(stock_code) != 6
                 or not stock_code.isdigit()
@@ -136,6 +137,7 @@ class ScreeningStockUniverseStore:
                     "stockCode": stock_code,
                     "stockName": stock_name,
                     "market": market,
+                    "industry": industry,
                 }
             )
         return sorted(normalized, key=lambda item: item["stockCode"])
