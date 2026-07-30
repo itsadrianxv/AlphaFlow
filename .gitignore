@@ -44,6 +44,7 @@ yarn-error.log*
 .env*.local
 docker/.env
 docker/python/vendor/*
+!docker/python/vendor/.gitkeep
 !docker/python/vendor/README.md
 !docker/python/vendor/iFinDPy.py
 !docker/python/vendor/iFinDAPI/
@@ -79,3 +80,5 @@ design-system/
 temp/
 
 .models/
+
+AGENTS.md

@@ -5,6 +5,8 @@ WORKDIR /repo/web
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN set -eux; \
+  find /etc/apt -type f \( -name '*.sources' -o -name '*.list' \) -print0 \
+    | xargs -0 -r sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g'; \
   apt-get update; \
   apt-get install -y --no-install-recommends openssl; \
   rm -rf /var/lib/apt/lists/*

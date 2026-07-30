@@ -272,9 +272,9 @@ services:
       AUTH_SECRET_2: ${AUTH_SECRET_2:-}
       AUTH_SECRET_3: ${AUTH_SECRET_3:-}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
-      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      AUTH_URL: ${AUTH_URL:?AUTH_URL must be configured in docker/.env}
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
-      NEXTAUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXTAUTH_URL: ${AUTH_URL:?AUTH_URL must be configured in docker/.env}
       AUTH_WECHAT_ID: ${AUTH_WECHAT_ID:-}
       AUTH_WECHAT_SECRET: ${AUTH_WECHAT_SECRET:-}
       AUTH_QQ_ID: ${AUTH_QQ_ID:-}

@@ -1,6 +1,9 @@
 ﻿FROM debian:bookworm-slim AS builder
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN set -eux; \
+  find /etc/apt -type f \( -name '*.sources' -o -name '*.list' \) -print0 \
+    | xargs -0 -r sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g'; \
+  apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     ninja-build \
@@ -21,7 +24,10 @@ RUN cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
 
 FROM debian:bookworm-slim AS runtime
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN set -eux; \
+  find /etc/apt -type f \( -name '*.sources' -o -name '*.list' \) -print0 \
+    | xargs -0 -r sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g'; \
+  apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
     libboost-system1.74.0 \

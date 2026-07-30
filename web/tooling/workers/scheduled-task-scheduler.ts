@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { type Prisma, PrismaClient } from "@prisma/client";
 import Redis from "ioredis";
-import { submitScheduledTaskExecution } from "../../server/application/scheduled-task/scheduled-task-execution-service";
 import { publishDefinitiveTaskRun } from "../../server/application/scheduled-task/definitive-task-run-stream";
+import { submitScheduledTaskExecution } from "../../server/application/scheduled-task/scheduled-task-execution-service";
 import {
   scheduledTaskDeliverySpecSchema,
   scheduledTaskOutputSpecSchema,
@@ -12,6 +12,7 @@ import {
   computeNextRunAt,
   type ScheduleSpec,
 } from "../../server/domain/scheduled-task/schedule";
+import { resolvePublicBaseUrl } from "../../shared/public-url";
 import {
   DeliveryAttemptError,
   deliverScheduledTask,
@@ -72,7 +73,7 @@ function deliveryResult(
   const record = value ? asRecord(value) : {};
   if (record.type === "SCORING_REPORT" && context) {
     const rows = context.rows.slice(0, context.summaryLimit);
-    const baseUrl = (process.env.AUTH_URL ?? "http://localhost:3000").replace(/\/$/, "");
+    const baseUrl = resolvePublicBaseUrl({ authUrl: process.env.AUTH_URL });
     const lines = rows.map(
       (row) =>
         `${row.rank}. ${row.stockName}（${row.stockCode}） ${row.score} 分`,
