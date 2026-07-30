@@ -14,7 +14,7 @@ export function buildLoginHref(redirectTo: string) {
 export async function requireAuth(redirectTo: string) {
   const session = await auth();
 
-  if (!session?.user) {
+  if (!session?.user?.id) {
     redirect(buildLoginHref(redirectTo));
   }
 

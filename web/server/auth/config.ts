@@ -5,6 +5,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import WeChatProvider from "next-auth/providers/wechat";
 
 import { env } from "~/env";
+import { authenticateCredentials } from "~/server/auth/credential-service";
 import {
   collectAuthSecrets,
   isSecretRotationErrorMessage,
@@ -21,15 +22,13 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      // ...other properties
-      // role: UserRole;
+      sessionVersion: number;
     } & DefaultSession["user"];
   }
 
-  // interface User {
-  //   // ...other properties
-  //   // role: UserRole;
-  // }
+  interface User {
+    sessionVersion?: number;
+  }
 }
 
 /**
@@ -37,10 +36,6 @@ declare module "next-auth" {
  *
  * @see https://next-auth.js.org/configuration/options
  */
-const localCredentialsUsername = env.AUTH_CREDENTIALS_USERNAME ?? "admin";
-const localCredentialsPassword = env.AUTH_CREDENTIALS_PASSWORD ?? "admin123456";
-const localCredentialsEmail = "local-user@alphaflow.local";
-
 const authSecrets = collectAuthSecrets({
   authSecret: env.AUTH_SECRET,
   authSecret1: env.AUTH_SECRET_1,
@@ -198,46 +193,13 @@ const createQQProvider = (options: {
 const providers: NextAuthConfig["providers"] = [
   CredentialsProvider({
     id: "local-credentials",
-    name: "本地账号密码",
+    name: "账号密码",
     credentials: {
-      username: { label: "用户名", type: "text" },
+      identifier: { label: "手机号或邮箱", type: "text" },
       password: { label: "密码", type: "password" },
     },
-    authorize: async (credentials) => {
-      const usernameInput = credentials?.username;
-      const passwordInput = credentials?.password;
-
-      if (
-        typeof usernameInput !== "string" ||
-        typeof passwordInput !== "string"
-      ) {
-        return null;
-      }
-
-      if (
-        usernameInput.trim() !== localCredentialsUsername ||
-        passwordInput !== localCredentialsPassword
-      ) {
-        return null;
-      }
-
-      const user = await db.user.upsert({
-        where: { email: localCredentialsEmail },
-        create: {
-          email: localCredentialsEmail,
-          name: localCredentialsUsername,
-        },
-        update: {
-          name: localCredentialsUsername,
-        },
-      });
-
-      return {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      };
-    },
+    authorize: (credentials, request) =>
+      authenticateCredentials(credentials, request.headers),
   }),
 ];
 
@@ -285,11 +247,30 @@ export const authConfig = {
   adapter: PrismaAdapter(db),
   session: {
     strategy: "jwt",
+    maxAge: 7 * 24 * 60 * 60,
   },
   callbacks: {
-    jwt: ({ token, user }) => {
+    jwt: async ({ token, user }) => {
       if (user?.id) {
         token.sub = user.id;
+        const storedUser = await db.user.findUnique({
+          where: { id: user.id },
+          select: { sessionVersion: true, status: true },
+        });
+        token.sessionVersion = storedUser?.sessionVersion ?? 0;
+        token.authInvalid = !storedUser || storedUser.status !== "ACTIVE";
+        return token;
+      }
+
+      if (token.sub) {
+        const storedUser = await db.user.findUnique({
+          where: { id: token.sub },
+          select: { sessionVersion: true, status: true },
+        });
+        token.authInvalid =
+          !storedUser ||
+          storedUser.status !== "ACTIVE" ||
+          storedUser.sessionVersion !== token.sessionVersion;
       }
 
       return token;
@@ -298,7 +279,9 @@ export const authConfig = {
       ...session,
       user: {
         ...session.user,
-        id: token.sub ?? "",
+        id: token.authInvalid === true ? "" : (token.sub ?? ""),
+        sessionVersion:
+          typeof token.sessionVersion === "number" ? token.sessionVersion : 0,
       },
     }),
   },

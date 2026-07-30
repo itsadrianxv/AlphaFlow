@@ -1,43 +1,39 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { PasswordRequirements } from "~/app/_components/password-requirements";
 import { InlineNotice } from "~/app/_components/ui";
 import {
-  type LoginActionState,
-  signInWithCredentials,
-} from "~/app/login/actions";
+  type RegisterActionState,
+  registerWithCredentials,
+} from "~/app/register/actions";
 
-const initialState: LoginActionState = {
-  error: null,
-};
+const initialState: RegisterActionState = { error: null };
 
 function SubmitButton() {
   const { pending } = useFormStatus();
-
   return (
     <button
       type="submit"
       className="app-button app-button-primary w-full"
       disabled={pending}
     >
-      {pending ? "登录中..." : "登录"}
+      {pending ? "注册中..." : "注册"}
     </button>
   );
 }
 
-export function CredentialsForm(props: { redirectTo: string }) {
-  const { redirectTo } = props;
+export function RegisterForm(props: { redirectTo: string }) {
+  const [password, setPassword] = useState("");
   const [state, formAction] = useActionState(
-    signInWithCredentials,
+    registerWithCredentials,
     initialState,
   );
-
   return (
     <form action={formAction} className="grid gap-4">
-      <input type="hidden" name="redirectTo" value={redirectTo} />
-
+      <input type="hidden" name="redirectTo" value={props.redirectTo} />
       <label className="grid gap-2">
         <span className="text-sm text-[var(--app-text-muted)]">
           手机号或邮箱
@@ -47,27 +43,36 @@ export function CredentialsForm(props: { redirectTo: string }) {
           name="identifier"
           autoComplete="username"
           className="app-input"
-          placeholder="输入手机号或邮箱"
+          placeholder="输入中国大陆手机号或邮箱"
           required
         />
       </label>
-
       <label className="grid gap-2">
         <span className="text-sm text-[var(--app-text-muted)]">密码</span>
         <input
           type="password"
           name="password"
-          autoComplete="current-password"
+          autoComplete="new-password"
           className="app-input"
-          placeholder="输入登录密码"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
           required
         />
       </label>
-
+      <PasswordRequirements password={password} />
+      <label className="grid gap-2">
+        <span className="text-sm text-[var(--app-text-muted)]">确认密码</span>
+        <input
+          type="password"
+          name="confirmPassword"
+          autoComplete="new-password"
+          className="app-input"
+          required
+        />
+      </label>
       {state.error ? (
         <InlineNotice tone="warning" description={state.error} />
       ) : null}
-
       <SubmitButton />
     </form>
   );

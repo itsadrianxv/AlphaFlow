@@ -60,6 +60,12 @@ model User {
     email                             String?                            @unique
     emailVerified                     DateTime?
     image                             String?
+    loginIdentifier                   String?                            @unique
+    loginIdentifierType               LoginIdentifierType?
+    passwordHash                      String?
+    sessionVersion                    Int                                @default(0)
+    status                            UserStatus                         @default(ACTIVE)
+    passwordChangedAt                 DateTime?
     accounts                          Account[]
     sessions                          Session[]
     posts                             Post[]
@@ -88,6 +94,16 @@ model User {
     scheduledTasks                    ScheduledTask[]
     collections                       Collection[]
     mindMaps                          MindMap[]
+}
+
+enum LoginIdentifierType {
+    PHONE
+    EMAIL
+}
+
+enum UserStatus {
+    ACTIVE
+    DISABLED
 }
 
 enum ScheduledTaskStatus {

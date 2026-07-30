@@ -121,7 +121,7 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
 export const protectedProcedure = t.procedure
   .use(timingMiddleware)
   .use(async ({ ctx, next }) => {
-    if (!ctx.session?.user) {
+    if (!ctx.session?.user?.id) {
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
@@ -129,9 +129,13 @@ export const protectedProcedure = t.procedure
     // 避免下游写入带来外键约束异常。
     const user = await ctx.db.user.findUnique({
       where: { id: ctx.session.user.id },
-      select: { id: true },
+      select: { id: true, sessionVersion: true, status: true },
     });
-    if (!user) {
+    if (
+      !user ||
+      user.status !== "ACTIVE" ||
+      user.sessionVersion !== ctx.session.user.sessionVersion
+    ) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
         message: "登录状态已失效，请重新登录",

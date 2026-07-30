@@ -55,11 +55,17 @@ function baseResult(withAnalysis: boolean) {
 function callerWithFindFirst(findFirst: ReturnType<typeof vi.fn>) {
   return createCaller({
     db: {
-      user: { findUnique: vi.fn(async () => ({ id: "user-1" })) },
+      user: {
+        findUnique: vi.fn(async () => ({
+          id: "user-1",
+          sessionVersion: 0,
+          status: "ACTIVE",
+        })),
+      },
       workflowRun: { findFirst },
     },
     session: {
-      user: { id: "user-1" },
+      user: { id: "user-1", sessionVersion: 0 },
       expires: "2099-01-01T00:00:00.000Z",
     },
     headers: new Headers(),

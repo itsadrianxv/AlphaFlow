@@ -14,24 +14,24 @@ export async function signInWithCredentials(
   formData: FormData,
 ): Promise<LoginActionState> {
   const redirectTo = resolveAuthRedirect(formData.get("redirectTo"));
-  const username = formData.get("username");
+  const identifier = formData.get("identifier");
   const password = formData.get("password");
 
   if (
-    typeof username !== "string" ||
+    typeof identifier !== "string" ||
     typeof password !== "string" ||
-    username.trim().length === 0 ||
+    identifier.trim().length === 0 ||
     password.length === 0
   ) {
     return {
-      error: "请输入用户名和密码后再登录。",
+      error: "请输入手机号或邮箱和密码后再登录。",
     };
   }
 
   try {
     await signIn("local-credentials", {
       redirectTo,
-      username: username.trim(),
+      identifier: identifier.trim(),
       password,
     });
   } catch (error) {

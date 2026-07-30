@@ -1,5 +1,6 @@
 "use client";
 
+import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, {
@@ -47,7 +48,8 @@ export type WorkspaceSection =
   | "companyResearch"
   | "researchTargets"
   | "mindMaps"
-  | "scheduledTasks";
+  | "scheduledTasks"
+  | "account";
 
 export type WorkspaceSectionView = "default" | "history";
 
@@ -119,6 +121,12 @@ const sidebarNavItems: Array<{
     href: "/scheduled-tasks",
     label: "定时任务",
     icon: ScheduledTasksIcon,
+  },
+  {
+    key: "account",
+    href: "/account/security",
+    label: "账号安全",
+    icon: ShieldCheck,
   },
 ];
 
