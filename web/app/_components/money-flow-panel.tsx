@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { companyOverviewHref } from "~/app/company-research/company-overview-link";
 import { api } from "~/trpc/react";
+import { useHomePageSnapshot } from "~/app/_components/home-page-snapshot-provider";
+import type { MoneyFlowSnapshot } from "~/server/application/overview/sell-side-overview-service";
 
 function amount(value: unknown, unit = "元") {
   const number = typeof value === "number" ? value : Number(value);
@@ -117,10 +119,12 @@ function MarketChart({ history }: { history: Array<Record<string, unknown>> }) {
 }
 
 export function MoneyFlowPanel() {
-  const query = api.overviewInsights.getMoneyFlow.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-    staleTime: 6 * 60 * 60 * 1000,
-  });
+  const snapshot = useHomePageSnapshot();
+  const query = {
+    data: snapshot.data?.payload.moneyFlow as MoneyFlowSnapshot | undefined,
+    isLoading: snapshot.isLoading,
+    isError: snapshot.isError,
+  };
   const [direction, setDirection] = useState<"inflows" | "outflows">("inflows");
   if (query.isLoading)
     return (

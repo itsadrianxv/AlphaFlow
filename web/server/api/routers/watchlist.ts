@@ -13,6 +13,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { enqueuePersonalizedHomePage } from "~/server/application/homepage/home-page-snapshot-service";
 // 领域层
 import { WatchList } from "~/server/domain/screening/aggregates/watch-list";
 // 领域异常
@@ -140,6 +141,7 @@ export const watchlistRouter = createTRPCRouter({
 
         // 持久化
         await repository.save(watchList);
+        await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
 
         return {
           id: watchList.id,
@@ -181,6 +183,7 @@ export const watchlistRouter = createTRPCRouter({
 
         // 删除列表
         await repository.delete(input.id);
+        await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
 
         return { success: true };
       } catch (error) {
@@ -249,6 +252,7 @@ export const watchlistRouter = createTRPCRouter({
         }
 
         await repository.save(watchList);
+        await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
 
         return {
           id: watchList.id,
@@ -338,6 +342,7 @@ export const watchlistRouter = createTRPCRouter({
 
         // 持久化
         await repository.save(watchList);
+        await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
 
         return { success: true };
       } catch (error) {
@@ -378,6 +383,7 @@ export const watchlistRouter = createTRPCRouter({
 
         // 持久化
         await repository.save(watchList);
+        await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
 
         return { success: true };
       } catch (error) {
@@ -418,6 +424,7 @@ export const watchlistRouter = createTRPCRouter({
 
         // 持久化
         await repository.save(watchList);
+        await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
 
         return { success: true };
       } catch (error) {
@@ -458,6 +465,7 @@ export const watchlistRouter = createTRPCRouter({
 
         // 持久化
         await repository.save(watchList);
+        await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
 
         return { success: true };
       } catch (error) {

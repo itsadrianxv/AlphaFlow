@@ -513,7 +513,10 @@ export class ImpactMappingService {
 
     const selectedEvent = await this.loadBaseEvent(
       params.userId,
-      input.baseRunId as string,
+      {
+        runId: input.baseRunId,
+        snapshotId: input.baseSnapshotId,
+      },
       input.eventId as string,
     );
     const news = [selectedEvent];
@@ -1007,12 +1010,29 @@ export class ImpactMappingService {
     };
   }
 
-  private async loadBaseEvent(userId: string, runId: string, eventId: string) {
-    const run = await this.deps.prisma.workflowRun.findFirst({
-      where: { id: runId, userId },
-      select: { result: true },
-    });
-    const result = asObject(run?.result) as Partial<ImpactMappingResult>;
+  private async loadBaseEvent(
+    userId: string,
+    source: { runId?: string; snapshotId?: string },
+    eventId: string,
+  ) {
+    let value: unknown;
+    if (source.runId) {
+      const run = await this.deps.prisma.workflowRun.findFirst({
+        where: { id: source.runId, userId },
+        select: { result: true },
+      });
+      value = run?.result;
+    } else if (source.snapshotId) {
+      const snapshot = await this.deps.prisma.homePageSnapshot.findFirst({
+        where: {
+          id: source.snapshotId,
+          OR: [{ scope: "DEFAULT" }, { userId }],
+        },
+        select: { payload: true },
+      });
+      value = asObject(snapshot?.payload).impactMapping;
+    }
+    const result = asObject(value) as Partial<ImpactMappingResult>;
     const event =
       result.events?.find((item) => item.event.id === eventId)?.event ??
       (result.selectedEvent?.id === eventId ? result.selectedEvent : undefined);

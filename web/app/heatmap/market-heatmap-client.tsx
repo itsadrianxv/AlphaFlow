@@ -16,6 +16,7 @@ import {
 import { type ThemeMode, useTheme } from "~/app/_components/theme-provider";
 import { companyOverviewHref } from "~/app/company-research/company-overview-link";
 import type { MarketHeatmapSnapshot } from "~/contracts/market-heatmap";
+import { useHomePageSnapshot } from "~/app/_components/home-page-snapshot-provider";
 import { api } from "~/trpc/react";
 
 type TreeMapDatum = {
@@ -234,15 +235,13 @@ export function MarketHeatmapClient() {
     undefined,
   );
   const chartElement = useRef<HTMLDivElement>(null);
-  const query = api.heatmap.getSnapshot.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-  });
+  const query = useHomePageSnapshot();
   const snapshot = useMemo(
     () =>
-      query.data
+      query.data?.payload.heatmap
         ? {
-            ...query.data,
-            concepts: getUniqueConcepts(query.data.concepts).slice(
+            ...query.data.payload.heatmap,
+            concepts: getUniqueConcepts(query.data.payload.heatmap.concepts).slice(
               0,
               expanded ? 15 : 8,
             ),
@@ -355,9 +354,9 @@ export function MarketHeatmapClient() {
           正在读取市场快照…
         </div>
       ) : null}
-      {query.error ? (
+      {query.isError ? (
         <div className="flex min-h-[680px] items-center justify-center text-sm text-[var(--app-danger-text)]">
-          {query.error.message}
+          市场快照暂不可用。
         </div>
       ) : null}
       {snapshot ? (

@@ -242,7 +242,7 @@ export class WorkflowCommandService {
       input: command.input,
       idempotencyKey:
         command.idempotencyKey ??
-        `impact-mapping:${command.userId}:${command.input.mode}:${command.input.baseRunId ?? "latest"}:${command.input.eventId ?? "radar"}:${command.input.traceCursor ?? "current"}`,
+        `impact-mapping:${command.userId}:${command.input.mode}:${command.input.baseRunId ?? command.input.baseSnapshotId ?? "latest"}:${command.input.eventId ?? "radar"}:${command.input.traceCursor ?? "current"}`,
     });
   }
 

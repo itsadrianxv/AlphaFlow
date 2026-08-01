@@ -75,6 +75,20 @@ vi.mock("~/trpc/react", () => ({
   },
 }));
 
+vi.mock("~/app/_components/home-page-snapshot-provider", () => ({
+  useHomePageSnapshot: () => ({
+    data: mocks.latest
+      ? {
+          snapshotId: mocks.latest.id,
+          generatedAt: "2026-07-24T08:30:00.000Z",
+          payload: { impactMapping: mocks.latest.result },
+        }
+      : undefined,
+    isLoading: mocks.latestLoading,
+    isError: false,
+  }),
+}));
+
 import {
   buildEvidenceOrdinals,
   ImpactMappingWorkspace,
@@ -321,7 +335,9 @@ describe("ImpactMappingWorkspace", () => {
     expect(routerSource).toContain("ensureImpactMappingAnalyses");
     expect(routerSource).toContain("新闻雷达基准快照不存在");
     expect(routerSource).toContain("availableEventIds.has(eventId)");
-    expect(routerSource).toContain("impact-analysis:${input.baseRunId}:${eventId}");
+    expect(routerSource).toContain(
+      "impact-analysis:${sourceKind}:${sourceId}:${eventId}",
+    );
   });
 
   it("按首次出现顺序为证据去重编号", () => {

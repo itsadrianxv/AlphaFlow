@@ -64,6 +64,7 @@ struct RuntimeConfig {
   int recovery_interval_ms{1000};
   int probe_interval_ms{5000};
   int max_attempts{3};
+  std::vector<int> retry_delays_seconds{10, 30, 90};
 };
 
 }  // namespace task_runtime

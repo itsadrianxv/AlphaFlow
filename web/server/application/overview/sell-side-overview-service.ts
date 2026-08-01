@@ -400,21 +400,28 @@ function chipSignal(item: ChipPosition) {
   return "跌破 15% 成本带，承接待确认";
 }
 
-export async function getOverviewInsights(userId: string) {
+export async function getOverviewInsights(
+  userId?: string,
+  frozenStockCodes?: string[],
+) {
   const [state, forecasts, watchLists, savedCompanies] = await Promise.all([
     db.sellSideRefreshState.findUnique({ where: { id: "global" } }),
     getEffectiveForecastRows(),
-    db.watchList.findMany({
+    userId
+      ? db.watchList.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
       select: { stocks: true },
-    }),
-    db.savedCompany.findMany({
+    })
+      : [],
+    userId
+      ? db.savedCompany.findMany({
       where: { userId, archivedAt: null },
       orderBy: { updatedAt: "desc" },
       take: 10,
       select: { stockCode: true },
-    }),
+    })
+      : [],
   ]);
   const revisions = buildSellSideRevisions(forecasts).slice(0, 3);
   const codes: string[] = [];
@@ -426,6 +433,7 @@ export async function getOverviewInsights(userId: string) {
       codes.push(code);
     }
   };
+  for (const code of frozenStockCodes ?? []) add(code);
   for (const list of watchLists)
     for (const stock of Array.isArray(list.stocks) ? list.stocks : [])
       if (

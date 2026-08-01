@@ -156,9 +156,17 @@ const startImpactMappingInput = z.intersection(
 
 const ensureImpactMappingAnalysesInput = z
   .object({
-    baseRunId: z.string().cuid(),
+    baseRunId: z.string().cuid().optional(),
+    baseSnapshotId: z.string().cuid().optional(),
     eventIds: z.array(z.string().min(1)).min(1).max(3),
   })
+  .refine(
+    (value) => Boolean(value.baseRunId) !== Boolean(value.baseSnapshotId),
+    {
+      message: "baseRunId 与 baseSnapshotId 必须且只能提供一个",
+      path: ["baseRunId"],
+    },
+  )
   .refine((value) => new Set(value.eventIds).size === value.eventIds.length, {
     message: "eventIds 不能重复",
     path: ["eventIds"],
@@ -249,28 +257,46 @@ export const workflowRouter = createTRPCRouter({
     .input(ensureImpactMappingAnalysesInput)
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
-      const baseRun = await ctx.db.workflowRun.findFirst({
-        where: {
-          id: input.baseRunId,
-          userId,
-          status: WorkflowRunStatus.SUCCEEDED,
-          template: { is: { code: IMPACT_MAPPING_TEMPLATE_CODE } },
-        },
-        select: { input: true, result: true },
-      });
-      if (!baseRun || !isRecord(baseRun.input) || !isRecord(baseRun.result)) {
+      let baseResult: Record<string, unknown> | undefined;
+      if (input.baseRunId) {
+        const baseRun = await ctx.db.workflowRun.findFirst({
+          where: {
+            id: input.baseRunId,
+            userId,
+            status: WorkflowRunStatus.SUCCEEDED,
+            template: { is: { code: IMPACT_MAPPING_TEMPLATE_CODE } },
+          },
+          select: { input: true, result: true },
+        });
+        if (
+          baseRun &&
+          isRecord(baseRun.input) &&
+          baseRun.input.mode === "overview" &&
+          isRecord(baseRun.result)
+        ) {
+          baseResult = baseRun.result;
+        }
+      } else if (input.baseSnapshotId) {
+        const snapshot = await ctx.db.homePageSnapshot.findFirst({
+          where: {
+            id: input.baseSnapshotId,
+            OR: [{ scope: "DEFAULT" }, { userId }],
+          },
+          select: { payload: true },
+        });
+        const payload = isRecord(snapshot?.payload)
+          ? snapshot.payload
+          : undefined;
+        if (isRecord(payload?.impactMapping)) {
+          baseResult = payload.impactMapping;
+        }
+      }
+      if (!baseResult) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "新闻雷达基准快照不存在",
         });
       }
-      if (baseRun.input.mode !== "overview") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "只能基于 overview 新闻雷达加载分析",
-        });
-      }
-      const baseResult = baseRun.result as Record<string, unknown>;
 
       const events = Array.isArray(baseResult.events) ? baseResult.events : [];
       const availableEventIds = new Set(
@@ -305,7 +331,9 @@ export const workflowRouter = createTRPCRouter({
             };
           }
 
-          const idempotencyKey = `impact-analysis:${input.baseRunId}:${eventId}`;
+          const sourceId = input.baseRunId ?? input.baseSnapshotId;
+          const sourceKind = input.baseRunId ? "run" : "snapshot";
+          const idempotencyKey = `impact-analysis:${sourceKind}:${sourceId}:${eventId}`;
           const existing = await ctx.db.workflowRun.findFirst({
             where: { userId, idempotencyKey },
             orderBy: { createdAt: "desc" },
@@ -342,6 +370,7 @@ export const workflowRouter = createTRPCRouter({
             input: impactMappingInputSchema.parse({
               mode: "trace",
               baseRunId: input.baseRunId,
+              baseSnapshotId: input.baseSnapshotId,
               eventId,
               traceMaxDays: 365,
               traceMaxEvents: 30,

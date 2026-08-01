@@ -24,6 +24,7 @@ import {
   updateSavedIndustryInputSchema,
 } from "~/contracts/research-target";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { enqueuePersonalizedHomePage } from "~/server/application/homepage/home-page-snapshot-service";
 import { DeepSeekClient } from "~/server/infrastructure/intelligence/deepseek-client";
 
 type SavedCompanyRecord = {
@@ -640,6 +641,7 @@ export const researchTargetRouter = createTRPCRouter({
           metadataJson: input.metadata,
         },
       });
+      await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
       return buildCompany(created);
     }),
 
@@ -661,6 +663,7 @@ export const researchTargetRouter = createTRPCRouter({
           ...(input.metadata ? { metadataJson: input.metadata } : {}),
         },
       });
+      await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
       return buildCompany(updated);
     }),
 
@@ -688,6 +691,7 @@ export const researchTargetRouter = createTRPCRouter({
           metadataJson: input.metadata,
         },
       });
+      await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
       return buildIndustry(created);
     }),
 
@@ -712,6 +716,7 @@ export const researchTargetRouter = createTRPCRouter({
           ...(input.metadata ? { metadataJson: input.metadata } : {}),
         },
       });
+      await enqueuePersonalizedHomePage(ctx.db, ctx.session.user.id, "PREFERENCE_CHANGE");
       return buildIndustry(updated);
     }),
 

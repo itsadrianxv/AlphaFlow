@@ -2,1323 +2,1390 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
-    // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
-    // Further reading:
-    // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
-    // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  // NOTE: When using mysql or sqlserver, uncomment the @db.Text annotations in model Account below
+  // Further reading:
+  // https://next-auth.js.org/adapters/prisma#create-the-prisma-schema
+  // https://www.prisma.io/docs/reference/api-reference/prisma-schema-reference#string
+  url      = env("DATABASE_URL")
 }
 
 model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    createdBy   User   @relation(fields: [createdById], references: [id])
-    createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+  createdById String
 
-    @@index([name])
+  @@index([name])
 }
 
 // Necessary for Next auth
 model Account {
-    id                       String  @id @default(cuid())
-    userId                   String
-    type                     String
-    provider                 String
-    providerAccountId        String
-    refresh_token            String? // @db.Text
-    access_token             String? // @db.Text
-    expires_at               Int?
-    token_type               String?
-    scope                    String?
-    id_token                 String? // @db.Text
-    session_state            String?
-    user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    refresh_token_expires_in Int?
+  id                       String  @id @default(cuid())
+  userId                   String
+  type                     String
+  provider                 String
+  providerAccountId        String
+  refresh_token            String? // @db.Text
+  access_token             String? // @db.Text
+  expires_at               Int?
+  token_type               String?
+  scope                    String?
+  id_token                 String? // @db.Text
+  session_state            String?
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refresh_token_expires_in Int?
 
-    @@unique([provider, providerAccountId])
+  @@unique([provider, providerAccountId])
 }
 
 model Session {
-    id           String   @id @default(cuid())
-    sessionToken String   @unique
-    userId       String
-    expires      DateTime
-    user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model User {
-    id                                String                             @id @default(cuid())
-    name                              String?
-    email                             String?                            @unique
-    emailVerified                     DateTime?
-    image                             String?
-    loginIdentifier                   String?                            @unique
-    loginIdentifierType               LoginIdentifierType?
-    passwordHash                      String?
-    sessionVersion                    Int                                @default(0)
-    status                            UserStatus                         @default(ACTIVE)
-    passwordChangedAt                 DateTime?
-    accounts                          Account[]
-    sessions                          Session[]
-    posts                             Post[]
-    screeningWorkspaces               ScreeningWorkspace[]
-    screeningFormulas                 ScreeningFormula[]
-    screeningRuns                     ScreeningRun[]
-    watchLists                        WatchList[]
-    timingSignalSnapshots             TimingSignalSnapshot[]
-    timingKronosForecastSnapshots     TimingKronosForecastSnapshot[]
-    timingResearchReports             TimingResearchReport[]
-    portfolioCompositions             PortfolioComposition[]
-    portfolioRiskDiagnostics          PortfolioRiskDiagnostic[]
-    timingPresets                     TimingPreset[]
-    timingPresetRevisions             TimingPresetRevision[]
-    timingRuleValidationRuns          TimingRuleValidationRun[]
-    workflowRuns                      WorkflowRun[]
-    agentConversations                AgentConversation[]
-    savedCompanies                    SavedCompany[]
-    savedIndustries                   SavedIndustry[]
-    researchNotes                     ResearchNote[]
-    financialSnapshots                FinancialSnapshot[]
-    researchArtifacts                 ResearchArtifact[]
-    evidenceContexts                  EvidenceContext[]
-    evidenceContextItems              EvidenceContextItem[]
-    researchContextSnapshots          ResearchContextSnapshot[]
-    scheduledTasks                    ScheduledTask[]
-    collections                       Collection[]
-    mindMaps                          MindMap[]
+  id                            String                         @id @default(cuid())
+  name                          String?
+  email                         String?                        @unique
+  emailVerified                 DateTime?
+  image                         String?
+  loginIdentifier               String?                        @unique
+  loginIdentifierType           LoginIdentifierType?
+  passwordHash                  String?
+  sessionVersion                Int                            @default(0)
+  status                        UserStatus                     @default(ACTIVE)
+  passwordChangedAt             DateTime?
+  accounts                      Account[]
+  sessions                      Session[]
+  posts                         Post[]
+  screeningWorkspaces           ScreeningWorkspace[]
+  screeningFormulas             ScreeningFormula[]
+  screeningRuns                 ScreeningRun[]
+  watchLists                    WatchList[]
+  timingSignalSnapshots         TimingSignalSnapshot[]
+  timingKronosForecastSnapshots TimingKronosForecastSnapshot[]
+  timingResearchReports         TimingResearchReport[]
+  portfolioCompositions         PortfolioComposition[]
+  portfolioRiskDiagnostics      PortfolioRiskDiagnostic[]
+  timingPresets                 TimingPreset[]
+  timingPresetRevisions         TimingPresetRevision[]
+  timingRuleValidationRuns      TimingRuleValidationRun[]
+  workflowRuns                  WorkflowRun[]
+  agentConversations            AgentConversation[]
+  savedCompanies                SavedCompany[]
+  savedIndustries               SavedIndustry[]
+  researchNotes                 ResearchNote[]
+  financialSnapshots            FinancialSnapshot[]
+  researchArtifacts             ResearchArtifact[]
+  evidenceContexts              EvidenceContext[]
+  evidenceContextItems          EvidenceContextItem[]
+  researchContextSnapshots      ResearchContextSnapshot[]
+  scheduledTasks                ScheduledTask[]
+  collections                   Collection[]
+  mindMaps                      MindMap[]
+  homePageSnapshots             HomePageSnapshot[]
+  homePageGenerationTasks       HomePageGenerationTask[]
+}
+
+enum HomePageSnapshotScope {
+  DEFAULT
+  PERSONALIZED
+}
+
+enum HomePageGenerationTaskStatus {
+  PENDING
+  RUNNING
+  RETRY_WAIT
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model HomePageSnapshot {
+  id                        String                 @id @default(cuid())
+  scope                     HomePageSnapshotScope
+  userId                    String?
+  preferenceFingerprint     String?
+  baselineDefaultSnapshotId String?
+  payload                   Json
+  dataAsOf                  String
+  generatedAt               DateTime               @default(now())
+  generationTaskId          String                 @unique
+  user                      User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generationTask            HomePageGenerationTask @relation(fields: [generationTaskId], references: [id], onDelete: Restrict)
+
+  @@index([scope, generatedAt])
+  @@index([userId, preferenceFingerprint, generatedAt])
+  @@index([baselineDefaultSnapshotId])
+}
+
+model HomePageGenerationTask {
+  id                        String                       @id @default(cuid())
+  generationKey             String                       @unique
+  scope                     HomePageSnapshotScope
+  userId                    String?
+  preferenceFingerprint     String?
+  baselineDefaultSnapshotId String?
+  selectionJson             Json                         @default("{}")
+  triggerReason             String
+  targetTradeDate           String
+  status                    HomePageGenerationTaskStatus @default(PENDING)
+  attempts                  Int                          @default(0)
+  workerId                  String?
+  fencingToken              BigInt                       @default(0)
+  leaseExpiresAt            DateTime?
+  heartbeatAt               DateTime?
+  nextAttemptAt             DateTime?
+  eventPublishedAt          DateTime?
+  errorCode                 String?
+  errorMessage              String?
+  startedAt                 DateTime?
+  completedAt               DateTime?
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+  user                      User?                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshot                  HomePageSnapshot?
+
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseExpiresAt])
+  @@index([eventPublishedAt, status])
+  @@index([userId, createdAt])
 }
 
 enum LoginIdentifierType {
-    PHONE
-    EMAIL
+  PHONE
+  EMAIL
 }
 
 enum UserStatus {
-    ACTIVE
-    DISABLED
+  ACTIVE
+  DISABLED
 }
 
 enum ScheduledTaskStatus {
-    DRAFT
-    ACTIVE
-    PAUSED
-    CANCELLED
+  DRAFT
+  ACTIVE
+  PAUSED
+  CANCELLED
 }
 
 enum AgentConversationRoutingMode {
-    AUTO
-    SCHEDULED_TASK_SETUP
-    SCHEDULED_TASK_EDIT
+  AUTO
+  SCHEDULED_TASK_SETUP
+  SCHEDULED_TASK_EDIT
 }
 
 enum ScheduledTaskExecutionTrigger {
-    SCHEDULED
-    MANUAL
+  SCHEDULED
+  MANUAL
 }
 
 enum ScheduledTaskEditDraftSource {
-    STRUCTURED
-    AGENT
+  STRUCTURED
+  AGENT
 }
 
 enum ScheduledTaskEditDraftStatus {
-    PENDING
-    CONFIRMED
-    DISCARDED
+  PENDING
+  CONFIRMED
+  DISCARDED
 }
 
 enum ScheduledTaskExecutionStatus {
-    PENDING
-    CLAIMED
-    SUBMITTED
-    RUNNING
-    SUCCEEDED
-    FAILED
-    RETRYING
-    CANCELLED
+  PENDING
+  CLAIMED
+  SUBMITTED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  RETRYING
+  CANCELLED
 }
 
 enum ScheduledTaskDeliveryStatus {
-    PENDING
-    SENDING
-    SENT
-    FAILED
-    RETRYING
-    SKIPPED
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  RETRYING
+  SKIPPED
 }
 
 enum CollectionType {
-    COMPANY
-    INDUSTRY
-    WATCHLIST
+  COMPANY
+  INDUSTRY
+  WATCHLIST
 }
 
 model Collection {
-    id             String         @id @default(cuid())
-    userId         String
-    collectionType CollectionType
-    title          String
-    description    String?
-    tags           String[]       @default([])
-    payload        Json           @default("{}")
-    archivedAt     DateTime?
-    createdAt      DateTime       @default(now())
-    updatedAt      DateTime       @updatedAt
+  id             String         @id @default(cuid())
+  userId         String
+  collectionType CollectionType
+  title          String
+  description    String?
+  tags           String[]       @default([])
+  payload        Json           @default("{}")
+  archivedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-    user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-    mindMaps       CollectionMindMap[]
+  user     User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mindMaps CollectionMindMap[]
 
-    @@index([userId, collectionType, updatedAt])
-    @@index([userId, archivedAt])
-    @@unique([userId, collectionType, title])
+  @@unique([userId, collectionType, title])
+  @@index([userId, collectionType, updatedAt])
+  @@index([userId, archivedAt])
 }
 
 model MindMap {
-    id          String   @id @default(cuid())
-    userId      String
-    title       String
-    description String?
-    data        Json
-    config      Json?
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  data        Json
+  config      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-    user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-    collections CollectionMindMap[]
-    references  MindMapReference[]
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collections CollectionMindMap[]
+  references  MindMapReference[]
 
-    @@index([userId, updatedAt])
+  @@index([userId, updatedAt])
 }
 
 model CollectionMindMap {
-    collectionId String
-    mindMapId    String
-    createdAt    DateTime   @default(now())
+  collectionId String
+  mindMapId    String
+  createdAt    DateTime @default(now())
 
-    collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-    mindMap    MindMap    @relation(fields: [mindMapId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  mindMap    MindMap    @relation(fields: [mindMapId], references: [id], onDelete: Cascade)
 
-    @@id([collectionId, mindMapId])
-    @@index([mindMapId, createdAt])
+  @@id([collectionId, mindMapId])
+  @@index([mindMapId, createdAt])
 }
 
 model MindMapReference {
-    id           String   @id @default(cuid())
-    mindMapId    String
-    nodeId       String?
-    targetType   String
-    targetId     String
-    relationType String?
-    createdAt    DateTime @default(now())
+  id           String   @id @default(cuid())
+  mindMapId    String
+  nodeId       String?
+  targetType   String
+  targetId     String
+  relationType String?
+  createdAt    DateTime @default(now())
 
-    mindMap MindMap @relation(fields: [mindMapId], references: [id], onDelete: Cascade)
+  mindMap MindMap @relation(fields: [mindMapId], references: [id], onDelete: Cascade)
 
-    @@index([mindMapId, nodeId])
-    @@index([targetType, targetId])
+  @@index([mindMapId, nodeId])
+  @@index([targetType, targetId])
 }
 
 model ScheduledTask {
-    id              String             @id @default(cuid())
-    userId          String
-    name            String
-    status          ScheduledTaskStatus @default(DRAFT)
-    currentVersion  Int                @default(1)
-    timezone        String             @default("Asia/Shanghai")
-    nextRunAt       DateTime?
-    setupConversationId String?
-    createdAt       DateTime           @default(now())
-    updatedAt       DateTime           @updatedAt
-    user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-    versions        ScheduledTaskVersion[]
-    executions      ScheduledTaskExecution[]
-    editDrafts      ScheduledTaskEditDraft[]
+  id                  String                   @id @default(cuid())
+  userId              String
+  name                String
+  status              ScheduledTaskStatus      @default(DRAFT)
+  currentVersion      Int                      @default(1)
+  timezone            String                   @default("Asia/Shanghai")
+  nextRunAt           DateTime?
+  setupConversationId String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions            ScheduledTaskVersion[]
+  executions          ScheduledTaskExecution[]
+  editDrafts          ScheduledTaskEditDraft[]
 
-    @@index([status, nextRunAt])
-    @@index([userId, status])
-    @@index([userId, status, setupConversationId])
+  @@index([status, nextRunAt])
+  @@index([userId, status])
+  @@index([userId, status, setupConversationId])
 }
 
 model ScheduledTaskEditDraft {
-    id              String                       @id @default(cuid())
-    taskId          String
-    userId          String
-    conversationId  String?
-    source          ScheduledTaskEditDraftSource
-    status          ScheduledTaskEditDraftStatus @default(PENDING)
-    baseVersion     Int
-    revision        Int                          @default(1)
-    name            String
-    userPrompt      String
-    scheduleSpec    Json
-    dataSources     Json                         @default("[]")
-    executionPlan   Json
-    outputSpec      Json
-    deliverySpec    Json
-    feasibility     Json                         @default("{}")
-    changes         Json                         @default("[]")
-    nextRunAt       DateTime?
-    idempotencyKey  String?                      @unique
-    confirmedAt     DateTime?
-    discardedAt     DateTime?
-    createdAt       DateTime                     @default(now())
-    updatedAt       DateTime                     @updatedAt
-    task            ScheduledTask                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  id             String                       @id @default(cuid())
+  taskId         String
+  userId         String
+  conversationId String?
+  source         ScheduledTaskEditDraftSource
+  status         ScheduledTaskEditDraftStatus @default(PENDING)
+  baseVersion    Int
+  revision       Int                          @default(1)
+  name           String
+  userPrompt     String
+  scheduleSpec   Json
+  dataSources    Json                         @default("[]")
+  executionPlan  Json
+  outputSpec     Json
+  deliverySpec   Json
+  feasibility    Json                         @default("{}")
+  changes        Json                         @default("[]")
+  nextRunAt      DateTime?
+  idempotencyKey String?                      @unique
+  confirmedAt    DateTime?
+  discardedAt    DateTime?
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+  task           ScheduledTask                @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-    @@index([taskId, status, updatedAt])
-    @@index([userId, status, updatedAt])
-    @@index([conversationId, status])
+  @@index([taskId, status, updatedAt])
+  @@index([userId, status, updatedAt])
+  @@index([conversationId, status])
 }
 
 model ScheduledTaskVersion {
-    id             String        @id @default(cuid())
-    taskId         String
-    version        Int
-    userPrompt     String
-    scheduleSpec   Json
-    dataSources    Json          @default("[]")
-    executionPlan  Json
-    outputSpec     Json
-    deliverySpec   Json
-    feasibility    Json          @default("{}")
-    idempotencyKey String?       @unique
-    createdAt      DateTime      @default(now())
-    task           ScheduledTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-    executions     ScheduledTaskExecution[]
+  id             String                   @id @default(cuid())
+  taskId         String
+  version        Int
+  userPrompt     String
+  scheduleSpec   Json
+  dataSources    Json                     @default("[]")
+  executionPlan  Json
+  outputSpec     Json
+  deliverySpec   Json
+  feasibility    Json                     @default("{}")
+  idempotencyKey String?                  @unique
+  createdAt      DateTime                 @default(now())
+  task           ScheduledTask            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  executions     ScheduledTaskExecution[]
 
-    @@unique([taskId, version])
-    @@index([taskId, createdAt])
+  @@unique([taskId, version])
+  @@index([taskId, createdAt])
 }
 
 model ScheduledTaskExecution {
-    id             String                         @id @default(cuid())
-    taskId         String
-    taskVersionId  String
-    scheduledAt    DateTime
-    status         ScheduledTaskExecutionStatus  @default(PENDING)
-    trigger        ScheduledTaskExecutionTrigger @default(SCHEDULED)
-    deliveryRequested Boolean                    @default(false)
-    idempotencyKey String?                       @unique
-    workerId       String?
-    fencingToken   BigInt                         @default(0)
-    leaseExpiresAt DateTime?
-    heartbeatAt    DateTime?
-    nextAttemptAt  DateTime?
-    agentRunId     String?
-    result         Json?
-    error          Json?
-    attempts       Int                            @default(0)
-    claimedAt      DateTime?
-    startedAt      DateTime?
-    completedAt    DateTime?
-    eventPublishedAt DateTime?
-    lastEventError Json?
-    createdAt      DateTime                       @default(now())
-    updatedAt      DateTime                       @updatedAt
-    task           ScheduledTask                  @relation(fields: [taskId], references: [id], onDelete: Cascade)
-    taskVersion    ScheduledTaskVersion           @relation(fields: [taskVersionId], references: [id], onDelete: Cascade)
-    evidence       ScheduledTaskEvidence[]
-    deliveries     ScheduledTaskDelivery[]
-    scoreResults   ScheduledTaskScoreResult[]
+  id                String                        @id @default(cuid())
+  taskId            String
+  taskVersionId     String
+  scheduledAt       DateTime
+  status            ScheduledTaskExecutionStatus  @default(PENDING)
+  trigger           ScheduledTaskExecutionTrigger @default(SCHEDULED)
+  deliveryRequested Boolean                       @default(false)
+  idempotencyKey    String?                       @unique
+  workerId          String?
+  fencingToken      BigInt                        @default(0)
+  leaseExpiresAt    DateTime?
+  heartbeatAt       DateTime?
+  nextAttemptAt     DateTime?
+  agentRunId        String?
+  result            Json?
+  error             Json?
+  attempts          Int                           @default(0)
+  claimedAt         DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  eventPublishedAt  DateTime?
+  lastEventError    Json?
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+  task              ScheduledTask                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskVersion       ScheduledTaskVersion          @relation(fields: [taskVersionId], references: [id], onDelete: Cascade)
+  evidence          ScheduledTaskEvidence[]
+  deliveries        ScheduledTaskDelivery[]
+  scoreResults      ScheduledTaskScoreResult[]
 
-    @@unique([taskId, taskVersionId, scheduledAt])
-    @@index([status, scheduledAt])
-    @@index([taskId, status])
-    @@index([status, eventPublishedAt])
-    @@index([completedAt, eventPublishedAt])
-    @@index([status, leaseExpiresAt])
-    @@index([status, nextAttemptAt])
+  @@unique([taskId, taskVersionId, scheduledAt])
+  @@index([status, scheduledAt])
+  @@index([taskId, status])
+  @@index([status, eventPublishedAt])
+  @@index([completedAt, eventPublishedAt])
+  @@index([status, leaseExpiresAt])
+  @@index([status, nextAttemptAt])
 }
 
 model ScheduledTaskScoreResult {
-    id               String                 @id @default(cuid())
-    executionId      String
-    stockCode        String
-    stockName        String
-    rank             Int
-    selected         Boolean                @default(false)
-    evaluationStatus String
-    score            Float
-    maxScore         Float
-    ruleResults      Json
-    createdAt        DateTime               @default(now())
-    execution        ScheduledTaskExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  id               String                 @id @default(cuid())
+  executionId      String
+  stockCode        String
+  stockName        String
+  rank             Int
+  selected         Boolean                @default(false)
+  evaluationStatus String
+  score            Float
+  maxScore         Float
+  ruleResults      Json
+  createdAt        DateTime               @default(now())
+  execution        ScheduledTaskExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
-    @@unique([executionId, stockCode])
-    @@unique([executionId, rank])
-    @@index([executionId, selected, rank])
+  @@unique([executionId, stockCode])
+  @@unique([executionId, rank])
+  @@index([executionId, selected, rank])
 }
 
 model ScheduledTaskEvidence {
-    id           String                   @id @default(cuid())
-    executionId  String
-    sourceType   String
-    sourceId     String
-    title        String?
-    url          String?
-    observedAt   DateTime?
-    content      String?
-    metadata     Json?
-    createdAt    DateTime                 @default(now())
-    execution    ScheduledTaskExecution  @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  id          String                 @id @default(cuid())
+  executionId String
+  sourceType  String
+  sourceId    String
+  title       String?
+  url         String?
+  observedAt  DateTime?
+  content     String?
+  metadata    Json?
+  createdAt   DateTime               @default(now())
+  execution   ScheduledTaskExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
-    @@index([executionId, createdAt])
+  @@index([executionId, createdAt])
 }
 
 model ScheduledTaskDelivery {
-    id           String                         @id @default(cuid())
-    executionId  String
-    targetType   String
-    targetRef    String?
-    status       ScheduledTaskDeliveryStatus   @default(PENDING)
-    attempts     Int                            @default(0)
-    error        String?
-    sentAt       DateTime?
-    createdAt    DateTime                       @default(now())
-    updatedAt    DateTime                       @updatedAt
-    execution    ScheduledTaskExecution        @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  id          String                      @id @default(cuid())
+  executionId String
+  targetType  String
+  targetRef   String?
+  status      ScheduledTaskDeliveryStatus @default(PENDING)
+  attempts    Int                         @default(0)
+  error       String?
+  sentAt      DateTime?
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  execution   ScheduledTaskExecution      @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
-    @@unique([executionId, targetType, targetRef])
-    @@index([status, createdAt])
+  @@unique([executionId, targetType, targetRef])
+  @@index([status, createdAt])
 }
 
 model VerificationToken {
-    identifier String
-    token      String   @unique
-    expires    DateTime
+  identifier String
+  token      String   @unique
+  expires    DateTime
 
-    @@unique([identifier, token])
+  @@unique([identifier, token])
 }
 
 model ScreeningWorkspace {
-    id             String   @id @default(cuid())
-    userId         String
-    name           String
-    description    String?
-    stockCodes     String[] @default([])
-    indicatorIds   String[] @default([])
-    formulaIds     String[] @default([])
-    timeConfig     Json
-    filterRules    Json
-    sortState      Json?
-    columnState    Json
-    resultSnapshot Json?
-    universe       Json     @default("{\"type\":\"STOCKS\",\"stockCodes\":[]}")
-    lastFetchedAt  DateTime?
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  name           String
+  description    String?
+  stockCodes     String[]  @default([])
+  indicatorIds   String[]  @default([])
+  formulaIds     String[]  @default([])
+  timeConfig     Json
+  filterRules    Json
+  sortState      Json?
+  columnState    Json
+  resultSnapshot Json?
+  universe       Json      @default("{\"type\":\"STOCKS\",\"stockCodes\":[]}")
+  lastFetchedAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-    user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    runs           ScreeningRun[]
+  user User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs ScreeningRun[]
 
-    @@index([userId, updatedAt])
-    @@index([userId, createdAt])
-    @@index([userId, name])
+  @@index([userId, updatedAt])
+  @@index([userId, createdAt])
+  @@index([userId, name])
 }
 
 enum ScreeningRunStatus {
-    PENDING
-    RUNNING
-    RETRYING
-    SUCCEEDED
-    PARTIAL
-    FAILED
+  PENDING
+  RUNNING
+  RETRYING
+  SUCCEEDED
+  PARTIAL
+  FAILED
 }
 
 model ScreeningRun {
-    id               String             @id @default(cuid())
-    workspaceId      String
-    userId           String
-    status           ScreeningRunStatus @default(PENDING)
-    config           Json
-    universeCount    Int?
-    totalCount       Int?
-    warnings         Json               @default("[]")
-    diagnostics      Json               @default("{}")
-    attempts         Int                @default(0)
-    workerId         String?
-    fencingToken     BigInt             @default(0)
-    leaseExpiresAt   DateTime?
-    heartbeatAt      DateTime?
-    nextAttemptAt    DateTime?
-    errorCode        String?
-    errorMessage     String?
-    startedAt        DateTime?
-    completedAt      DateTime?
-    createdAt        DateTime           @default(now())
-    updatedAt        DateTime           @updatedAt
-    workspace        ScreeningWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-    user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-    results          ScreeningRunResult[]
+  id             String               @id @default(cuid())
+  workspaceId    String
+  userId         String
+  status         ScreeningRunStatus   @default(PENDING)
+  config         Json
+  universeCount  Int?
+  totalCount     Int?
+  warnings       Json                 @default("[]")
+  diagnostics    Json                 @default("{}")
+  attempts       Int                  @default(0)
+  workerId       String?
+  fencingToken   BigInt               @default(0)
+  leaseExpiresAt DateTime?
+  heartbeatAt    DateTime?
+  nextAttemptAt  DateTime?
+  errorCode      String?
+  errorMessage   String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  workspace      ScreeningWorkspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  results        ScreeningRunResult[]
 
-    @@index([workspaceId, createdAt])
-    @@index([userId, createdAt])
-    @@index([status, leaseExpiresAt])
+  @@index([workspaceId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status, leaseExpiresAt])
 }
 
 model ScreeningRunResult {
-    id        String       @id @default(cuid())
-    runId     String
-    stockCode String
-    rank      Int
-    run       ScreeningRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  id        String       @id @default(cuid())
+  runId     String
+  stockCode String
+  rank      Int
+  run       ScreeningRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
-    @@unique([runId, stockCode])
-    @@unique([runId, rank])
-    @@index([runId, rank])
+  @@unique([runId, stockCode])
+  @@unique([runId, rank])
+  @@index([runId, rank])
 }
 
 model ScreeningFormula {
-    id               String   @id @default(cuid())
-    userId           String
-    name             String
-    expression       String
-    targetIndicators Json
-    description      String?
-    categoryId       String
-    createdAt        DateTime @default(now())
-    updatedAt        DateTime @updatedAt
+  id               String   @id @default(cuid())
+  userId           String
+  name             String
+  expression       String
+  targetIndicators Json
+  description      String?
+  categoryId       String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-    user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@index([userId, updatedAt])
-    @@unique([userId, name])
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
 }
 
 model WatchList {
-    id                    String   @id @default(cuid())
-    name                  String
-    description           String?
-    stocks                Json     @default("[]")
-    createdAt             DateTime @default(now())
-    updatedAt             DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  stocks      Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-    userId                String
-    user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    timingResearchReports TimingResearchReport[]
+  userId                String
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timingResearchReports TimingResearchReport[]
 
-    @@index([userId])
-    @@index([name])
+  @@index([userId])
+  @@index([name])
 }
 
 model SavedCompany {
-    id           String    @id @default(cuid())
-    userId       String
-    stockCode    String
-    companyName  String
-    reason       String?
-    tags         String[]  @default([])
-    metadataJson Json      @default("{}")
-    archivedAt   DateTime?
-    createdAt    DateTime  @default(now())
-    updatedAt    DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  userId       String
+  stockCode    String
+  companyName  String
+  reason       String?
+  tags         String[]  @default([])
+  metadataJson Json      @default("{}")
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-    user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, stockCode])
-    @@index([userId, updatedAt])
-    @@index([userId, archivedAt])
+  @@unique([userId, stockCode])
+  @@index([userId, updatedAt])
+  @@index([userId, archivedAt])
 }
 
 model SellSideBrokerRecommendation {
-    id        String   @id @default(cuid())
-    month     String
-    broker    String
-    tsCode    String
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id        String   @id @default(cuid())
+  month     String
+  broker    String
+  tsCode    String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    @@unique([month, broker, tsCode])
-    @@index([month, tsCode])
+  @@unique([month, broker, tsCode])
+  @@index([month, tsCode])
 }
 
 model SellSideEarningsForecast {
-    id          String   @id @default(cuid())
-    sourceKey   String   @unique
-    tsCode      String
-    name        String
-    reportDate  String
-    reportTitle String?
-    orgName     String
-    quarter     String
-    eps         Float?
-    netProfit   Float?
-    rating      String?
-    maxPrice    Float?
-    minPrice    Float?
-    createdAt   DateTime @default(now())
-    updatedAt   DateTime @updatedAt
+  id          String   @id @default(cuid())
+  sourceKey   String   @unique
+  tsCode      String
+  name        String
+  reportDate  String
+  reportTitle String?
+  orgName     String
+  quarter     String
+  eps         Float?
+  netProfit   Float?
+  rating      String?
+  maxPrice    Float?
+  minPrice    Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-    @@index([tsCode, orgName, quarter, reportDate])
-    @@index([reportDate])
+  @@index([tsCode, orgName, quarter, reportDate])
+  @@index([reportDate])
 }
 
 model SellSideRefreshState {
-    id                    String   @id
-    latestRecommendationMonth String?
-    latestForecastDate    String?
-    lastSuccessfulAt      DateTime?
-    lastError             String?
-    updatedAt             DateTime @updatedAt
+  id                        String    @id
+  latestRecommendationMonth String?
+  latestForecastDate        String?
+  lastSuccessfulAt          DateTime?
+  lastError                 String?
+  updatedAt                 DateTime  @updatedAt
 }
 
 model SavedIndustry {
-    id                   String    @id @default(cuid())
-    userId               String
-    name                 String
-    source               String
-    reason               String?
-    tags                 String[]  @default([])
-    relatedCompaniesJson Json      @default("[]")
-    metadataJson         Json      @default("{}")
-    archivedAt           DateTime?
-    createdAt            DateTime  @default(now())
-    updatedAt            DateTime  @updatedAt
+  id                   String    @id @default(cuid())
+  userId               String
+  name                 String
+  source               String
+  reason               String?
+  tags                 String[]  @default([])
+  relatedCompaniesJson Json      @default("[]")
+  metadataJson         Json      @default("{}")
+  archivedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-    user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@unique([userId, source, name])
-    @@index([userId, updatedAt])
-    @@index([userId, archivedAt])
+  @@unique([userId, source, name])
+  @@index([userId, updatedAt])
+  @@index([userId, archivedAt])
 }
 
 model ResearchNote {
-    id              String   @id @default(cuid())
-    userId          String
-    targetType      String
-    targetId        String
-    title           String?
-    kind            String?
-    contentMarkdown String
-    rawContent      String?
-    sourceJson      Json?
-    tags            String[] @default([])
-    createdAt       DateTime @default(now())
-    updatedAt       DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String
+  targetType      String
+  targetId        String
+  title           String?
+  kind            String?
+  contentMarkdown String
+  rawContent      String?
+  sourceJson      Json?
+  tags            String[] @default([])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-    user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    @@index([userId, targetType, targetId, updatedAt])
-    @@index([userId, updatedAt])
+  @@index([userId, targetType, targetId, updatedAt])
+  @@index([userId, updatedAt])
 }
 
 model FinancialSnapshot {
-    id               String   @id @default(cuid())
-    userId           String
-    targetType       String
-    targetId         String
-    companyRefsJson  Json
-    metricSetJson    Json
-    periodRangeJson  Json
-    rawSnapshotJson  Json
-    sourceJson       Json
-    createdAt        DateTime @default(now())
+  id              String   @id @default(cuid())
+  userId          String
+  targetType      String
+  targetId        String
+  companyRefsJson Json
+  metricSetJson   Json
+  periodRangeJson Json
+  rawSnapshotJson Json
+  sourceJson      Json
+  createdAt       DateTime @default(now())
 
-    user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    artifacts        ResearchArtifact[]
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artifacts ResearchArtifact[]
 
-    @@index([userId, targetType, targetId, createdAt])
-    @@index([userId, createdAt])
+  @@index([userId, targetType, targetId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model ResearchArtifact {
-    id                  String             @id @default(cuid())
-    userId              String
-    targetType          String
-    targetId            String
-    financialSnapshotId String?
-    artifactType        String
-    title               String
-    contentType         String
-    payloadJson         Json
-    sourceJson          Json?
-    createdAt           DateTime           @default(now())
-    updatedAt           DateTime           @updatedAt
+  id                  String   @id @default(cuid())
+  userId              String
+  targetType          String
+  targetId            String
+  financialSnapshotId String?
+  artifactType        String
+  title               String
+  contentType         String
+  payloadJson         Json
+  sourceJson          Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-    user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-    financialSnapshot   FinancialSnapshot? @relation(fields: [financialSnapshotId], references: [id], onDelete: SetNull)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  financialSnapshot FinancialSnapshot? @relation(fields: [financialSnapshotId], references: [id], onDelete: SetNull)
 
-    @@index([userId, targetType, targetId, updatedAt])
-    @@index([financialSnapshotId])
-    @@index([userId, artifactType, updatedAt])
+  @@index([userId, targetType, targetId, updatedAt])
+  @@index([financialSnapshotId])
+  @@index([userId, artifactType, updatedAt])
 }
 
 model SharedNewsDaySync {
-    id              String   @id @default(cuid())
-    date            DateTime @unique
-    status          String
-    leaseExpiresAt  DateTime?
-    attemptedAt     DateTime?
-    completedAt     DateTime?
-    warnings        String[] @default([])
-    createdAt       DateTime @default(now())
-    updatedAt       DateTime @updatedAt
+  id             String    @id @default(cuid())
+  date           DateTime  @unique
+  status         String
+  leaseExpiresAt DateTime?
+  attemptedAt    DateTime?
+  completedAt    DateTime?
+  warnings       String[]  @default([])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-    @@index([status, leaseExpiresAt])
+  @@index([status, leaseExpiresAt])
 }
 
 model SharedNewsItem {
-    id           String   @id @default(cuid())
-    sourceItemId String   @unique
-    sourceKind   String
-    sourceName   String
-    url          String?
-    title        String
-    content      String
-    publishedAt  DateTime
-    contentHash  String
-    rawPayload   Json
-    createdAt    DateTime @default(now())
-    updatedAt    DateTime @updatedAt
+  id           String   @id @default(cuid())
+  sourceItemId String   @unique
+  sourceKind   String
+  sourceName   String
+  url          String?
+  title        String
+  content      String
+  publishedAt  DateTime
+  contentHash  String
+  rawPayload   Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-    @@index([publishedAt])
-    @@index([sourceKind, publishedAt])
-    @@index([contentHash])
+  @@index([publishedAt])
+  @@index([sourceKind, publishedAt])
+  @@index([contentHash])
 }
 
 model EvidenceContext {
-    id          String   @id @default(cuid())
-    userId      String
-    workflowRunId String?
-    schemaVersion String @default("1.0")
-    subjectType String
-    subjectId   String
-    subjectLabel String?
-    phase       String?
-    metadataJson Json
-    createdAt   DateTime @default(now())
+  id            String   @id @default(cuid())
+  userId        String
+  workflowRunId String?
+  schemaVersion String   @default("1.0")
+  subjectType   String
+  subjectId     String
+  subjectLabel  String?
+  phase         String?
+  metadataJson  Json
+  createdAt     DateTime @default(now())
 
-    user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-    workflowRun WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
-    blocks     EvidenceContextBlock[]
-    items      EvidenceContextItem[]
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowRun WorkflowRun?           @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  blocks      EvidenceContextBlock[]
+  items       EvidenceContextItem[]
 
-    @@index([userId, subjectType, subjectId, createdAt])
-    @@index([workflowRunId, createdAt])
+  @@index([userId, subjectType, subjectId, createdAt])
+  @@index([workflowRunId, createdAt])
 }
 
 model EvidenceContextBlock {
-    id            String   @id @default(cuid())
-    contextId     String
-    blockKey      String
-    status        String
-    sourceType    String?
-    sourceId      String?
-    sourceName    String?
-    sourceUrl     String?
-    observedAt    DateTime?
-    fetchedAt     DateTime?
-    warnings      String[] @default([])
-    limitations   String[] @default([])
-    metadataJson  Json
-    createdAt     DateTime @default(now())
+  id           String    @id @default(cuid())
+  contextId    String
+  blockKey     String
+  status       String
+  sourceType   String?
+  sourceId     String?
+  sourceName   String?
+  sourceUrl    String?
+  observedAt   DateTime?
+  fetchedAt    DateTime?
+  warnings     String[]  @default([])
+  limitations  String[]  @default([])
+  metadataJson Json
+  createdAt    DateTime  @default(now())
 
-    context       EvidenceContext @relation(fields: [contextId], references: [id], onDelete: Cascade)
-    items         EvidenceContextItem[]
+  context EvidenceContext       @relation(fields: [contextId], references: [id], onDelete: Cascade)
+  items   EvidenceContextItem[]
 
-    @@unique([contextId, blockKey])
-    @@index([blockKey, createdAt])
+  @@unique([contextId, blockKey])
+  @@index([blockKey, createdAt])
 }
 
 model EvidenceContextItem {
-    id            String   @id @default(cuid())
-    contextId     String
-    blockId       String
-    userId        String
-    itemKey       String
-    status        String
-    extractedFact String?
-    snippet       String?
-    valueJson     Json?
-    rawValueJson  Json?
-    sourceType    String
-    sourceId      String?
-    sourceName    String?
-    sourceUrl     String?
-    publishedAt   DateTime?
-    observedAt    DateTime?
-    fetchedAt     DateTime?
-    fallbackFrom  String?
-    missingReason String?
-    warnings      String[] @default([])
-    limitations   String[] @default([])
-    metadataJson  Json
-    recordKind    String   @default("observation")
-    lineageId     String
-    derivedFromItemIds String[] @default([])
-    algorithmVersion String?
-    parametersJson Json?
-    correctionOfItemId String?
-    supersedesItemId String?
-    contentHash   String
-    createdAt     DateTime @default(now())
+  id                 String    @id @default(cuid())
+  contextId          String
+  blockId            String
+  userId             String
+  itemKey            String
+  status             String
+  extractedFact      String?
+  snippet            String?
+  valueJson          Json?
+  rawValueJson       Json?
+  sourceType         String
+  sourceId           String?
+  sourceName         String?
+  sourceUrl          String?
+  publishedAt        DateTime?
+  observedAt         DateTime?
+  fetchedAt          DateTime?
+  fallbackFrom       String?
+  missingReason      String?
+  warnings           String[]  @default([])
+  limitations        String[]  @default([])
+  metadataJson       Json
+  recordKind         String    @default("observation")
+  lineageId          String
+  derivedFromItemIds String[]  @default([])
+  algorithmVersion   String?
+  parametersJson     Json?
+  correctionOfItemId String?
+  supersedesItemId   String?
+  contentHash        String
+  createdAt          DateTime  @default(now())
 
-    context       EvidenceContext @relation(fields: [contextId], references: [id], onDelete: Cascade)
-    block         EvidenceContextBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
-    user          User @relation(fields: [userId], references: [id], onDelete: Cascade)
-    snapshotItems ResearchContextSnapshotItem[]
-    claimCitations ResearchClaimCitation[]
+  context        EvidenceContext               @relation(fields: [contextId], references: [id], onDelete: Cascade)
+  block          EvidenceContextBlock          @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  user           User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshotItems  ResearchContextSnapshotItem[]
+  claimCitations ResearchClaimCitation[]
 
-    @@index([lineageId, createdAt])
-    @@index([correctionOfItemId])
-    @@index([supersedesItemId])
-    @@index([userId, contextId, createdAt])
-    @@index([sourceType, sourceId])
+  @@index([lineageId, createdAt])
+  @@index([correctionOfItemId])
+  @@index([supersedesItemId])
+  @@index([userId, contextId, createdAt])
+  @@index([sourceType, sourceId])
 }
 
 model ResearchContextSnapshot {
-    id                 String   @id @default(cuid())
-    userId             String
-    workflowRunId      String?
-    requestGroupId     String
-    requestSequence    Int
-    attempt            Int      @default(1)
-    purpose            String
-    policy             String
-    model              String?
-    requestOptionsJson Json?
-    messagesJson       Json
-    qualityJson        Json
-    projectionVersion  String
-    contentHash        String
-    status             String   @default("prepared")
-    errorMessage       String?
-    createdAt          DateTime @default(now())
-    sentAt             DateTime?
-    completedAt        DateTime?
+  id                 String    @id @default(cuid())
+  userId             String
+  workflowRunId      String?
+  requestGroupId     String
+  requestSequence    Int
+  attempt            Int       @default(1)
+  purpose            String
+  policy             String
+  model              String?
+  requestOptionsJson Json?
+  messagesJson       Json
+  qualityJson        Json
+  projectionVersion  String
+  contentHash        String
+  status             String    @default("prepared")
+  errorMessage       String?
+  createdAt          DateTime  @default(now())
+  sentAt             DateTime?
+  completedAt        DateTime?
 
-    user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    workflowRun   WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
-    items         ResearchContextSnapshotItem[]
-    claims        ResearchClaim[]
+  user        User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowRun WorkflowRun?                  @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  items       ResearchContextSnapshotItem[]
+  claims      ResearchClaim[]
 
-    @@unique([requestGroupId, attempt])
-    @@index([userId, workflowRunId, createdAt])
-    @@index([workflowRunId, requestSequence])
+  @@unique([requestGroupId, attempt])
+  @@index([userId, workflowRunId, createdAt])
+  @@index([workflowRunId, requestSequence])
 }
 
 model ResearchContextSnapshotItem {
-    id                 String   @id @default(cuid())
-    snapshotId         String
-    evidenceItemId     String
-    ordinal            Int
-    projectionJson     Json
-    projectionHash     String
-    truncationReason   String?
-    createdAt          DateTime @default(now())
+  id               String   @id @default(cuid())
+  snapshotId       String
+  evidenceItemId   String
+  ordinal          Int
+  projectionJson   Json
+  projectionHash   String
+  truncationReason String?
+  createdAt        DateTime @default(now())
 
-    snapshot     ResearchContextSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-    evidenceItem EvidenceContextItem @relation(fields: [evidenceItemId], references: [id], onDelete: Restrict)
+  snapshot     ResearchContextSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  evidenceItem EvidenceContextItem     @relation(fields: [evidenceItemId], references: [id], onDelete: Restrict)
 
-    @@unique([snapshotId, evidenceItemId])
-    @@unique([snapshotId, ordinal])
-    @@index([evidenceItemId])
+  @@unique([snapshotId, evidenceItemId])
+  @@unique([snapshotId, ordinal])
+  @@index([evidenceItemId])
 }
 
 model ResearchClaim {
-    id              String   @id @default(cuid())
-    snapshotId      String
-    artifactKey     String
-    ordinal         Int
-    text            String
-    status          String
-    qualityFlags    String[] @default([])
-    createdAt       DateTime @default(now())
+  id           String   @id @default(cuid())
+  snapshotId   String
+  artifactKey  String
+  ordinal      Int
+  text         String
+  status       String
+  qualityFlags String[] @default([])
+  createdAt    DateTime @default(now())
 
-    snapshot        ResearchContextSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
-    citations       ResearchClaimCitation[]
+  snapshot  ResearchContextSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  citations ResearchClaimCitation[]
 
-    @@unique([snapshotId, artifactKey, ordinal])
-    @@index([snapshotId, createdAt])
+  @@unique([snapshotId, artifactKey, ordinal])
+  @@index([snapshotId, createdAt])
 }
 
 model ResearchClaimCitation {
-    id              String   @id @default(cuid())
-    claimId         String
-    evidenceItemId  String
-    relation        String   @default("support")
-    createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  claimId        String
+  evidenceItemId String
+  relation       String   @default("support")
+  createdAt      DateTime @default(now())
 
-    claim           ResearchClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
-    evidenceItem    EvidenceContextItem @relation(fields: [evidenceItemId], references: [id], onDelete: Restrict)
+  claim        ResearchClaim       @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  evidenceItem EvidenceContextItem @relation(fields: [evidenceItemId], references: [id], onDelete: Restrict)
 
-    @@unique([claimId, evidenceItemId, relation])
-    @@index([evidenceItemId])
+  @@unique([claimId, evidenceItemId, relation])
+  @@index([evidenceItemId])
 }
 
 model TimingSignalSnapshot {
-    id           String    @id @default(cuid())
-    userId       String
-    workflowRunId String?
-    stockCode    String
-    stockName    String
-    asOfDate     DateTime
-    sourceType   String
-    sourceId     String
-    timeframe    String    @default("DAILY")
-    barsCount    Int
-    bars         Json?
-    barsByTimeframe Json?
-    indicators   Json
-    signalContext Json
-    presetRevisionId String?
-    featureEvidence Json?
-    dataManifest Json?
-    featureVersion String?
-    inputHash String?
-    createdAt    DateTime  @default(now())
+  id               String   @id @default(cuid())
+  userId           String
+  workflowRunId    String?
+  stockCode        String
+  stockName        String
+  asOfDate         DateTime
+  sourceType       String
+  sourceId         String
+  timeframe        String   @default("DAILY")
+  barsCount        Int
+  bars             Json?
+  barsByTimeframe  Json?
+  indicators       Json
+  signalContext    Json
+  presetRevisionId String?
+  featureEvidence  Json?
+  dataManifest     Json?
+  featureVersion   String?
+  inputHash        String?
+  createdAt        DateTime @default(now())
 
-    user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-    workflowRun  WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
-    presetRevision TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
-    researchReports TimingResearchReport[]
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowRun     WorkflowRun?           @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  presetRevision  TimingPresetRevision?  @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
+  researchReports TimingResearchReport[]
 
-    @@index([userId, createdAt])
-    @@index([workflowRunId])
-    @@index([userId, stockCode, asOfDate])
-    @@index([sourceType, sourceId])
-    @@index([presetRevisionId])
-    @@index([inputHash])
+  @@index([userId, createdAt])
+  @@index([workflowRunId])
+  @@index([userId, stockCode, asOfDate])
+  @@index([sourceType, sourceId])
+  @@index([presetRevisionId])
+  @@index([inputHash])
 }
 
 model TimingResearchReport {
-    id                String    @id @default(cuid())
-    userId            String
-    workflowRunId     String?
-    watchListId       String?
-    presetId          String?
-    presetRevisionId  String?
-    stockCode         String
-    stockName         String
-    sourceType        String
-    sourceId          String
-    signalSnapshotId  String
-    researchState     String
-    trendState        String
-    confidence        Float
-    marketState       String?
-    marketTransition  String?
-    summary           String
-    dimensions        Json
-    observationConditions Json
-    dataCompleteness  Json
-    modelOutlook      Json?
-    riskFlags         String[]
-    reasoning         Json
-    ruleAudit         Json
-    createdAt         DateTime  @default(now())
-    updatedAt         DateTime  @updatedAt
+  id                    String   @id @default(cuid())
+  userId                String
+  workflowRunId         String?
+  watchListId           String?
+  presetId              String?
+  presetRevisionId      String?
+  stockCode             String
+  stockName             String
+  sourceType            String
+  sourceId              String
+  signalSnapshotId      String
+  researchState         String
+  trendState            String
+  confidence            Float
+  marketState           String?
+  marketTransition      String?
+  summary               String
+  dimensions            Json
+  observationConditions Json
+  dataCompleteness      Json
+  modelOutlook          Json?
+  riskFlags             String[]
+  reasoning             Json
+  ruleAudit             Json
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-    user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-    workflowRun      WorkflowRun?         @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
-    watchList        WatchList?           @relation(fields: [watchListId], references: [id], onDelete: SetNull)
-    preset           TimingPreset?        @relation(fields: [presetId], references: [id], onDelete: SetNull)
-    presetRevision   TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
-    signalSnapshot   TimingSignalSnapshot @relation(fields: [signalSnapshotId], references: [id], onDelete: Cascade)
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowRun    WorkflowRun?          @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  watchList      WatchList?            @relation(fields: [watchListId], references: [id], onDelete: SetNull)
+  preset         TimingPreset?         @relation(fields: [presetId], references: [id], onDelete: SetNull)
+  presetRevision TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
+  signalSnapshot TimingSignalSnapshot  @relation(fields: [signalSnapshotId], references: [id], onDelete: Cascade)
 
-    @@index([userId, createdAt])
-    @@index([workflowRunId])
-    @@index([watchListId, createdAt])
-    @@index([presetId])
-    @@index([presetRevisionId])
-    @@index([signalSnapshotId])
-    @@index([userId, stockCode, createdAt])
-    @@index([sourceType, sourceId])
+  @@index([userId, createdAt])
+  @@index([workflowRunId])
+  @@index([watchListId, createdAt])
+  @@index([presetId])
+  @@index([presetRevisionId])
+  @@index([signalSnapshotId])
+  @@index([userId, stockCode, createdAt])
+  @@index([sourceType, sourceId])
 }
 
 model PortfolioComposition {
-    id              String   @id @default(cuid())
-    userId          String
-    name            String
-    positions       Json
-    source          String   @default("SAVED")
-    workflowRunId   String?  @unique
-    createdAt       DateTime @default(now())
-    updatedAt       DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  positions     Json
+  source        String   @default("SAVED")
+  workflowRunId String?  @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-    user                   User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    workflowRun            WorkflowRun?             @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
-    diagnostics            PortfolioRiskDiagnostic[]
+  user        User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowRun WorkflowRun?              @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  diagnostics PortfolioRiskDiagnostic[]
 
-    @@index([userId, updatedAt])
-    @@index([userId, name])
+  @@index([userId, updatedAt])
+  @@index([userId, name])
 }
 
 model PortfolioRiskDiagnostic {
-    id                    String   @id @default(cuid())
-    userId                String
-    workflowRunId         String?
-    portfolioCompositionId String
-    asOfDate              DateTime
-    concentration         Json
-    exposures             Json
-    correlation           Json
-    volatility            Json
-    liquidity             Json
-    scenarios             Json
-    dataQuality           Json
-    createdAt             DateTime @default(now())
+  id                     String   @id @default(cuid())
+  userId                 String
+  workflowRunId          String?
+  portfolioCompositionId String
+  asOfDate               DateTime
+  concentration          Json
+  exposures              Json
+  correlation            Json
+  volatility             Json
+  liquidity              Json
+  scenarios              Json
+  dataQuality            Json
+  createdAt              DateTime @default(now())
 
-    user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-    workflowRun           WorkflowRun?         @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
-    portfolioComposition  PortfolioComposition @relation(fields: [portfolioCompositionId], references: [id], onDelete: Cascade)
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowRun          WorkflowRun?         @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  portfolioComposition PortfolioComposition @relation(fields: [portfolioCompositionId], references: [id], onDelete: Cascade)
 
-    @@index([userId, createdAt])
-    @@index([workflowRunId])
-    @@index([portfolioCompositionId, createdAt])
+  @@index([userId, createdAt])
+  @@index([workflowRunId])
+  @@index([portfolioCompositionId, createdAt])
 }
 
 model TimingPreset {
-    id                    String                 @id @default(cuid())
-    userId                String
-    name                  String
-    description           String?
-    origin                String                 @default("USER")
-    templateKey           String?
-    config                Json
-    activeRevisionId      String?
-    createdAt             DateTime               @default(now())
-    updatedAt             DateTime               @updatedAt
+  id               String   @id @default(cuid())
+  userId           String
+  name             String
+  description      String?
+  origin           String   @default("USER")
+  templateKey      String?
+  config           Json
+  activeRevisionId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-    user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    timingResearchReports TimingResearchReport[]
-    revisions             TimingPresetRevision[] @relation("TimingPresetRevisions")
-    activeRevision        TimingPresetRevision?  @relation("ActiveTimingPresetRevision", fields: [activeRevisionId], references: [id], onDelete: SetNull)
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timingResearchReports TimingResearchReport[]
+  revisions             TimingPresetRevision[] @relation("TimingPresetRevisions")
+  activeRevision        TimingPresetRevision?  @relation("ActiveTimingPresetRevision", fields: [activeRevisionId], references: [id], onDelete: SetNull)
 
-    @@index([userId, updatedAt])
-    @@unique([activeRevisionId])
-    @@unique([userId, name])
-    @@unique([userId, templateKey])
+  @@unique([activeRevisionId])
+  @@unique([userId, name])
+  @@unique([userId, templateKey])
+  @@index([userId, updatedAt])
 }
 
 model TimingPresetRevision {
-    id                String   @id @default(cuid())
-    presetId          String
-    userId            String
-    revisionNumber    Int
-    status            String   @default("DRAFT")
-    config            Json
-    configHash        String
-    engineVersion     String
-    featureVersion    String
-    templateVersion   Int?
-    validationSource  String?
-    publishedAt       DateTime?
-    archivedAt        DateTime?
-    createdAt         DateTime @default(now())
-    updatedAt         DateTime @updatedAt
+  id               String    @id @default(cuid())
+  presetId         String
+  userId           String
+  revisionNumber   Int
+  status           String    @default("DRAFT")
+  config           Json
+  configHash       String
+  engineVersion    String
+  featureVersion   String
+  templateVersion  Int?
+  validationSource String?
+  publishedAt      DateTime?
+  archivedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-    user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-    preset            TimingPreset            @relation("TimingPresetRevisions", fields: [presetId], references: [id], onDelete: Cascade)
-    activeForPreset   TimingPreset?            @relation("ActiveTimingPresetRevision")
-    signalSnapshots   TimingSignalSnapshot[]
-    researchReports   TimingResearchReport[]
-    validationRuns    TimingRuleValidationRun[]
+  user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preset          TimingPreset              @relation("TimingPresetRevisions", fields: [presetId], references: [id], onDelete: Cascade)
+  activeForPreset TimingPreset?             @relation("ActiveTimingPresetRevision")
+  signalSnapshots TimingSignalSnapshot[]
+  researchReports TimingResearchReport[]
+  validationRuns  TimingRuleValidationRun[]
 
-    @@unique([presetId, revisionNumber])
-    @@index([presetId, configHash])
-    @@index([userId, status, updatedAt])
+  @@unique([presetId, revisionNumber])
+  @@index([presetId, configHash])
+  @@index([userId, status, updatedAt])
 }
 
 model TimingRuleValidationRun {
-    id                         String   @id @default(cuid())
-    userId                     String
-    presetRevisionId           String
-    watchListId                String?
-    status                     String   @default("PENDING")
-    configHash                 String
-    sampleSnapshot             Json
-    qualityMetrics             Json?
-    warnings                   String[] @default([])
-    errorMessage               String?
-    startedAt                  DateTime?
-    completedAt                DateTime?
-    createdAt                  DateTime @default(now())
-    updatedAt                  DateTime @updatedAt
+  id               String    @id @default(cuid())
+  userId           String
+  presetRevisionId String
+  watchListId      String?
+  status           String    @default("PENDING")
+  configHash       String
+  sampleSnapshot   Json
+  qualityMetrics   Json?
+  warnings         String[]  @default([])
+  errorMessage     String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-    user                       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-    presetRevision             TimingPresetRevision @relation(fields: [presetRevisionId], references: [id], onDelete: Cascade)
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  presetRevision TimingPresetRevision @relation(fields: [presetRevisionId], references: [id], onDelete: Cascade)
 
-    @@index([userId, createdAt])
-    @@index([presetRevisionId, status, createdAt])
-    @@index([watchListId, createdAt])
+  @@index([userId, createdAt])
+  @@index([presetRevisionId, status, createdAt])
+  @@index([watchListId, createdAt])
 }
 
 model TimingMarketContextSnapshot {
-    id             String   @id @default(cuid())
-    asOfDate       DateTime @unique
-    state          String
-    transition     String
-    persistenceDays Int
-    snapshotJson   Json
-    analysisJson   Json
-    createdAt      DateTime @default(now())
-    updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  asOfDate        DateTime @unique
+  state           String
+  transition      String
+  persistenceDays Int
+  snapshotJson    Json
+  analysisJson    Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-    @@index([asOfDate])
-    @@index([state, updatedAt])
+  @@index([asOfDate])
+  @@index([state, updatedAt])
 }
 
 enum WorkflowRunStatus {
-    PENDING
-    RUNNING
-    PAUSED
-    SUCCEEDED
-    FAILED
-    CANCELLED
+  PENDING
+  RUNNING
+  PAUSED
+  SUCCEEDED
+  FAILED
+  CANCELLED
 }
 
 enum AgentConversationStatus {
-    ACTIVE
-    ARCHIVED
+  ACTIVE
+  ARCHIVED
 }
 
 enum AgentConversationMessageRole {
-    USER
-    ASSISTANT
+  USER
+  ASSISTANT
 }
 
 enum AgentConversationMessageStatus {
-    PENDING
-    STREAMING
-    WAITING_FOR_INPUT
-    SUCCEEDED
-    FAILED
-    CANCELLED
+  PENDING
+  STREAMING
+  WAITING_FOR_INPUT
+  SUCCEEDED
+  FAILED
+  CANCELLED
 }
 
 enum WorkflowNodeRunStatus {
-    PENDING
-    RUNNING
-    WAITING_FOR_INPUT
-    SUCCEEDED
-    FAILED
-    SKIPPED
+  PENDING
+  RUNNING
+  WAITING_FOR_INPUT
+  SUCCEEDED
+  FAILED
+  SKIPPED
 }
 
 enum WorkflowEventType {
-    RUN_CREATED
-    RUN_STARTED
-    RUN_PAUSED
-    RUN_RESUMED
-    RUN_CANCEL_REQUESTED
-    RUN_CANCELLED
-    RUN_SUCCEEDED
-    RUN_FAILED
-    NODE_STARTED
-    NODE_PROGRESS
-    NODE_SUCCEEDED
-    NODE_FAILED
+  RUN_CREATED
+  RUN_STARTED
+  RUN_PAUSED
+  RUN_RESUMED
+  RUN_CANCEL_REQUESTED
+  RUN_CANCELLED
+  RUN_SUCCEEDED
+  RUN_FAILED
+  NODE_STARTED
+  NODE_PROGRESS
+  NODE_SUCCEEDED
+  NODE_FAILED
 }
 
 model WorkflowTemplate {
-    id          String        @id @default(cuid())
-    code        String
-    version     Int
-    graphConfig Json
-    inputSchema Json
-    isActive    Boolean       @default(true)
-    createdAt   DateTime      @default(now())
-    updatedAt   DateTime      @updatedAt
-    runs        WorkflowRun[]
+  id          String        @id @default(cuid())
+  code        String
+  version     Int
+  graphConfig Json
+  inputSchema Json
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  runs        WorkflowRun[]
 
-    @@unique([code, version])
-    @@index([code, isActive])
+  @@unique([code, version])
+  @@index([code, isActive])
 }
 
 model WorkflowRun {
-    id                      String             @id @default(cuid())
-    templateId              String
-    userId                  String
-    query                   String
-    input                   Json
-    status                  WorkflowRunStatus  @default(PENDING)
-    progressPercent         Int                @default(0)
-    currentNodeKey          String?
-    checkpointKey           String?
-    cancellationRequestedAt DateTime?
-    idempotencyKey          String?
-    result                  Json?
-    errorCode               String?
-    errorMessage            String?
-    startedAt               DateTime?
-    completedAt             DateTime?
-    createdAt               DateTime           @default(now())
-    updatedAt               DateTime           @updatedAt
-    template                WorkflowTemplate   @relation(fields: [templateId], references: [id], onDelete: Restrict)
-    user                    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-    nodeRuns                WorkflowNodeRun[]
-    events                  WorkflowEvent[]
-    timingSignalSnapshots   TimingSignalSnapshot[]
-    timingResearchReports   TimingResearchReport[]
-    portfolioComposition    PortfolioComposition?
-    portfolioRiskDiagnostics PortfolioRiskDiagnostic[]
-    timingKronosForecastSnapshots TimingKronosForecastSnapshot[]
-    agentToolCalls          AgentToolCall[]
-    agentArtifacts          AgentArtifact[]
-    agentConversationMessages AgentConversationMessage[]
-    evidenceContexts        EvidenceContext[]
-    researchContextSnapshots ResearchContextSnapshot[]
+  id                            String                         @id @default(cuid())
+  templateId                    String
+  userId                        String
+  query                         String
+  input                         Json
+  status                        WorkflowRunStatus              @default(PENDING)
+  progressPercent               Int                            @default(0)
+  currentNodeKey                String?
+  checkpointKey                 String?
+  cancellationRequestedAt       DateTime?
+  idempotencyKey                String?
+  result                        Json?
+  errorCode                     String?
+  errorMessage                  String?
+  startedAt                     DateTime?
+  completedAt                   DateTime?
+  createdAt                     DateTime                       @default(now())
+  updatedAt                     DateTime                       @updatedAt
+  template                      WorkflowTemplate               @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  user                          User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nodeRuns                      WorkflowNodeRun[]
+  events                        WorkflowEvent[]
+  timingSignalSnapshots         TimingSignalSnapshot[]
+  timingResearchReports         TimingResearchReport[]
+  portfolioComposition          PortfolioComposition?
+  portfolioRiskDiagnostics      PortfolioRiskDiagnostic[]
+  timingKronosForecastSnapshots TimingKronosForecastSnapshot[]
+  agentToolCalls                AgentToolCall[]
+  agentArtifacts                AgentArtifact[]
+  agentConversationMessages     AgentConversationMessage[]
+  evidenceContexts              EvidenceContext[]
+  researchContextSnapshots      ResearchContextSnapshot[]
 
-    @@index([templateId])
-    @@index([userId, createdAt])
-    @@index([userId, idempotencyKey])
-    @@index([status, createdAt])
+  @@index([templateId])
+  @@index([userId, createdAt])
+  @@index([userId, idempotencyKey])
+  @@index([status, createdAt])
 }
 
 model TimingKronosForecastSnapshot {
-    id               String   @id @default(cuid())
-    userId           String
-    workflowRunId    String?
-    stockCode        String
-    stockName        String
-    timeframe        String   @default("DAILY")
-    asOfDate         DateTime
-    sourceType       String
-    sourceId         String
-    modelName        String
-    modelVersion     String
-    lookbackDays     Int
-    predictionLength Int
-    inputBarsHash    String
-    forecastJson     Json
-    summaryJson      Json
-    warnings         String[]
-    createdAt        DateTime @default(now())
+  id               String   @id @default(cuid())
+  userId           String
+  workflowRunId    String?
+  stockCode        String
+  stockName        String
+  timeframe        String   @default("DAILY")
+  asOfDate         DateTime
+  sourceType       String
+  sourceId         String
+  modelName        String
+  modelVersion     String
+  lookbackDays     Int
+  predictionLength Int
+  inputBarsHash    String
+  forecastJson     Json
+  summaryJson      Json
+  warnings         String[]
+  createdAt        DateTime @default(now())
 
-    user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    workflowRun WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowRun WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
 
-    @@index([userId, stockCode, asOfDate, timeframe])
-    @@index([workflowRunId])
-    @@index([sourceType, sourceId])
-    @@unique([userId, stockCode, asOfDate, timeframe, modelName, predictionLength, inputBarsHash])
+  @@unique([userId, stockCode, asOfDate, timeframe, modelName, predictionLength, inputBarsHash])
+  @@index([userId, stockCode, asOfDate, timeframe])
+  @@index([workflowRunId])
+  @@index([sourceType, sourceId])
 }
 
 model WorkflowNodeRun {
-    id           String                @id @default(cuid())
-    runId        String
-    nodeKey      String
-    agentName    String
-    attempt      Int                   @default(1)
-    status       WorkflowNodeRunStatus @default(PENDING)
-    input        Json?
-    output       Json?
-    errorCode    String?
-    errorMessage String?
-    durationMs   Int?
-    startedAt    DateTime?
-    completedAt  DateTime?
-    createdAt    DateTime              @default(now())
-    updatedAt    DateTime              @updatedAt
-    run          WorkflowRun           @relation(fields: [runId], references: [id], onDelete: Cascade)
-    events       WorkflowEvent[]
+  id           String                @id @default(cuid())
+  runId        String
+  nodeKey      String
+  agentName    String
+  attempt      Int                   @default(1)
+  status       WorkflowNodeRunStatus @default(PENDING)
+  input        Json?
+  output       Json?
+  errorCode    String?
+  errorMessage String?
+  durationMs   Int?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+  run          WorkflowRun           @relation(fields: [runId], references: [id], onDelete: Cascade)
+  events       WorkflowEvent[]
 
-    @@unique([runId, nodeKey, attempt])
-    @@index([runId, status])
+  @@unique([runId, nodeKey, attempt])
+  @@index([runId, status])
 }
 
 model WorkflowEvent {
-    id         String            @id @default(cuid())
-    runId      String
-    nodeRunId  String?
-    sequence   Int
-    eventType  WorkflowEventType
-    payload    Json
-    occurredAt DateTime
-    createdAt  DateTime          @default(now())
-    run        WorkflowRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
-    nodeRun    WorkflowNodeRun?  @relation(fields: [nodeRunId], references: [id], onDelete: SetNull)
+  id         String            @id @default(cuid())
+  runId      String
+  nodeRunId  String?
+  sequence   Int
+  eventType  WorkflowEventType
+  payload    Json
+  occurredAt DateTime
+  createdAt  DateTime          @default(now())
+  run        WorkflowRun       @relation(fields: [runId], references: [id], onDelete: Cascade)
+  nodeRun    WorkflowNodeRun?  @relation(fields: [nodeRunId], references: [id], onDelete: SetNull)
 
-    @@unique([runId, sequence])
-    @@index([runId, occurredAt])
+  @@unique([runId, sequence])
+  @@index([runId, occurredAt])
 }
 
 model AgentToolCall {
-    id                 String      @id @default(cuid())
-    workflowRunId      String
-    skillId            String
-    externalToolCallId String?
-    toolName           String
-    inputSummary       Json?
-    outputSummary      Json?
-    status             String
-    durationMs         Int?
-    errorCode          String?
-    errorMessage       String?
-    createdAt          DateTime    @default(now())
-    updatedAt          DateTime    @updatedAt
+  id                 String   @id @default(cuid())
+  workflowRunId      String
+  skillId            String
+  externalToolCallId String?
+  toolName           String
+  inputSummary       Json?
+  outputSummary      Json?
+  status             String
+  durationMs         Int?
+  errorCode          String?
+  errorMessage       String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-    workflowRun        WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowRun WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
 
-    @@index([workflowRunId, createdAt])
-    @@index([workflowRunId, externalToolCallId])
-    @@index([skillId, createdAt])
+  @@index([workflowRunId, createdAt])
+  @@index([workflowRunId, externalToolCallId])
+  @@index([skillId, createdAt])
 }
 
 model AgentArtifact {
-    id            String      @id @default(cuid())
-    workflowRunId String
-    kind          String
-    title         String
-    contentType   String
-    uri           String?
-    payload       Json?
-    createdAt     DateTime    @default(now())
+  id            String   @id @default(cuid())
+  workflowRunId String
+  kind          String
+  title         String
+  contentType   String
+  uri           String?
+  payload       Json?
+  createdAt     DateTime @default(now())
 
-    workflowRun   WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowRun WorkflowRun @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
 
-    @@index([workflowRunId, createdAt])
-    @@index([kind, createdAt])
+  @@index([workflowRunId, createdAt])
+  @@index([kind, createdAt])
 }
 
 model AgentConversation {
-    id                  String                  @id @default(cuid())
-    userId              String
-    title               String
-    status              AgentConversationStatus @default(ACTIVE)
-    routingMode         AgentConversationRoutingMode @default(AUTO)
-    activeScheduledTaskDraftId String?
-    activeScheduledTaskEditTaskId String?
-    piSessionId         String                  @unique
-    lastMessageAt       DateTime                @default(now())
-    createdAt           DateTime                @default(now())
-    updatedAt           DateTime                @updatedAt
+  id                            String                       @id @default(cuid())
+  userId                        String
+  title                         String
+  status                        AgentConversationStatus      @default(ACTIVE)
+  routingMode                   AgentConversationRoutingMode @default(AUTO)
+  activeScheduledTaskDraftId    String?
+  activeScheduledTaskEditTaskId String?
+  piSessionId                   String                       @unique
+  lastMessageAt                 DateTime                     @default(now())
+  createdAt                     DateTime                     @default(now())
+  updatedAt                     DateTime                     @updatedAt
 
-    user     User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-    messages AgentConversationMessage[]
+  user     User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AgentConversationMessage[]
 
-    @@index([userId, lastMessageAt])
-    @@index([userId, status])
+  @@index([userId, lastMessageAt])
+  @@index([userId, status])
 }
 
 model AgentConversationMessage {
-    id             String                         @id @default(cuid())
-    conversationId String
-    role           AgentConversationMessageRole
-    content        String
-    skillId        String?
-    status         AgentConversationMessageStatus @default(SUCCEEDED)
-    workflowRunId  String?                        @unique
-    sequence       Int
-    metadata       Json?
-    errorCode      String?
-    errorMessage   String?
-    createdAt      DateTime                       @default(now())
-    updatedAt      DateTime                       @updatedAt
+  id             String                         @id @default(cuid())
+  conversationId String
+  role           AgentConversationMessageRole
+  content        String
+  skillId        String?
+  status         AgentConversationMessageStatus @default(SUCCEEDED)
+  workflowRunId  String?                        @unique
+  sequence       Int
+  metadata       Json?
+  errorCode      String?
+  errorMessage   String?
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
 
-    conversation AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-    workflowRun  WorkflowRun?      @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  conversation AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  workflowRun  WorkflowRun?      @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
 
-    @@unique([conversationId, sequence])
-    @@index([conversationId, createdAt])
-    @@index([workflowRunId])
+  @@unique([conversationId, sequence])
+  @@index([conversationId, createdAt])
+  @@index([workflowRunId])
 }

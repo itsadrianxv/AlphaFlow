@@ -16,13 +16,13 @@ import type {
   ImpactTimelineItem,
 } from "~/server/domain/intelligence/impact-mapping";
 import { api } from "~/trpc/react";
+import { useHomePageSnapshot } from "~/app/_components/home-page-snapshot-provider";
 
 void React;
 
 const CACHE_TTL_MS = 60 * 60 * 1_000;
 const RETRY_DELAY_MS = 60 * 1_000;
 const PAGE_SIZE = 3;
-const NEWS_DAYS = 7;
 const MAX_TIMELINE_HISTORY = 5;
 
 type EventAnalysis = {
@@ -600,6 +600,7 @@ function NewsAnalysis({
 }
 
 export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
+  const snapshot = useHomePageSnapshot();
   const utils = api.useUtils();
   const [overviewRunId, setOverviewRunId] = useState<string>();
   const [baseRunId, setBaseRunId] = useState<string>();
@@ -615,10 +616,14 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
   const handledOverviewRunIdRef = useRef<string | undefined>(undefined);
   const requestedAnalysisKeysRef = useRef(new Set<string>());
 
-  const latestQuery = api.workflow.getLatestImpactMapping.useQuery(undefined, {
-    enabled: signedIn,
-    refetchOnWindowFocus: false,
-  });
+  const snapshotResult = asOverviewResult(snapshot.data?.payload.impactMapping);
+  const latestQuery = {
+    data: snapshotResult
+      ? { result: snapshotResult, completedAt: snapshot.data?.generatedAt, id: undefined }
+      : null,
+    isLoading: snapshot.isLoading,
+    refetch: async () => undefined,
+  };
   const overviewRunQuery = api.workflow.getRun.useQuery(
     { runId: overviewRunId ?? "" },
     {
@@ -706,13 +711,7 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
       return () => window.clearTimeout(timeout);
     }
     if (retryNotBeforeRef.current > Date.now()) return;
-    startOverviewMutation.mutate({
-      mode: "overview",
-      days: NEWS_DAYS,
-      traceMaxDays: 365,
-      traceMaxEvents: 30,
-      idempotencyKey: `impact-news-overview:${Math.floor(Date.now() / CACHE_TTL_MS)}`,
-    });
+    return;
   }, [
     checkRequestedAt,
     latestQuery.data,
@@ -774,9 +773,11 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
 
   const requestAnalyses = useCallback(
     async (eventIds: string[], force = false) => {
-      if (!baseRunId || eventIds.length === 0) return;
+      const baseSnapshotId = baseRunId ? undefined : snapshot.data?.snapshotId;
+      const sourceId = baseRunId ?? baseSnapshotId;
+      if (!sourceId || eventIds.length === 0) return;
       const uniqueEventIds = [...new Set(eventIds)].slice(0, PAGE_SIZE);
-      const requestKey = `${baseRunId}:${uniqueEventIds.join(",")}`;
+      const requestKey = `${sourceId}:${uniqueEventIds.join(",")}`;
       if (!force && requestedAnalysisKeysRef.current.has(requestKey)) return;
       requestedAnalysisKeysRef.current.add(requestKey);
       setAnalysisStates((current) => {
@@ -789,6 +790,7 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
       try {
         const records = await ensureMutation.mutateAsync({
           baseRunId,
+          baseSnapshotId,
           eventIds: uniqueEventIds,
         });
         setAnalysisStates((current) => {
@@ -824,7 +826,7 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
         });
       }
     },
-    [baseRunId, ensureMutation],
+    [baseRunId, ensureMutation, snapshot.data?.snapshotId],
   );
 
   useEffect(() => {
@@ -836,19 +838,6 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
       .map((item) => item.event.id);
     void requestAnalyses(missing);
   }, [analysisStates, pageEvents, requestAnalyses]);
-
-  useEffect(() => {
-    if (!signedIn) return;
-    const checkWhenVisible = () => {
-      if (document.visibilityState === "visible") {
-        void latestQuery.refetch();
-        setCheckRequestedAt(Date.now());
-      }
-    };
-    document.addEventListener("visibilitychange", checkWhenVisible);
-    return () =>
-      document.removeEventListener("visibilitychange", checkWhenVisible);
-  }, [latestQuery, signedIn]);
 
   if (!signedIn || events.length === 0) return null;
 

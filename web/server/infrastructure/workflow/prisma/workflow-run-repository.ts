@@ -386,6 +386,7 @@ export class PrismaWorkflowRunRepository {
         watchListIds: { type: "array", items: { type: "string" }, maxItems: 5 },
         eventId: { type: "string" },
         baseRunId: { type: "string" },
+        baseSnapshotId: { type: "string" },
         days: { type: "integer", minimum: 1, maximum: 30 },
         traceCursor: { type: "string" },
         traceMaxDays: { type: "integer", minimum: 30, maximum: 365 },

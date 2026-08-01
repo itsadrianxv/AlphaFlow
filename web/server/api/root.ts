@@ -2,6 +2,7 @@ import { agentRuntimeRouter } from "~/server/api/routers/agent-runtime";
 import { companyOverviewRouter } from "~/server/api/routers/company-overview";
 import { evidenceContextRouter } from "~/server/api/routers/evidence-context";
 import { heatmapRouter } from "~/server/api/routers/heatmap";
+import { homepageRouter } from "~/server/api/routers/homepage";
 import { intelligenceRouter } from "~/server/api/routers/intelligence";
 import { marketContextRouter } from "~/server/api/routers/market-context";
 import { collectionRouter } from "~/server/api/routers/collection";
@@ -27,6 +28,7 @@ export const appRouter = createTRPCRouter({
   companyOverview: companyOverviewRouter,
   evidenceContext: evidenceContextRouter,
   heatmap: heatmapRouter,
+  homepage: homepageRouter,
   intelligence: intelligenceRouter,
   marketContext: marketContextRouter,
   mindMap: mindMapRouter,

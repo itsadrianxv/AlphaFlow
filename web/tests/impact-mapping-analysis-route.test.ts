@@ -72,6 +72,27 @@ function callerWithFindFirst(findFirst: ReturnType<typeof vi.fn>) {
   } as never);
 }
 
+function callerWithSnapshot(snapshot: unknown) {
+  return createCaller({
+    db: {
+      user: {
+        findUnique: vi.fn(async () => ({
+          id: "user-1",
+          sessionVersion: 0,
+          status: "ACTIVE",
+        })),
+      },
+      workflowRun: { findFirst: vi.fn() },
+      homePageSnapshot: { findFirst: vi.fn(async () => snapshot) },
+    },
+    session: {
+      user: { id: "user-1", sessionVersion: 0 },
+      expires: "2099-01-01T00:00:00.000Z",
+    },
+    headers: new Headers(),
+  } as never);
+}
+
 describe("ensureImpactMappingAnalyses", () => {
   it("直接复用 overview 内嵌分析", async () => {
     const findFirst = vi.fn(async () => ({
@@ -89,6 +110,23 @@ describe("ensureImpactMappingAnalyses", () => {
       result: { mode: "trace", selectedEvent: { id: "event-1" } },
     });
     expect(findFirst).toHaveBeenCalledTimes(1);
+  });
+
+  it("允许基于首页快照中的事件复用内嵌分析", async () => {
+    const baseSnapshotId = "cly1234567890123456789012";
+    const result = await callerWithSnapshot({
+      payload: { impactMapping: baseResult(true) },
+    }).ensureImpactMappingAnalyses({
+      baseSnapshotId,
+      eventIds: ["event-1"],
+    });
+
+    expect(result[0]).toMatchObject({
+      eventId: "event-1",
+      status: WorkflowRunStatus.SUCCEEDED,
+      source: "base",
+      result: { selectedEvent: { id: "event-1" } },
+    });
   });
 
   it("复用已完成的事件 trace 运行", async () => {

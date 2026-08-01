@@ -16,6 +16,7 @@ export const impactMappingInputSchema = z
     watchListIds: z.array(z.string().min(1)).max(5).default([]),
     eventId: z.string().min(1).optional(),
     baseRunId: z.string().cuid().optional(),
+    baseSnapshotId: z.string().cuid().optional(),
     days: z.number().int().min(1).max(30).default(7),
     traceCursor: z.string().datetime().optional(),
     traceMaxDays: z.number().int().min(30).max(365).default(365),
@@ -25,11 +26,14 @@ export const impactMappingInputSchema = z
     if (
       value.mode !== "radar" &&
       value.mode !== "overview" &&
-      (!value.eventId || !value.baseRunId)
+      (!value.eventId ||
+        (!value.baseRunId && !value.baseSnapshotId) ||
+        Boolean(value.baseRunId && value.baseSnapshotId))
     ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "deep_dive 和 trace 必须提供 eventId 与 baseRunId",
+        message:
+          "deep_dive 和 trace 必须提供 eventId，并且只能选择 baseRunId 或 baseSnapshotId 之一",
       });
     }
   });

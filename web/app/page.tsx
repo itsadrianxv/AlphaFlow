@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { HighlightToNote } from "~/app/_components/highlight-to-note";
+import { HomePageSnapshotProvider } from "~/app/_components/home-page-snapshot-provider";
 import { ImpactMappingWorkspace } from "~/app/_components/impact-mapping-workspace";
 import { OverviewInsightsPanel } from "~/app/_components/overview-insights-panel";
 import { WorkspaceShell } from "~/app/_components/ui";
@@ -16,17 +17,19 @@ export default async function Home() {
   return (
     <HydrateClient>
       <WorkspaceShell section="home" showHistory={false}>
-        <HighlightToNote floatingToolbar source={{ kind: "overview" }}>
-          <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_18rem]">
-            <div className="min-w-0">
-              <MarketHeatmapClient />
+        <HomePageSnapshotProvider>
+          <HighlightToNote floatingToolbar source={{ kind: "overview" }}>
+            <div className="grid min-h-full xl:grid-cols-[minmax(0,1fr)_18rem]">
+              <div className="min-w-0">
+                <MarketHeatmapClient />
+              </div>
+              <OverviewInsightsPanel />
+              <div className="min-w-0 xl:col-span-2">
+                <ImpactMappingWorkspace signedIn={signedIn} />
+              </div>
             </div>
-            <OverviewInsightsPanel />
-            <div className="min-w-0 xl:col-span-2">
-              <ImpactMappingWorkspace signedIn={signedIn} />
-            </div>
-          </div>
-        </HighlightToNote>
+          </HighlightToNote>
+        </HomePageSnapshotProvider>
         {signedIn ? (
           <div className="pb-[144px]">
             <Suspense fallback={null}>

@@ -2,6 +2,12 @@ import { randomUUID } from "node:crypto";
 import { type Prisma, PrismaClient } from "@prisma/client";
 import Redis from "ioredis";
 import { publishDefinitiveTaskRun } from "../../server/application/scheduled-task/definitive-task-run-stream";
+import { enqueueHomePageTask } from "../../server/application/homepage/home-page-snapshot-service";
+import { publishHomePageGenerationTask } from "../../server/application/homepage/home-page-task-stream";
+import {
+  homePageDueDateCandidates,
+  shanghaiClock,
+} from "../../server/application/homepage/home-page-schedule";
 import { submitScheduledTaskExecution } from "../../server/application/scheduled-task/scheduled-task-execution-service";
 import {
   scheduledTaskDeliverySpecSchema,
@@ -584,6 +590,59 @@ async function recoverDatabaseEvents() {
   }
 }
 
+async function scheduleHomePageDefault() {
+  const snapshot = await db.homePageSnapshot.findFirst({
+    where: { scope: "DEFAULT" },
+    orderBy: { generatedAt: "desc" },
+    select: { id: true },
+  });
+  const clock = shanghaiClock();
+  if (!snapshot) {
+    await enqueueHomePageTask(db, {
+      scope: "DEFAULT",
+      triggerReason: "BOOTSTRAP",
+      targetTradeDate: clock.date,
+    });
+    return;
+  }
+  let targetTradeDate: string | undefined;
+  for (const candidate of homePageDueDateCandidates()) {
+    if (await isTradingDay(candidate.replaceAll("-", ""), "SSE")) {
+      targetTradeDate = candidate;
+      break;
+    }
+  }
+  if (!targetTradeDate) return;
+  await enqueueHomePageTask(db, {
+    scope: "DEFAULT",
+    triggerReason: "DEFAULT_DAILY",
+    targetTradeDate,
+  });
+}
+
+async function recoverHomePageTaskEvents() {
+  const tasks = await db.homePageGenerationTask.findMany({
+    where: {
+      status: { in: ["PENDING", "RETRY_WAIT"] },
+      eventPublishedAt: null,
+      OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }],
+    },
+    orderBy: { createdAt: "asc" },
+    take: batchSize,
+  });
+  for (const task of tasks) {
+    try {
+      const published = await publishHomePageGenerationTask(task.id, commands);
+      await db.homePageGenerationTask.updateMany({
+        where: { id: task.id, eventPublishedAt: null },
+        data: { eventPublishedAt: new Date(published.createdAt) },
+      });
+    } catch (error) {
+      console.error("[scheduler] homepage event publish failed", error);
+    }
+  }
+}
+
 async function main() {
   assertDeliveryTargetSecretsConfigured();
   try {
@@ -600,6 +659,18 @@ async function main() {
         console.error("[scheduler] dispatch failed", error),
       ),
     pollMs,
+  );
+  setInterval(
+    () => void scheduleHomePageDefault().catch((error) =>
+      console.error("[scheduler] homepage schedule failed", error),
+    ),
+    60_000,
+  );
+  setInterval(
+    () => void recoverHomePageTaskEvents().catch((error) =>
+      console.error("[scheduler] homepage event recovery failed", error),
+    ),
+    5_000,
   );
   setInterval(
     () =>
@@ -625,6 +696,8 @@ async function main() {
   void consumeNew();
   void recoverPending();
   void claimAndSubmit();
+  void scheduleHomePageDefault();
+  void recoverHomePageTaskEvents();
 }
 
 void main().catch((error) => {

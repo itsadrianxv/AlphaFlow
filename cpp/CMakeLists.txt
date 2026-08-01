@@ -62,6 +62,7 @@ endfunction()
 
 add_worker(screening-worker screening)
 add_worker(definitive-task-worker definitive_task)
+add_worker(homepage-worker homepage)
 
 if(BUILD_TESTING)
   add_executable(task_runtime_tests libs/task_runtime/tests/runtime_test.cpp)
@@ -74,3 +75,4 @@ endif()
 
 add_subdirectory(workers/screening)
 add_subdirectory(workers/definitive_task)
+add_subdirectory(workers/homepage)

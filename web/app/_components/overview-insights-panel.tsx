@@ -8,16 +8,21 @@ import {
 import { companyOverviewHref } from "~/app/company-research/company-overview-link";
 import { api } from "~/trpc/react";
 import { MoneyFlowPanel } from "~/app/_components/money-flow-panel";
+import { useHomePageSnapshot } from "~/app/_components/home-page-snapshot-provider";
 
 function signed(value: number) {
   return `${value >= 0 ? "+" : ""}${value.toFixed(1)}`;
 }
 
 export function OverviewInsightsPanel() {
-  const query = api.overviewInsights.get.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000,
-  });
+  const snapshot = useHomePageSnapshot();
+  const query = {
+    data: snapshot.data?.payload.overviewInsights as
+      | Awaited<ReturnType<typeof import("~/server/application/overview/sell-side-overview-service").getOverviewInsights>>
+      | undefined,
+    isLoading: snapshot.isLoading,
+    isError: snapshot.isError,
+  };
   if (query.isLoading)
     return (
       <aside className="hidden px-4 py-5 xl:block">

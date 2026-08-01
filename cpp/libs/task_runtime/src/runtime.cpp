@@ -15,14 +15,6 @@
 #include "concurrency/blocking_queue.hpp"
 
 namespace task_runtime {
-namespace {
-int retry_delay(int attempt) {
-  if (attempt <= 1) return 10;
-  if (attempt == 2) return 30;
-  return 90;
-}
-}
-
 class WorkerRuntime::Impl {
  public:
   Impl(RuntimeConfig config, WorkerDefinition definition, std::shared_ptr<messaging::StreamTransport> transport, std::atomic<bool>& stopping)
@@ -111,7 +103,11 @@ class WorkerRuntime::Impl {
     if (stopping_.load()) return;
     try {
       if (error.retryable() && task.attempt < config_.max_attempts && definition_.schedule_retry) {
-        const int delay = retry_delay(task.attempt);
+        const auto index = static_cast<std::size_t>(std::max(0, task.attempt - 1));
+        const int delay = config_.retry_delays_seconds.empty()
+                              ? 10
+                              : config_.retry_delays_seconds[
+                                    std::min(index, config_.retry_delays_seconds.size() - 1)];
         definition_.schedule_retry(task, error, delay);
         if (definition_.republish) {
           std::lock_guard lock(retry_mutex_);

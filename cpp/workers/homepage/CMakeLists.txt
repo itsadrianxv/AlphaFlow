@@ -1,0 +1,3 @@
+add_library(homepage_worker_domain INTERFACE)
+target_include_directories(homepage_worker_domain INTERFACE src)
+target_link_libraries(homepage_worker_domain INTERFACE homepage-worker_core)
