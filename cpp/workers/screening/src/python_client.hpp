@@ -1,6 +1,6 @@
 #pragma once
 
-#include <atomic>
+#include <stop_token>
 #include <string>
 
 #include "config.hpp"
@@ -8,10 +8,10 @@
 
 class PythonClient {
  public:
-  PythonClient(const Config& config, const std::atomic<bool>& stopping)
-      : config_(config), stopping_(stopping) {}
+  explicit PythonClient(const Config& config) : config_(config) {}
 
-  ScreeningExecutionResult execute(const RunTask& task) const;
+  task_lifecycle::ExecutionResult<ScreeningExecutionResult> execute(
+      const ScreeningTask& task, std::stop_token stop_token) const;
   bool health() const;
 
   static ScreeningExecutionResult parse_response(const std::string& body, const std::string& expected_run_id);
@@ -19,5 +19,4 @@ class PythonClient {
 
  private:
   const Config& config_;
-  const std::atomic<bool>& stopping_;
 };

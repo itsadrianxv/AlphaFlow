@@ -16,7 +16,7 @@ size_t append_body(char* data, size_t size, size_t count, void* output) {
 size_t discard_body(char*, size_t size, size_t count, void*) { return size * count; }
 
 int progress_callback(void* state, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
-  return static_cast<const std::atomic<bool>*>(state)->load() ? 1 : 0;
+  return static_cast<const std::stop_token*>(state)->stop_requested() ? 1 : 0;
 }
 
 struct CurlHandle {
@@ -83,10 +83,11 @@ DefinitiveTaskExecutionResult PythonClient::parse_response(const std::string& bo
   }
 }
 
-DefinitiveTaskExecutionResult PythonClient::execute(const RunTask& task) const {
+task_lifecycle::ExecutionResult<DefinitiveTaskExecutionResult> PythonClient::execute(
+    const DefinitiveTask& task, std::stop_token stop_token) const {
   CurlHandle curl;
-  if (!curl.value) throw WorkerError("PYTHON_CONNECTION_ERROR", "无法初始化 libcurl", true);
-  const std::string request = task.config.dump();
+  if (!curl.value) return task_lifecycle::RetryableFailure{{"PYTHON_CONNECTION_ERROR", "无法初始化 libcurl"}};
+  const std::string request = task.input.dump();
   std::string response;
   const std::string url = config_.python_service_url + "/api/v1/definitive-scheduled-tasks/execute";
   curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
@@ -99,15 +100,17 @@ DefinitiveTaskExecutionResult PythonClient::execute(const RunTask& task) const {
   curl_easy_setopt(curl.value, CURLOPT_TIMEOUT_MS, static_cast<long>(config_.python_timeout_ms));
   curl_easy_setopt(curl.value, CURLOPT_CONNECTTIMEOUT_MS, 10000L);
   curl_easy_setopt(curl.value, CURLOPT_XFERINFOFUNCTION, progress_callback);
-  curl_easy_setopt(curl.value, CURLOPT_XFERINFODATA, &stopping_);
+  curl_easy_setopt(curl.value, CURLOPT_XFERINFODATA, &stop_token);
   curl_easy_setopt(curl.value, CURLOPT_NOPROGRESS, 0L);
   const CURLcode code = curl_easy_perform(curl.value);
   long status = 0;
   curl_easy_getinfo(curl.value, CURLINFO_RESPONSE_CODE, &status);
   curl_slist_free_all(headers);
   if (code != CURLE_OK) {
-    if (code == CURLE_ABORTED_BY_CALLBACK && stopping_.load()) throw WorkerError("WORKER_STOPPING", "服务停止导致请求中断", true);
-    throw WorkerError(code == CURLE_OPERATION_TIMEDOUT ? "PYTHON_TIMEOUT" : "PYTHON_CONNECTION_ERROR", curl_easy_strerror(code), true);
+    if (code == CURLE_ABORTED_BY_CALLBACK && stop_token.stop_requested()) return task_lifecycle::Obsolete{};
+    return task_lifecycle::RetryableFailure{{
+        code == CURLE_OPERATION_TIMEDOUT ? "PYTHON_TIMEOUT" : "PYTHON_CONNECTION_ERROR",
+        curl_easy_strerror(code)}};
   }
   if (status < 200 || status >= 300) {
     bool retryable = retryable_http_status(status);
@@ -120,9 +123,17 @@ DefinitiveTaskExecutionResult PythonClient::execute(const RunTask& task) const {
       message = error.value("message", message);
     } catch (...) {
     }
-    throw WorkerError(code_value, message, retryable);
+    task_lifecycle::Failure failure{std::move(code_value), std::move(message)};
+    if (retryable) return task_lifecycle::RetryableFailure{std::move(failure)};
+    return task_lifecycle::TerminalFailure{std::move(failure)};
   }
-  return parse_response(response, task.message.run_id);
+  try {
+    return task_lifecycle::Completed{parse_response(response, task.message.run_id)};
+  } catch (const WorkerError& error) {
+    task_lifecycle::Failure failure{error.code(), error.what()};
+    if (error.retryable()) return task_lifecycle::RetryableFailure{std::move(failure)};
+    return task_lifecycle::TerminalFailure{std::move(failure)};
+  }
 }
 
 bool PythonClient::health() const {

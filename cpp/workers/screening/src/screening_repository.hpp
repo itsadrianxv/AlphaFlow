@@ -1,6 +1,5 @@
 #pragma once
 
-#include <chrono>
 #include <string>
 #include <utility>
 #include <vector>
@@ -12,12 +11,10 @@ class ScreeningRepository {
  public:
   explicit ScreeningRepository(const Config& config) : config_(config) {}
 
-  ClaimResult claim(const StreamMessage& message) const;
-  std::vector<std::pair<std::string, std::int64_t>> heartbeat(
-      const std::vector<std::pair<std::string, std::int64_t>>& leases) const;
-  bool schedule_retry(const RunTask& task, const WorkerError& error, int delay_seconds) const;
-  bool mark_failed(const RunTask& task, const WorkerError& error) const;
-  void commit_result(const RunTask& task, const ScreeningExecutionResult& result) const;
+  ScreeningClaimResult claim(const task_lifecycle::StreamMessage& message) const;
+  std::vector<task_lifecycle::Lease> renew(
+      const std::vector<task_lifecycle::Lease>& leases) const;
+  void settle(const ScreeningTask& task, ScreeningSettlement settlement) const;
   bool ping() const;
 
  private:

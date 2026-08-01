@@ -1,5 +1,9 @@
 #pragma once
 #include <nlohmann/json.hpp>
-#include "task_runtime/types.hpp"
-using StreamMessage=task_runtime::StreamMessage; using RunTask=task_runtime::RunTask; using ClaimStatus=task_runtime::ClaimStatus; using ClaimResult=task_runtime::ClaimResult; using WorkerError=task_runtime::WorkerError;
+#include "task_lifecycle/types.hpp"
+using HomePageInput=nlohmann::json;
+using HomePageTask=task_lifecycle::Task<HomePageInput>;
+using HomePageClaimResult=task_lifecycle::ClaimResult<HomePageInput>;
+using WorkerError=task_lifecycle::ExecutionError;
 struct HomePageGenerationResult { nlohmann::json payload; std::string data_as_of; };
+using HomePageSettlement=task_lifecycle::Settlement<HomePageGenerationResult>;

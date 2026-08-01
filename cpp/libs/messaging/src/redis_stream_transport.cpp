@@ -17,7 +17,8 @@ std::unique_ptr<StreamTransport> RedisStreamTransport::clone() const { return st
 
 void RedisStreamTransport::connect() {
   if (context_) redisFree(context_);
-  context_ = redisConnect(settings_.host.c_str(), settings_.port);
+  const timeval timeout{1, 0};
+  context_ = redisConnectWithTimeout(settings_.host.c_str(), settings_.port, timeout);
   if (!context_ || context_->err) throw std::runtime_error(context_ ? context_->errstr : "无法创建 Redis 连接");
   if (!settings_.password.empty()) {
     auto reply = command("AUTH %s", settings_.password.c_str());
@@ -32,8 +33,20 @@ void RedisStreamTransport::connect() {
 RedisStreamTransport::ReplyPtr RedisStreamTransport::command(const char* format, ...) {
   va_list args;
   va_start(args, format);
+  va_list retry_args;
+  va_copy(retry_args, args);
   auto* raw = static_cast<redisReply*>(redisvCommand(context_, format, args));
   va_end(args);
+  if (!raw) {
+    try {
+      connect();
+      raw = static_cast<redisReply*>(redisvCommand(context_, format, retry_args));
+    } catch (...) {
+      va_end(retry_args);
+      throw;
+    }
+  }
+  va_end(retry_args);
   if (!raw) throw std::runtime_error(context_ ? context_->errstr : "Redis 命令失败");
   return ReplyPtr(raw, &freeReplyObject);
 }
@@ -43,11 +56,11 @@ void RedisStreamTransport::ensure_group() {
   if (reply->type == REDIS_REPLY_ERROR && reply_string(reply.get()).find("BUSYGROUP") == std::string::npos) throw std::runtime_error(reply_string(reply.get()));
 }
 
-task_runtime::StreamMessage RedisStreamTransport::parse_message(const std::string& id, const redisReply& fields) const {
-  if (fields.type != REDIS_REPLY_ARRAY || fields.elements % 2 != 0) throw task_runtime::WorkerError("INVALID_STREAM_MESSAGE", "Stream 消息字段不是键值数组", false);
+StreamMessage RedisStreamTransport::parse_message(const std::string& id, const redisReply& fields) const {
+  if (fields.type != REDIS_REPLY_ARRAY || fields.elements % 2 != 0) throw std::runtime_error("Stream 消息字段不是键值数组");
   std::unordered_map<std::string, std::string> values;
   for (std::size_t i = 0; i < fields.elements; i += 2) values.emplace(reply_string(fields.element[i]), reply_string(fields.element[i + 1]));
-  task_runtime::StreamMessage message;
+  StreamMessage message;
   message.message_id = id;
   if (settings_.screening_protocol) {
     message.event_id = values["eventId"];
@@ -58,24 +71,24 @@ task_runtime::StreamMessage RedisStreamTransport::parse_message(const std::strin
     message.created_at = values["enqueuedAt"];
   }
   message.schema_version = values["schemaVersion"];
-  if (message.schema_version != "1" || message.run_id.empty() || message.created_at.empty() || (settings_.screening_protocol && message.event_id.empty())) throw task_runtime::WorkerError("INVALID_STREAM_MESSAGE", "Stream 消息缺少字段或 schemaVersion 不受支持", false);
+  if (message.schema_version != "1" || message.run_id.empty() || message.created_at.empty() || (settings_.screening_protocol && message.event_id.empty())) throw std::runtime_error("Stream 消息缺少字段或 schemaVersion 不受支持");
   return message;
 }
 
-std::vector<task_runtime::StreamMessage> RedisStreamTransport::parse_entries(const redisReply& entries) {
-  std::vector<task_runtime::StreamMessage> result;
+std::vector<StreamMessage> RedisStreamTransport::parse_entries(const redisReply& entries) {
+  std::vector<StreamMessage> result;
   if (entries.type != REDIS_REPLY_ARRAY) return result;
   for (std::size_t i = 0; i < entries.elements; ++i) {
     const auto* entry = entries.element[i];
     if (!entry || entry->type != REDIS_REPLY_ARRAY || entry->elements != 2) continue;
     const auto id = reply_string(entry->element[0]);
     try { result.push_back(parse_message(id, *entry->element[1])); }
-    catch (const task_runtime::WorkerError& error) { std::cerr << "丢弃非法 Stream 消息 " << id << ": " << error.what() << '\n'; ack_delete(id); }
+    catch (const std::runtime_error& error) { std::cerr << "丢弃非法 Stream 消息 " << id << ": " << error.what() << '\n'; ack_delete(id); }
   }
   return result;
 }
 
-std::vector<task_runtime::StreamMessage> RedisStreamTransport::read(std::size_t count) {
+std::vector<StreamMessage> RedisStreamTransport::read(std::size_t count) {
   auto reply = command("XREADGROUP GROUP %s %s COUNT %d BLOCK %d STREAMS %s >", settings_.group.c_str(), settings_.consumer.c_str(), static_cast<int>(count), settings_.block_ms, settings_.stream.c_str());
   if (reply->type == REDIS_REPLY_NIL) return {};
   if (reply->type == REDIS_REPLY_ERROR) throw std::runtime_error(reply_string(reply.get()));
@@ -85,7 +98,7 @@ std::vector<task_runtime::StreamMessage> RedisStreamTransport::read(std::size_t 
   return parse_entries(*stream->element[1]);
 }
 
-std::vector<task_runtime::StreamMessage> RedisStreamTransport::auto_claim(std::size_t count) {
+std::vector<StreamMessage> RedisStreamTransport::auto_claim(std::size_t count) {
   auto reply = command("XAUTOCLAIM %s %s %s %d %s COUNT %d", settings_.stream.c_str(), settings_.group.c_str(), settings_.consumer.c_str(), settings_.claim_idle_ms, claim_cursor_.c_str(), static_cast<int>(count));
   if (reply->type == REDIS_REPLY_ERROR) throw std::runtime_error(reply_string(reply.get()));
   if (reply->type != REDIS_REPLY_ARRAY || reply->elements < 2) return {};
@@ -93,7 +106,7 @@ std::vector<task_runtime::StreamMessage> RedisStreamTransport::auto_claim(std::s
   return parse_entries(*reply->element[1]);
 }
 
-std::string RedisStreamTransport::publish(const task_runtime::StreamMessage& message) {
+std::string RedisStreamTransport::publish(const StreamMessage& message) {
   ReplyPtr reply(nullptr, &freeReplyObject);
   if (settings_.screening_protocol) reply = command("XADD %s * schemaVersion %s eventId %s runId %s createdAt %s", settings_.stream.c_str(), message.schema_version.c_str(), message.event_id.c_str(), message.run_id.c_str(), message.created_at.c_str());
   else reply = command("XADD %s * schemaVersion %s executionId %s enqueuedAt %s", settings_.stream.c_str(), message.schema_version.c_str(), message.run_id.c_str(), message.created_at.c_str());

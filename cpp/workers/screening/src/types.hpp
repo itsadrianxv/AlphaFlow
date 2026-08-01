@@ -1,18 +1,15 @@
 #pragma once
 
-#include <chrono>
 #include <string>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
-#include "task_runtime/types.hpp"
+#include "task_lifecycle/types.hpp"
 
-using StreamMessage = task_runtime::StreamMessage;
-using RunTask = task_runtime::RunTask;
-using ClaimStatus = task_runtime::ClaimStatus;
-using ClaimResult = task_runtime::ClaimResult;
-using WorkerError = task_runtime::WorkerError;
+using ScreeningInput = nlohmann::json;
+using ScreeningTask = task_lifecycle::Task<ScreeningInput>;
+using ScreeningClaimResult = task_lifecycle::ClaimResult<ScreeningInput>;
 
 struct ScreeningResultRow {
   std::string stock_code;
@@ -29,7 +26,4 @@ struct ScreeningExecutionResult {
   nlohmann::json diagnostics = nlohmann::json::object();
 };
 
-struct RetryTask {
-  StreamMessage message;
-  std::chrono::steady_clock::time_point due_at;
-};
+using ScreeningSettlement = task_lifecycle::Settlement<ScreeningExecutionResult>;

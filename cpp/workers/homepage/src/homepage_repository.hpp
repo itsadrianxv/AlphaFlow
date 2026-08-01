@@ -6,11 +6,9 @@
 class HomePageRepository {
  public:
   explicit HomePageRepository(const Config& config):config_(config){}
-  ClaimResult claim(const StreamMessage&) const;
-  std::vector<std::pair<std::string,std::int64_t>> heartbeat(const std::vector<std::pair<std::string,std::int64_t>>&) const;
-  bool schedule_retry(const RunTask&,const WorkerError&,int) const;
-  bool mark_failed(const RunTask&,const WorkerError&) const;
-  void commit_result(const RunTask&,const HomePageGenerationResult&) const;
+  HomePageClaimResult claim(const task_lifecycle::StreamMessage&) const;
+  std::vector<task_lifecycle::Lease> renew(const std::vector<task_lifecycle::Lease>&) const;
+  void settle(const HomePageTask&,HomePageSettlement) const;
   bool ping() const;
  private: const Config& config_;
 };

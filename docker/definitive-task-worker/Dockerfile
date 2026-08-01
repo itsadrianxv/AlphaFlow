@@ -19,8 +19,8 @@ RUN set -eux; \
 WORKDIR /src
 COPY cpp/ ./cpp/
 RUN cmake -S cpp -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
-  && cmake --build build --target definitive-task-worker task_runtime_tests concurrency_tests \
-  && ctest --test-dir build -R 'WorkerRuntimeTest' --output-on-failure \
+  && cmake --build build --target definitive-task-worker definitive-task-worker_tests definitive_task_repository_contract_tests task_lifecycle_tests concurrency_tests \
+  && ctest --test-dir build -R '(PythonResponseTest|DefinitiveTaskRepositoryContractTest|TaskLifecycleWorkerTest)' --output-on-failure \
   && ./build/concurrency_tests
 
 FROM debian:bookworm-slim AS runtime

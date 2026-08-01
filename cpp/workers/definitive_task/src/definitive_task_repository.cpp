@@ -12,7 +12,7 @@ bool terminal_status(const std::string& status) {
 }
 }  // namespace
 
-ClaimResult DefinitiveTaskRepository::claim(const StreamMessage& message) const {
+DefinitiveTaskClaimResult DefinitiveTaskRepository::claim(const task_lifecycle::StreamMessage& message) const {
   pqxx::connection connection(config_.database_url);
   pqxx::work transaction(connection);
   const auto rows = transaction.exec_params(
@@ -45,76 +45,63 @@ ClaimResult DefinitiveTaskRepository::claim(const StreamMessage& message) const 
       )SQL",
       message.run_id, config_.worker_id, config_.lease_seconds);
   if (!rows.empty()) {
-    RunTask task{message, rows[0][1].as<std::int64_t>(), rows[0][2].as<int>(),
-                 nlohmann::json::parse(rows[0][0].as<std::string>())};
+    DefinitiveTask task{message, rows[0][1].as<std::int64_t>(), rows[0][2].as<int>(),
+                        nlohmann::json::parse(rows[0][0].as<std::string>())};
     transaction.commit();
-    return {ClaimStatus::claimed, std::move(task)};
+    return DefinitiveTaskClaimResult::claimed(std::move(task));
   }
   const auto state = transaction.exec_params(R"SQL(SELECT status::text FROM "ScheduledTaskExecution" WHERE id = $1)SQL", message.run_id);
   transaction.commit();
-  if (state.empty()) return {ClaimStatus::missing, {}};
-  return {terminal_status(state[0][0].as<std::string>()) ? ClaimStatus::terminal : ClaimStatus::busy, {}};
+  if (state.empty() || terminal_status(state[0][0].as<std::string>())) return DefinitiveTaskClaimResult::discard();
+  return DefinitiveTaskClaimResult::defer();
 }
 
-std::vector<std::pair<std::string, std::int64_t>> DefinitiveTaskRepository::heartbeat(
-    const std::vector<std::pair<std::string, std::int64_t>>& leases) const {
-  std::vector<std::pair<std::string, std::int64_t>> renewed;
+std::vector<task_lifecycle::Lease> DefinitiveTaskRepository::renew(
+    const std::vector<task_lifecycle::Lease>& leases) const {
+  std::vector<task_lifecycle::Lease> renewed;
   if (leases.empty()) return renewed;
   pqxx::connection connection(config_.database_url);
   pqxx::work transaction(connection);
-  for (const auto& [run_id, token] : leases) {
+  for (const auto& lease : leases) {
     const auto result = transaction.exec_params(
         R"SQL(UPDATE "ScheduledTaskExecution" SET "heartbeatAt"=NOW(), "leaseExpiresAt"=NOW()+($3*INTERVAL '1 second'), "updatedAt"=NOW()
                WHERE id=$1 AND "fencingToken"=$2 AND status='RUNNING')SQL",
-        run_id, token, config_.lease_seconds);
-    if (result.affected_rows() == 1) renewed.emplace_back(run_id, token);
+        lease.task_id, lease.fencing_token, config_.lease_seconds);
+    if (result.affected_rows() == 1) renewed.push_back(lease);
   }
   transaction.commit();
   return renewed;
 }
 
-bool DefinitiveTaskRepository::schedule_retry(const RunTask& task, const WorkerError& error, int delay_seconds) const {
+void DefinitiveTaskRepository::settle(const DefinitiveTask& task, DefinitiveTaskSettlement settlement) const {
   pqxx::connection connection(config_.database_url);
   pqxx::work transaction(connection);
-  const auto result = transaction.exec_params(
-      R"SQL(UPDATE "ScheduledTaskExecution" SET status='RETRYING', "nextAttemptAt"=NOW()+($5*INTERVAL '1 second'),
-             error=jsonb_build_object('code',$3::text,'message',$4::text,'retryable',true), "workerId"=NULL, "leaseExpiresAt"=NULL, "updatedAt"=NOW()
-             WHERE id=$1 AND "fencingToken"=$2 AND status='RUNNING')SQL",
-      task.message.run_id, task.fencing_token, error.code(), error.what(), delay_seconds);
-  transaction.commit();
-  return result.affected_rows() == 1;
-}
-
-bool DefinitiveTaskRepository::mark_submitted(const std::string& execution_id) const {
-  pqxx::connection connection(config_.database_url);
-  pqxx::work transaction(connection);
-  const auto result = transaction.exec_params(
-      R"SQL(UPDATE "ScheduledTaskExecution" SET status='SUBMITTED', "updatedAt"=NOW()
-             WHERE id=$1 AND status='RETRYING')SQL",
-      execution_id);
-  transaction.commit();
-  return result.affected_rows() == 1;
-}
-
-bool DefinitiveTaskRepository::mark_failed(const RunTask& task, const WorkerError& error) const {
-  pqxx::connection connection(config_.database_url);
-  pqxx::work transaction(connection);
-  const auto result = transaction.exec_params(
-      R"SQL(UPDATE "ScheduledTaskExecution" SET status='FAILED', error=jsonb_build_object('code',$3::text,'message',$4::text,'retryable',false),
-             "workerId"=NULL, "leaseExpiresAt"=NULL, "completedAt"=NOW(), "updatedAt"=NOW()
-             WHERE id=$1 AND "fencingToken"=$2 AND status='RUNNING')SQL",
-      task.message.run_id, task.fencing_token, error.code(), error.what());
-  transaction.commit();
-  return result.affected_rows() == 1;
-}
-
-void DefinitiveTaskRepository::commit_result(const RunTask& task, const DefinitiveTaskExecutionResult& result) const {
-  pqxx::connection connection(config_.database_url);
-  pqxx::work transaction(connection);
+  if (settlement.disposition == task_lifecycle::SettlementDisposition::retry) {
+    const auto& failure = *settlement.failure;
+    const auto updated = transaction.exec_params(
+        R"SQL(UPDATE "ScheduledTaskExecution" SET status='RETRYING', "nextAttemptAt"=NOW()+($5*INTERVAL '1 second'), error=jsonb_build_object('code',$3::text,'message',$4::text,'retryable',true), "workerId"=NULL, "leaseExpiresAt"=NULL, "updatedAt"=NOW() WHERE id=$1 AND "fencingToken"=$2 AND status='RUNNING')SQL",
+        task.message.run_id, task.fencing_token, failure.code, failure.message,
+        settlement.retry_delay.count());
+    if (updated.affected_rows() != 1) throw task_lifecycle::LeaseLost("写入重试状态时 lease 已失效");
+    transaction.commit();
+    return;
+  }
+  if (settlement.disposition != task_lifecycle::SettlementDisposition::completed) {
+    const auto failure = settlement.failure.value_or(task_lifecycle::Failure{"TASK_OBSOLETE", "任务已过期"});
+    const auto updated = transaction.exec_params(
+        R"SQL(UPDATE "ScheduledTaskExecution" SET status=$3::"ScheduledTaskExecutionStatus", error=jsonb_build_object('code',$4::text,'message',$5::text,'retryable',false), "workerId"=NULL, "leaseExpiresAt"=NULL, "completedAt"=NOW(), "updatedAt"=NOW() WHERE id=$1 AND "fencingToken"=$2 AND status='RUNNING')SQL",
+        task.message.run_id, task.fencing_token,
+        settlement.disposition == task_lifecycle::SettlementDisposition::obsolete ? "CANCELLED" : "FAILED",
+        failure.code, failure.message);
+    if (updated.affected_rows() != 1) throw task_lifecycle::LeaseLost("写入终态时 lease 已失效");
+    transaction.commit();
+    return;
+  }
+  const auto& result = *settlement.result;
   const auto locked = transaction.exec_params(
       R"SQL(SELECT id FROM "ScheduledTaskExecution" WHERE id=$1 AND "fencingToken"=$2 AND status='RUNNING' FOR UPDATE)SQL",
       task.message.run_id, task.fencing_token);
-  if (locked.empty()) throw WorkerError("LEASE_LOST", "提交结果前 lease 已失效", true);
+  if (locked.empty()) throw task_lifecycle::LeaseLost("提交结果前 lease 已失效");
 
   transaction.exec(R"SQL(CREATE TEMP TABLE definitive_result_stage (
     stock_code TEXT NOT NULL, stock_name TEXT NOT NULL, rank INTEGER NOT NULL,
@@ -159,7 +146,7 @@ void DefinitiveTaskRepository::commit_result(const RunTask& task, const Definiti
              "workerId"=NULL, "leaseExpiresAt"=NULL, "nextAttemptAt"=NULL, "completedAt"=NOW(), "updatedAt"=NOW()
              WHERE id=$1 AND "fencingToken"=$2 AND status='RUNNING')SQL",
       task.message.run_id, task.fencing_token, summary.dump());
-  if (updated.affected_rows() != 1) throw WorkerError("LEASE_LOST", "提交终态时 lease 已失效", true);
+  if (updated.affected_rows() != 1) throw task_lifecycle::LeaseLost("提交终态时 lease 已失效");
   transaction.commit();
 }
 

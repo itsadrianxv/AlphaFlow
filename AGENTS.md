@@ -27,3 +27,17 @@
 ## 部署到 ECS 服务器
 - 本项目部署到阿里云 ECS 服务器，但是仍未开放给广大用户使用
 - 部署到 ECS 服务器的脚本位于 temp\阿里云服务器\deploy-to-ecs.ps1
+
+## Agent skills
+
+### Issue tracker
+
+项目规格与问题使用 GitHub Issues 管理。详见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+项目使用默认的五类 triage 标签词汇。详见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+项目采用单一上下文：根目录 `CONTEXT.md` 与 `docs/adr/`。详见 `docs/agents/domain.md`。

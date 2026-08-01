@@ -122,11 +122,22 @@ publish http-400-event run-http-400
 wait_status run-http-400 FAILED 10
 [ "$($compose exec -T postgres-test psql -U postgres -d screening_worker_test -Atc "SELECT attempts FROM \"ScreeningRun\" WHERE id='run-http-400'")" = "1" ]
 
-# 首次请求超时，替代消息在退避后成功。
+# 首次请求超时，原消息保留在 PEL 并在数据库退避到期后成功。
 insert_run run-timeout '{"mockDelaySequenceMs":[6000,0]}'
 publish timeout-event run-timeout
 wait_status run-timeout SUCCEEDED 30
 [ "$($compose exec -T postgres-test psql -U postgres -d screening_worker_test -Atc "SELECT attempts FROM \"ScreeningRun\" WHERE id='run-timeout'")" = "2" ]
+
+# retry 期间不发布替代消息，原消息始终留在 PEL。
+insert_run run-pel-retry '{"mockStatusSequence":[500,200]}'
+publish pel-retry-event run-pel-retry
+wait_status run-pel-retry RETRYING 10
+[ "$($compose exec -T redis-test redis-cli XLEN screening:runs)" = "1" ]
+pending=$($compose exec -T redis-test redis-cli XPENDING screening:runs screening-worker | awk 'NR==1 {print $1}')
+[ "$pending" = "1" ]
+sleep 3
+[ "$(status_of run-pel-retry)" = "RETRYING" ]
+wait_status run-pel-retry SUCCEEDED 25
 
 # Redis 在事务提交后不可用：结果已经完整提交，重启后终态消息只做 ACK/XDEL。
 insert_run run-ack-recovery '{"delayMs":3000}'

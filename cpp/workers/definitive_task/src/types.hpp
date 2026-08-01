@@ -1,18 +1,16 @@
 ﻿#pragma once
 
-#include <chrono>
 #include <string>
 #include <vector>
 
 #include <nlohmann/json.hpp>
 
-#include "task_runtime/types.hpp"
+#include "task_lifecycle/types.hpp"
 
-using StreamMessage = task_runtime::StreamMessage;
-using RunTask = task_runtime::RunTask;
-using ClaimStatus = task_runtime::ClaimStatus;
-using ClaimResult = task_runtime::ClaimResult;
-using WorkerError = task_runtime::WorkerError;
+using DefinitiveTaskInput = nlohmann::json;
+using DefinitiveTask = task_lifecycle::Task<DefinitiveTaskInput>;
+using DefinitiveTaskClaimResult = task_lifecycle::ClaimResult<DefinitiveTaskInput>;
+using WorkerError = task_lifecycle::ExecutionError;
 
 struct DefinitiveTaskResultRow {
   std::string stock_code;
@@ -38,7 +36,4 @@ struct DefinitiveTaskExecutionResult {
   nlohmann::json diagnostics = nlohmann::json::object();
 };
 
-struct RetryTask {
-  StreamMessage message;
-  std::chrono::steady_clock::time_point due_at;
-};
+using DefinitiveTaskSettlement = task_lifecycle::Settlement<DefinitiveTaskExecutionResult>;

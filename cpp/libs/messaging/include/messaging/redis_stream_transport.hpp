@@ -34,9 +34,9 @@ class RedisStreamTransport final : public StreamTransport {
 
   std::unique_ptr<StreamTransport> clone() const override;
   void ensure_group() override;
-  std::vector<task_runtime::StreamMessage> read(std::size_t count) override;
-  std::vector<task_runtime::StreamMessage> auto_claim(std::size_t count) override;
-  std::string publish(const task_runtime::StreamMessage& message) override;
+  std::vector<StreamMessage> read(std::size_t count) override;
+  std::vector<StreamMessage> auto_claim(std::size_t count) override;
+  std::string publish(const StreamMessage& message) override;
   void ack_delete(std::string_view message_id) override;
   bool ping() override;
 
@@ -44,9 +44,9 @@ class RedisStreamTransport final : public StreamTransport {
   using ReplyPtr = std::unique_ptr<redisReply, decltype(&freeReplyObject)>;
   void connect();
   ReplyPtr command(const char* format, ...);
-  std::vector<task_runtime::StreamMessage> parse_entries(const redisReply& entries);
+  std::vector<StreamMessage> parse_entries(const redisReply& entries);
   static std::string reply_string(const redisReply* reply);
-  task_runtime::StreamMessage parse_message(const std::string& id, const redisReply& fields) const;
+  StreamMessage parse_message(const std::string& id, const redisReply& fields) const;
 
   RedisStreamSettings settings_;
   redisContext* context_{nullptr};

@@ -16,7 +16,7 @@ size_t append_body(char* data, size_t size, size_t count, void* output) {
 size_t discard_body(char*, size_t size, size_t count, void*) { return size * count; }
 
 int progress_callback(void* state, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
-  return static_cast<const std::atomic<bool>*>(state)->load() ? 1 : 0;
+  return static_cast<const std::stop_token*>(state)->stop_requested() ? 1 : 0;
 }
 
 struct CurlHandle {
@@ -34,7 +34,7 @@ ScreeningExecutionResult PythonClient::parse_response(const std::string& body, c
   try {
     payload = nlohmann::json::parse(body);
   } catch (const std::exception& error) {
-    throw WorkerError("INVALID_PYTHON_JSON", error.what(), false);
+    throw task_lifecycle::ExecutionError("INVALID_PYTHON_JSON", error.what(), false);
   }
   try {
     ScreeningExecutionResult result;
@@ -64,17 +64,18 @@ ScreeningExecutionResult PythonClient::parse_response(const std::string& body, c
       if (!ranks.contains(rank)) throw std::runtime_error("rank 必须从 1 连续递增");
     }
     return result;
-  } catch (const WorkerError&) {
+  } catch (const task_lifecycle::ExecutionError&) {
     throw;
   } catch (const std::exception& error) {
-    throw WorkerError("INVALID_PYTHON_RESPONSE", error.what(), false);
+    throw task_lifecycle::ExecutionError("INVALID_PYTHON_RESPONSE", error.what(), false);
   }
 }
 
-ScreeningExecutionResult PythonClient::execute(const RunTask& task) const {
+task_lifecycle::ExecutionResult<ScreeningExecutionResult> PythonClient::execute(
+    const ScreeningTask& task, std::stop_token stop_token) const {
   CurlHandle curl;
-  if (!curl.value) throw WorkerError("PYTHON_CONNECTION_ERROR", "无法初始化 libcurl", true);
-  const std::string request = nlohmann::json{{"runId", task.message.run_id}, {"config", task.config}}.dump();
+  if (!curl.value) return task_lifecycle::RetryableFailure{{"PYTHON_CONNECTION_ERROR", "无法初始化 libcurl"}};
+  const std::string request = nlohmann::json{{"runId", task.message.run_id}, {"config", task.input}}.dump();
   std::string response;
   const std::string url = config_.python_service_url + "/api/v1/screening/execute-run";
   curl_slist* headers = curl_slist_append(nullptr, "Content-Type: application/json");
@@ -87,20 +88,32 @@ ScreeningExecutionResult PythonClient::execute(const RunTask& task) const {
   curl_easy_setopt(curl.value, CURLOPT_TIMEOUT_MS, static_cast<long>(config_.python_timeout_ms));
   curl_easy_setopt(curl.value, CURLOPT_CONNECTTIMEOUT_MS, 10000L);
   curl_easy_setopt(curl.value, CURLOPT_XFERINFOFUNCTION, progress_callback);
-  curl_easy_setopt(curl.value, CURLOPT_XFERINFODATA, &stopping_);
+  curl_easy_setopt(curl.value, CURLOPT_XFERINFODATA, &stop_token);
   curl_easy_setopt(curl.value, CURLOPT_NOPROGRESS, 0L);
   const CURLcode code = curl_easy_perform(curl.value);
   long status = 0;
   curl_easy_getinfo(curl.value, CURLINFO_RESPONSE_CODE, &status);
   curl_slist_free_all(headers);
   if (code != CURLE_OK) {
-    if (code == CURLE_ABORTED_BY_CALLBACK && stopping_.load()) throw WorkerError("WORKER_STOPPING", "服务停止导致请求中断", true);
-    throw WorkerError(code == CURLE_OPERATION_TIMEDOUT ? "PYTHON_TIMEOUT" : "PYTHON_CONNECTION_ERROR", curl_easy_strerror(code), true);
+    if (code == CURLE_ABORTED_BY_CALLBACK && stop_token.stop_requested()) {
+      return task_lifecycle::Obsolete{};
+    }
+    return task_lifecycle::RetryableFailure{{
+        code == CURLE_OPERATION_TIMEDOUT ? "PYTHON_TIMEOUT" : "PYTHON_CONNECTION_ERROR",
+        curl_easy_strerror(code)}};
   }
   if (status < 200 || status >= 300) {
-    throw WorkerError("PYTHON_HTTP_" + std::to_string(status), response, retryable_http_status(status));
+    task_lifecycle::Failure failure{"PYTHON_HTTP_" + std::to_string(status), response};
+    if (retryable_http_status(status)) return task_lifecycle::RetryableFailure{std::move(failure)};
+    return task_lifecycle::TerminalFailure{std::move(failure)};
   }
-  return parse_response(response, task.message.run_id);
+  try {
+    return task_lifecycle::Completed{parse_response(response, task.message.run_id)};
+  } catch (const task_lifecycle::ExecutionError& error) {
+    task_lifecycle::Failure failure{error.code(), error.what()};
+    if (error.retryable()) return task_lifecycle::RetryableFailure{std::move(failure)};
+    return task_lifecycle::TerminalFailure{std::move(failure)};
+  }
 }
 
 bool PythonClient::health() const {

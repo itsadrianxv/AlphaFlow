@@ -13,7 +13,7 @@ TEST(PythonResponseTest, 拒绝重复股票和断裂排名) {
   EXPECT_THROW(PythonClient::parse_response(
                    R"({"runId":"run-1","status":"SUCCEEDED","universeCount":2,"totalCount":2,"results":[{"stockCode":"000001","rank":1},{"stockCode":"000001","rank":3}],"warnings":[],"diagnostics":{}})",
                    "run-1"),
-               WorkerError);
+               task_lifecycle::ExecutionError);
 }
 
 TEST(PythonResponseTest, HTTP重试分类符合协议) {

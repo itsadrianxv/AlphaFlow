@@ -69,7 +69,7 @@ $compose exec -T redis-test redis-cli XADD definitive-task:runs '*' schemaVersio
 sleep 2
 [ "$($compose exec -T redis-test redis-cli XPENDING definitive-task:runs definitive-task-worker | head -n 1)" = "0" ]
 
-# 500 进入内存重试，替代消息成功后原消息才 ACK/XDEL。
+# 500 写入数据库到期时间，原 PEL 消息到期后恢复，不发布替代消息或回写 SUBMITTED。
 insert_execution execution-retry '{"schemaVersion":1,"type":"deterministic_scoring","mockStatusSequence":[500,200]}'
 publish execution-retry
 wait_status execution-retry SUCCEEDED 25
