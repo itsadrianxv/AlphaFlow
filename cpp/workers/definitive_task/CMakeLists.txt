@@ -1,0 +1,3 @@
+add_library(definitive_task_worker_domain INTERFACE)
+target_include_directories(definitive_task_worker_domain INTERFACE src)
+target_link_libraries(definitive_task_worker_domain INTERFACE definitive-task-worker_core)

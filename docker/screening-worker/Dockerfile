@@ -17,9 +17,10 @@ RUN set -eux; \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-COPY screening_worker/ ./
-RUN cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
-  && cmake --build build --target screening-worker
+COPY cpp/ ./cpp/
+RUN cmake -S cpp -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
+  && cmake --build build --target screening-worker screening-worker_tests \
+  && ctest --test-dir build -R '(ConfigTest|PythonResponseTest)' --output-on-failure
 
 FROM debian:bookworm-slim AS runtime
 

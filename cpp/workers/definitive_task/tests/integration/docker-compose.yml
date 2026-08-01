@@ -1,0 +1,67 @@
+﻿services:
+  postgres-test:
+    image: postgres:16
+    profiles: ["definitive-task-worker-test"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: definitive_task_worker_test
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d definitive_task_worker_test"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+
+  redis-test:
+    image: redis:7-alpine
+    profiles: ["definitive-task-worker-test"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+
+  mock-python:
+    image: python:3.12-alpine
+    profiles: ["definitive-task-worker-test"]
+    volumes:
+      - ./mock_python.py:/app/mock_python.py:ro
+    command: ["python", "/app/mock_python.py"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8000/health"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+
+  worker-test:
+    profiles: ["definitive-task-worker-test"]
+    build:
+      context: ../../../../..
+      dockerfile: docker/definitive-task-worker/Dockerfile
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+      mock-python:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres-test:5432/definitive_task_worker_test
+      REDIS_URL: redis://redis-test:6379
+      PYTHON_SERVICE_URL: http://mock-python:8000
+      DEFINITIVE_TASK_WORKER_THREADS: 2
+      DEFINITIVE_TASK_WORKER_QUEUE_CAPACITY: 2
+      DEFINITIVE_TASK_WORKER_LEASE_SECONDS: 4
+      DEFINITIVE_TASK_WORKER_HEARTBEAT_SECONDS: 1
+      DEFINITIVE_TASK_WORKER_CLAIM_IDLE_MS: 1000
+      DEFINITIVE_TASK_WORKER_PYTHON_TIMEOUT_MS: 5000
+      DEFINITIVE_TASK_WORKER_HEALTH_PORT: 8030
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8030/health/ready"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+    stop_grace_period: 40s
+

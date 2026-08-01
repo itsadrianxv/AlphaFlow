@@ -1,0 +1,3 @@
+add_library(screening_worker_domain INTERFACE)
+target_include_directories(screening_worker_domain INTERFACE src)
+target_link_libraries(screening_worker_domain INTERFACE screening-worker_core)

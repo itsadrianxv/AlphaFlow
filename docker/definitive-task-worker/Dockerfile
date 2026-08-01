@@ -17,10 +17,11 @@ RUN set -eux; \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
-COPY definitive_task_worker/ ./
-RUN cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
-  && cmake --build build --target definitive-task-worker definitive-task-worker-tests \
-  && ctest --test-dir build --output-on-failure
+COPY cpp/ ./cpp/
+RUN cmake -S cpp -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
+  && cmake --build build --target definitive-task-worker task_runtime_tests concurrency_tests \
+  && ctest --test-dir build -R 'WorkerRuntimeTest' --output-on-failure \
+  && ./build/concurrency_tests
 
 FROM debian:bookworm-slim AS runtime
 

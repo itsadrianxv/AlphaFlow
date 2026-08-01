@@ -41,7 +41,7 @@ python_services/app/
 └── data_providers/
     └── tushare_provider.py
 
-definitive_task_worker/
+cpp/workers/definitive_task/
 ├── src/                    # Redis、lease、线程池、Python client、结果事务
 └── tests/                  # 队列、重试及响应契约测试
 
