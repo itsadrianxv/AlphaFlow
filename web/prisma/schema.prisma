@@ -163,6 +163,41 @@ model HomePageGenerationTask {
   @@index([userId, createdAt])
 }
 
+enum LlmTaskExecutionStatus {
+  PENDING
+  RUNNING
+  RETRY_WAIT
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+model LlmTaskExecution {
+  id             String                 @id @default(cuid())
+  taskType       String
+  idempotencyKey String                 @unique
+  inputHash      String
+  inputJson      Json                   @default("{}")
+  status         LlmTaskExecutionStatus @default(PENDING)
+  attempts       Int                    @default(0)
+  workerId       String?
+  fencingToken   BigInt                 @default(0)
+  leaseExpiresAt DateTime?
+  heartbeatAt    DateTime?
+  nextAttemptAt  DateTime?
+  eventPublishedAt DateTime?
+  result         Json?
+  error          Json?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseExpiresAt])
+  @@index([eventPublishedAt, status])
+}
+
 enum LoginIdentifierType {
   PHONE
   EMAIL

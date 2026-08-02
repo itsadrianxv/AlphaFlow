@@ -23,6 +23,7 @@ struct RedisStreamSettings {
   int block_ms{5000};
   int claim_idle_ms{120000};
   bool screening_protocol{false};
+  bool llm_protocol{false};
 };
 
 class RedisStreamTransport final : public StreamTransport {

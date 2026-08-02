@@ -1,0 +1,3 @@
+add_library(llm_scheduler_worker_domain INTERFACE)
+target_include_directories(llm_scheduler_worker_domain INTERFACE src)
+target_link_libraries(llm_scheduler_worker_domain INTERFACE llm-scheduler_core)

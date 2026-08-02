@@ -1,0 +1,70 @@
+services:
+  postgres-test:
+    image: postgres:16
+    profiles: ["llm-scheduler-test"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: llm_scheduler_worker_test
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d llm_scheduler_worker_test"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+
+  redis-test:
+    image: redis:7-alpine
+    profiles: ["llm-scheduler-test"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+
+  mock-web:
+    image: python:3.12-alpine
+    profiles: ["llm-scheduler-test"]
+    volumes:
+      - ./mock_web.py:/app/mock_web.py:ro
+    command: ["python", "/app/mock_web.py"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8000/api/health/live"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+
+  worker-test:
+    profiles: ["llm-scheduler-test"]
+    build:
+      context: ../../../../..
+      dockerfile: docker/llm-scheduler/Dockerfile
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+      mock-web:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:password@postgres-test:5432/llm_scheduler_worker_test
+      REDIS_URL: redis://redis-test:6379
+      ALPHAFLOW_WEB_INTERNAL_URL: http://mock-web:8000
+      ALPHAFLOW_INTERNAL_API_SECRET: test-secret
+      LLM_WORKER_THREADS: 2
+      LLM_WORKER_QUEUE_CAPACITY: 2
+      LLM_WORKER_LEASE_SECONDS: 4
+      LLM_WORKER_HEARTBEAT_SECONDS: 1
+      LLM_WORKER_CLAIM_IDLE_MS: 1000
+      LLM_WORKER_REQUEST_TIMEOUT_MS: 5000
+      LLM_WORKER_CONNECT_TIMEOUT_MS: 1000
+      LLM_WORKER_MAX_ATTEMPTS: 2
+      LLM_WORKER_RETRY_DELAYS_SECONDS: 1
+      LLM_WORKER_HEALTH_PORT: 8060
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8060/health/ready"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+    stop_grace_period: 20s

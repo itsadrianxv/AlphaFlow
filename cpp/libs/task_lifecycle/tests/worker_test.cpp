@@ -277,5 +277,94 @@ TEST(TaskLifecycleWorkerTest, RequestsTaskCancellationOnLeaseLossAndStop) {
   }
 }
 
+TEST(TaskLifecycleWorkerTest, NeverExceedsConfiguredConcurrency) {
+  struct Shared {
+    std::mutex mutex;
+    std::deque<StreamMessage> fresh;
+    int settlements{};
+    int active{};
+    int max_active{};
+    std::condition_variable changed;
+  };
+
+  class Transport final : public messaging::StreamTransport {
+   public:
+    explicit Transport(std::shared_ptr<Shared> state) : state_(std::move(state)) {}
+    std::unique_ptr<messaging::StreamTransport> clone() const override {
+      return std::make_unique<Transport>(state_);
+    }
+    void ensure_group() override {}
+    std::vector<StreamMessage> read(std::size_t count) override {
+      std::lock_guard lock(state_->mutex);
+      std::vector<StreamMessage> result;
+      while (result.size() < count && !state_->fresh.empty()) {
+        result.push_back(state_->fresh.front());
+        state_->fresh.pop_front();
+      }
+      return result;
+    }
+    std::vector<StreamMessage> auto_claim(std::size_t) override { return {}; }
+    std::string publish(const StreamMessage&) override { return {}; }
+    void ack_delete(std::string_view) override {}
+    bool ping() override { return true; }
+
+   private:
+    std::shared_ptr<Shared> state_;
+  };
+
+  class Repository {
+   public:
+    explicit Repository(std::shared_ptr<Shared> state) : state_(std::move(state)) {}
+    ClaimResult<std::string> claim(const StreamMessage& message) {
+      return ClaimResult<std::string>::claimed({message, 1, 1, message.run_id});
+    }
+    std::vector<Lease> renew(const std::vector<Lease>& leases) { return leases; }
+    void settle(const Task<std::string>&, Settlement<int>) {
+      std::lock_guard lock(state_->mutex);
+      ++state_->settlements;
+      state_->changed.notify_all();
+    }
+
+   private:
+    std::shared_ptr<Shared> state_;
+  };
+
+  auto state = std::make_shared<Shared>();
+  for (int index = 0; index < 4; ++index) {
+    state->fresh.push_back({std::to_string(index) + "-0", "", "task-" + std::to_string(index), "now", "1"});
+  }
+  WorkerConfig worker_config;
+  worker_config.transport = std::make_shared<Transport>(state);
+  worker_config.worker_threads = 2;
+  worker_config.queue_capacity = 4;
+  worker_config.heartbeat_interval = std::chrono::milliseconds(5);
+  worker_config.recovery_interval = std::chrono::milliseconds(5);
+  worker_config.retry_delays = {std::chrono::seconds(0)};
+
+  auto worker = make_worker<std::string, int>(
+      worker_config, Repository(state), [state](const Task<std::string>&, std::stop_token token) {
+        if (token.stop_requested()) return ExecutionResult<int>{Obsolete{}};
+        {
+          std::lock_guard lock(state->mutex);
+          ++state->active;
+          state->max_active = std::max(state->max_active, state->active);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        {
+          std::lock_guard lock(state->mutex);
+          --state->active;
+        }
+        return ExecutionResult<int>{Completed<int>{1}};
+      });
+  std::thread thread([&] { worker->run(); });
+  ASSERT_TRUE(wait_until([&] {
+    std::lock_guard lock(state->mutex);
+    return state->settlements == 4;
+  }));
+  worker->request_stop();
+  thread.join();
+  EXPECT_EQ(state->max_active, 2);
+}
+
 }  // namespace
 }  // namespace task_lifecycle

@@ -57,6 +57,7 @@ class TypedLifecycleWorker final : public Worker {
         queue_(config_.queue_capacity) {
     if (!config_.transport) throw std::invalid_argument("stream transport is required");
     if (config_.worker_threads == 0) throw std::invalid_argument("worker_threads must be positive");
+    if (config_.queue_capacity == 0) throw std::invalid_argument("queue_capacity must be positive");
     if (config_.max_attempts <= 0) throw std::invalid_argument("max_attempts must be positive");
   }
 
@@ -126,6 +127,11 @@ class TypedLifecycleWorker final : public Worker {
       const Lease lease{claim.task->message.run_id, claim.task->fencing_token};
       {
         std::lock_guard lock(active_mutex_);
+        const auto existing = active_.find(lease.task_id);
+        if (existing != active_.end() && existing->second.fencing_token != lease.fencing_token) {
+          // 同一任务的新 fencing token 代表旧 owner 已失效，尽早请求旧执行退出。
+          existing->second.stop_source->request_stop();
+        }
         active_[lease.task_id] = {lease.fencing_token, source};
       }
       if (!queue_.push({std::move(*claim.task), source})) remove_active(lease);

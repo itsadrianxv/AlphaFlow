@@ -66,12 +66,23 @@ StreamMessage RedisStreamTransport::parse_message(const std::string& id, const r
     message.event_id = values["eventId"];
     message.run_id = values["runId"];
     message.created_at = values["createdAt"];
+  } else if (settings_.llm_protocol) {
+    message.run_id = values["taskId"];
+    message.task_type = values["taskType"];
+    message.idempotency_key = values["idempotencyKey"];
+    message.input_hash = values["inputHash"];
+    message.created_at = values["createdAt"];
   } else {
     message.run_id = values["executionId"];
     message.created_at = values["enqueuedAt"];
   }
   message.schema_version = values["schemaVersion"];
-  if (message.schema_version != "1" || message.run_id.empty() || message.created_at.empty() || (settings_.screening_protocol && message.event_id.empty())) throw std::runtime_error("Stream 消息缺少字段或 schemaVersion 不受支持");
+  if (message.schema_version != "1" || message.run_id.empty() || message.created_at.empty() ||
+      (settings_.screening_protocol && message.event_id.empty()) ||
+      (settings_.llm_protocol &&
+       (message.task_type.empty() || message.idempotency_key.empty() || message.input_hash.empty()))) {
+    throw std::runtime_error("Stream 消息缺少字段或 schemaVersion 不受支持");
+  }
   return message;
 }
 
@@ -109,6 +120,7 @@ std::vector<StreamMessage> RedisStreamTransport::auto_claim(std::size_t count) {
 std::string RedisStreamTransport::publish(const StreamMessage& message) {
   ReplyPtr reply(nullptr, &freeReplyObject);
   if (settings_.screening_protocol) reply = command("XADD %s * schemaVersion %s eventId %s runId %s createdAt %s", settings_.stream.c_str(), message.schema_version.c_str(), message.event_id.c_str(), message.run_id.c_str(), message.created_at.c_str());
+  else if (settings_.llm_protocol) reply = command("XADD %s * schemaVersion %s taskId %s taskType %s idempotencyKey %s inputHash %s createdAt %s", settings_.stream.c_str(), message.schema_version.c_str(), message.run_id.c_str(), message.task_type.c_str(), message.idempotency_key.c_str(), message.input_hash.c_str(), message.created_at.c_str());
   else reply = command("XADD %s * schemaVersion %s executionId %s enqueuedAt %s", settings_.stream.c_str(), message.schema_version.c_str(), message.run_id.c_str(), message.created_at.c_str());
   if (reply->type == REDIS_REPLY_ERROR) throw std::runtime_error(reply_string(reply.get()));
   return reply_string(reply.get());

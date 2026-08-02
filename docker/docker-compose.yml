@@ -302,6 +302,44 @@ services:
       timeout: 5s
       retries: 20
 
+  llm-scheduler:
+    build:
+      context: ..
+      dockerfile: docker/llm-scheduler/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      web:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      ALPHAFLOW_WEB_INTERNAL_URL: http://web:3000
+      ALPHAFLOW_INTERNAL_API_SECRET: ${ALPHAFLOW_INTERNAL_API_SECRET:-dev-internal-secret}
+      LLM_WORKER_THREADS: ${LLM_WORKER_THREADS:-8}
+      LLM_WORKER_QUEUE_CAPACITY: ${LLM_WORKER_QUEUE_CAPACITY:-16}
+      LLM_WORKER_LEASE_SECONDS: ${LLM_WORKER_LEASE_SECONDS:-900}
+      LLM_WORKER_HEARTBEAT_SECONDS: ${LLM_WORKER_HEARTBEAT_SECONDS:-30}
+      LLM_WORKER_CLAIM_IDLE_MS: ${LLM_WORKER_CLAIM_IDLE_MS:-1200000}
+      LLM_WORKER_REQUEST_TIMEOUT_MS: ${LLM_WORKER_REQUEST_TIMEOUT_MS:-900000}
+      LLM_WORKER_CONNECT_TIMEOUT_MS: ${LLM_WORKER_CONNECT_TIMEOUT_MS:-10000}
+      LLM_WORKER_MAX_ATTEMPTS: ${LLM_WORKER_MAX_ATTEMPTS:-5}
+      LLM_WORKER_RETRY_DELAYS_SECONDS: ${LLM_WORKER_RETRY_DELAYS_SECONDS:-30,120,600,1800}
+      LLM_WORKER_HEALTH_PORT: ${LLM_WORKER_HEALTH_PORT:-8060}
+      LLM_TASK_STREAM: ${LLM_TASK_STREAM:-llm:tasks}
+      LLM_TASK_GROUP: ${LLM_TASK_GROUP:-llm-worker}
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8060/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
   web:
     build:
       context: ..
