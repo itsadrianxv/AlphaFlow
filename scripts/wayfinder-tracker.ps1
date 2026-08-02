@@ -51,8 +51,25 @@ function Invoke-Gh {
     }
     elseif ($PSBoundParameters.ContainsKey('Body')) {
         $inputJson = $Body | ConvertTo-Json -Depth $script:JsonDepth -Compress
-        $output = $inputJson | & $script:GhCommand @Arguments 2>&1
-        $exitCode = $LASTEXITCODE
+        $temporaryBodyPath = [System.IO.Path]::GetTempFileName()
+        try {
+            [System.IO.File]::WriteAllText(
+                $temporaryBodyPath,
+                $inputJson,
+                [System.Text.UTF8Encoding]::new($false)
+            )
+            $inputArguments = @($Arguments)
+            $inputIndex = [Array]::IndexOf($inputArguments, '--input')
+            if ($inputIndex -lt 0 -or ($inputIndex + 1) -ge $inputArguments.Count) {
+                throw 'Body requests must include an --input argument.'
+            }
+            $inputArguments[$inputIndex + 1] = $temporaryBodyPath
+            $output = & $script:GhCommand @inputArguments 2>&1
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            Remove-Item -LiteralPath $temporaryBodyPath -Force -ErrorAction SilentlyContinue
+        }
     }
     else {
         $output = & $script:GhCommand @Arguments 2>&1
@@ -116,26 +133,42 @@ function Get-SubIssues {
     param([Parameter(Mandatory = $true)][int]$MapNumber)
 
     $repository = Get-Repository
-    return @(Invoke-GhApi -Method GET -Endpoint "repos/$repository/issues/$MapNumber/sub_issues" -Query @{ per_page = 100 })
+    $issues = Invoke-GhApi -Method GET -Endpoint "repos/$repository/issues/$MapNumber/sub_issues" -Query @{ per_page = 100 }
+    foreach ($issue in @($issues)) {
+        foreach ($item in @($issue)) {
+            $item
+        }
+    }
 }
 
 function Get-BlockedBy {
     param([Parameter(Mandatory = $true)][int]$TicketNumber)
 
     $repository = Get-Repository
-    return @(Invoke-GhApi -Method GET -Endpoint "repos/$repository/issues/$TicketNumber/dependencies/blocked_by" -Query @{ per_page = 100 })
+    $issues = Invoke-GhApi -Method GET -Endpoint "repos/$repository/issues/$TicketNumber/dependencies/blocked_by" -Query @{ per_page = 100 }
+    foreach ($issue in @($issues)) {
+        foreach ($item in @($issue)) {
+            $item
+        }
+    }
 }
 
 function ConvertTo-TicketSummary {
     param([Parameter(Mandatory = $true)]$Issue)
 
-    return [ordered]@{
-        number = [int]$Issue.number
-        id = [long]$Issue.id
-        title = $Issue.title
-        state = $Issue.state
-        url = $Issue.html_url
-        assignees = @($Issue.assignees | ForEach-Object { $_.login })
+    foreach ($item in @($Issue)) {
+        if ($item -is [System.Array]) {
+            ConvertTo-TicketSummary -Issue $item
+            continue
+        }
+        [ordered]@{
+            number = [int]$item.number
+            id = [long]$item.id
+            title = $item.title
+            state = $item.state
+            url = $item.html_url
+            assignees = @($item.assignees | ForEach-Object { $_.login })
+        }
     }
 }
 
