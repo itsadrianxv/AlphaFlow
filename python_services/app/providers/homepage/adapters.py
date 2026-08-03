@@ -98,14 +98,18 @@ class AdapterPage:
     upstream_as_of: datetime | None = None
     source_published_at: datetime | None = None
     terminal_error: ProviderError | None = None
+    prebuilt_result: HomepageDataItemResult | None = None
 
     @classmethod
     def from_value(cls, value: Any) -> "AdapterPage":
         if isinstance(value, cls):
             return value
+        if value is None:
+            raise ProviderAdapterException("Provider 未返回页面结果", error_class="invalid_response", retryability=Retryability.NON_RETRYABLE)
         if isinstance(value, HomepageDataItemResult):
             return cls(
-                items=value.observations,
+                prebuilt_result=value,
+                items=(),
                 covered_scope=value.covered_scope,
                 missing_scope=value.missing_scope,
                 actual_data_cutoff=value.actual_data_cutoff,
@@ -250,6 +254,10 @@ def _observation_from_record(record: Mapping[str, Any], *, dataset_key: str, sou
         value = _first(record, "value", "amount", "close", "current", "content", "title")
     value_type = _text(_first(record, "valueType", "value_type") or ("decimal" if isinstance(value, (int, float, Decimal)) else "json"))
     missing_reason = _first(record, "missingReason", "missing_reason")
+    if value is None and value_json is None and not missing_reason:
+        # 目录/主体类数据没有单一数值，整个规范化字段集作为 JSON payload 保留。
+        value_json = dict(record)
+        value_type = "json"
     if value is not None and value_type in {"decimal", "number", "numeric"}:
         value = normalize_decimal(value)
         value_type = "decimal"
@@ -346,7 +354,6 @@ class HomepageProviderAdapter:
                 provider_version=self.provider_version,
                 normalization_rules_version=self.normalization_rules_version,
             )
-            self._result_cache[request.idempotency_key or ""] = (request.request_fingerprint or "", result)
             return result
 
         if request.replay_mode == ReplayMode.REPLAY:
@@ -362,7 +369,6 @@ class HomepageProviderAdapter:
                 provider_version=self.provider_version,
                 normalization_rules_version=self.normalization_rules_version,
             )
-            self._result_cache[request.idempotency_key or ""] = (request.request_fingerprint or "", result)
             return result
 
         if not self.supports_dataset(request.dataset_key):
@@ -411,6 +417,23 @@ class HomepageProviderAdapter:
                 errors.append(exc.to_error())
                 break
             pages.append(page)
+            if page.prebuilt_result is not None:
+                result = page.prebuilt_result
+                if result.dataset_key != request.dataset_key or result.provider_key != self.provider_key:
+                    result = HomepageDataItemResult.error_result(
+                        request=request,
+                        provider_key=self.provider_key,
+                        error=ProviderError(
+                            error_class="contract_incompatible",
+                            retryability=Retryability.NON_RETRYABLE,
+                            message="脚本结果的 datasetKey/providerKey 与请求不一致",
+                            code="PREBUILT_RESULT_IDENTITY_MISMATCH",
+                        ),
+                        provider_version=self.provider_version,
+                        normalization_rules_version=self.normalization_rules_version,
+                    )
+                self._result_cache[request.idempotency_key or ""] = (request.request_fingerprint or "", result)
+                return result
             if page.terminal_error:
                 errors.append(page.terminal_error)
                 break
@@ -648,7 +671,8 @@ class ScriptedHomepageProviderAdapter(HomepageProviderAdapter):
                 queue: list[Any] = [script]
             else:
                 try:
-                    queue = list(script)
+                    entries = list(script)
+                    queue = entries if entries and all(_looks_like_page(item) for item in entries) else [AdapterPage(items=tuple(entries))]
                 except TypeError:
                     queue = [script]
             self._scripts[key] = queue
@@ -689,6 +713,14 @@ def _capability(dataset_key: str, value: DatasetCapability | Mapping[str, Any] |
             supports_pagination=bool(value.get("supportsPagination", value.get("supports_pagination", True))),
         )
     return DatasetCapability(dataset_key=dataset_key, dataset_payload_version=str(value or "1.0"))
+
+
+def _looks_like_page(value: Any) -> bool:
+    if isinstance(value, (AdapterPage, HomepageDataItemResult, ProviderError, ProviderAdapterException)):
+        return True
+    if isinstance(value, Mapping):
+        return any(key in value for key in ("items", "records", "data", "nextCursor", "next_cursor", "terminalError", "error"))
+    return False
 
 
 def _compatible_major(requested: str, supported: str) -> bool:
@@ -768,6 +800,9 @@ def _infer_cutoff(items: Sequence[Any], request: HomepageDataItemRequest) -> Dat
             record = _mapping(item)
         except ProviderAdapterException:
             continue
+        period = record.get("observationPeriod") or record.get("observation_period")
+        if isinstance(period, Mapping):
+            record = {**period, **record}
         for key in ("tradeDate", "trade_date", "date", "periodEnd", "period_end", "publishedAt", "published_at", "pub_time"):
             value = record.get(key)
             if value in (None, ""):

@@ -515,14 +515,16 @@ class HomepageDataItemResult:
             raise ValueError("同一结果不能包含重复规范化观测")
         if len({item.assertion_key for item in self.source_assertions}) != len(self.source_assertions):
             raise ValueError("同一结果不能包含重复来源断言")
+        observation_ids = {item.identity_key for item in self.observations}
+        if any(item.dataset_key != self.dataset_key for item in self.source_assertions):
+            raise ValueError("来源断言的 dataset_key 必须与结果一致")
+        if any(item.observation_identity_key not in observation_ids for item in self.source_assertions):
+            raise ValueError("来源断言必须引用同一结果中的规范化观测")
         if status == ResultStatus.ERROR.value and not self.errors:
             raise ValueError("error 结果必须包含结构化错误")
         if status == ResultStatus.EMPTY.value and self.observations:
             raise ValueError("empty 结果不能包含规范化观测")
-        if status == ResultStatus.SUCCESS.value and quality != QualityStatus.NORMAL.value:
-            raise ValueError("success 结果必须使用 normal 质量，限制结果应为 degraded")
-        if status == ResultStatus.ERROR.value and quality == QualityStatus.NORMAL.value:
-            raise ValueError("error 结果不能使用 normal 质量")
+        # 结果状态描述覆盖/可交付性，质量状态描述数据质量；两者必须保持独立。
         _validate_no_non_finite(self.observation_period, path="observationPeriod")
         if self.upstream_as_of is not None:
             object.__setattr__(self, "upstream_as_of", _ensure_aware(self.upstream_as_of))
