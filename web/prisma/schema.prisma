@@ -55,56 +55,57 @@ model Session {
 }
 
 model User {
-  id                            String                         @id @default(cuid())
-  name                          String?
-  email                         String?                        @unique
-  emailVerified                 DateTime?
-  image                         String?
-  loginIdentifier               String?                        @unique
-  loginIdentifierType           LoginIdentifierType?
-  passwordHash                  String?
-  sessionVersion                Int                            @default(0)
-  status                        UserStatus                     @default(ACTIVE)
-  passwordChangedAt             DateTime?
-  accounts                      Account[]
-  sessions                      Session[]
-  posts                         Post[]
-  screeningWorkspaces           ScreeningWorkspace[]
-  screeningFormulas             ScreeningFormula[]
-  screeningRuns                 ScreeningRun[]
-  watchLists                    WatchList[]
-  timingSignalSnapshots         TimingSignalSnapshot[]
-  timingKronosForecastSnapshots TimingKronosForecastSnapshot[]
-  timingResearchReports         TimingResearchReport[]
-  portfolioCompositions         PortfolioComposition[]
-  portfolioRiskDiagnostics      PortfolioRiskDiagnostic[]
-  timingPresets                 TimingPreset[]
-  timingPresetRevisions         TimingPresetRevision[]
-  timingRuleValidationRuns      TimingRuleValidationRun[]
-  workflowRuns                  WorkflowRun[]
-  agentConversations            AgentConversation[]
-  savedCompanies                SavedCompany[]
-  savedIndustries               SavedIndustry[]
-  researchNotes                 ResearchNote[]
-  financialSnapshots            FinancialSnapshot[]
-  researchArtifacts             ResearchArtifact[]
-  evidenceContexts              EvidenceContext[]
-  evidenceContextItems          EvidenceContextItem[]
-  researchContextSnapshots      ResearchContextSnapshot[]
-  scheduledTasks                ScheduledTask[]
-  collections                   Collection[]
-  mindMaps                      MindMap[]
-  homepageDataManifests         HomepageDataManifest[]
-  homepageSnapshots             HomepageSnapshot[]
-  homepageCurrentSnapshots      HomepageCurrentSnapshotProjection[]
-  researchPreference            ResearchPreference?
-  researchPreferenceCommands    ResearchPreferenceCommand[]
-  researchPreferenceSnapshots   ResearchPreferenceSnapshot[]
-  researchRelevanceAssessments  ResearchEventRelevanceAssessment[]
-  researchInboxEntries          ResearchInboxEntry[]
-  researchInboxFeedback         ResearchInboxFeedback[]
-  researchTasks                 ResearchTask[]
-  researchAuditRecords          ResearchAuditRecord[]
+  id                               String                              @id @default(cuid())
+  name                             String?
+  email                            String?                             @unique
+  emailVerified                    DateTime?
+  image                            String?
+  loginIdentifier                  String?                             @unique
+  loginIdentifierType              LoginIdentifierType?
+  passwordHash                     String?
+  sessionVersion                   Int                                 @default(0)
+  status                           UserStatus                          @default(ACTIVE)
+  passwordChangedAt                DateTime?
+  accounts                         Account[]
+  sessions                         Session[]
+  posts                            Post[]
+  screeningWorkspaces              ScreeningWorkspace[]
+  screeningFormulas                ScreeningFormula[]
+  screeningRuns                    ScreeningRun[]
+  watchLists                       WatchList[]
+  timingSignalSnapshots            TimingSignalSnapshot[]
+  timingKronosForecastSnapshots    TimingKronosForecastSnapshot[]
+  timingResearchReports            TimingResearchReport[]
+  portfolioCompositions            PortfolioComposition[]
+  portfolioRiskDiagnostics         PortfolioRiskDiagnostic[]
+  timingPresets                    TimingPreset[]
+  timingPresetRevisions            TimingPresetRevision[]
+  timingRuleValidationRuns         TimingRuleValidationRun[]
+  workflowRuns                     WorkflowRun[]
+  agentConversations               AgentConversation[]
+  savedCompanies                   SavedCompany[]
+  savedIndustries                  SavedIndustry[]
+  researchNotes                    ResearchNote[]
+  financialSnapshots               FinancialSnapshot[]
+  researchArtifacts                ResearchArtifact[]
+  evidenceContexts                 EvidenceContext[]
+  evidenceContextItems             EvidenceContextItem[]
+  researchContextSnapshots         ResearchContextSnapshot[]
+  scheduledTasks                   ScheduledTask[]
+  scheduledTaskDeliveryCredentials ScheduledTaskDeliveryCredential[]
+  collections                      Collection[]
+  mindMaps                         MindMap[]
+  homepageDataManifests            HomepageDataManifest[]
+  homepageSnapshots                HomepageSnapshot[]
+  homepageCurrentSnapshots         HomepageCurrentSnapshotProjection[]
+  researchPreference               ResearchPreference?
+  researchPreferenceCommands       ResearchPreferenceCommand[]
+  researchPreferenceSnapshots      ResearchPreferenceSnapshot[]
+  researchRelevanceAssessments     ResearchEventRelevanceAssessment[]
+  researchInboxEntries             ResearchInboxEntry[]
+  researchInboxFeedback            ResearchInboxFeedback[]
+  researchTasks                    ResearchTask[]
+  researchAuditRecords             ResearchAuditRecord[]
 }
 
 enum LlmTaskExecutionStatus {
@@ -117,25 +118,25 @@ enum LlmTaskExecutionStatus {
 }
 
 model LlmTaskExecution {
-  id             String                 @id @default(cuid())
-  taskType       String
-  idempotencyKey String                 @unique
-  inputHash      String
-  inputJson      Json                   @default("{}")
-  status         LlmTaskExecutionStatus @default(PENDING)
-  attempts       Int                    @default(0)
-  workerId       String?
-  fencingToken   BigInt                 @default(0)
-  leaseExpiresAt DateTime?
-  heartbeatAt    DateTime?
-  nextAttemptAt  DateTime?
+  id               String                 @id @default(cuid())
+  taskType         String
+  idempotencyKey   String                 @unique
+  inputHash        String
+  inputJson        Json                   @default("{}")
+  status           LlmTaskExecutionStatus @default(PENDING)
+  attempts         Int                    @default(0)
+  workerId         String?
+  fencingToken     BigInt                 @default(0)
+  leaseExpiresAt   DateTime?
+  heartbeatAt      DateTime?
+  nextAttemptAt    DateTime?
   eventPublishedAt DateTime?
-  result         Json?
-  error          Json?
-  startedAt      DateTime?
-  completedAt    DateTime?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
+  result           Json?
+  error            Json?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   @@index([status, nextAttemptAt])
   @@index([status, leaseExpiresAt])
@@ -168,6 +169,7 @@ enum AgentConversationRoutingMode {
 enum ScheduledTaskExecutionTrigger {
   SCHEDULED
   MANUAL
+  PREVIEW
 }
 
 enum ScheduledTaskEditDraftSource {
@@ -272,24 +274,40 @@ model MindMapReference {
 }
 
 model ScheduledTask {
-  id                  String                   @id @default(cuid())
+  id                  String                            @id @default(cuid())
   userId              String
   name                String
-  status              ScheduledTaskStatus      @default(DRAFT)
-  currentVersion      Int                      @default(1)
-  timezone            String                   @default("Asia/Shanghai")
+  status              ScheduledTaskStatus               @default(DRAFT)
+  currentVersion      Int                               @default(1)
+  timezone            String                            @default("Asia/Shanghai")
   nextRunAt           DateTime?
   setupConversationId String?
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
-  user                User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt           DateTime                          @default(now())
+  updatedAt           DateTime                          @updatedAt
+  user                User                              @relation(fields: [userId], references: [id], onDelete: Cascade)
   versions            ScheduledTaskVersion[]
   executions          ScheduledTaskExecution[]
   editDrafts          ScheduledTaskEditDraft[]
+  deliveryCredentials ScheduledTaskDeliveryCredential[]
 
   @@index([status, nextRunAt])
   @@index([userId, status])
   @@index([userId, status, setupConversationId])
+}
+
+model ScheduledTaskDeliveryCredential {
+  id             String        @id @default(cuid())
+  taskId         String
+  userId         String
+  channel        String
+  encryptedValue String
+  maskedValue    String
+  createdAt      DateTime      @default(now())
+  task           ScheduledTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, channel, createdAt])
+  @@index([userId, channel, createdAt])
 }
 
 model ScheduledTaskEditDraft {
@@ -344,35 +362,37 @@ model ScheduledTaskVersion {
 }
 
 model ScheduledTaskExecution {
-  id                String                        @id @default(cuid())
-  taskId            String
-  taskVersionId     String
-  scheduledAt       DateTime
-  status            ScheduledTaskExecutionStatus  @default(PENDING)
-  trigger           ScheduledTaskExecutionTrigger @default(SCHEDULED)
-  deliveryRequested Boolean                       @default(false)
-  idempotencyKey    String?                       @unique
-  workerId          String?
-  fencingToken      BigInt                        @default(0)
-  leaseExpiresAt    DateTime?
-  heartbeatAt       DateTime?
-  nextAttemptAt     DateTime?
-  agentRunId        String?
-  result            Json?
-  error             Json?
-  attempts          Int                           @default(0)
-  claimedAt         DateTime?
-  startedAt         DateTime?
-  completedAt       DateTime?
-  eventPublishedAt  DateTime?
-  lastEventError    Json?
-  createdAt         DateTime                      @default(now())
-  updatedAt         DateTime                      @updatedAt
-  task              ScheduledTask                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  taskVersion       ScheduledTaskVersion          @relation(fields: [taskVersionId], references: [id], onDelete: Cascade)
-  evidence          ScheduledTaskEvidence[]
-  deliveries        ScheduledTaskDelivery[]
-  scoreResults      ScheduledTaskScoreResult[]
+  id                       String                        @id @default(cuid())
+  taskId                   String
+  taskVersionId            String
+  scheduledAt              DateTime
+  status                   ScheduledTaskExecutionStatus  @default(PENDING)
+  trigger                  ScheduledTaskExecutionTrigger @default(SCHEDULED)
+  deliveryRequested        Boolean                       @default(false)
+  executionPlanOverride    Json?
+  previewSourceFingerprint String?
+  idempotencyKey           String?                       @unique
+  workerId                 String?
+  fencingToken             BigInt                        @default(0)
+  leaseExpiresAt           DateTime?
+  heartbeatAt              DateTime?
+  nextAttemptAt            DateTime?
+  agentRunId               String?
+  result                   Json?
+  error                    Json?
+  attempts                 Int                           @default(0)
+  claimedAt                DateTime?
+  startedAt                DateTime?
+  completedAt              DateTime?
+  eventPublishedAt         DateTime?
+  lastEventError           Json?
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  task                     ScheduledTask                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskVersion              ScheduledTaskVersion          @relation(fields: [taskVersionId], references: [id], onDelete: Cascade)
+  evidence                 ScheduledTaskEvidence[]
+  deliveries               ScheduledTaskDelivery[]
+  scoreResults             ScheduledTaskScoreResult[]
 
   @@unique([taskId, taskVersionId, scheduledAt])
   @@index([status, scheduledAt])
@@ -2030,13 +2050,13 @@ model ResearchExternalCopy {
 }
 
 model ResearchDeliveryCircuit {
-  id                  String   @id @default(cuid())
-  channel             String   @unique
-  state               String   @default("CLOSED")
-  consecutiveFailures Int      @default(0)
-  openCount           Int      @default(0)
+  id                  String    @id @default(cuid())
+  channel             String    @unique
+  state               String    @default("CLOSED")
+  consecutiveFailures Int       @default(0)
+  openCount           Int       @default(0)
   retryAfter          DateTime? @db.Timestamptz(3)
-  updatedAt           DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  updatedAt           DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
 }
 
 model ResearchInboxEntryHistory {
@@ -2205,50 +2225,50 @@ model ResearchAuditRecord {
 }
 
 model ResearchRuntimeObservation {
-  id                String    @id @default(cuid())
-  idempotencyKey    String    @unique
-  metricKind        String
-  sourceKey         String?
-  datasetKey        String?
-  stage             String?
-  resourcePoolKey   String?
-  tradingDate       String?
-  sourceClockAt     DateTime? @db.Timestamptz(3)
-  sourceClockKind   String?
-  productClockAt    DateTime? @db.Timestamptz(3)
-  readyAt           DateTime  @db.Timestamptz(3)
-  actualDataCutoff  DateTime? @db.Timestamptz(3)
-  targetDataCutoff  DateTime? @db.Timestamptz(3)
-  sourceLatencyMs   Int?
-  productLatencyMs  Int?
-  deliveryLatencyMs Int?
-  dataCutoffMet     Boolean?
-  sourceTargetMs    Int?
-  productTargetMs   Int?
-  deliveryTargetMs  Int?
-  backlogAgeMs      Int?
-  backlogTargetMs   Int?
-  success           Boolean   @default(true)
-  degraded          Boolean   @default(false)
-  permitState       String?
-  permitWaitMs      Int?
-  permitHeldMs      Int?
-  circuitState      String?
+  id                  String    @id @default(cuid())
+  idempotencyKey      String    @unique
+  metricKind          String
+  sourceKey           String?
+  datasetKey          String?
+  stage               String?
+  resourcePoolKey     String?
+  tradingDate         String?
+  sourceClockAt       DateTime? @db.Timestamptz(3)
+  sourceClockKind     String?
+  productClockAt      DateTime? @db.Timestamptz(3)
+  readyAt             DateTime  @db.Timestamptz(3)
+  actualDataCutoff    DateTime? @db.Timestamptz(3)
+  targetDataCutoff    DateTime? @db.Timestamptz(3)
+  sourceLatencyMs     Int?
+  productLatencyMs    Int?
+  deliveryLatencyMs   Int?
+  dataCutoffMet       Boolean?
+  sourceTargetMs      Int?
+  productTargetMs     Int?
+  deliveryTargetMs    Int?
+  backlogAgeMs        Int?
+  backlogTargetMs     Int?
+  success             Boolean   @default(true)
+  degraded            Boolean   @default(false)
+  permitState         String?
+  permitWaitMs        Int?
+  permitHeldMs        Int?
+  circuitState        String?
   previousConcurrency Int?
   currentConcurrency  Int?
   hardConcurrency     Int?
   adaptiveReason      String?
   cooldownUntil       DateTime? @db.Timestamptz(3)
-  usageRequests     Int       @default(0)
-  usageInputTokens  Int       @default(0)
-  usageOutputTokens Int       @default(0)
-  usageCostMicros   Int       @default(0)
-  deliveryChannel   String?
-  deliveryStatus    String?
-  deliveryAttempt   Int?
-  errorClass        String?
-  recordedAt        DateTime  @default(now()) @db.Timestamptz(3)
-  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  usageRequests       Int       @default(0)
+  usageInputTokens    Int       @default(0)
+  usageOutputTokens   Int       @default(0)
+  usageCostMicros     Int       @default(0)
+  deliveryChannel     String?
+  deliveryStatus      String?
+  deliveryAttempt     Int?
+  errorClass          String?
+  recordedAt          DateTime  @default(now()) @db.Timestamptz(3)
+  createdAt           DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([sourceKey, datasetKey, stage, recordedAt], map: "ResearchRuntimeObservation_segment_idx")
   @@index([resourcePoolKey, recordedAt], map: "ResearchRuntimeObservation_resource_idx")

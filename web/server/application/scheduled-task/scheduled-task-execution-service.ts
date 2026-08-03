@@ -3,6 +3,7 @@ import { env } from "~/env";
 import { scheduledTaskDeliverySpecSchema } from "~/server/domain/scheduled-task/contracts";
 import { hasDeliveryTarget } from "~/server/domain/scheduled-task/delivery-targets";
 import { publishDefinitiveTaskRun } from "./definitive-task-run-stream";
+import { ScheduledTaskWebhookCredentialService } from "./scheduled-task-webhook-credential-service";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -119,15 +120,26 @@ export class ScheduledTaskExecutionService {
     const delivery = scheduledTaskDeliverySpecSchema.parse(
       version.deliverySpec,
     );
+    const deterministic =
+      asRecord(version.executionPlan).type === "deterministic_scoring";
     if (params.deliver) {
       if (
         delivery.type !== "FEISHU" ||
-        !hasDeliveryTarget("FEISHU", delivery.targetRef)
+        (deterministic
+          ? !(await new ScheduledTaskWebhookCredentialService(this.db)
+              .describe({
+                userId: params.userId,
+                taskId: task.id,
+                credentialRef:
+                  delivery.type === "FEISHU" ? delivery.targetRef : "",
+              })
+              .then(() => true)
+              .catch(() => false))
+          : !hasDeliveryTarget("FEISHU", delivery.targetRef))
       ) {
         throw new Error("DELIVERY_TARGET_UNAVAILABLE");
       }
     }
-    const deterministic = asRecord(version.executionPlan).type === "deterministic_scoring";
     const execution = await this.db.scheduledTaskExecution.create({
       data: {
         taskId: task.id,

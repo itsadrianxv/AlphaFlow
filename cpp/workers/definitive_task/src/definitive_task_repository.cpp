@@ -40,7 +40,7 @@ DefinitiveTaskClaimResult DefinitiveTaskRepository::claim(const task_lifecycle::
           'taskVersionId', execution."taskVersionId",
           'scheduledAt', to_char(execution."scheduledAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
           'timezone', task.timezone,
-          'executionPlan', version."executionPlan"
+          'executionPlan', COALESCE(execution."executionPlanOverride", version."executionPlan")
         )::text, execution."fencingToken", execution.attempts
       )SQL",
       message.run_id, config_.worker_id, config_.lease_seconds);

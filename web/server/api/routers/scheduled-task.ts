@@ -3,12 +3,15 @@ import { z } from "zod";
 import { env } from "~/env";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { AgentConversationService } from "~/server/application/agent-runtime/agent-conversation-service";
+import { ScheduledTaskDraftController } from "~/server/application/scheduled-task/scheduled-task-draft-controller";
 import { ScheduledTaskEditService } from "~/server/application/scheduled-task/scheduled-task-edit-service";
 import { ScheduledTaskExecutionService } from "~/server/application/scheduled-task/scheduled-task-execution-service";
+import { ScheduledTaskScoringDraftService } from "~/server/application/scheduled-task/scheduled-task-scoring-draft-service";
+import { ScheduledTaskScoringLifecycleService } from "~/server/application/scheduled-task/scheduled-task-scoring-lifecycle-service";
 import { ScheduledTaskSetupService } from "~/server/application/scheduled-task/scheduled-task-setup-service";
+import { ScheduledTaskWebhookCredentialService } from "~/server/application/scheduled-task/scheduled-task-webhook-credential-service";
 import { WorkflowCommandService } from "~/server/application/workflow/command-service";
 import {
-  deterministicExecutionPlanSchema,
   scheduledTaskDeliverySpecSchema,
   scheduledTaskOutputSpecSchema,
   scheduledTaskStructuredEditSchema,
@@ -21,6 +24,12 @@ import {
 import { PrismaAgentConversationRepository } from "~/server/infrastructure/agent-runtime/prisma-agent-conversation-repository";
 import { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function taskError(error: unknown): never {
   const message = error instanceof Error ? error.message : "定时任务操作失败";
   if (
@@ -32,7 +41,7 @@ function taskError(error: unknown): never {
   ) {
     throw new TRPCError({ code: "NOT_FOUND", message: "定时任务不存在" });
   }
-  if (message === "EDIT_VERSION_CONFLICT") {
+  if (["EDIT_VERSION_CONFLICT", "PREVIEW_VERSION_CONFLICT"].includes(message)) {
     throw new TRPCError({
       code: "CONFLICT",
       message: "任务版本已更新，请基于最新版本重新预览",
@@ -43,6 +52,14 @@ function taskError(error: unknown): never {
     NEXT_RUN_UNAVAILABLE: "无法计算下一次执行时间",
     NO_CHANGES: "没有检测到配置变更",
     DRAFT_NOT_CONFIRMABLE: "候选修改尚未通过验证",
+    PREVIEW_NOT_FOUND: "评分预览不存在",
+    PREVIEW_REQUIRED: "首次启用前必须运行当前版本的评分预览",
+    PREVIEW_NOT_EVALUABLE: "全部预览样本均无法评估，不能启用任务",
+    PREVIEW_SAMPLE_REQUIRED: "全部 A 股预览必须选择 1 至 20 只样本",
+    PREVIEW_SAMPLE_LIMIT: "评分预览最多选择 20 只样本",
+    PREVIEW_SAMPLE_INVALID: "预览样本必须使用六位股票代码",
+    PREVIEW_SAMPLE_DUPLICATED: "预览样本不能重复",
+    PREVIEW_SAMPLE_OUTSIDE_UNIVERSE: "预览样本不在当前指定股票范围内",
   };
   throw new TRPCError({
     code: "BAD_REQUEST",
@@ -54,17 +71,107 @@ export const scheduledTaskRouter = createTRPCRouter({
   validateDeterministicPlan: protectedProcedure
     .input(z.object({ plan: z.unknown() }))
     .mutation(({ input }) => {
-      const parsed = deterministicExecutionPlanSchema.safeParse(input.plan);
-      return parsed.success
-        ? { valid: true as const, normalizedPlan: parsed.data, issues: [] }
-        : {
-            valid: false as const,
-            normalizedPlan: null,
-            issues: parsed.error.issues.map((issue) => ({
-              path: issue.path.join("."),
-              message: issue.message,
-            })),
-          };
+      return new ScheduledTaskDraftController().validateExecutionPlan(
+        input.plan,
+      );
+    }),
+  saveScoringDraft: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string().cuid().optional(),
+        expectedVersion: z.number().int().positive().optional(),
+        idempotencyKey: z.string().min(8).max(128),
+        value: z.unknown(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new ScheduledTaskScoringDraftService(ctx.db).save({
+          userId: ctx.session.user.id,
+          taskId: input.taskId,
+          expectedVersion: input.expectedVersion,
+          idempotencyKey: input.idempotencyKey,
+          value: input.value,
+        });
+      } catch (error) {
+        taskError(error);
+      }
+    }),
+  startScoringPreview: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string().cuid(),
+        expectedVersion: z.number().int().positive(),
+        sampleStockCodes: z.array(z.string()).max(20).optional(),
+        idempotencyKey: z.string().min(8).max(128),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new ScheduledTaskScoringLifecycleService(
+          ctx.db,
+        ).startPreview({
+          userId: ctx.session.user.id,
+          ...input,
+        });
+      } catch (error) {
+        taskError(error);
+      }
+    }),
+  getScoringPreview: protectedProcedure
+    .input(z.object({ previewId: z.string().cuid() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        return await new ScheduledTaskScoringLifecycleService(
+          ctx.db,
+        ).getPreview({
+          userId: ctx.session.user.id,
+          previewId: input.previewId,
+        });
+      } catch (error) {
+        taskError(error);
+      }
+    }),
+  getScoringDraft: protectedProcedure
+    .input(z.object({ taskId: z.string().cuid() }))
+    .query(async ({ ctx, input }) => {
+      const task = await ctx.db.scheduledTask.findFirst({
+        where: {
+          id: input.taskId,
+          userId: ctx.session.user.id,
+          status: "DRAFT",
+        },
+      });
+      if (!task)
+        throw new TRPCError({ code: "NOT_FOUND", message: "评分草稿不存在" });
+      const version = await ctx.db.scheduledTaskVersion.findUnique({
+        where: {
+          taskId_version: { taskId: task.id, version: task.currentVersion },
+        },
+      });
+      if (!version)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "评分草稿版本不存在",
+        });
+      const delivery = scheduledTaskDeliverySpecSchema.parse(
+        version.deliverySpec,
+      );
+      const deliveryCredential =
+        delivery.type === "FEISHU"
+          ? await new ScheduledTaskWebhookCredentialService(ctx.db).describe({
+              userId: ctx.session.user.id,
+              taskId: task.id,
+              credentialRef: delivery.targetRef,
+            })
+          : null;
+      return {
+        taskId: task.id,
+        version: task.currentVersion,
+        name: task.name,
+        config: version,
+        deliveryCredential,
+      };
     }),
   updateSetupDraftPlan: protectedProcedure
     .input(
@@ -75,12 +182,14 @@ export const scheduledTaskRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const parsed = deterministicExecutionPlanSchema.safeParse(input.plan);
-      if (!parsed.success)
+      const parsed = new ScheduledTaskDraftController().validateExecutionPlan(
+        input.plan,
+      );
+      if (!parsed.valid)
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: parsed.error.issues
-            .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+          message: parsed.issues
+            .map((issue) => `${issue.path}: ${issue.message}`)
             .join("；"),
         });
       const semantic = await fetch(
@@ -88,13 +197,13 @@ export const scheduledTaskRouter = createTRPCRouter({
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(parsed.data),
+          body: JSON.stringify(parsed.normalizedPlan),
         },
       );
       if (!semantic.ok) {
-        const payload = (await semantic.json().catch(() => null)) as
-          | { message?: string }
-          | null;
+        const payload = (await semantic.json().catch(() => null)) as {
+          message?: string;
+        } | null;
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: payload?.message ?? "评分规则语义校验失败",
@@ -118,14 +227,28 @@ export const scheduledTaskRouter = createTRPCRouter({
             version: input.expectedVersion,
           },
         },
-        data: { executionPlan: parsed.data },
+        data: { executionPlan: parsed.normalizedPlan },
       });
-      return { valid: true as const, normalizedPlan: parsed.data };
+      return { valid: true as const, normalizedPlan: parsed.normalizedPlan };
     }),
   list: protectedProcedure.query(async ({ ctx }) => {
     const tasks = await ctx.db.scheduledTask.findMany({
       where: { userId: ctx.session.user.id, status: { not: "DRAFT" } },
-      include: { versions: { orderBy: { version: "desc" } } },
+      include: {
+        versions: { orderBy: { version: "desc" } },
+        executions: {
+          where: { trigger: { not: "PREVIEW" } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: {
+            deliveries: {
+              select: { status: true, targetType: true },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
+        },
+      },
       orderBy: { updatedAt: "desc" },
     });
     return tasks.map((task) => ({
@@ -144,7 +267,21 @@ export const scheduledTaskRouter = createTRPCRouter({
           userId: ctx.session.user.id,
           status: { not: "DRAFT" },
         },
-        include: { versions: { orderBy: { version: "desc" } } },
+        include: {
+          versions: { orderBy: { version: "desc" } },
+          executions: {
+            where: { trigger: { not: "PREVIEW" } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            include: {
+              deliveries: { orderBy: { createdAt: "desc" }, take: 1 },
+              scoreResults: {
+                orderBy: { rank: "asc" },
+                take: 20,
+              },
+            },
+          },
+        },
       });
       const version = task?.versions.find(
         (item) => item.version === task.currentVersion,
@@ -155,16 +292,34 @@ export const scheduledTaskRouter = createTRPCRouter({
       const delivery = scheduledTaskDeliverySpecSchema.parse(
         version.deliverySpec,
       );
+      const deterministic =
+        asRecord(version.executionPlan).type === "deterministic_scoring";
+      const storedCredential =
+        deterministic && delivery.type === "FEISHU"
+          ? await new ScheduledTaskWebhookCredentialService(ctx.db)
+              .describe({
+                userId: ctx.session.user.id,
+                taskId: task.id,
+                credentialRef: delivery.targetRef,
+              })
+              .catch(() => null)
+          : null;
+      const deliveryTarget = storedCredential
+        ? {
+            type: "FEISHU" as const,
+            targetRef: storedCredential.credentialRef,
+            name: storedCredential.maskedWebhook,
+          }
+        : delivery.type === "FEISHU"
+          ? (targets.find(
+              (target) => target.targetRef === delivery.targetRef,
+            ) ?? null)
+          : null;
       return {
         ...task,
         versions: undefined,
         version,
-        deliveryTarget:
-          delivery.type === "FEISHU"
-            ? (targets.find(
-                (target) => target.targetRef === delivery.targetRef,
-              ) ?? null)
-            : null,
+        deliveryTarget,
         availableDeliveryTargets: targets,
       };
     }),
@@ -210,6 +365,7 @@ export const scheduledTaskRouter = createTRPCRouter({
           taskVersion: { select: { version: true } },
           evidence: { orderBy: { createdAt: "asc" } },
           deliveries: { orderBy: { createdAt: "asc" } },
+          scoreResults: { orderBy: { rank: "asc" } },
         },
       });
       if (!execution)
@@ -238,11 +394,22 @@ export const scheduledTaskRouter = createTRPCRouter({
         where: { executionId: input.executionId },
         orderBy: { rank: "asc" },
         take: input.limit + 1,
-        ...(input.cursor ? { cursor: { executionId_rank: { executionId: input.executionId, rank: input.cursor } }, skip: 1 } : {}),
+        ...(input.cursor
+          ? {
+              cursor: {
+                executionId_rank: {
+                  executionId: input.executionId,
+                  rank: input.cursor,
+                },
+              },
+              skip: 1,
+            }
+          : {}),
       });
       return {
         items: rows.slice(0, input.limit),
-        nextCursor: rows.length > input.limit ? rows[input.limit]?.rank : undefined,
+        nextCursor:
+          rows.length > input.limit ? rows[input.limit]?.rank : undefined,
       };
     }),
   prepareStructuredEdit: protectedProcedure
@@ -305,14 +472,31 @@ export const scheduledTaskRouter = createTRPCRouter({
         taskError(error);
       }
     }),
+  discardEditDraft: protectedProcedure
+    .input(z.object({ draftId: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new ScheduledTaskEditService(ctx.db).discard({
+          userId: ctx.session.user.id,
+          draftId: input.draftId,
+        });
+      } catch (error) {
+        taskError(error);
+      }
+    }),
   startAgentEdit: protectedProcedure
-    .input(z.object({ taskId: z.string().cuid() }))
+    .input(
+      z.object({
+        taskId: z.string().cuid(),
+        prompt: z.string().trim().min(1).max(4000).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const task = await ctx.db.scheduledTask.findFirst({
         where: {
           id: input.taskId,
           userId: ctx.session.user.id,
-          status: { in: ["ACTIVE", "PAUSED"] },
+          status: { in: ["DRAFT", "ACTIVE", "PAUSED"] },
         },
         include: { versions: { orderBy: { version: "desc" } } },
       });
@@ -330,21 +514,24 @@ export const scheduledTaskRouter = createTRPCRouter({
         userId: ctx.session.user.id,
         skillId: "scheduled-task-edit",
         skillIds: ["scheduled-task-edit"],
-        prompt: `我想修改定时任务“${task.name}”。请先根据当前配置询问我具体想修改什么，生成候选修改后等待我在预览中确认。`,
+        prompt:
+          input.prompt ??
+          `我想修改定时任务“${task.name}”。请先询问我具体想修改什么，生成候选修改后等待我在构建器中确认。`,
         title: `修改定时任务：${task.name}`,
         routingMode: "SCHEDULED_TASK_EDIT",
         scheduledTaskEditTaskId: task.id,
         context: {
           scheduledTaskEdit: {
+            mode:
+              asRecord(version.executionPlan).type === "deterministic_scoring"
+                ? "deterministic_scoring_builder"
+                : "scheduled_task",
             taskId: task.id,
-            baseVersion: task.currentVersion,
+            generatedAtVersion: task.currentVersion,
             name: task.name,
-            userPrompt: version.userPrompt,
             schedule: version.scheduleSpec,
-            dataSources: version.dataSources,
             executionPlan: version.executionPlan,
             output: version.outputSpec,
-            delivery: version.deliverySpec,
           },
         },
       });
@@ -389,6 +576,7 @@ export const scheduledTaskRouter = createTRPCRouter({
       z.object({
         taskId: z.string().cuid(),
         expectedVersion: z.number().int().positive(),
+        previewId: z.string().cuid().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -409,6 +597,33 @@ export const scheduledTaskRouter = createTRPCRouter({
           code: "CONFLICT",
           message: "草稿已更新，请检查最新预览",
         });
+      const executionPlan =
+        version.executionPlan &&
+        typeof version.executionPlan === "object" &&
+        !Array.isArray(version.executionPlan)
+          ? (version.executionPlan as Record<string, unknown>)
+          : {};
+      if (executionPlan.type === "deterministic_scoring") {
+        if (!input.previewId)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "首次启用前必须运行当前版本的评分预览",
+          });
+        try {
+          const setup = new ScheduledTaskSetupService(ctx.db);
+          return await new ScheduledTaskScoringLifecycleService(
+            ctx.db,
+          ).activate({
+            userId: ctx.session.user.id,
+            taskId: input.taskId,
+            expectedVersion: input.expectedVersion,
+            previewId: input.previewId,
+            resolveNextRunAt: (schedule) => setup.nextRunAt(schedule),
+          });
+        } catch (error) {
+          taskError(error);
+        }
+      }
       const feasibility =
         version.feasibility &&
         typeof version.feasibility === "object" &&
@@ -430,6 +645,17 @@ export const scheduledTaskRouter = createTRPCRouter({
         });
       }
       const schedule = scheduleSpecSchema.parse(version.scheduleSpec);
+      const planValidation =
+        new ScheduledTaskDraftController().validateExecutionPlan(
+          version.executionPlan,
+        );
+      if (!planValidation.valid)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: planValidation.issues
+            .map((issue) => `${issue.path}: ${issue.message}`)
+            .join("；"),
+        });
       scheduledTaskOutputSpecSchema.parse(version.outputSpec);
       const delivery = scheduledTaskDeliverySpecSchema.parse(
         version.deliverySpec,
@@ -483,7 +709,7 @@ export const scheduledTaskRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const result = await ctx.db.scheduledTask.updateMany({
         where: { id: input.id, userId: ctx.session.user.id, status: "ACTIVE" },
-        data: { status: "PAUSED" },
+        data: { status: "PAUSED", nextRunAt: null },
       });
       if (!result.count) throw new TRPCError({ code: "NOT_FOUND" });
       return { success: true };
@@ -491,9 +717,26 @@ export const scheduledTaskRouter = createTRPCRouter({
   resume: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const task = await ctx.db.scheduledTask.findFirst({
+        where: { id: input.id, userId: ctx.session.user.id, status: "PAUSED" },
+        include: { versions: { orderBy: { version: "desc" } } },
+      });
+      const version = task?.versions.find(
+        (item) => item.version === task.currentVersion,
+      );
+      if (!task || !version) throw new TRPCError({ code: "NOT_FOUND" });
+      const schedule = scheduleSpecSchema.parse(version.scheduleSpec);
+      const nextRunAt = await new ScheduledTaskSetupService(ctx.db).nextRunAt(
+        schedule,
+      );
+      if (!nextRunAt)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "无法计算下一次执行时间",
+        });
       const result = await ctx.db.scheduledTask.updateMany({
         where: { id: input.id, userId: ctx.session.user.id, status: "PAUSED" },
-        data: { status: "ACTIVE" },
+        data: { status: "ACTIVE", nextRunAt },
       });
       if (!result.count) throw new TRPCError({ code: "NOT_FOUND" });
       return { success: true };

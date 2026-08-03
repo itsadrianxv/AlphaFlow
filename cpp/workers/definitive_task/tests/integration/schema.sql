@@ -2,6 +2,10 @@ CREATE TYPE "ScheduledTaskExecutionStatus" AS ENUM (
   'PENDING', 'SUBMITTED', 'RUNNING', 'RETRYING', 'SUCCEEDED', 'FAILED', 'CANCELLED'
 );
 
+CREATE TYPE "ScheduledTaskExecutionTrigger" AS ENUM (
+  'SCHEDULED', 'MANUAL', 'PREVIEW'
+);
+
 CREATE TABLE "ScheduledTask" (
   id TEXT PRIMARY KEY,
   timezone TEXT NOT NULL DEFAULT 'Asia/Shanghai'
@@ -18,6 +22,10 @@ CREATE TABLE "ScheduledTaskExecution" (
   "taskVersionId" TEXT NOT NULL REFERENCES "ScheduledTaskVersion"(id),
   "scheduledAt" TIMESTAMPTZ NOT NULL,
   status "ScheduledTaskExecutionStatus" NOT NULL DEFAULT 'PENDING',
+  trigger "ScheduledTaskExecutionTrigger" NOT NULL DEFAULT 'SCHEDULED',
+  "deliveryRequested" BOOLEAN NOT NULL DEFAULT FALSE,
+  "executionPlanOverride" JSONB,
+  "previewSourceFingerprint" TEXT,
   attempts INTEGER NOT NULL DEFAULT 0,
   "workerId" TEXT,
   "fencingToken" BIGINT NOT NULL DEFAULT 0,

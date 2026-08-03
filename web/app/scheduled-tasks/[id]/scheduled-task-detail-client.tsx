@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, ChevronRight, Download, Play, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Play,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -609,22 +616,76 @@ export function ScheduledTaskDetailClient(props: { taskId: string }) {
                             ) : executionDetail.data?.result ? (
                               asRecord(executionDetail.data.result).type ===
                               "SCORING_REPORT" ? (
-                                <div className="flex flex-wrap items-center justify-between gap-3">
-                                  <p className="text-sm text-[var(--app-text)]">
-                                    已评估 {String(asRecord(executionDetail.data.result).evaluatedCount ?? 0)} 只，入选 {String(asRecord(executionDetail.data.result).selectedCount ?? 0)} 只。
-                                  </p>
-                                  <a
-                                    className="app-button"
-                                    href={`/api/scheduled-tasks/executions/${execution.id}/export`}
-                                  >
-                                    <Download aria-hidden size={16} />
-                                    下载 Excel
-                                  </a>
+                                <div>
+                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <p className="text-sm text-[var(--app-text)]">
+                                      数据截止{" "}
+                                      {String(
+                                        asRecord(executionDetail.data.result)
+                                          .asOfDate ?? "—",
+                                      )}
+                                      ；已评估{" "}
+                                      {String(
+                                        asRecord(executionDetail.data.result)
+                                          .evaluatedCount ?? 0,
+                                      )}{" "}
+                                      只，入选{" "}
+                                      {String(
+                                        asRecord(executionDetail.data.result)
+                                          .selectedCount ?? 0,
+                                      )}{" "}
+                                      只；投递状态 {deliveryStatus}。
+                                    </p>
+                                    <a
+                                      className="app-button"
+                                      href={`/api/scheduled-tasks/executions/${execution.id}/export`}
+                                    >
+                                      <Download aria-hidden size={16} />
+                                      下载 Excel
+                                    </a>
+                                  </div>
+                                  <div className="mt-4 overflow-x-auto">
+                                    <table className="app-table min-w-[620px]">
+                                      <thead>
+                                        <tr>
+                                          <th>股票</th>
+                                          <th>总分</th>
+                                          <th>规则明细</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {executionDetail.data.scoreResults.map(
+                                          (row) => (
+                                            <tr key={row.id}>
+                                              <td>
+                                                {row.stockName}（{row.stockCode}
+                                                ）
+                                              </td>
+                                              <td>
+                                                {row.score} / {row.maxScore}
+                                              </td>
+                                              <td>
+                                                {Object.entries(
+                                                  asRecord(row.ruleResults),
+                                                )
+                                                  .map(
+                                                    ([ruleId, value]) =>
+                                                      `${ruleId}: ${String(asRecord(value).status ?? "NOT_EVALUATED")} / ${String(asRecord(value).awardedPoints ?? 0)} 分`,
+                                                  )
+                                                  .join("；") || "—"}
+                                              </td>
+                                            </tr>
+                                          ),
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 </div>
                               ) : (
                                 <MarkdownContent
                                   content={String(
-                                    asRecord(executionDetail.data.result).body ??
+                                    asRecord(executionDetail.data.result)
+                                      .body ??
                                       asRecord(executionDetail.data.result)
                                         .summary ??
                                       "",

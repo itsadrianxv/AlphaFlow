@@ -143,4 +143,24 @@ describe("飞书投递结果", () => {
     ).catch((value: unknown) => value);
     expect(error).toMatchObject({ retryable: true, code: "FEISHU_HTTP_503" });
   });
+
+  it("网络错误不回显 Webhook 凭证", async () => {
+    const secretWebhook =
+      "https://open.feishu.cn/open-apis/bot/v2/hook/top-secret-token";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error(`connect failed: ${secretWebhook}`)),
+    );
+    const error = await deliverScheduledTask(
+      { type: "FEISHU", targetRef: "credential-1" },
+      { body: "内容" },
+      { resolveWebhook: async () => secretWebhook },
+    ).catch((value: unknown) => value);
+    expect(error).toMatchObject({
+      retryable: true,
+      code: "FEISHU_NETWORK_ERROR",
+      message: "飞书 Webhook 网络请求失败",
+    });
+    expect(JSON.stringify(error)).not.toContain("top-secret-token");
+  });
 });

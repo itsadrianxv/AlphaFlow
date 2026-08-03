@@ -8,6 +8,10 @@ import {
   scheduleSpecSchema,
 } from "~/server/domain/scheduled-task/contracts";
 import { hasDeliveryTarget } from "~/server/domain/scheduled-task/delivery-targets";
+import {
+  ScheduledTaskAgentChangeController,
+  scoringTaskAgentChangeSetSchema,
+} from "./scheduled-task-agent-change-controller";
 
 type DraftSource = "STRUCTURED" | "AGENT";
 
@@ -23,6 +27,54 @@ function json(value: unknown) {
 
 function comparable(value: unknown) {
   return JSON.stringify(value);
+}
+
+function scoringBuilderDraft(params: {
+  name: string;
+  scheduleSpec: unknown;
+  executionPlan: unknown;
+  outputSpec: unknown;
+  deliverySpec: unknown;
+}) {
+  const plan = asRecord(params.executionPlan);
+  const universe = asRecord(plan.universe);
+  const indicators = Array.isArray(plan.indicators)
+    ? plan.indicators.map(asRecord)
+    : [];
+  const macd = indicators.find((item) => item.type === "macd");
+  const kdj = indicators.find((item) => item.type === "kdj");
+  return {
+    name: params.name,
+    schedule: params.scheduleSpec,
+    universe:
+      universe.type === "stocks"
+        ? {
+            type: "stocks" as const,
+            stockInputs: Array.isArray(universe.stockCodes)
+              ? universe.stockCodes.map(String)
+              : [],
+          }
+        : { type: "all_a_shares" as const },
+    data: plan.data,
+    indicatorParams: {
+      macd: {
+        fast: 12,
+        slow: 26,
+        signal: 9,
+        ...asRecord(macd?.params),
+      },
+      kdj: {
+        period: 9,
+        kSmoothing: 3,
+        dSmoothing: 3,
+        ...asRecord(kdj?.params),
+      },
+    },
+    rules: plan.rules,
+    selection: plan.selection,
+    output: params.outputSpec,
+    delivery: params.deliverySpec,
+  };
 }
 
 function buildChanges(
@@ -212,6 +264,78 @@ export class ScheduledTaskEditService {
     });
   }
 
+  async prepareScoringAgentChange(params: {
+    userId: string;
+    taskId: string;
+    conversationId: string;
+    changeSet: unknown;
+    idempotencyKey: string;
+  }) {
+    const duplicate = await this.db.scheduledTaskEditDraft.findUnique({
+      where: { idempotencyKey: params.idempotencyKey },
+    });
+    if (duplicate?.userId === params.userId) return duplicate;
+    const parsed = scoringTaskAgentChangeSetSchema.parse(params.changeSet);
+    if (parsed.ambiguity.status === "NEEDS_CLARIFICATION")
+      return {
+        status: "NEEDS_CLARIFICATION" as const,
+        question: parsed.ambiguity.question,
+      };
+    const task = await this.db.scheduledTask.findFirst({
+      where: {
+        id: params.taskId,
+        userId: params.userId,
+        status: { in: ["DRAFT", "ACTIVE", "PAUSED"] },
+      },
+      include: {
+        versions: {
+          where: { version: parsed.generatedAtVersion },
+          take: 1,
+        },
+      },
+    });
+    const version = task?.versions[0];
+    if (!task || !version) throw new Error("EDIT_VERSION_CONFLICT");
+    const baseDraft = scoringBuilderDraft({
+      name: task.name,
+      scheduleSpec: version.scheduleSpec,
+      executionPlan: version.executionPlan,
+      outputSpec: version.outputSpec,
+      deliverySpec: version.deliverySpec,
+    });
+    const applied = new ScheduledTaskAgentChangeController().apply({
+      generatedDraft: baseDraft,
+      currentDraft: baseDraft,
+      currentVersion: parsed.generatedAtVersion,
+      changeSet: parsed,
+    });
+    if (applied.status !== "APPLIED") throw new Error("DRAFT_NOT_CONFIRMABLE");
+    const nextRunAt = await this.setup.nextRunAt(applied.draft.schedule);
+    if (!nextRunAt) throw new Error("NEXT_RUN_UNAVAILABLE");
+    return this.replacePendingDraft({
+      userId: params.userId,
+      taskId: task.id,
+      conversationId: params.conversationId,
+      source: "AGENT",
+      baseVersion: parsed.generatedAtVersion,
+      name: applied.draft.name,
+      userPrompt: version.userPrompt,
+      scheduleSpec: applied.draft.schedule,
+      dataSources: version.dataSources,
+      executionPlan: applied.draft.executionPlan,
+      outputSpec: version.outputSpec,
+      deliverySpec: version.deliverySpec,
+      feasibility: {
+        status: "SUPPORTED",
+        warnings: [],
+        blockingIssues: [],
+      },
+      changes: applied.markers,
+      nextRunAt,
+      idempotencyKey: params.idempotencyKey,
+    });
+  }
+
   private async replacePendingDraft(params: {
     userId: string;
     taskId: string;
@@ -361,5 +485,18 @@ export class ScheduledTaskEditService {
       }
       return { taskId: draft.taskId, version: nextVersion };
     });
+  }
+
+  async discard(params: { userId: string; draftId: string }) {
+    const discarded = await this.db.scheduledTaskEditDraft.updateMany({
+      where: {
+        id: params.draftId,
+        userId: params.userId,
+        status: "PENDING",
+      },
+      data: { status: "DISCARDED", discardedAt: new Date() },
+    });
+    if (discarded.count !== 1) throw new Error("EDIT_DRAFT_NOT_FOUND");
+    return { discarded: true as const };
   }
 }

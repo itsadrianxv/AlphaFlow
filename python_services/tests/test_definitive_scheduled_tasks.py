@@ -102,6 +102,17 @@ def test_scoring_keeps_unavailable_stock_and_stably_selects_top_n():
     assert rows[0]["selected"] is True
     assert rows[1]["evaluationStatus"] == "NONE"
     assert rows[1]["ruleResults"]["macd_positive"]["status"] == "NOT_EVALUATED"
+    leaf = rows[1]["ruleResults"]["macd_positive"]["conditionTree"]
+    assert leaf == {
+        "kind": "LEAF",
+        "status": "NOT_EVALUATED",
+        "timeframe": "daily",
+        "metric": "macd_default.histogram",
+        "operator": "gt",
+        "expected": 0,
+        "observations": {},
+        "reason": "指标数据不存在",
+    }
 
 
 def test_validation_route_returns_derived_requirements():

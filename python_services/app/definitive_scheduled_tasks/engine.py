@@ -95,6 +95,34 @@ def evaluate_condition(condition: Condition, frames: dict[str, pd.DataFrame]) ->
     return ConditionStatus.NOT_EVALUATED, observations, "; ".join(reasons) or "子条件未评估"
 
 
+def evaluate_condition_tree(condition: Condition, frames: dict[str, pd.DataFrame]) -> dict[str, Any]:
+    status, observations, reason = evaluate_condition(condition, frames)
+    if isinstance(condition, AtomicCondition):
+        return {
+            "kind": "LEAF",
+            "status": status.value,
+            "timeframe": condition.timeframe,
+            "metric": condition.metric,
+            "operator": condition.operator,
+            "expected": condition.value,
+            "observations": observations,
+            **({"reason": reason} if reason else {}),
+        }
+    if isinstance(condition, NotCondition):
+        children = [evaluate_condition_tree(condition.not_, frames)]
+        kind = "NOT"
+    else:
+        source = condition.all if isinstance(condition, AllCondition) else condition.any
+        children = [evaluate_condition_tree(child, frames) for child in source]
+        kind = "ALL" if isinstance(condition, AllCondition) else "ANY"
+    return {
+        "kind": kind,
+        "status": status.value,
+        "children": children,
+        **({"reason": reason} if reason else {}),
+    }
+
+
 def score_stock(*, stock_code: str, stock_name: str, frames: dict[str, pd.DataFrame], plan: DeterministicExecutionPlan) -> dict[str, Any]:
     rule_results: dict[str, Any] = {}
     score = 0.0
@@ -110,6 +138,7 @@ def score_stock(*, stock_code: str, stock_name: str, frames: dict[str, pd.DataFr
             "awardedPoints": awarded,
             "possiblePoints": rule.points,
             "observations": observations,
+            "conditionTree": evaluate_condition_tree(rule.condition, frames),
             **({"reason": reason} if reason else {}),
         }
     evaluation_status = "NONE" if evaluated == 0 else "FULL" if evaluated == len(plan.rules) else "PARTIAL"
