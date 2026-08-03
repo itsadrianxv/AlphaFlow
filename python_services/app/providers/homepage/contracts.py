@@ -487,6 +487,7 @@ class HomepageDataItemResult:
     result_status: ResultStatus
     quality_status: QualityStatus
     coverage: ScopeCoverage
+    provider_version: str = "1.0"
     observations: tuple[NormalizedObservation, ...] = ()
     source_assertions: tuple[SourceAssertion, ...] = ()
     actual_data_cutoff: DataCutoff | None = None
@@ -515,14 +516,16 @@ class HomepageDataItemResult:
             raise ValueError("同一结果不能包含重复规范化观测")
         if len({item.assertion_key for item in self.source_assertions}) != len(self.source_assertions):
             raise ValueError("同一结果不能包含重复来源断言")
+        observation_ids = {item.identity_key for item in self.observations}
+        if any(item.dataset_key != self.dataset_key for item in self.source_assertions):
+            raise ValueError("来源断言的 dataset_key 必须与结果一致")
+        if any(item.observation_identity_key not in observation_ids for item in self.source_assertions):
+            raise ValueError("来源断言必须引用同一结果中的规范化观测")
         if status == ResultStatus.ERROR.value and not self.errors:
             raise ValueError("error 结果必须包含结构化错误")
         if status == ResultStatus.EMPTY.value and self.observations:
             raise ValueError("empty 结果不能包含规范化观测")
-        if status == ResultStatus.SUCCESS.value and quality != QualityStatus.NORMAL.value:
-            raise ValueError("success 结果必须使用 normal 质量，限制结果应为 degraded")
-        if status == ResultStatus.ERROR.value and quality == QualityStatus.NORMAL.value:
-            raise ValueError("error 结果不能使用 normal 质量")
+        # 结果状态描述覆盖/可交付性，质量状态描述数据质量；两者必须保持独立。
         _validate_no_non_finite(self.observation_period, path="observationPeriod")
         if self.upstream_as_of is not None:
             object.__setattr__(self, "upstream_as_of", _ensure_aware(self.upstream_as_of))
@@ -538,6 +541,46 @@ class HomepageDataItemResult:
     @property
     def resultHash(self) -> str:
         return self.result_hash
+
+    @property
+    def datasetKey(self) -> str:
+        return self.dataset_key
+
+    @property
+    def providerKey(self) -> str:
+        return self.provider_key
+
+    @property
+    def providerVersion(self) -> str:
+        return self.provider_version
+
+    @property
+    def datasetPayloadVersion(self) -> str:
+        return self.dataset_payload_version
+
+    @property
+    def resultStatus(self) -> ResultStatus:
+        return self.result_status
+
+    @property
+    def qualityStatus(self) -> QualityStatus:
+        return self.quality_status
+
+    @property
+    def contractVersion(self) -> str:
+        return self.contract_version
+
+    @property
+    def normalizationRulesVersion(self) -> str:
+        return self.normalization_rules_version
+
+    @property
+    def sourceAssertions(self) -> tuple[SourceAssertion, ...]:
+        return self.source_assertions
+
+    @property
+    def actualDataCutoff(self) -> DataCutoff | None:
+        return self.actual_data_cutoff
 
     @property
     def requested_scope(self) -> Mapping[str, Any]:
@@ -556,15 +599,22 @@ class HomepageDataItemResult:
             "contractVersion": self.contract_version,
             "datasetKey": self.dataset_key,
             "providerKey": self.provider_key,
+            "providerVersion": self.provider_version,
             "datasetPayloadVersion": self.dataset_payload_version,
             "normalizationRulesVersion": self.normalization_rules_version,
             "resultStatus": self.result_status.value if isinstance(self.result_status, ResultStatus) else self.result_status,
             "qualityStatus": self.quality_status.value if isinstance(self.quality_status, QualityStatus) else self.quality_status,
             "coverage": self.coverage.to_dict(),
             "observations": [item.to_dict() for item in self.observations],
-            "sourceAssertions": [item.to_dict() for item in self.source_assertions],
+            "sourceAssertions": [
+                {key: value for key, value in item.to_dict().items() if key != "fetchedAt"}
+                for item in self.source_assertions
+            ],
             "actualDataCutoff": self.actual_data_cutoff.to_dict() if self.actual_data_cutoff else None,
-            "errors": [item.to_dict() for item in self.errors],
+            "errors": [
+                {key: value for key, value in item.to_dict().items() if key != "occurredAt"}
+                for item in self.errors
+            ],
             "authority": self.authority.to_dict() if self.authority else None,
             "observationPeriod": _canonical_value(self.observation_period),
             "upstreamAsOf": _canonical_value(self.upstream_as_of),
@@ -584,6 +634,12 @@ class HomepageDataItemResult:
     def model_dump(self, *, mode: str = "python", **_: Any) -> dict[str, Any]:
         del mode
         return self.to_dict()
+
+    @classmethod
+    def model_validate(cls, value: Mapping[str, Any] | Self) -> Self:
+        if isinstance(value, cls):
+            return value
+        return cls.from_dict(value)
 
     def dict(self, **kwargs: Any) -> dict[str, Any]:
         return self.model_dump(**kwargs)
@@ -614,6 +670,7 @@ class HomepageDataItemResult:
         return cls(
             dataset_key=request.dataset_key,
             provider_key=provider_key,
+            provider_version=provider_version,
             result_status=ResultStatus.ERROR,
             quality_status=quality_status,
             coverage=ScopeCoverage(requested_scope=request.requested_scope),
@@ -660,6 +717,7 @@ class HomepageDataItemResult:
         return cls(
             dataset_key=str(value.get("datasetKey") or value.get("dataset_key") or ""),
             provider_key=str(value.get("providerKey") or value.get("provider_key") or ""),
+            provider_version=str(value.get("providerVersion") or value.get("provider_version") or "1.0"),
             result_status=value.get("resultStatus") or value.get("result_status") or ResultStatus.ERROR,
             quality_status=value.get("qualityStatus") or value.get("quality_status") or QualityStatus.ISOLATED,
             coverage=coverage,

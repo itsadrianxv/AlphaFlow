@@ -38,6 +38,7 @@ const historyHrefBySection: Record<WorkspaceSection, string | undefined> = {
   timing: "/timing/history",
   watchlists: undefined,
   companyResearch: "/company-research/history",
+  researchInbox: undefined,
   researchTargets: undefined,
   mindMaps: undefined,
   scheduledTasks: undefined,

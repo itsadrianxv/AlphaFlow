@@ -63,6 +63,25 @@ function createToolGuard(maxToolCalls: number) {
   };
 }
 
+export function assertPublicHttpUrl(rawUrl: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error("PUBLIC_WEB_URL_INVALID: 只能读取有效的公开 HTTP(S) URL");
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("PUBLIC_WEB_URL_SCHEME_FORBIDDEN: 只能读取 HTTP(S) URL");
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error("PUBLIC_WEB_URL_CREDENTIALS_FORBIDDEN: 公开网页读取不能携带凭据");
+  }
+  if (isPrivateHostname(parsed.hostname)) {
+    throw new Error("PUBLIC_WEB_URL_PRIVATE_FORBIDDEN: 不允许访问本机、内网或链路本地地址");
+  }
+}
+
 function withTimeout(signal: AbortSignal | undefined, timeoutMs: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);

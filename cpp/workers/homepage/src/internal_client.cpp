@@ -9,14 +9,38 @@ struct CurlHandle{ CURL* value{curl_easy_init()}; ~CurlHandle(){if(value)curl_ea
 }
 bool InternalClient::retryable_http_status(long status){ return status==408||status==429||status>=500; }
 HomePageGenerationResult InternalClient::parse_response(const std::string& body){
-  try { auto json=nlohmann::json::parse(body); auto payload=json.at("payload"); auto as_of=json.at("dataAsOf").get<std::string>(); if(!payload.is_object()||as_of.empty()) throw std::runtime_error("payload 或 dataAsOf 不合法"); return {std::move(payload),std::move(as_of)}; }
+  try {
+    auto json=nlohmann::json::parse(body);
+    const auto kind=json.at("kind").get<std::string>();
+    if(kind=="obsolete") throw WorkerError("STALE_GENERATION_TASK","首页生成任务已失效",false);
+    if(kind=="retryable_failure") throw WorkerError(json.at("errorCode").get<std::string>(),json.value("details",nlohmann::json::object()).dump(),true);
+    if(kind=="terminal_failure") throw WorkerError(json.at("errorCode").get<std::string>(),json.value("details",nlohmann::json::object()).dump(),false);
+    if(kind!="generated") throw std::runtime_error("未知首页生成结果类型");
+    auto payload=json.at("payload");
+    auto coverage=json.at("dataCoverage");
+    if(!payload.is_object()||!coverage.is_array()) throw std::runtime_error("payload 或 dataCoverage 不合法");
+    return {
+      json.at("taskId").get<std::string>(),
+      json.at("manifestId").get<std::string>(),
+      std::stoll(json.at("activationSequence").get<std::string>()),
+      json.at("promotionMode").get<std::string>(),
+      json.at("generationInputContractVersion").get<std::string>(),
+      json.at("generatorDefinitionVersion").get<std::string>(),
+      json.at("payloadSchemaVersion").get<std::string>(),
+      json.at("inputHash").get<std::string>(),
+      json.at("payloadHash").get<std::string>(),
+      std::move(payload),
+      std::move(coverage)
+    };
+  }
   catch(const WorkerError&){throw;} catch(const std::exception& error){throw WorkerError("INVALID_GENERATOR_RESPONSE",error.what(),false);}
 }
 task_lifecycle::ExecutionResult<HomePageGenerationResult> InternalClient::execute(const HomePageTask& task,std::stop_token stop_token) const{
   CurlHandle curl; if(!curl.value) return task_lifecycle::RetryableFailure{{"GENERATOR_CONNECTION_ERROR","无法初始化 libcurl"}}; std::string response;
   const std::string url=config_.web_internal_url+"/api/internal/homepage-generation/"+task.message.run_id;
   curl_slist* headers=nullptr; headers=curl_slist_append(headers,"Content-Type: application/json"); const std::string secret="X-Alphaflow-Internal-Secret: "+config_.internal_api_secret; headers=curl_slist_append(headers,secret.c_str());
-  curl_easy_setopt(curl.value,CURLOPT_URL,url.c_str()); curl_easy_setopt(curl.value,CURLOPT_HTTPHEADER,headers); curl_easy_setopt(curl.value,CURLOPT_POSTFIELDS,""); curl_easy_setopt(curl.value,CURLOPT_WRITEFUNCTION,append_body); curl_easy_setopt(curl.value,CURLOPT_WRITEDATA,&response);
+  const auto request_body=nlohmann::json{{"contractVersion","1.0"},{"taskId",task.message.run_id},{"workerId",config_.worker_id},{"fencingToken",std::to_string(task.fencing_token)}}.dump();
+  curl_easy_setopt(curl.value,CURLOPT_URL,url.c_str()); curl_easy_setopt(curl.value,CURLOPT_HTTPHEADER,headers); curl_easy_setopt(curl.value,CURLOPT_POSTFIELDS,request_body.c_str()); curl_easy_setopt(curl.value,CURLOPT_WRITEFUNCTION,append_body); curl_easy_setopt(curl.value,CURLOPT_WRITEDATA,&response);
   curl_easy_setopt(curl.value,CURLOPT_TIMEOUT_MS,static_cast<long>(config_.request_timeout_ms)); curl_easy_setopt(curl.value,CURLOPT_CONNECTTIMEOUT_MS,10000L); curl_easy_setopt(curl.value,CURLOPT_XFERINFOFUNCTION,progress_callback); curl_easy_setopt(curl.value,CURLOPT_XFERINFODATA,&stop_token); curl_easy_setopt(curl.value,CURLOPT_NOPROGRESS,0L);
   const CURLcode code=curl_easy_perform(curl.value); long status=0; curl_easy_getinfo(curl.value,CURLINFO_RESPONSE_CODE,&status); curl_slist_free_all(headers);
   if(code!=CURLE_OK) return task_lifecycle::RetryableFailure{{code==CURLE_OPERATION_TIMEDOUT?"GENERATOR_TIMEOUT":"GENERATOR_CONNECTION_ERROR",curl_easy_strerror(code)}};
@@ -26,6 +50,6 @@ task_lifecycle::ExecutionResult<HomePageGenerationResult> InternalClient::execut
     if(retryable_http_status(status)) return task_lifecycle::RetryableFailure{std::move(failure)};
     return task_lifecycle::TerminalFailure{std::move(failure)};
   }
-  try{return task_lifecycle::Completed{parse_response(response)};}catch(const WorkerError& error){return task_lifecycle::TerminalFailure{{error.code(),error.what()}};}
+  try{return task_lifecycle::Completed{parse_response(response)};}catch(const WorkerError& error){if(error.retryable()) return task_lifecycle::RetryableFailure{{error.code(),error.what()}}; if(error.code()=="STALE_GENERATION_TASK") return task_lifecycle::Obsolete{}; return task_lifecycle::TerminalFailure{{error.code(),error.what()}};}
 }
 bool InternalClient::health() const{ CurlHandle curl; if(!curl.value)return false; const std::string url=config_.web_internal_url+"/api/health/live"; curl_easy_setopt(curl.value,CURLOPT_URL,url.c_str()); curl_easy_setopt(curl.value,CURLOPT_WRITEFUNCTION,discard_body); curl_easy_setopt(curl.value,CURLOPT_TIMEOUT_MS,3000L); const auto code=curl_easy_perform(curl.value); long status=0; curl_easy_getinfo(curl.value,CURLINFO_RESPONSE_CODE,&status); return code==CURLE_OK&&status>=200&&status<300; }

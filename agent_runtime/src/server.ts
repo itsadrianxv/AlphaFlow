@@ -90,6 +90,12 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
     capabilityConstraints: isRecord(value.capabilityConstraints)
       ? value.capabilityConstraints
       : undefined,
+    executionBoundary: isRecord(value.executionBoundary)
+      ? value.executionBoundary
+      : undefined,
+    networkPolicy: isRecord(value.networkPolicy)
+      ? value.networkPolicy
+      : undefined,
   };
 }
 

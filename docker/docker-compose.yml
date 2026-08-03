@@ -302,6 +302,41 @@ services:
       timeout: 5s
       retries: 20
 
+  data-acquisition-worker:
+    build:
+      context: ..
+      dockerfile: docker/data-acquisition-worker/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-service:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      PYTHON_SERVICE_URL: ${PYTHON_SERVICE_URL:-http://python-service:8000}
+      ALPHAFLOW_INTERNAL_API_SECRET: ${ALPHAFLOW_INTERNAL_API_SECRET:-dev-internal-secret}
+      DATA_ACQUISITION_WORKER_THREADS: ${DATA_ACQUISITION_WORKER_THREADS:-2}
+      DATA_ACQUISITION_WORKER_QUEUE_CAPACITY: ${DATA_ACQUISITION_WORKER_QUEUE_CAPACITY:-4}
+      DATA_ACQUISITION_WORKER_LEASE_SECONDS: ${DATA_ACQUISITION_WORKER_LEASE_SECONDS:-300}
+      DATA_ACQUISITION_WORKER_HEARTBEAT_SECONDS: ${DATA_ACQUISITION_WORKER_HEARTBEAT_SECONDS:-30}
+      DATA_ACQUISITION_WORKER_CLAIM_IDLE_MS: ${DATA_ACQUISITION_WORKER_CLAIM_IDLE_MS:-300000}
+      DATA_ACQUISITION_WORKER_REQUEST_TIMEOUT_MS: ${DATA_ACQUISITION_WORKER_REQUEST_TIMEOUT_MS:-120000}
+      DATA_ACQUISITION_WORKER_HEALTH_PORT: ${DATA_ACQUISITION_WORKER_HEALTH_PORT:-8070}
+      DATA_ACQUISITION_STREAM: ${DATA_ACQUISITION_STREAM:-homepage:data-acquisition}
+      DATA_ACQUISITION_GROUP: ${DATA_ACQUISITION_GROUP:-data-acquisition-worker}
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8070/health/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
   llm-scheduler:
     build:
       context: ..

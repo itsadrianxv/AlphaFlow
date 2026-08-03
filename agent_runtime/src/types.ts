@@ -9,6 +9,9 @@ export type AgentRunStatus =
 export type AgentRuntimeEventType =
   | "run.created"
   | "run.started"
+  | "run.boundary.frozen"
+  | "run.audit.recorded"
+  | "candidate_seed.queued"
   | "agent.message.start"
   | "agent.message.delta"
   | "agent.message"
@@ -57,6 +60,7 @@ export type StartRunRequest = {
   sessionSeed?: AgentRuntimeSeedMessage[];
   allowedCapabilities?: string[];
   capabilityConstraints?: Record<string, unknown>;
+  executionBoundary?: Record<string, unknown>;
   networkPolicy?: {
     allowPublicHttp?: boolean;
     allowPrivateNetwork?: boolean;
@@ -106,8 +110,10 @@ export type AgentRunSnapshot = {
     prompt: string;
     skillIds?: string[];
     context?: Record<string, unknown>;
+    executionBoundary?: Record<string, unknown>;
   };
   finalOutput?: Record<string, unknown>;
+  audit?: Record<string, unknown>;
   errorCode?: string;
   errorMessage?: string;
   createdAt: string;

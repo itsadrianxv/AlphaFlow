@@ -70,7 +70,7 @@ async def health_check():
 
 # Register routers
 from app.routers import admin_jobs, capabilities_v1, definitive_scheduled_tasks_v1, intelligence_data
-from app.routers import company_overview_v1, intelligence_v1, market_context_v1, market_data, screening_v1, sell_side_v1, timing_v1
+from app.routers import company_overview_v1, homepage_provider_v1, intelligence_v1, market_context_v1, market_data, screening_v1, sell_side_v1, timing_v1
 
 app.include_router(
     intelligence_data.router, prefix="/api", tags=["intelligence"]
@@ -84,4 +84,5 @@ app.include_router(definitive_scheduled_tasks_v1.router)
 app.include_router(timing_v1.router, tags=["timing-v1"])
 app.include_router(company_overview_v1.router, tags=["company-overview-v1"])
 app.include_router(sell_side_v1.router, tags=["sell-side-v1"])
+app.include_router(homepage_provider_v1.router)
 app.include_router(admin_jobs.router)

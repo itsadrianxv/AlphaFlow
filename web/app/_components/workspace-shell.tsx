@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck } from "lucide-react";
+import { Inbox, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, {
@@ -46,6 +46,7 @@ export type WorkspaceSection =
   | "timing"
   | "watchlists"
   | "companyResearch"
+  | "researchInbox"
   | "researchTargets"
   | "mindMaps"
   | "scheduledTasks"
@@ -103,6 +104,12 @@ const sidebarNavItems: Array<{
     href: "/timing",
     label: "择时研究",
     icon: TimingIcon,
+  },
+  {
+    key: "researchInbox",
+    href: "/research-inbox",
+    label: "研究收件箱",
+    icon: Inbox,
   },
   {
     key: "researchTargets",

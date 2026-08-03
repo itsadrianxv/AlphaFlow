@@ -40,8 +40,10 @@ const agentRuntimeRunSchema = z.object({
     prompt: z.string(),
     skillIds: z.array(z.string()).optional(),
     context: z.record(z.unknown()).optional(),
+    executionBoundary: z.record(z.unknown()).optional(),
   }),
   finalOutput: z.record(z.unknown()).optional(),
+  audit: z.record(z.unknown()).optional(),
   errorCode: z.string().optional(),
   errorMessage: z.string().optional(),
   createdAt: z.string(),
@@ -80,6 +82,7 @@ export type StartAgentRuntimeRunInput = {
   prompt: string;
   title?: string;
   context?: Record<string, unknown>;
+  executionBoundary?: Record<string, unknown>;
   sessionSeed?: Array<{
     role: "user" | "assistant";
     content: string;
@@ -180,10 +183,15 @@ export class AgentRuntimeClient {
   }
 
   async cancelRun(runId: string) {
-    await this.requestJson(`/runs/${runId}/cancel`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    }, undefined, this.cancelTimeoutMs);
+    await this.requestJson(
+      `/runs/${runId}/cancel`,
+      {
+        method: "POST",
+        body: JSON.stringify({}),
+      },
+      undefined,
+      this.cancelTimeoutMs,
+    );
   }
 
   async *streamRunEvents(params: {

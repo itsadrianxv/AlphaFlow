@@ -83,7 +83,7 @@ function callerWithSnapshot(snapshot: unknown) {
         })),
       },
       workflowRun: { findFirst: vi.fn() },
-      homePageSnapshot: { findFirst: vi.fn(async () => snapshot) },
+      homepageSnapshot: { findFirst: vi.fn(async () => snapshot) },
     },
     session: {
       user: { id: "user-1", sessionVersion: 0 },
@@ -115,7 +115,7 @@ describe("ensureImpactMappingAnalyses", () => {
   it("允许基于首页快照中的事件复用内嵌分析", async () => {
     const baseSnapshotId = "cly1234567890123456789012";
     const result = await callerWithSnapshot({
-      payload: { impactMapping: baseResult(true) },
+      payloadJson: { impactMapping: baseResult(true) },
     }).ensureImpactMappingAnalyses({
       baseSnapshotId,
       eventIds: ["event-1"],

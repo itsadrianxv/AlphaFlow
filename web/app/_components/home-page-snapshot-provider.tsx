@@ -26,9 +26,9 @@ export function HomePageSnapshotProvider({
         isError: query.isError,
       }}
     >
-      {query.data?.isRefreshing ? (
+      {query.data?.refreshInProgress ? (
         <div className="border-b border-[var(--app-border-soft)] px-4 py-2 text-xs text-[var(--app-text-muted)]">
-          个性化数据更新中 · 当前数据日期 {query.data.dataAsOf}
+          首页快照更新中
         </div>
       ) : null}
       {children}

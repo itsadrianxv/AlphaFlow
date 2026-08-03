@@ -2,8 +2,8 @@ import { db } from "~/server/db";
 
 export async function GET() {
   try {
-    const snapshot = await db.homePageSnapshot.findFirst({
-      where: { scope: "DEFAULT" },
+    const snapshot = await db.homepageSnapshot.findFirst({
+      where: { scope: "BASELINE" },
       select: { id: true },
     });
     return snapshot

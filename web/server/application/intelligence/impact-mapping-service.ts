@@ -1023,14 +1023,14 @@ export class ImpactMappingService {
       });
       value = run?.result;
     } else if (source.snapshotId) {
-      const snapshot = await this.deps.prisma.homePageSnapshot.findFirst({
+      const snapshot = await this.deps.prisma.homepageSnapshot.findFirst({
         where: {
           id: source.snapshotId,
-          OR: [{ scope: "DEFAULT" }, { userId }],
+          OR: [{ scope: "BASELINE" }, { userId }],
         },
-        select: { payload: true },
+        select: { payloadJson: true },
       });
-      value = asObject(snapshot?.payload).impactMapping;
+      value = asObject(snapshot?.payloadJson).impactMapping;
     }
     const result = asObject(value) as Partial<ImpactMappingResult>;
     const event =

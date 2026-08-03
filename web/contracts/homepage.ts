@@ -10,11 +10,12 @@ export const homePagePayloadSchema = z.object({
 
 export const homePageSnapshotEnvelopeSchema = z.object({
   snapshotId: z.string(),
-  source: z.enum(["DEFAULT", "PERSONALIZED"]),
+  source: z.enum(["BASELINE", "PERSONALIZED"]),
+  manifestId: z.string(),
   generatedAt: z.string().datetime(),
-  dataAsOf: z.string(),
-  isStale: z.boolean(),
-  isRefreshing: z.boolean(),
+  dataCoverage: z.unknown(),
+  baselineOutdated: z.boolean(),
+  refreshInProgress: z.boolean(),
   personalizationPending: z.boolean(),
   payload: homePagePayloadSchema,
 });

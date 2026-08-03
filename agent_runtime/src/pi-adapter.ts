@@ -15,8 +15,19 @@ import {
 import { createModels } from "@earendil-works/pi-ai";
 import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
 import { asJsonObject, summarizeValue } from "./json";
+import {
+  AgentBudgetController,
+  createExecutionBoundary,
+  type AgentRunAudit,
+  type AgentStopReason,
+} from "./execution-boundary";
 import { PythonGatewayClient } from "./python-gateway-client";
 import { RestrictedExecutionEnv } from "./restricted-env";
+import {
+  buildImmediateResearchCandidateSeeds,
+  buildResearchOnlySystemInstruction,
+  enforceResearchOnlyFinalText,
+} from "./research-only-policy";
 import type { SkillRegistry } from "./skill-registry";
 import { createInternalTools, STANDARD_INTERNAL_TOOL_NAMES } from "./tool-policy";
 import { createScheduledTaskSetupTools, SCHEDULED_TASK_SETUP_TOOL_NAMES } from "./scheduled-task-setup-tools";
@@ -120,8 +131,9 @@ function resolveSystemPrompt(now = new Date()) {
     "当用户提到“我的收藏”“我的行业”“我的公司”“我的自选股”“已有笔记”或“已保存报告”时，优先使用内部投研对象工具读取当前用户授权范围内的对象。",
     "仅在用户明确提出分析、比较、补充、风险、催化、跟踪指标或类似请求时，才基于投研对象继续调用行情、财务、事件、资金流等市场数据工具；普通列举或查看请求不要主动补行情财务。",
     "内部投研对象工具是只读工具，不得声称已经保存、修改、删除或加入收藏；如果用户要求保存，只输出可保存的文本草稿并说明当前运行不会写入收藏。",
+    buildResearchOnlySystemInstruction(),
     "默认使用中文输出，并在涉及数据、网页或筛选结果时说明来源。",
-    "不得输出买卖建议、收益保证或确定性投资承诺。",
+    "不得输出收益保证或确定性投资承诺。",
   ].join("\n");
 }
 
@@ -171,6 +183,8 @@ export type HarnessEventState = {
   waitingForInput?: UserInputRequest;
   scheduledDraftBuilt: boolean;
   scheduleValidationStatus?: string;
+  toolSummaries?: Array<Record<string, unknown>>;
+  budgetController?: AgentBudgetController;
 };
 
 export function mapHarnessEvent(
@@ -180,6 +194,7 @@ export function mapHarnessEvent(
   state: HarnessEventState,
 ) {
   if (event.type === "message_start" && event.message.role === "assistant") {
+    state.budgetController?.recordStep();
     state.lastAssistantText = "";
     store.appendEvent(request.runId, "agent.message.start", {
       conversationId: request.conversationId,
@@ -230,6 +245,7 @@ export function mapHarnessEvent(
   }
 
   if (event.type === "tool_call") {
+    state.budgetController?.recordToolCall(event.toolName);
     store.appendEvent(request.runId, "tool.call.started", {
       toolCallId: event.toolCallId,
       toolName: event.toolName,
@@ -256,6 +272,14 @@ export function mapHarnessEvent(
       ),
       isError: event.isError,
     };
+    state.toolSummaries?.push({
+      toolCallId: event.toolCallId,
+      toolName: event.toolName,
+      skillIds: resolveSkillIds(request),
+      inputSummary: payload.inputSummary,
+      outputSummary: payload.outputSummary,
+      isError: event.isError,
+    });
 
     store.appendEvent(
       request.runId,
@@ -502,6 +526,11 @@ export class PiAdapter {
 
   private async runTurn(request: StartRunRequest, turnGeneration: number) {
     const skillIds = resolveSkillIds(request);
+    const boundary = createExecutionBoundary(
+      { ...request, skillIds },
+      this.config,
+    );
+    const budgetController = new AgentBudgetController(boundary);
     const skills = skillIds
       .map((skillId) => this.skillRegistry.get(skillId))
       .filter((skill): skill is Skill => Boolean(skill));
@@ -531,6 +560,9 @@ export class PiAdapter {
       return;
     }
     this.store.markRunning(request.runId);
+    this.store.appendEvent(request.runId, "run.boundary.frozen", {
+      boundary,
+    });
     const scheduledContext = request.context as Record<string, unknown> | undefined;
     const executionId = typeof scheduledContext?.executionId === "string" ? scheduledContext.executionId : undefined;
     const taskId = typeof scheduledContext?.taskId === "string" ? scheduledContext.taskId : "";
@@ -572,19 +604,34 @@ export class PiAdapter {
       ...STANDARD_INTERNAL_TOOL_NAMES.filter((name) => name !== "ask_user"),
       "internal_tushare_dataset",
     ];
-    const activeToolNames = isSetup || isEdit
+    const requestedActiveToolNames = isSetup || isEdit
       ? [...SCHEDULED_TASK_SETUP_TOOL_NAMES, "ask_user"]
       : isScheduledExecution
         ? executionToolNames.filter((name) => request.allowedCapabilities?.includes(name))
         : [...STANDARD_INTERNAL_TOOL_NAMES];
+    if (!request.allowedCapabilities || request.allowedCapabilities.length === 0) {
+      boundary.allowedCapabilities = [
+        ...new Set([...boundary.allowedCapabilities, ...requestedActiveToolNames]),
+      ].sort();
+    }
+    const activeToolNames = requestedActiveToolNames.filter((name) =>
+      boundary.allowedCapabilities.includes(name),
+    );
     const standardTools = createInternalTools({
       pythonGatewayClient: this.pythonGatewayClient,
       webInternalClient: this.webInternalClient,
       runId: request.runId,
       userId: request.userId,
-      maxToolCalls: this.config.maxToolCallsPerRun,
+      maxToolCalls: boundary.budget.maxToolCalls,
       toolTimeoutMs: this.config.toolTimeoutMs,
-      networkPolicy: request.networkPolicy,
+      networkPolicy: {
+        allowPublicHttp: boundary.networkPolicy.allowPublicHttp,
+        allowPrivateNetwork: !boundary.networkPolicy.denyPrivateNetwork,
+        allowCredentialedUrls: boundary.networkPolicy.allowCredentials,
+        allowedSchemes: boundary.networkPolicy.allowedSchemes.map(
+          (scheme) => `${scheme}:`,
+        ),
+      },
       capabilityConstraints: request.capabilityConstraints,
     });
     const setupTools = request.conversationId
@@ -627,6 +674,8 @@ export class PiAdapter {
     const eventState: HarnessEventState = {
       lastAssistantText: "",
       scheduledDraftBuilt: false,
+      toolSummaries: [],
+      budgetController,
     };
     registerHarnessEventHandlers({
       harness,
@@ -646,6 +695,8 @@ export class PiAdapter {
         runtimeSkill.name,
         `${request.prompt}${context}`,
       );
+      const usage = (assistantMessage as { usage?: { input?: number; output?: number } }).usage;
+      budgetController.recordModelUsage(usage?.input ?? 0, usage?.output ?? 0);
       const postTurnSnapshot = this.store.snapshot(request.runId);
       if (
         !this.store.isCurrentTurn(request.runId, turnGeneration) ||
@@ -662,6 +713,11 @@ export class PiAdapter {
         scheduledTaskInteractive &&
         !isScheduledTaskFlowComplete(eventState)
       ) {
+        this.recordAudit({
+          boundary,
+          state: eventState,
+          stopReason: "contract_invalid",
+        });
         this.store.markFailed(
           request.runId,
           "SCHEDULED_TASK_FLOW_INCOMPLETE",
@@ -680,13 +736,29 @@ export class PiAdapter {
         this.store.markCancelled(request.runId, "cancel_requested");
         return;
       }
-      const text = extractMessageText(assistantMessage);
+      const rawText = extractMessageText(assistantMessage);
+      const researchOnly = enforceResearchOnlyFinalText({
+        prompt: request.prompt,
+        text: rawText,
+      });
+      const text = researchOnly.text;
+      const candidateSeeds = buildImmediateResearchCandidateSeeds({
+        runId: request.runId,
+        prompt: request.prompt,
+        toolSummaries: eventState.toolSummaries ?? [],
+      });
       const finalOutput = {
         text,
         skillId: request.skillId,
         skillIds,
         generatedAt: new Date().toISOString(),
         context: asJsonObject(request.context),
+        researchOnly: {
+          mode: "research_only",
+          blockedExecutableRequest: researchOnly.blocked,
+          categories: researchOnly.categories,
+          removedLineCount: researchOnly.removedLineCount,
+        },
       };
       if (executionId) {
         await this.webInternalClient.persistScheduledTaskResult(executionId, { runId: request.runId, status: "SUCCEEDED", ...parseScheduledOutput(text) });
@@ -699,6 +771,21 @@ export class PiAdapter {
         contentType: "text/markdown",
         payload: finalOutput,
       });
+      if (candidateSeeds.length > 0) {
+        this.store.appendEvent(request.runId, "candidate_seed.queued", {
+          mode: "post_response_async",
+          idempotent: true,
+          count: candidateSeeds.length,
+          seedKeys: candidateSeeds.map((seed) => seed.seedKey),
+        });
+      }
+      this.recordAudit({
+        boundary,
+        state: eventState,
+        stopReason: "completed",
+        structuredOutput: finalOutput,
+        followUpObjects: candidateSeeds,
+      });
       this.store.markSucceeded(request.runId, finalOutput);
     } catch (error) {
       if (abortController.signal.aborted) {
@@ -706,18 +793,58 @@ export class PiAdapter {
           await this.webInternalClient.persistScheduledTaskResult(executionId, { runId: request.runId, status: "CANCELLED", error: { message: "cancel_requested" } }).catch(() => undefined);
           await publishScheduled("execution.cancelled", "cancelled", "cancel_requested");
         }
+        this.recordAudit({
+          boundary,
+          state: eventState,
+          stopReason: "cancelled",
+        });
         this.store.markCancelled(request.runId, "cancel_requested");
         return;
       }
 
       const message = error instanceof Error ? error.message : "未知错误";
+      const stopReason: AgentStopReason =
+        /预算|budget|超过上限/.test(message)
+          ? "budget_exhausted"
+          : /未授权|扩权|能力/.test(message)
+            ? "boundary_violation"
+            : "model_error";
       if (executionId) {
         await this.webInternalClient.persistScheduledTaskResult(executionId, { runId: request.runId, status: "FAILED", error: { message } }).catch(() => undefined);
         await publishScheduled("execution.failed", "failed", message);
       }
+      this.recordAudit({
+        boundary,
+        state: eventState,
+        stopReason,
+      });
       this.store.markFailed(request.runId, "PI_AGENT_FAILED", message);
     } finally {
       await env.cleanup();
     }
+  }
+
+  private recordAudit(params: {
+    boundary: ReturnType<typeof createExecutionBoundary>;
+    state: HarnessEventState;
+    stopReason: AgentStopReason;
+    structuredOutput?: Record<string, unknown>;
+    followUpObjects?: Array<Record<string, unknown>>;
+  }) {
+    const audit: AgentRunAudit = {
+      boundary: params.boundary,
+      toolSummaries: params.state.toolSummaries ?? [],
+      structuredOutput: params.structuredOutput,
+      stopReason: params.stopReason,
+      usage: params.state.budgetController?.snapshotUsage() ?? {
+        steps: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        toolCalls: 0,
+        subtasksStarted: 0,
+      },
+      followUpObjects: params.followUpObjects ?? [],
+    };
+    this.store.recordAudit(params.boundary.runId, audit as unknown as Record<string, unknown>);
   }
 }
