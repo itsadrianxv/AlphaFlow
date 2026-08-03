@@ -114,8 +114,19 @@ export async function POST(request: Request) {
             { error: "EDIT_CONTEXT_NOT_FOUND" },
             { status: 409 },
           );
+        const edit = new ScheduledTaskEditService(db);
+        if (input.params.changeSet)
+          return Response.json(
+            await edit.prepareScoringAgentChange({
+              userId: input.userId,
+              taskId: conversation.activeScheduledTaskEditTaskId,
+              conversationId: input.conversationId,
+              idempotencyKey: input.idempotencyKey,
+              changeSet: input.params.changeSet,
+            }),
+          );
         return Response.json(
-          await new ScheduledTaskEditService(db).prepareAgent({
+          await edit.prepareAgent({
             userId: input.userId,
             taskId: conversation.activeScheduledTaskEditTaskId,
             conversationId: input.conversationId,

@@ -6,17 +6,22 @@ import { enqueueHomePageTask } from "../../server/application/homepage/home-page
 import { publishHomePageGenerationTask } from "../../server/application/homepage/home-page-task-stream";
 import { publishDefinitiveTaskRun } from "../../server/application/scheduled-task/definitive-task-run-stream";
 import { submitScheduledTaskExecution } from "../../server/application/scheduled-task/scheduled-task-execution-service";
+import { ScheduledTaskWebhookCredentialService } from "../../server/application/scheduled-task/scheduled-task-webhook-credential-service";
 import {
   scheduledTaskDeliverySpecSchema,
   scheduledTaskOutputSpecSchema,
 } from "../../server/domain/scheduled-task/contracts";
-import { assertDeliveryTargetSecretsConfigured } from "../../server/domain/scheduled-task/delivery-targets";
+import {
+  assertDeliveryTargetSecretsConfigured,
+  resolveFeishuWebhook,
+} from "../../server/domain/scheduled-task/delivery-targets";
 import {
   computeNextRunAt,
   type ScheduleSpec,
 } from "../../server/domain/scheduled-task/schedule";
 import { resolvePublicBaseUrl } from "../../shared/public-url";
 import {
+  buildScoringDeliveryMessage,
   DeliveryAttemptError,
   deliverScheduledTask,
 } from "../scheduler-delivery";
@@ -68,6 +73,7 @@ function deliveryResult(
   value: Prisma.JsonValue | null,
   context?: {
     taskName: string;
+    taskId: string;
     executionId: string;
     rows: Array<{
       stockCode: string;
@@ -80,22 +86,15 @@ function deliveryResult(
 ) {
   const record = value ? asRecord(value) : {};
   if (record.type === "SCORING_REPORT" && context) {
-    const rows = context.rows.slice(0, context.summaryLimit);
     const baseUrl = resolvePublicBaseUrl({ authUrl: process.env.AUTH_URL });
-    const lines = rows.map(
-      (row) =>
-        `${row.rank}. ${row.stockName}（${row.stockCode}） ${row.score} 分`,
-    );
-    return {
-      title: `${context.taskName}评分完成`,
-      summary: `入选 ${String(record.selectedCount ?? rows.length)} 只股票`,
-      body: [
-        `数据截止：${String(record.asOfDate ?? "-")}`,
-        `评估 ${String(record.evaluatedCount ?? "-")} / ${String(record.universeCount ?? "-")} 只股票，入选 ${String(record.selectedCount ?? rows.length)} 只。`,
-        ...lines,
-        `完整结果与 Excel：${baseUrl}/api/scheduled-tasks/executions/${context.executionId}/export`,
-      ].join("\n"),
-    };
+    return buildScoringDeliveryMessage({
+      ...context,
+      baseUrl,
+      asOfDate: String(record.asOfDate ?? "-"),
+      evaluatedCount: Number(record.evaluatedCount ?? 0),
+      universeCount: Number(record.universeCount ?? 0),
+      selectedCount: Number(record.selectedCount ?? context.rows.length),
+    });
   }
   return {
     title: typeof record.title === "string" ? record.title : undefined,
@@ -467,7 +466,7 @@ async function processDeliveries() {
       execution: {
         include: {
           taskVersion: true,
-          task: { select: { name: true } },
+          task: { select: { id: true, name: true } },
           scoreResults: {
             where: { selected: true },
             orderBy: { rank: "asc" },
@@ -515,10 +514,17 @@ async function processDeliveries() {
         spec,
         deliveryResult(delivery.execution.result, {
           taskName: delivery.execution.task.name,
+          taskId: delivery.execution.task.id,
           executionId: delivery.execution.id,
           rows: delivery.execution.scoreResults,
           summaryLimit,
         }),
+        {
+          resolveWebhook: (credentialRef) =>
+            new ScheduledTaskWebhookCredentialService(db)
+              .resolveForDelivery(credentialRef)
+              .catch(() => resolveFeishuWebhook(credentialRef)),
+        },
       );
       if (result.outcome !== "SENT")
         throw new DeliveryAttemptError(

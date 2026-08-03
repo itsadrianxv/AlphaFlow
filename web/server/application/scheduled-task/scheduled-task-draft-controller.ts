@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   type DeterministicExecutionPlan,
   deterministicExecutionPlanSchema,
-  scheduledTaskDeliverySpecSchema,
   scheduledTaskOutputSpecSchema,
   scheduleSpecSchema,
 } from "~/server/domain/scheduled-task/contracts";
@@ -19,6 +18,24 @@ const operatorSchema = z.enum([
   "between",
   "cross_above",
   "cross_below",
+]);
+
+const scoringBuilderDeliverySchema = z.union([
+  z.object({ type: z.literal("SAVE_ONLY") }).strict(),
+  z
+    .object({
+      type: z.literal("FEISHU"),
+      targetRef: z
+        .string()
+        .regex(/^[a-z0-9][a-z0-9_-]{0,62}$/)
+        .optional(),
+      webhookUrl: z.string().trim().min(1).optional(),
+      maskedWebhook: z.string().optional(),
+    })
+    .strict()
+    .refine((value) => value.targetRef || value.webhookUrl, {
+      message: "请输入飞书官方 Webhook",
+    }),
 ]);
 
 const scoringBuilderDraftSchema = z.object({
@@ -60,7 +77,7 @@ const scoringBuilderDraftSchema = z.object({
     limit: z.number().int().min(1).max(5000),
   }),
   output: scheduledTaskOutputSpecSchema,
-  delivery: scheduledTaskDeliverySpecSchema,
+  delivery: scoringBuilderDeliverySchema,
 });
 
 export type ScoringBuilderDraftInput = z.input<

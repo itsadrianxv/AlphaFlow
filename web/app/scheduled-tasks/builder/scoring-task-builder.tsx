@@ -1,6 +1,16 @@
 "use client";
 
-import { Copy, Plus, Save, Trash2, Undo2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  MessageSquare,
+  Plus,
+  Save,
+  Send,
+  Trash2,
+  Undo2,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -57,7 +67,14 @@ type Draft = {
     feishuSummaryLimit: number;
     sendOnEmpty: boolean;
   };
-  delivery: { type: "SAVE_ONLY" } | { type: "FEISHU"; targetRef: string };
+  delivery:
+    | { type: "SAVE_ONLY" }
+    | {
+        type: "FEISHU";
+        targetRef?: string;
+        webhookUrl?: string;
+        maskedWebhook?: string;
+      };
 };
 
 const metricOptions = [
@@ -407,12 +424,29 @@ function ConditionEditor(props: {
   );
 }
 
-function draftFromConfig(payload: { name: string; config: unknown }): Draft {
+function draftFromConfig(payload: {
+  name: string;
+  config: unknown;
+  deliveryCredential?: {
+    credentialRef: string;
+    maskedWebhook: string;
+  } | null;
+}): Draft {
   const config = asRecord(payload.config);
   const plan = asRecord(config.executionPlan);
   const schedule = asRecord(config.scheduleSpec) as Draft["schedule"];
   const output = asRecord(config.outputSpec) as Draft["output"];
-  const delivery = asRecord(config.deliverySpec) as Draft["delivery"];
+  const deliverySpec = asRecord(config.deliverySpec);
+  const delivery: Draft["delivery"] =
+    deliverySpec.type === "FEISHU"
+      ? {
+          type: "FEISHU",
+          targetRef:
+            payload.deliveryCredential?.credentialRef ??
+            String(deliverySpec.targetRef ?? ""),
+          maskedWebhook: payload.deliveryCredential?.maskedWebhook,
+        }
+      : { type: "SAVE_ONLY" };
   const universe = asRecord(plan.universe);
   const indicators = Array.isArray(plan.indicators)
     ? plan.indicators.map(asRecord)
@@ -462,6 +496,15 @@ export function ScoringTaskBuilder() {
   const [stockSearchKeyword, setStockSearchKeyword] = useState("");
   const [previewSampleInput, setPreviewSampleInput] = useState("");
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [agentExpanded, setAgentExpanded] = useState(true);
+  const [agentPrompt, setAgentPrompt] = useState("");
+  const [agentConversationId, setAgentConversationId] = useState<string | null>(
+    null,
+  );
+  const [agentConflict, setAgentConflict] = useState(false);
+  const [agentMarkers, setAgentMarkers] = useState<
+    Array<{ type: string; ruleId?: string; field?: string }>
+  >([]);
   const [removedRule, setRemovedRule] = useState<{
     rule: Rule;
     index: number;
@@ -476,6 +519,25 @@ export function ScoringTaskBuilder() {
   const saveMutation = api.scheduledTask.saveScoringDraft.useMutation();
   const previewMutation = api.scheduledTask.startScoringPreview.useMutation();
   const activateMutation = api.scheduledTask.activateDraft.useMutation();
+  const startAgentMutation = api.scheduledTask.startAgentEdit.useMutation({
+    onSuccess: (result) => setAgentConversationId(result.conversationId),
+  });
+  const sendAgentMutation = api.agentRuntime.sendMessage.useMutation();
+  const discardAgentMutation = api.scheduledTask.discardEditDraft.useMutation();
+  const agentConversation = api.agentRuntime.getConversation.useQuery(
+    { conversationId: agentConversationId ?? "" },
+    {
+      enabled: Boolean(agentConversationId),
+      refetchInterval: 1500,
+    },
+  );
+  const agentDraftQuery = api.scheduledTask.getEditDraft.useQuery(
+    { conversationId: agentConversationId ?? undefined },
+    {
+      enabled: Boolean(agentConversationId),
+      refetchInterval: 1500,
+    },
+  );
   const previewQuery = api.scheduledTask.getScoringPreview.useQuery(
     { previewId: previewId ?? "" },
     {
@@ -531,6 +593,16 @@ export function ScoringTaskBuilder() {
     setIssues([]);
     setTaskId(result.taskId);
     setVersion(result.version);
+    const savedDelivery = result.delivery;
+    if (savedDelivery?.type === "FEISHU")
+      setDraft((current) => ({
+        ...current,
+        delivery: {
+          type: "FEISHU",
+          targetRef: savedDelivery.credentialRef,
+          maskedWebhook: savedDelivery.maskedWebhook,
+        },
+      }));
     setLastSavedAt(new Date());
     if (revisionRef.current === savingRevision) setDirty(false);
     else {
@@ -581,6 +653,62 @@ export function ScoringTaskBuilder() {
       previewId,
     });
     router.push(`/scheduled-tasks/${taskId}`);
+  };
+
+  const sendAgentPrompt = async () => {
+    const prompt = agentPrompt.trim();
+    if (!prompt || !taskId) return;
+    if (!agentConversationId) {
+      await startAgentMutation.mutateAsync({ taskId, prompt });
+    } else {
+      await sendAgentMutation.mutateAsync({
+        conversationId: agentConversationId,
+        prompt,
+      });
+    }
+    setAgentPrompt("");
+  };
+
+  const applyAgentDraft = (overwrite = false) => {
+    const proposal = agentDraftQuery.data;
+    if (!proposal || !version) return;
+    if (proposal.baseVersion !== version && !overwrite) {
+      setAgentConflict(true);
+      return;
+    }
+    const proposed = draftFromConfig({
+      name: proposal.name,
+      config: {
+        executionPlan: proposal.executionPlan,
+        scheduleSpec: proposal.scheduleSpec,
+        outputSpec: proposal.outputSpec,
+        deliverySpec: proposal.deliverySpec,
+      },
+      deliveryCredential:
+        draft.delivery.type === "FEISHU" && draft.delivery.targetRef
+          ? {
+              credentialRef: draft.delivery.targetRef,
+              maskedWebhook: draft.delivery.maskedWebhook ?? "",
+            }
+          : null,
+    });
+    revisionRef.current += 1;
+    setDraft({ ...proposed, delivery: draft.delivery });
+    setDirty(true);
+    setAgentConflict(false);
+    setAgentMarkers(
+      Array.isArray(proposal.changes)
+        ? proposal.changes.map((item) => asRecord(item) as never)
+        : [],
+    );
+  };
+
+  const discardAgentDraft = async () => {
+    const proposal = agentDraftQuery.data;
+    if (!proposal) return;
+    await discardAgentMutation.mutateAsync({ draftId: proposal.id });
+    setAgentConflict(false);
+    await agentDraftQuery.refetch();
   };
 
   const removeRule = (index: number) =>
@@ -652,6 +780,122 @@ export function ScoringTaskBuilder() {
             .join("；")}
         />
       ) : null}
+
+      <section className="border-b border-[var(--app-border-soft)] bg-[var(--app-panel)]">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left sm:px-6"
+          onClick={() => setAgentExpanded((value) => !value)}
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--app-text-strong)]">
+            <MessageSquare size={16} />
+            Agent 辅助
+          </span>
+          {agentExpanded ? (
+            <ChevronDown size={16} />
+          ) : (
+            <ChevronRight size={16} />
+          )}
+        </button>
+        {agentExpanded ? (
+          <div className="border-t border-[var(--app-border-soft)] px-4 py-4 sm:px-6">
+            {agentConversation.data?.messages.length ? (
+              <div className="max-h-56 space-y-3 overflow-y-auto border-y border-[var(--app-border-soft)] py-3">
+                {agentConversation.data.messages.map((message) => (
+                  <div key={message.id} className="text-sm">
+                    <span className="font-medium text-[var(--app-text-strong)]">
+                      {message.role === "USER" ? "你" : "Agent"}
+                    </span>
+                    <p className="mt-1 whitespace-pre-wrap text-[var(--app-text-muted)]">
+                      {String(message.content ?? message.status)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div className="mt-3 flex gap-2">
+              <textarea
+                className="min-h-20 flex-1 resize-y border border-[var(--app-border)] bg-[var(--app-surface)] p-2.5 text-sm outline-none focus:border-[var(--app-accent-strong)]"
+                value={agentPrompt}
+                onChange={(event) => setAgentPrompt(event.target.value)}
+                placeholder="描述需要新增、修改或移除的规则，也可以调整范围、调度和筛选条件"
+              />
+              <button
+                type="button"
+                className="app-button app-button-icon self-end"
+                title="发送给 Agent"
+                disabled={
+                  !taskId ||
+                  !agentPrompt.trim() ||
+                  startAgentMutation.isPending ||
+                  sendAgentMutation.isPending
+                }
+                onClick={() => void sendAgentPrompt()}
+              >
+                <Send size={16} />
+              </button>
+            </div>
+            {!taskId ? (
+              <p className="mt-2 text-xs text-[var(--app-text-subtle)]">
+                先保存草稿后即可使用 Agent 辅助。
+              </p>
+            ) : null}
+            {agentDraftQuery.data ? (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border-soft)] pt-3">
+                <div className="text-sm text-[var(--app-text-muted)]">
+                  Agent 已生成版本 {agentDraftQuery.data.baseVersion}{" "}
+                  的结构化变更，可继续逐条编辑后再保存整套草稿。
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="app-button"
+                    onClick={() => void discardAgentDraft()}
+                  >
+                    丢弃 Agent 变更
+                  </button>
+                  <button
+                    type="button"
+                    className="app-button app-button-primary"
+                    onClick={() => applyAgentDraft()}
+                  >
+                    整套应用
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {agentConflict ? (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-l-2 border-[var(--app-warning)] pl-3 text-sm text-[var(--app-text-muted)]">
+                <span>Agent 生成后当前草稿已变化，系统不会自动合并。</span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="app-button"
+                    onClick={() => void discardAgentDraft()}
+                  >
+                    丢弃 Agent 变更
+                  </button>
+                  <button
+                    type="button"
+                    className="app-button app-button-primary"
+                    onClick={() => applyAgentDraft(true)}
+                  >
+                    覆盖草稿
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {agentConversationId ? (
+              <Link
+                className="mt-3 inline-block text-xs text-[var(--app-accent-strong)]"
+                href={`/agent-runtime?conversationId=${encodeURIComponent(agentConversationId)}`}
+              >
+                回看完整 Agent 会话与审计
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
 
       <div className="border-y border-[var(--app-border-soft)] bg-[var(--app-panel)] px-4 py-5 sm:px-6">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -829,6 +1073,14 @@ export function ScoringTaskBuilder() {
         <div className="mt-4 divide-y divide-[var(--app-border-soft)] border-y border-[var(--app-border-soft)]">
           {draft.rules.map((rule, index) => (
             <article key={rule.id} className="py-4">
+              {agentMarkers.find((marker) => marker.ruleId === rule.id) ? (
+                <span className="mb-2 inline-block text-xs font-medium text-[var(--app-accent-strong)]">
+                  {agentMarkers.find((marker) => marker.ruleId === rule.id)
+                    ?.type === "ADDED"
+                    ? "Agent 新增"
+                    : "Agent 修改"}
+                </span>
+              ) : null}
               <div className="grid items-end gap-3 md:grid-cols-[minmax(180px,1fr)_120px_auto]">
                 <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
                   <span>规则名称</span>
@@ -1256,7 +1508,7 @@ export function ScoringTaskBuilder() {
                   ...current,
                   delivery:
                     event.target.value === "FEISHU"
-                      ? { type: "FEISHU", targetRef: "" }
+                      ? { type: "FEISHU", webhookUrl: "" }
                       : { type: "SAVE_ONLY" },
                 }))
               }
@@ -1267,14 +1519,24 @@ export function ScoringTaskBuilder() {
           </label>
           {draft.delivery.type === "FEISHU" ? (
             <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-              <span>飞书目标</span>
+              <span>飞书 Webhook</span>
               <input
                 className={inputClass()}
-                value={draft.delivery.targetRef}
+                type="url"
+                autoComplete="off"
+                placeholder={
+                  draft.delivery.maskedWebhook ??
+                  "https://open.feishu.cn/open-apis/bot/v2/hook/..."
+                }
+                value={draft.delivery.webhookUrl ?? ""}
                 onChange={(event) =>
                   change((current) => ({
                     ...current,
-                    delivery: { type: "FEISHU", targetRef: event.target.value },
+                    delivery: {
+                      ...current.delivery,
+                      type: "FEISHU",
+                      webhookUrl: event.target.value,
+                    },
                   }))
                 }
               />
