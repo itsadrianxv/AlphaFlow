@@ -94,73 +94,16 @@ model User {
   scheduledTasks                ScheduledTask[]
   collections                   Collection[]
   mindMaps                      MindMap[]
-  homePageSnapshots             HomePageSnapshot[]
-  homePageGenerationTasks       HomePageGenerationTask[]
-}
-
-enum HomePageSnapshotScope {
-  DEFAULT
-  PERSONALIZED
-}
-
-enum HomePageGenerationTaskStatus {
-  PENDING
-  RUNNING
-  RETRY_WAIT
-  SUCCEEDED
-  FAILED
-  CANCELLED
-}
-
-model HomePageSnapshot {
-  id                        String                 @id @default(cuid())
-  scope                     HomePageSnapshotScope
-  userId                    String?
-  preferenceFingerprint     String?
-  baselineDefaultSnapshotId String?
-  payload                   Json
-  dataAsOf                  String
-  generatedAt               DateTime               @default(now())
-  generationTaskId          String                 @unique
-  user                      User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  generationTask            HomePageGenerationTask @relation(fields: [generationTaskId], references: [id], onDelete: Restrict)
-
-  @@index([scope, generatedAt])
-  @@index([userId, preferenceFingerprint, generatedAt])
-  @@index([baselineDefaultSnapshotId])
-}
-
-model HomePageGenerationTask {
-  id                        String                       @id @default(cuid())
-  generationKey             String                       @unique
-  scope                     HomePageSnapshotScope
-  userId                    String?
-  preferenceFingerprint     String?
-  baselineDefaultSnapshotId String?
-  selectionJson             Json                         @default("{}")
-  triggerReason             String
-  targetTradeDate           String
-  status                    HomePageGenerationTaskStatus @default(PENDING)
-  attempts                  Int                          @default(0)
-  workerId                  String?
-  fencingToken              BigInt                       @default(0)
-  leaseExpiresAt            DateTime?
-  heartbeatAt               DateTime?
-  nextAttemptAt             DateTime?
-  eventPublishedAt          DateTime?
-  errorCode                 String?
-  errorMessage              String?
-  startedAt                 DateTime?
-  completedAt               DateTime?
-  createdAt                 DateTime                     @default(now())
-  updatedAt                 DateTime                     @updatedAt
-  user                      User?                        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  snapshot                  HomePageSnapshot?
-
-  @@index([status, nextAttemptAt])
-  @@index([status, leaseExpiresAt])
-  @@index([eventPublishedAt, status])
-  @@index([userId, createdAt])
+  homepageDataManifests         HomepageDataManifest[]
+  homepageSnapshots             HomepageSnapshot[]
+  homepageCurrentSnapshots      HomepageCurrentSnapshotProjection[]
+  researchPreference            ResearchPreference?
+  researchPreferenceSnapshots   ResearchPreferenceSnapshot[]
+  researchRelevanceAssessments  ResearchEventRelevanceAssessment[]
+  researchInboxEntries          ResearchInboxEntry[]
+  researchInboxFeedback         ResearchInboxFeedback[]
+  researchTasks                 ResearchTask[]
+  researchAuditRecords          ResearchAuditRecord[]
 }
 
 enum LlmTaskExecutionStatus {
@@ -1423,4 +1366,793 @@ model AgentConversationMessage {
   @@unique([conversationId, sequence])
   @@index([conversationId, createdAt])
   @@index([workflowRunId])
+}
+
+// F01 权威研究信息模型。跨行检查、部分索引和不可变触发器由 PostgreSQL 迁移维护。
+model SourceAssertion {
+  id                      String                           @id @default(cuid())
+  assertionKey            String                           @unique
+  canonicalizationVersion String
+  sourceKey               String
+  datasetKey              String
+  sourceRecordKey         String
+  observationIdentityKey  String
+  rawRecordJson           Json
+  contentHash             String
+  requestParamsHash       String
+  providerVersion         String
+  upstreamAsOf            DateTime?                        @db.Timestamptz(3)
+  sourcePublishedAt       DateTime?                        @db.Timestamptz(3)
+  fetchedAt               DateTime                         @db.Timestamptz(3)
+  createdAt               DateTime                         @default(now()) @db.Timestamptz(3)
+  revisionSources         DataObservationRevisionSource[]
+  candidateMaterials      ResearchCandidateMaterial[]
+  candidateEvidence       ResearchEventCandidateEvidence[]
+  claimCitations          ResearchEventClaimCitation[]
+
+  @@index([sourceKey, datasetKey, sourceRecordKey], map: "SourceAssertion_source_dataset_record_idx")
+  @@index([observationIdentityKey])
+}
+
+model DataObservation {
+  id                      String                    @id @default(cuid())
+  identityKey             String                    @unique
+  canonicalizationVersion String
+  subjectType             String
+  subjectKey              String
+  metricCatalogId         String
+  dimensionsJson          Json                      @default("{}")
+  observationKind         String
+  observationDate         DateTime?                 @db.Date
+  periodStart             DateTime?                 @db.Date
+  periodEnd               DateTime?                 @db.Date
+  currentRevisionId       String?
+  createdAt               DateTime                  @default(now()) @db.Timestamptz(3)
+  currentRevision         DataObservationRevision?  @relation("ObservationCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revisions               DataObservationRevision[] @relation("ObservationRevisions")
+
+  @@index([subjectType, subjectKey, metricCatalogId], map: "DataObservation_subject_metric_idx")
+}
+
+model DataObservationRevision {
+  id                        String                                       @id @default(cuid())
+  observationId             String
+  revisionNo                Int
+  revisionDedupKey          String                                       @unique
+  canonicalizationVersion   String
+  valueType                 String
+  valueText                 String?
+  valueJson                 Json?
+  unit                      String?
+  precision                 Int?
+  missingReason             String?
+  qualityStatus             String
+  qualityFlags              String[]                                     @default([])
+  valueHash                 String
+  normalizationRulesVersion String
+  supersedesRevisionId      String?
+  correctionOfRevisionId    String?
+  explicitCorrection        Boolean                                      @default(false)
+  upstreamAsOf              DateTime?                                    @db.Timestamptz(3)
+  sourcePublishedAt         DateTime?                                    @db.Timestamptz(3)
+  normalizedAt              DateTime                                     @db.Timestamptz(3)
+  createdAt                 DateTime                                     @default(now()) @db.Timestamptz(3)
+  observation               DataObservation                              @relation("ObservationRevisions", fields: [observationId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentForObservations    DataObservation[]                            @relation("ObservationCurrentRevision")
+  supersedesRevision        DataObservationRevision?                     @relation("ObservationRevisionSupersedes", fields: [supersedesRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  supersededByRevisions     DataObservationRevision[]                    @relation("ObservationRevisionSupersedes")
+  correctionOfRevision      DataObservationRevision?                     @relation("ObservationRevisionCorrection", fields: [correctionOfRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  correctionRevisions       DataObservationRevision[]                    @relation("ObservationRevisionCorrection")
+  revisionSources           DataObservationRevisionSource[]
+  revisionInputs            DataObservationRevisionInput[]               @relation("ObservationRevisionInputs")
+  inputForRevisions         DataObservationRevisionInput[]               @relation("ObservationRevisionInputDependencies")
+  selectedBySettlements     HomepageDataManifestItemSettlement[]
+  settlementRevisions       HomepageDataManifestItemSettlementRevision[]
+  candidateEvidence         ResearchEventCandidateEvidence[]
+  claimCitations            ResearchEventClaimCitation[]
+
+  @@unique([observationId, revisionNo])
+  @@index([observationId, normalizedAt])
+}
+
+model DataObservationRevisionSource {
+  revisionId               String
+  sourceAssertionId        String
+  role                     String
+  authorityStrategyVersion String
+  selectionReason          String
+  fallbackReason           String?
+  createdAt                DateTime                @default(now()) @db.Timestamptz(3)
+  revision                 DataObservationRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sourceAssertion          SourceAssertion         @relation(fields: [sourceAssertionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([revisionId, sourceAssertionId])
+}
+
+model DataObservationRevisionInput {
+  revisionId       String
+  inputRevisionId  String
+  ordinal          Int
+  role             String
+  algorithmVersion String
+  parametersJson   Json                    @default("{}")
+  createdAt        DateTime                @default(now()) @db.Timestamptz(3)
+  revision         DataObservationRevision @relation("ObservationRevisionInputs", fields: [revisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  inputRevision    DataObservationRevision @relation("ObservationRevisionInputDependencies", fields: [inputRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([revisionId, inputRevisionId])
+  @@unique([revisionId, ordinal])
+  @@index([inputRevisionId])
+}
+
+model HomepageDataManifest {
+  id                              String                     @id @default(cuid())
+  manifestKey                     String                     @unique
+  canonicalizationVersion         String
+  scope                           String
+  definitionVersion               String
+  targetContextKey                String
+  targetContextJson               Json
+  requestNonce                    String?
+  activationSequence              BigInt                     @unique @default(autoincrement())
+  userId                          String?
+  baseManifestId                  String?
+  frozenPreferenceContractVersion String?
+  frozenPreferenceJson            Json?
+  gateStatus                      String                     @default("PENDING")
+  createdAt                       DateTime                   @default(now()) @db.Timestamptz(3)
+  user                            User?                      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  baseManifest                    HomepageDataManifest?      @relation("HomepageManifestBase", fields: [baseManifestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  personalizedManifests           HomepageDataManifest[]     @relation("HomepageManifestBase")
+  items                           HomepageDataManifestItem[]
+  generationTask                  HomepageGenerationTask?
+  snapshots                       HomepageSnapshot[]
+  researchTasks                   ResearchTask[]
+  auditRecords                    ResearchAuditRecord[]
+
+  @@index([scope, gateStatus, createdAt])
+  @@index([userId, gateStatus, createdAt])
+}
+
+model HomepageDataManifestItem {
+  id                      String                              @id @default(cuid())
+  manifestId              String
+  itemKey                 String
+  canonicalizationVersion String
+  datasetKey              String
+  factScopeKey            String
+  factScopeJson           Json
+  requirementVersion      String
+  required                Boolean
+  emptyPolicy             String
+  targetDataCutoffKey     String
+  targetDataCutoffJson    Json
+  createdAt               DateTime                            @default(now()) @db.Timestamptz(3)
+  manifest                HomepageDataManifest                @relation(fields: [manifestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  attempts                HomepageDataManifestItemAttempt[]
+  settlement              HomepageDataManifestItemSettlement?
+
+  @@unique([manifestId, itemKey])
+  @@index([manifestId, required])
+}
+
+model HomepageDataManifestItemAttempt {
+  id                        String                              @id @default(cuid())
+  manifestItemId            String
+  attemptNo                 Int
+  idempotencyKey            String                              @unique
+  providerKey               String
+  providerContractVersion   String
+  normalizationRulesVersion String
+  requestFingerprint        String
+  status                    String                              @default("PENDING")
+  resultStatus              String?
+  resultEnvelopeJson        Json?
+  resultHash                String?
+  errorClass                String?
+  retryability              String?
+  attempts                  Int                                 @default(0)
+  workerId                  String?
+  fencingToken              BigInt                              @default(0)
+  leaseExpiresAt            DateTime?                           @db.Timestamptz(3)
+  heartbeatAt               DateTime?                           @db.Timestamptz(3)
+  nextAttemptAt             DateTime?                           @db.Timestamptz(3)
+  eventPublishedAt          DateTime?                           @db.Timestamptz(3)
+  startedAt                 DateTime?                           @db.Timestamptz(3)
+  completedAt               DateTime?                           @db.Timestamptz(3)
+  createdAt                 DateTime                            @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime                            @default(now()) @updatedAt @db.Timestamptz(3)
+  manifestItem              HomepageDataManifestItem            @relation(fields: [manifestItemId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  settlement                HomepageDataManifestItemSettlement?
+
+  @@unique([manifestItemId, attemptNo])
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseExpiresAt])
+}
+
+model HomepageDataManifestItemSettlement {
+  id                   String                                       @id @default(cuid())
+  manifestItemId       String                                       @unique
+  settledAttemptId     String                                       @unique
+  settledFencingToken  BigInt
+  selectedRevisionId   String?
+  settlementStatus     String
+  providerResultStatus String
+  requestedScopeJson   Json
+  coveredScopeJson     Json
+  missingScopeJson     Json
+  targetDataCutoffKey  String
+  targetDataCutoffJson Json
+  actualDataCutoffKey  String
+  actualDataCutoffJson Json
+  qualityStatus        String
+  qualityFlags         String[]                                     @default([])
+  limitations          String[]                                     @default([])
+  errorClass           String?
+  retryability         String?
+  settledAt            DateTime                                     @db.Timestamptz(3)
+  createdAt            DateTime                                     @default(now()) @db.Timestamptz(3)
+  manifestItem         HomepageDataManifestItem                     @relation(fields: [manifestItemId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  settledAttempt       HomepageDataManifestItemAttempt              @relation(fields: [settledAttemptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  selectedRevision     DataObservationRevision?                     @relation(fields: [selectedRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revisions            HomepageDataManifestItemSettlementRevision[]
+}
+
+model HomepageDataManifestItemSettlementRevision {
+  settlementId          String
+  observationRevisionId String
+  ordinal               Int
+  createdAt             DateTime                           @default(now()) @db.Timestamptz(3)
+  settlement            HomepageDataManifestItemSettlement @relation(fields: [settlementId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  observationRevision   DataObservationRevision            @relation(fields: [observationRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "HDPSettlementRevision_observationRevision_fkey")
+
+  @@id([settlementId, observationRevisionId])
+  @@unique([settlementId, ordinal], map: "HomepageDataManifestItemSettlementRevision_settlementId_ordinal")
+  @@index([observationRevisionId], map: "HomepageDataManifestItemSettlementRevision_observationRevisionI")
+}
+
+model HomepageGenerationTask {
+  id                             String               @id @default(cuid())
+  generationKey                  String               @unique
+  manifestId                     String               @unique
+  activationSequence             BigInt
+  generationInputContractVersion String
+  generatorDefinitionVersion     String
+  payloadSchemaVersion           String
+  promotionMode                  String
+  schedulingTier                 String
+  resourcePoolKey                String
+  fairnessKey                    String
+  targetCompletionAt             DateTime?            @db.Timestamptz(3)
+  status                         String               @default("PENDING")
+  attempts                       Int                  @default(0)
+  workerId                       String?
+  fencingToken                   BigInt               @default(0)
+  leaseExpiresAt                 DateTime?            @db.Timestamptz(3)
+  heartbeatAt                    DateTime?            @db.Timestamptz(3)
+  nextAttemptAt                  DateTime?            @db.Timestamptz(3)
+  eventPublishedAt               DateTime?            @db.Timestamptz(3)
+  inputHash                      String?
+  errorCode                      String?
+  errorDetailsJson               Json?
+  startedAt                      DateTime?            @db.Timestamptz(3)
+  completedAt                    DateTime?            @db.Timestamptz(3)
+  createdAt                      DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt                      DateTime             @default(now()) @updatedAt @db.Timestamptz(3)
+  manifest                       HomepageDataManifest @relation(fields: [manifestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  snapshot                       HomepageSnapshot?
+
+  @@index([status, nextAttemptAt])
+  @@index([status, leaseExpiresAt])
+}
+
+model HomepageSnapshot {
+  id                             String                              @id @default(cuid())
+  manifestId                     String
+  generationTaskId               String                              @unique
+  scope                          String
+  userId                         String?
+  activationSequence             BigInt
+  generationInputContractVersion String
+  generatorDefinitionVersion     String
+  payloadSchemaVersion           String
+  inputHash                      String
+  payloadHash                    String
+  dataCoverageJson               Json
+  payloadJson                    Json
+  generatedAt                    DateTime                            @default(now()) @db.Timestamptz(3)
+  manifest                       HomepageDataManifest                @relation(fields: [manifestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  generationTask                 HomepageGenerationTask              @relation(fields: [generationTaskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user                           User?                               @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentProjections             HomepageCurrentSnapshotProjection[]
+
+  @@index([scope, activationSequence])
+  @@index([userId, activationSequence])
+}
+
+model HomepageCurrentSnapshotProjection {
+  id                 String           @id @default(cuid())
+  scope              String
+  userId             String?
+  snapshotId         String
+  activationSequence BigInt
+  updatedAt          DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+  snapshot           HomepageSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user               User?            @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model ResearchCandidateMaterial {
+  id                String                           @id @default(cuid())
+  materialKey       String                           @unique
+  sourceItemKey     String?
+  normalizedUrl     String?
+  contentHash       String
+  sourceAssertionId String?
+  rawContentJson    Json
+  publishedAt       DateTime?                        @db.Timestamptz(3)
+  fetchedAt         DateTime                         @db.Timestamptz(3)
+  createdAt         DateTime                         @default(now()) @db.Timestamptz(3)
+  sourceAssertion   SourceAssertion?                 @relation(fields: [sourceAssertionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  candidateEvidence ResearchEventCandidateEvidence[]
+}
+
+model ResearchEventCandidate {
+  id                      String                           @id @default(cuid())
+  candidateKey            String                           @unique
+  clusterKey              String
+  subjectType             String?
+  subjectKey              String?
+  status                  String                           @default("OPEN")
+  currentDecisionId       String?
+  evidenceFrozenAt        DateTime?                        @db.Timestamptz(3)
+  observationWindowEndsAt DateTime?                        @db.Timestamptz(3)
+  nextCheckAt             DateTime?                        @db.Timestamptz(3)
+  closedAt                DateTime?                        @db.Timestamptz(3)
+  createdAt               DateTime                         @default(now()) @db.Timestamptz(3)
+  evidence                ResearchEventCandidateEvidence[]
+  currentDecision         ResearchEventCandidateDecision?  @relation("ResearchCandidateCurrentDecision", fields: [currentDecisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  decisions               ResearchEventCandidateDecision[] @relation("ResearchCandidateDecisions")
+  eventRevisions          ResearchEventRevision[]
+  inboxEntries            ResearchInboxEntry[]
+  tasks                   ResearchTask[]
+
+  @@index([status, nextCheckAt])
+}
+
+model ResearchEventCandidateDecision {
+  id               String                   @id @default(cuid())
+  candidateId      String
+  decisionNo       Int
+  inputHash        String                   @unique
+  contractVersion  String
+  model            String
+  promptVersion    String
+  schemaVersion    String
+  outcome          String
+  decisionJson     Json
+  evidenceFrozenAt DateTime                 @db.Timestamptz(3)
+  createdAt        DateTime                 @default(now()) @db.Timestamptz(3)
+  candidate        ResearchEventCandidate   @relation("ResearchCandidateDecisions", fields: [candidateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentFor       ResearchEventCandidate[] @relation("ResearchCandidateCurrentDecision")
+
+  @@unique([candidateId, decisionNo])
+}
+
+model ResearchEventCandidateEvidence {
+  id                    String                       @id @default(cuid())
+  candidateId           String
+  materialId            String?
+  sourceAssertionId     String?
+  observationRevisionId String?
+  ordinal               Int
+  evidenceRole          String
+  sourceIdentityStatus  String
+  proofQualification    String
+  independenceKey       String
+  citationJson          Json
+  createdAt             DateTime                     @default(now()) @db.Timestamptz(3)
+  candidate             ResearchEventCandidate       @relation(fields: [candidateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  material              ResearchCandidateMaterial?   @relation(fields: [materialId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sourceAssertion       SourceAssertion?             @relation(fields: [sourceAssertionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  observationRevision   DataObservationRevision?     @relation(fields: [observationRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  claimCitations        ResearchEventClaimCitation[]
+
+  @@unique([candidateId, ordinal])
+}
+
+model ResearchEvent {
+  id                      String                  @id @default(cuid())
+  eventKey                String                  @unique
+  canonicalizationVersion String
+  subjectType             String
+  subjectKey              String
+  status                  String                  @default("ACTIVE")
+  currentRevisionId       String?
+  createdAt               DateTime                @default(now()) @db.Timestamptz(3)
+  currentRevision         ResearchEventRevision?  @relation("ResearchEventCurrentRevision", fields: [currentRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  revisions               ResearchEventRevision[] @relation("ResearchEventRevisions")
+}
+
+model ResearchEventRevision {
+  id                   String                             @id @default(cuid())
+  eventId              String
+  sourceCandidateId    String?
+  revisionNo           Int
+  revisionDedupKey     String                             @unique
+  revisionKind         String
+  supersedesRevisionId String?
+  title                String
+  summary              String
+  narrativeJson        Json
+  uncertaintyJson      Json
+  counterEvidenceJson  Json
+  occurredAt           DateTime                           @db.Timestamptz(3)
+  knownAt              DateTime                           @db.Timestamptz(3)
+  effectiveUntil       DateTime?                          @db.Timestamptz(3)
+  createdAt            DateTime                           @default(now()) @db.Timestamptz(3)
+  event                ResearchEvent                      @relation("ResearchEventRevisions", fields: [eventId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  currentForEvents     ResearchEvent[]                    @relation("ResearchEventCurrentRevision")
+  sourceCandidate      ResearchEventCandidate?            @relation(fields: [sourceCandidateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  supersedesRevision   ResearchEventRevision?             @relation("ResearchEventRevisionSupersedes", fields: [supersedesRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  supersededBy         ResearchEventRevision[]            @relation("ResearchEventRevisionSupersedes")
+  claims               ResearchEventClaim[]
+  impacts              ResearchEventImpact[]
+  globalAssessment     ResearchEventGlobalAssessment?
+  relevanceAssessments ResearchEventRelevanceAssessment[]
+  inboxEntries         ResearchInboxEntry[]
+  tasks                ResearchTask[]
+  auditRecords         ResearchAuditRecord[]
+
+  @@unique([eventId, revisionNo])
+}
+
+model ResearchEventClaim {
+  id              String                       @id @default(cuid())
+  eventRevisionId String
+  ordinal         Int
+  claimType       String
+  claimText       String
+  isInference     Boolean                      @default(false)
+  createdAt       DateTime                     @default(now()) @db.Timestamptz(3)
+  eventRevision   ResearchEventRevision        @relation(fields: [eventRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  citations       ResearchEventClaimCitation[]
+
+  @@unique([eventRevisionId, ordinal])
+}
+
+model ResearchEventClaimCitation {
+  id                    String                          @id @default(cuid())
+  claimId               String
+  candidateEvidenceId   String?
+  sourceAssertionId     String?
+  observationRevisionId String?
+  relation              String
+  sourceIdentityStatus  String
+  proofQualification    String
+  citationJson          Json
+  createdAt             DateTime                        @default(now()) @db.Timestamptz(3)
+  claim                 ResearchEventClaim              @relation(fields: [claimId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  candidateEvidence     ResearchEventCandidateEvidence? @relation(fields: [candidateEvidenceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  sourceAssertion       SourceAssertion?                @relation(fields: [sourceAssertionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  observationRevision   DataObservationRevision?        @relation(fields: [observationRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model ResearchEventImpact {
+  id              String                @id @default(cuid())
+  eventRevisionId String
+  subjectType     String
+  subjectKey      String
+  impactType      String
+  materiality     String
+  pathJson        Json
+  createdAt       DateTime              @default(now()) @db.Timestamptz(3)
+  eventRevision   ResearchEventRevision @relation(fields: [eventRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([eventRevisionId, subjectType, subjectKey, impactType], map: "ResearchEventImpact_revision_subject_key")
+}
+
+model ResearchPreference {
+  id                    String                   @id @default(cuid())
+  userId                String                   @unique
+  enabled               Boolean                  @default(true)
+  urgentAlertsEnabled   Boolean                  @default(true)
+  briefingsEnabled      Boolean                  @default(true)
+  externalCopiesEnabled Boolean                  @default(true)
+  lastCommandId         String?
+  createdAt             DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                 @default(now()) @updatedAt @db.Timestamptz(3)
+  user                  User                     @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  items                 ResearchPreferenceItem[]
+}
+
+model ResearchPreferenceItem {
+  id                 String             @id @default(cuid())
+  preferenceId       String
+  targetType         String
+  targetKey          String
+  level              String             @default("REGULAR")
+  createdByCommandId String
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+  removedAt          DateTime?          @db.Timestamptz(3)
+  preference         ResearchPreference @relation(fields: [preferenceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([preferenceId, removedAt])
+}
+
+model ResearchPreferenceSnapshot {
+  id                    String                             @id @default(cuid())
+  userId                String?
+  contractVersion       String
+  enabled               Boolean
+  urgentAlertsEnabled   Boolean
+  briefingsEnabled      Boolean
+  externalCopiesEnabled Boolean
+  normalizedItemsJson   Json?
+  contentHash           String
+  frozenAt              DateTime                           @db.Timestamptz(3)
+  personalDataDeletedAt DateTime?                          @db.Timestamptz(3)
+  createdAt             DateTime                           @default(now()) @db.Timestamptz(3)
+  user                  User?                              @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  items                 ResearchPreferenceSnapshotItem[]
+  relevanceAssessments  ResearchEventRelevanceAssessment[]
+  inboxEntries          ResearchInboxEntry[]
+  tasks                 ResearchTask[]
+  auditRecords          ResearchAuditRecord[]
+
+  @@unique([userId, contentHash])
+}
+
+model ResearchPreferenceSnapshotItem {
+  snapshotId String
+  ordinal    Int
+  targetType String
+  targetKey  String
+  level      String
+  createdAt  DateTime                   @default(now()) @db.Timestamptz(3)
+  snapshot   ResearchPreferenceSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([snapshotId, ordinal])
+  @@unique([snapshotId, targetType, targetKey], map: "ResearchPreferenceSnapshotItem_identity_key")
+}
+
+model ResearchEventGlobalAssessment {
+  id                 String                @id @default(cuid())
+  eventRevisionId    String                @unique
+  inputHash          String                @unique
+  contractVersion    String
+  model              String
+  promptVersion      String
+  schemaVersion      String
+  importance         Int?                  @db.SmallInt
+  confidence         Int?                  @db.SmallInt
+  informationNovelty Int?                  @db.SmallInt
+  dimensionsJson     Json
+  inputSnapshotJson  Json
+  usageJson          Json
+  createdAt          DateTime              @default(now()) @db.Timestamptz(3)
+  eventRevision      ResearchEventRevision @relation(fields: [eventRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  inboxEntries       ResearchInboxEntry[]
+}
+
+model ResearchEventRelevanceAssessment {
+  id                     String                     @id @default(cuid())
+  eventRevisionId        String
+  userId                 String?
+  preferenceSnapshotId   String
+  inputHash              String                     @unique
+  contractVersion        String
+  model                  String
+  promptVersion          String
+  schemaVersion          String
+  relevance              Int?                       @db.SmallInt
+  directFocusMatch       Boolean                    @default(false)
+  matchedPreferencesJson Json?
+  dimensionJson          Json?
+  inputSnapshotJson      Json?
+  usageJson              Json
+  personalDataDeletedAt  DateTime?                  @db.Timestamptz(3)
+  createdAt              DateTime                   @default(now()) @db.Timestamptz(3)
+  eventRevision          ResearchEventRevision      @relation(fields: [eventRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user                   User?                      @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Restrict)
+  preferenceSnapshot     ResearchPreferenceSnapshot @relation(fields: [preferenceSnapshotId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  inboxEntries           ResearchInboxEntry[]
+
+  @@unique([eventRevisionId, userId], map: "ResearchEventRelevanceAssessment_revision_user_key")
+}
+
+model ResearchInboxEntry {
+  id                          String                            @id @default(cuid())
+  distributionKey             String                            @unique
+  userId                      String
+  eventRevisionId             String?
+  candidateId                 String?
+  briefingTaskId              String?
+  globalAssessmentId          String?
+  relevanceAssessmentId       String?
+  preferenceSnapshotId        String?
+  highestChannel              String
+  entryKind                   String
+  title                       String
+  summary                     String
+  bodyJson                    Json
+  state                       String                            @default("UNREAD")
+  personalizationInputDeleted Boolean                           @default(false)
+  openedAt                    DateTime?                         @db.Timestamptz(3)
+  archivedAt                  DateTime?                         @db.Timestamptz(3)
+  createdAt                   DateTime                          @default(now()) @db.Timestamptz(3)
+  updatedAt                   DateTime                          @default(now()) @updatedAt @db.Timestamptz(3)
+  user                        User                              @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  eventRevision               ResearchEventRevision?            @relation(fields: [eventRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  candidate                   ResearchEventCandidate?           @relation(fields: [candidateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  briefingTask                ResearchTask?                     @relation(fields: [briefingTaskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  globalAssessment            ResearchEventGlobalAssessment?    @relation(fields: [globalAssessmentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  relevanceAssessment         ResearchEventRelevanceAssessment? @relation(fields: [relevanceAssessmentId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  preferenceSnapshot          ResearchPreferenceSnapshot?       @relation(fields: [preferenceSnapshotId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  history                     ResearchInboxEntryHistory[]
+  feedback                    ResearchInboxFeedback?
+
+  @@index([userId, state, createdAt])
+  @@index([eventRevisionId])
+}
+
+model ResearchInboxEntryHistory {
+  id         String             @id @default(cuid())
+  entryId    String
+  sequence   Int
+  fromState  String?
+  toState    String
+  action     String
+  commandId  String             @unique
+  occurredAt DateTime           @db.Timestamptz(3)
+  createdAt  DateTime           @default(now()) @db.Timestamptz(3)
+  entry      ResearchInboxEntry @relation(fields: [entryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([entryId, sequence])
+}
+
+model ResearchInboxFeedback {
+  id        String             @id @default(cuid())
+  entryId   String             @unique
+  userId    String
+  value     String
+  commandId String             @unique
+  createdAt DateTime           @default(now()) @db.Timestamptz(3)
+  entry     ResearchInboxEntry @relation(fields: [entryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model ResearchResourcePool {
+  id                 String                   @id @default(cuid())
+  poolKey            String                   @unique
+  resourceKind       String
+  hardConcurrency    Int
+  currentConcurrency Int                      @default(1)
+  controlVersion     BigInt                   @default(0)
+  lastHealthyAt      DateTime?                @db.Timestamptz(3)
+  cooldownUntil      DateTime?                @db.Timestamptz(3)
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                 @default(now()) @updatedAt @db.Timestamptz(3)
+  tasks              ResearchTask[]
+  permits            ResearchResourcePermit[]
+  circuitBreaker     ResearchCircuitBreaker?
+}
+
+model ResearchTask {
+  id                    String                      @id @default(cuid())
+  taskType              String
+  idempotencyKey        String                      @unique
+  inputHash             String
+  inputContractVersion  String
+  inputJson             Json
+  schedulingTier        String
+  resourcePoolId        String
+  fairnessKey           String
+  userId                String?
+  manifestId            String?
+  eventCandidateId      String?
+  eventRevisionId       String?
+  preferenceSnapshotId  String?
+  parentTaskId          String?
+  targetCompletionAt    DateTime?                   @db.Timestamptz(3)
+  status                String                      @default("PENDING")
+  attempts              Int                         @default(0)
+  maxAttempts           Int
+  retryDeadline         DateTime                    @db.Timestamptz(3)
+  nextAttemptAt         DateTime?                   @db.Timestamptz(3)
+  workerId              String?
+  fencingToken          BigInt                      @default(0)
+  leaseExpiresAt        DateTime?                   @db.Timestamptz(3)
+  heartbeatAt           DateTime?                   @db.Timestamptz(3)
+  resultContractVersion String?
+  resultHash            String?
+  resultJson            Json?
+  errorClass            String?
+  retryability          String?
+  terminalReason        String?
+  oldestBacklogAgeMs    BigInt?
+  createdAt             DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                    @default(now()) @updatedAt @db.Timestamptz(3)
+  resourcePool          ResearchResourcePool        @relation(fields: [resourcePoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user                  User?                       @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  manifest              HomepageDataManifest?       @relation(fields: [manifestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  eventCandidate        ResearchEventCandidate?     @relation(fields: [eventCandidateId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  eventRevision         ResearchEventRevision?      @relation(fields: [eventRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  preferenceSnapshot    ResearchPreferenceSnapshot? @relation(fields: [preferenceSnapshotId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  parentTask            ResearchTask?               @relation("ResearchTaskParent", fields: [parentTaskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  childTasks            ResearchTask[]              @relation("ResearchTaskParent")
+  permits               ResearchResourcePermit[]
+  circuitProbes         ResearchCircuitBreaker[]
+  auditRecords          ResearchAuditRecord[]
+  briefingEntries       ResearchInboxEntry[]
+
+  @@index([resourcePoolId, status, schedulingTier, targetCompletionAt, nextAttemptAt, createdAt], map: "ResearchTask_claim_idx")
+  @@index([resourcePoolId, schedulingTier, fairnessKey, createdAt], map: "ResearchTask_fairness_idx")
+  @@index([status, leaseExpiresAt], map: "ResearchTask_lease_idx")
+}
+
+model ResearchResourcePermit {
+  id             String               @id @default(cuid())
+  resourcePoolId String
+  taskId         String
+  permitKey      String               @unique
+  holderId       String
+  fencingToken   BigInt
+  status         String               @default("ACTIVE")
+  acquiredAt     DateTime             @db.Timestamptz(3)
+  leaseExpiresAt DateTime             @db.Timestamptz(3)
+  releasedAt     DateTime?            @db.Timestamptz(3)
+  releaseReason  String?
+  createdAt      DateTime             @default(now()) @db.Timestamptz(3)
+  resourcePool   ResearchResourcePool @relation(fields: [resourcePoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  task           ResearchTask         @relation(fields: [taskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([resourcePoolId, status, leaseExpiresAt], map: "ResearchResourcePermit_pool_status_lease_idx")
+}
+
+model ResearchCircuitBreaker {
+  id                  String               @id @default(cuid())
+  resourcePoolId      String               @unique
+  state               String               @default("CLOSED")
+  version             BigInt               @default(0)
+  consecutiveFailures Int                  @default(0)
+  windowAttempts      Int                  @default(0)
+  windowFailures      Int                  @default(0)
+  openCount           Int                  @default(0)
+  retryAfter          DateTime?            @db.Timestamptz(3)
+  halfOpenProbeTaskId String?
+  blockedReason       String?
+  updatedAt           DateTime             @default(now()) @updatedAt @db.Timestamptz(3)
+  resourcePool        ResearchResourcePool @relation(fields: [resourcePoolId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  halfOpenProbeTask   ResearchTask?        @relation(fields: [halfOpenProbeTaskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+}
+
+model ResearchAuditRecord {
+  id                    String                      @id @default(cuid())
+  auditKey              String                      @unique
+  actorType             String
+  actorId               String?
+  action                String
+  entityType            String
+  entityId              String
+  userId                String?
+  taskId                String?
+  manifestId            String?
+  eventRevisionId       String?
+  preferenceSnapshotId  String?
+  inputContractVersion  String?
+  inputHash             String?
+  resultContractVersion String?
+  resultHash            String?
+  outcome               String
+  detailsJson           Json                        @default("{}")
+  occurredAt            DateTime                    @db.Timestamptz(3)
+  createdAt             DateTime                    @default(now()) @db.Timestamptz(3)
+  user                  User?                       @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  task                  ResearchTask?               @relation(fields: [taskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  manifest              HomepageDataManifest?       @relation(fields: [manifestId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  eventRevision         ResearchEventRevision?      @relation(fields: [eventRevisionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  preferenceSnapshot    ResearchPreferenceSnapshot? @relation(fields: [preferenceSnapshotId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([entityType, entityId, occurredAt], map: "ResearchAuditRecord_entity_idx")
+  @@index([taskId, occurredAt], map: "ResearchAuditRecord_taskId_idx")
 }
