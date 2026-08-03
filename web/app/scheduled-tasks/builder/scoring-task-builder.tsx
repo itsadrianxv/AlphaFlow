@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  ChevronDown,
-  ChevronRight,
   Copy,
   MessageSquare,
   Plus,
@@ -15,6 +13,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { InlineNotice, WorkspaceShell } from "~/app/_components/ui";
+import { SCHEDULED_TASK_WORKBENCH_SECTIONS } from "~/server/domain/scheduled-task/workbench-release-gate";
 import { api } from "~/trpc/react";
 
 type Timeframe = "daily" | "weekly" | "monthly";
@@ -496,7 +495,7 @@ export function ScoringTaskBuilder() {
   const [stockSearchKeyword, setStockSearchKeyword] = useState("");
   const [previewSampleInput, setPreviewSampleInput] = useState("");
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const [agentExpanded, setAgentExpanded] = useState(true);
+  const [mobilePane, setMobilePane] = useState<"builder" | "agent">("builder");
   const [agentPrompt, setAgentPrompt] = useState("");
   const [agentConversationId, setAgentConversationId] = useState<string | null>(
     null,
@@ -781,24 +780,33 @@ export function ScoringTaskBuilder() {
         />
       ) : null}
 
-      <section className="border-b border-[var(--app-border-soft)] bg-[var(--app-panel)]">
+      <div className="grid grid-cols-2 border-b border-[var(--app-border-soft)] lg:hidden">
         <button
           type="button"
-          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left sm:px-6"
-          onClick={() => setAgentExpanded((value) => !value)}
+          className={`h-10 text-sm font-medium ${mobilePane === "builder" ? "border-b-2 border-[var(--app-accent-strong)] text-[var(--app-text-strong)]" : "text-[var(--app-text-muted)]"}`}
+          onClick={() => setMobilePane("builder")}
         >
-          <span className="flex items-center gap-2 text-sm font-semibold text-[var(--app-text-strong)]">
+          构建器
+        </button>
+        <button
+          type="button"
+          className={`h-10 text-sm font-medium ${mobilePane === "agent" ? "border-b-2 border-[var(--app-accent-strong)] text-[var(--app-text-strong)]" : "text-[var(--app-text-muted)]"}`}
+          onClick={() => setMobilePane("agent")}
+        >
+          Agent
+        </button>
+      </div>
+
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <aside
+          aria-label="Agent 辅助"
+          className={`${mobilePane === "agent" ? "block" : "hidden"} border-b border-[var(--app-border-soft)] bg-[var(--app-panel)] lg:sticky lg:top-0 lg:order-2 lg:block lg:max-h-screen lg:overflow-y-auto lg:border-b-0 lg:border-l`}
+        >
+          <div className="flex items-center gap-2 border-b border-[var(--app-border-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-text-strong)]">
             <MessageSquare size={16} />
             Agent 辅助
-          </span>
-          {agentExpanded ? (
-            <ChevronDown size={16} />
-          ) : (
-            <ChevronRight size={16} />
-          )}
-        </button>
-        {agentExpanded ? (
-          <div className="border-t border-[var(--app-border-soft)] px-4 py-4 sm:px-6">
+          </div>
+          <div className="px-4 py-4">
             {agentConversation.data?.messages.length ? (
               <div className="max-h-56 space-y-3 overflow-y-auto border-y border-[var(--app-border-soft)] py-3">
                 {agentConversation.data.messages.map((message) => (
@@ -894,669 +902,778 @@ export function ScoringTaskBuilder() {
               </Link>
             ) : null}
           </div>
-        ) : null}
-      </section>
+        </aside>
 
-      <div className="border-y border-[var(--app-border-soft)] bg-[var(--app-panel)] px-4 py-5 sm:px-6">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
-          <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>任务名称</span>
-            <input
-              className={inputClass()}
-              value={draft.name}
-              onChange={(event) =>
-                change((current) => ({ ...current, name: event.target.value }))
-              }
-              placeholder="例如：每日多周期趋势评分"
-            />
-          </label>
-          <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>复权口径</span>
-            <select
-              className={inputClass()}
-              value={draft.data.adjustment}
-              onChange={(event) =>
-                change((current) => ({
-                  ...current,
-                  data: {
-                    adjustment: event.target
-                      .value as Draft["data"]["adjustment"],
-                  },
-                }))
-              }
-            >
-              <option value="qfq">前复权</option>
-              <option value="hfq">后复权</option>
-              <option value="none">不复权</option>
-            </select>
-          </label>
-        </div>
-      </div>
+        <main
+          className={`${mobilePane === "builder" ? "block" : "hidden"} min-w-0 lg:order-1 lg:block`}
+        >
+          <nav
+            aria-label="任务构建分区"
+            className="sticky top-0 z-10 flex overflow-x-auto border-b border-[var(--app-border-soft)] bg-[var(--app-panel)] px-4 sm:px-6"
+          >
+            {SCHEDULED_TASK_WORKBENCH_SECTIONS.map((section) => (
+              <a
+                key={section.id}
+                href={`#${section.id}`}
+                className="shrink-0 px-3 py-2.5 text-sm text-[var(--app-text-muted)] hover:text-[var(--app-text-strong)]"
+              >
+                {section.label}
+              </a>
+            ))}
+          </nav>
 
-      <section className="border-b border-[var(--app-border-soft)] px-4 py-5 sm:px-6">
-        <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
-          股票范围
-        </h2>
-        <div className="mt-3 flex gap-5 text-sm">
-          <label>
-            <input
-              type="radio"
-              checked={draft.universe.type === "all_a_shares"}
-              onChange={() =>
-                change((current) => ({
-                  ...current,
-                  universe: { type: "all_a_shares" },
-                }))
-              }
-            />{" "}
-            全部 A 股
-          </label>
-          <label>
-            <input
-              type="radio"
-              checked={draft.universe.type === "stocks"}
-              onChange={() =>
-                change((current) => ({
-                  ...current,
-                  universe: { type: "stocks", stockInputs: [] },
-                }))
-              }
-            />{" "}
-            指定股票
-          </label>
-        </div>
-        {draft.universe.type === "stocks" ? (
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <div className="grid content-start gap-1 text-sm text-[var(--app-text-muted)]">
-              <label htmlFor="stock-search">按名称或代码搜索</label>
-              <input
-                id="stock-search"
-                className={inputClass()}
-                value={stockSearchKeyword}
-                onChange={(event) => setStockSearchKeyword(event.target.value)}
-                placeholder="例如：贵州茅台"
-              />
-              {stockSearch.data?.length ? (
-                <div className="divide-y divide-[var(--app-border-soft)] border border-[var(--app-border-soft)] bg-[var(--app-panel)]">
-                  {stockSearch.data.map((stock) => (
-                    <button
-                      key={stock.stockCode}
-                      type="button"
-                      className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-[var(--app-surface-quiet)]"
-                      onClick={() => {
-                        change((current) => {
-                          const inputs =
-                            current.universe.type === "stocks"
-                              ? current.universe.stockInputs
-                              : [];
-                          return {
-                            ...current,
-                            universe: {
-                              type: "stocks",
-                              stockInputs: [
-                                ...inputs,
-                                `${stock.stockName} ${stock.stockCode}`,
-                              ],
-                            },
-                          };
-                        });
-                        setStockSearchKeyword("");
-                      }}
-                    >
-                      <span>{stock.stockName}</span>
-                      <span className="font-mono text-xs">
-                        {stock.stockCode}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+          <div
+            id="task"
+            className="scroll-mt-12 border-y border-[var(--app-border-soft)] bg-[var(--app-panel)] px-4 py-5 sm:px-6"
+          >
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+              <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                <span>任务名称</span>
+                <input
+                  className={inputClass()}
+                  value={draft.name}
+                  onChange={(event) =>
+                    change((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                  placeholder="例如：每日多周期趋势评分"
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                <span>复权口径</span>
+                <select
+                  className={inputClass()}
+                  value={draft.data.adjustment}
+                  onChange={(event) =>
+                    change((current) => ({
+                      ...current,
+                      data: {
+                        adjustment: event.target
+                          .value as Draft["data"]["adjustment"],
+                      },
+                    }))
+                  }
+                >
+                  <option value="qfq">前复权</option>
+                  <option value="hfq">后复权</option>
+                  <option value="none">不复权</option>
+                </select>
+              </label>
             </div>
-            <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-              <span>已选股票，也可每行粘贴一个代码</span>
-              <textarea
-                className="min-h-28 w-full border border-[var(--app-border)] bg-[var(--app-surface)] p-2.5 text-sm outline-none focus:border-[var(--app-accent-strong)]"
-                value={draft.universe.stockInputs.join("\n")}
-                onChange={(event) =>
-                  change((current) => ({
-                    ...current,
-                    universe: {
-                      type: "stocks",
-                      stockInputs: event.target.value
-                        .split(/\r?\n/)
-                        .filter((item) => item.trim()),
-                    },
-                  }))
-                }
-                placeholder={"600519.SH\n000001"}
-              />
-            </label>
           </div>
-        ) : null}
-      </section>
 
-      <section className="border-b border-[var(--app-border-soft)] px-4 py-5 sm:px-6">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
-            评分规则
-          </h2>
-          <div className="flex gap-2">
-            {removedRule ? (
-              <button type="button" className="app-button" onClick={undoRemove}>
-                <Undo2 size={15} />
-                撤销移除
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="app-button"
-              onClick={() =>
-                change((current) => ({
-                  ...current,
-                  rules: [
-                    ...current.rules,
-                    {
-                      id: ruleId(),
-                      name: "",
-                      points: 10,
-                      condition: atomicCondition(),
-                    },
-                  ],
-                }))
-              }
-            >
-              <Plus size={15} />
-              新增规则
-            </button>
-          </div>
-        </div>
-        <div className="mt-4 divide-y divide-[var(--app-border-soft)] border-y border-[var(--app-border-soft)]">
-          {draft.rules.map((rule, index) => (
-            <article key={rule.id} className="py-4">
-              {agentMarkers.find((marker) => marker.ruleId === rule.id) ? (
-                <span className="mb-2 inline-block text-xs font-medium text-[var(--app-accent-strong)]">
-                  {agentMarkers.find((marker) => marker.ruleId === rule.id)
-                    ?.type === "ADDED"
-                    ? "Agent 新增"
-                    : "Agent 修改"}
-                </span>
-              ) : null}
-              <div className="grid items-end gap-3 md:grid-cols-[minmax(180px,1fr)_120px_auto]">
-                <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-                  <span>规则名称</span>
+          <section
+            id="universe"
+            className="scroll-mt-12 border-b border-[var(--app-border-soft)] px-4 py-5 sm:px-6"
+          >
+            <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
+              股票范围
+            </h2>
+            <div className="mt-3 flex gap-5 text-sm">
+              <label>
+                <input
+                  type="radio"
+                  checked={draft.universe.type === "all_a_shares"}
+                  onChange={() =>
+                    change((current) => ({
+                      ...current,
+                      universe: { type: "all_a_shares" },
+                    }))
+                  }
+                />{" "}
+                全部 A 股
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  checked={draft.universe.type === "stocks"}
+                  onChange={() =>
+                    change((current) => ({
+                      ...current,
+                      universe: { type: "stocks", stockInputs: [] },
+                    }))
+                  }
+                />{" "}
+                指定股票
+              </label>
+            </div>
+            {draft.universe.type === "stocks" ? (
+              <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <div className="grid content-start gap-1 text-sm text-[var(--app-text-muted)]">
+                  <label htmlFor="stock-search">按名称或代码搜索</label>
                   <input
+                    id="stock-search"
                     className={inputClass()}
-                    value={rule.name}
+                    value={stockSearchKeyword}
+                    onChange={(event) =>
+                      setStockSearchKeyword(event.target.value)
+                    }
+                    placeholder="例如：贵州茅台"
+                  />
+                  {stockSearch.data?.length ? (
+                    <div className="divide-y divide-[var(--app-border-soft)] border border-[var(--app-border-soft)] bg-[var(--app-panel)]">
+                      {stockSearch.data.map((stock) => (
+                        <button
+                          key={stock.stockCode}
+                          type="button"
+                          className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-[var(--app-surface-quiet)]"
+                          onClick={() => {
+                            change((current) => {
+                              const inputs =
+                                current.universe.type === "stocks"
+                                  ? current.universe.stockInputs
+                                  : [];
+                              return {
+                                ...current,
+                                universe: {
+                                  type: "stocks",
+                                  stockInputs: [
+                                    ...inputs,
+                                    `${stock.stockName} ${stock.stockCode}`,
+                                  ],
+                                },
+                              };
+                            });
+                            setStockSearchKeyword("");
+                          }}
+                        >
+                          <span>{stock.stockName}</span>
+                          <span className="font-mono text-xs">
+                            {stock.stockCode}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                  <span>已选股票，也可每行粘贴一个代码</span>
+                  <textarea
+                    className="min-h-28 w-full border border-[var(--app-border)] bg-[var(--app-surface)] p-2.5 text-sm outline-none focus:border-[var(--app-accent-strong)]"
+                    value={draft.universe.stockInputs.join("\n")}
                     onChange={(event) =>
                       change((current) => ({
                         ...current,
-                        rules: current.rules.map((item, ruleIndex) =>
-                          ruleIndex === index
-                            ? { ...item, name: event.target.value }
-                            : item,
-                        ),
+                        universe: {
+                          type: "stocks",
+                          stockInputs: event.target.value
+                            .split(/\r?\n/)
+                            .filter((item) => item.trim()),
+                        },
+                      }))
+                    }
+                    placeholder={"600519.SH\n000001"}
+                  />
+                </label>
+              </div>
+            ) : null}
+          </section>
+
+          <section
+            id="rules"
+            className="scroll-mt-12 border-b border-[var(--app-border-soft)] px-4 py-5 sm:px-6"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
+                评分规则
+              </h2>
+              <div className="flex gap-2">
+                {removedRule ? (
+                  <button
+                    type="button"
+                    className="app-button"
+                    onClick={undoRemove}
+                  >
+                    <Undo2 size={15} />
+                    撤销移除
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="app-button"
+                  onClick={() =>
+                    change((current) => ({
+                      ...current,
+                      rules: [
+                        ...current.rules,
+                        {
+                          id: ruleId(),
+                          name: "",
+                          points: 10,
+                          condition: atomicCondition(),
+                        },
+                      ],
+                    }))
+                  }
+                >
+                  <Plus size={15} />
+                  新增规则
+                </button>
+              </div>
+            </div>
+            <div className="mt-4 divide-y divide-[var(--app-border-soft)] border-y border-[var(--app-border-soft)]">
+              {draft.rules.map((rule, index) => (
+                <article key={rule.id} className="py-4">
+                  {agentMarkers.find((marker) => marker.ruleId === rule.id) ? (
+                    <span className="mb-2 inline-block text-xs font-medium text-[var(--app-accent-strong)]">
+                      {agentMarkers.find((marker) => marker.ruleId === rule.id)
+                        ?.type === "ADDED"
+                        ? "Agent 新增"
+                        : "Agent 修改"}
+                    </span>
+                  ) : null}
+                  <div className="grid items-end gap-3 md:grid-cols-[minmax(180px,1fr)_120px_auto]">
+                    <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                      <span>规则名称</span>
+                      <input
+                        className={inputClass()}
+                        value={rule.name}
+                        onChange={(event) =>
+                          change((current) => ({
+                            ...current,
+                            rules: current.rules.map((item, ruleIndex) =>
+                              ruleIndex === index
+                                ? { ...item, name: event.target.value }
+                                : item,
+                            ),
+                          }))
+                        }
+                      />
+                    </label>
+                    <NumberField
+                      label="分值"
+                      min={0}
+                      value={rule.points}
+                      onChange={(points) =>
+                        change((current) => ({
+                          ...current,
+                          rules: current.rules.map((item, ruleIndex) =>
+                            ruleIndex === index ? { ...item, points } : item,
+                          ),
+                        }))
+                      }
+                    />
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        className="app-button app-button-icon"
+                        title="复制规则"
+                        onClick={() =>
+                          change((current) => ({
+                            ...current,
+                            rules: [
+                              ...current.rules.slice(0, index + 1),
+                              {
+                                ...structuredClone(rule),
+                                id: ruleId(),
+                                name: `${rule.name} 副本`,
+                              },
+                              ...current.rules.slice(index + 1),
+                            ],
+                          }))
+                        }
+                      >
+                        <Copy size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        className="app-button app-button-icon"
+                        title="移除规则"
+                        disabled={draft.rules.length === 1}
+                        onClick={() => removeRule(index)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <ConditionEditor
+                      value={rule.condition}
+                      path={`rules.${index}.condition`}
+                      onChange={(condition) =>
+                        change((current) => ({
+                          ...current,
+                          rules: current.rules.map((item, ruleIndex) =>
+                            ruleIndex === index ? { ...item, condition } : item,
+                          ),
+                        }))
+                      }
+                    />
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="border-b border-[var(--app-border-soft)] px-4 py-5 sm:px-6">
+            <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
+              指标参数
+            </h2>
+            <div className="mt-3 grid gap-5 lg:grid-cols-2">
+              <fieldset className="grid grid-cols-3 gap-3">
+                <legend className="mb-2 text-sm font-medium">MACD</legend>
+                {(["fast", "slow", "signal"] as const).map((key) => (
+                  <NumberField
+                    key={key}
+                    label={key}
+                    min={2}
+                    value={draft.indicatorParams.macd[key]}
+                    onChange={(value) =>
+                      change((current) => ({
+                        ...current,
+                        indicatorParams: {
+                          ...current.indicatorParams,
+                          macd: {
+                            ...current.indicatorParams.macd,
+                            [key]: value,
+                          },
+                        },
+                      }))
+                    }
+                  />
+                ))}
+              </fieldset>
+              <fieldset className="grid grid-cols-3 gap-3">
+                <legend className="mb-2 text-sm font-medium">KDJ</legend>
+                {(["period", "kSmoothing", "dSmoothing"] as const).map(
+                  (key) => (
+                    <NumberField
+                      key={key}
+                      label={key}
+                      min={1}
+                      value={draft.indicatorParams.kdj[key]}
+                      onChange={(value) =>
+                        change((current) => ({
+                          ...current,
+                          indicatorParams: {
+                            ...current.indicatorParams,
+                            kdj: {
+                              ...current.indicatorParams.kdj,
+                              [key]: value,
+                            },
+                          },
+                        }))
+                      }
+                    />
+                  ),
+                )}
+              </fieldset>
+            </div>
+          </section>
+
+          <section
+            id="schedule"
+            className="scroll-mt-12 border-b border-[var(--app-border-soft)] px-4 py-5 sm:px-6"
+          >
+            <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
+              调度
+            </h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                <span>预设</span>
+                <select
+                  className={inputClass()}
+                  onChange={(event) => {
+                    const preset =
+                      schedulePresets[
+                        event.target.value as keyof typeof schedulePresets
+                      ];
+                    if (preset)
+                      change((current) => ({
+                        ...current,
+                        schedule: {
+                          ...current.schedule,
+                          ...preset,
+                          weekdays:
+                            "weekdays" in preset ? preset.weekdays : undefined,
+                        },
+                      }));
+                  }}
+                  defaultValue="TRADING_DAY_CLOSE"
+                >
+                  <option value="TRADING_DAY_CLOSE">交易日收盘后</option>
+                  <option value="DAILY_MORNING">每天盘前</option>
+                  <option value="WEEKLY">每周五</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                <span>时间</span>
+                <input
+                  className={inputClass()}
+                  type="time"
+                  value={draft.schedule.time}
+                  onChange={(event) =>
+                    change((current) => ({
+                      ...current,
+                      schedule: {
+                        ...current.schedule,
+                        time: event.target.value,
+                      },
+                    }))
+                  }
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                <span>时区</span>
+                <select
+                  className={inputClass()}
+                  value={draft.schedule.timezone}
+                  onChange={(event) =>
+                    change((current) => ({
+                      ...current,
+                      schedule: {
+                        ...current.schedule,
+                        timezone: event.target.value,
+                      },
+                    }))
+                  }
+                >
+                  <option value="Asia/Shanghai">Asia/Shanghai</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                <span>市场日历</span>
+                <select
+                  className={inputClass()}
+                  value={draft.schedule.marketCalendar ?? "SSE"}
+                  onChange={(event) =>
+                    change((current) => ({
+                      ...current,
+                      schedule: {
+                        ...current.schedule,
+                        marketCalendar: event.target.value,
+                      },
+                    }))
+                  }
+                >
+                  <option value="SSE">上交所</option>
+                  <option value="SZSE">深交所</option>
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                <span>开始时间（可选）</span>
+                <input
+                  className={inputClass()}
+                  type="datetime-local"
+                  value={draft.schedule.startAt?.slice(0, 16) ?? ""}
+                  onChange={(event) =>
+                    change((current) => ({
+                      ...current,
+                      schedule: {
+                        ...current.schedule,
+                        startAt: event.target.value
+                          ? new Date(event.target.value).toISOString()
+                          : undefined,
+                      },
+                    }))
+                  }
+                />
+              </label>
+              <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                <span>结束时间（可选）</span>
+                <input
+                  className={inputClass()}
+                  type="datetime-local"
+                  value={draft.schedule.endAt?.slice(0, 16) ?? ""}
+                  onChange={(event) =>
+                    change((current) => ({
+                      ...current,
+                      schedule: {
+                        ...current.schedule,
+                        endAt: event.target.value
+                          ? new Date(event.target.value).toISOString()
+                          : undefined,
+                      },
+                    }))
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <section
+            id="preview"
+            className="scroll-mt-12 border-t border-[var(--app-border-soft)] px-4 py-5 sm:px-6"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
+                  评分预览
+                </h2>
+                <p className="mt-1 text-sm text-[var(--app-text-muted)]">
+                  预览在后台运行，可继续编辑；实质修改并保存后旧预览自动失效。
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="app-button"
+                  disabled={
+                    previewMutation.isPending ||
+                    (draft.universe.type === "all_a_shares" &&
+                      previewSampleInput.trim().length === 0)
+                  }
+                  onClick={() => void runPreview()}
+                >
+                  运行预览
+                </button>
+                <button
+                  type="button"
+                  className="app-button app-button-primary"
+                  disabled={
+                    !previewQuery.data?.canActivate ||
+                    !previewQuery.data.valid ||
+                    activateMutation.isPending
+                  }
+                  onClick={() => void activate()}
+                >
+                  启用任务
+                </button>
+              </div>
+            </div>
+            {draft.universe.type === "all_a_shares" ? (
+              <label className="mt-4 grid max-w-xl gap-1 text-sm text-[var(--app-text-muted)]">
+                <span>全部 A 股预览样本（1 至 20 只）</span>
+                <textarea
+                  className="min-h-20 border border-[var(--app-border)] bg-[var(--app-surface)] p-2.5 text-sm outline-none focus:border-[var(--app-accent-strong)]"
+                  value={previewSampleInput}
+                  placeholder="600519 000001"
+                  onChange={(event) =>
+                    setPreviewSampleInput(event.target.value)
+                  }
+                />
+              </label>
+            ) : null}
+            {previewMutation.error ||
+            previewQuery.error ||
+            activateMutation.error ? (
+              <div className="mt-4">
+                <InlineNotice
+                  tone="danger"
+                  description={
+                    previewMutation.error?.message ??
+                    previewQuery.error?.message ??
+                    activateMutation.error?.message ??
+                    "评分预览失败"
+                  }
+                />
+              </div>
+            ) : null}
+            {previewQuery.data ? (
+              <div className="mt-4 border-y border-[var(--app-border-soft)] py-4">
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--app-text-muted)]">
+                  <span>状态：{previewQuery.data.status}</span>
+                  <span>版本：{previewQuery.data.taskVersion}</span>
+                  <span>
+                    数据截止：{previewQuery.data.dataCutoff ?? "等待执行"}
+                  </span>
+                  {!previewQuery.data.valid ? (
+                    <span className="text-amber-700">
+                      草稿已变化，此预览已失效
+                    </span>
+                  ) : null}
+                </div>
+                {previewQuery.data.warnings.length ? (
+                  <ul className="mt-3 list-disc pl-5 text-sm text-amber-700">
+                    {previewQuery.data.warnings.map((warning, index) => (
+                      <li key={`${String(warning)}-${index}`}>
+                        {String(warning)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {previewQuery.data.results.length ? (
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full min-w-[720px] text-left text-sm">
+                      <thead className="text-[var(--app-text-muted)]">
+                        <tr>
+                          <th className="py-2 pr-4">样本股票</th>
+                          <th className="py-2 pr-4">总分</th>
+                          <th className="py-2 pr-4">规则得分</th>
+                          <th className="py-2">叶子条件状态</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewQuery.data.results.map((result) => {
+                          const ruleResults = asRecord(result.ruleResults);
+                          return (
+                            <tr
+                              key={result.stockCode}
+                              className="border-t border-[var(--app-border-soft)]"
+                            >
+                              <td className="py-2 pr-4">
+                                {result.stockName}（{result.stockCode}）
+                              </td>
+                              <td className="py-2 pr-4">
+                                {result.score} / {result.maxScore}
+                              </td>
+                              <td className="py-2 pr-4">
+                                {Object.entries(ruleResults)
+                                  .map(([ruleId, value]) => {
+                                    const detail = asRecord(value);
+                                    return `${ruleId}: ${String(detail.awardedPoints ?? 0)}`;
+                                  })
+                                  .join("；") || "-"}
+                              </td>
+                              <td className="py-2">
+                                {Object.entries(ruleResults)
+                                  .flatMap(([ruleId, value]) =>
+                                    leafStatuses(
+                                      asRecord(value).conditionTree,
+                                    ).map((status) => `${ruleId} / ${status}`),
+                                  )
+                                  .join("；") || "-"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+
+          <section id="selection" className="scroll-mt-12 px-4 py-5 sm:px-6">
+            <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
+              筛选与投递
+            </h2>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <NumberField
+                label="最低分"
+                min={0}
+                value={draft.selection.minScore}
+                onChange={(minScore) =>
+                  change((current) => ({
+                    ...current,
+                    selection: { ...current.selection, minScore },
+                  }))
+                }
+              />
+              <NumberField
+                label="最多结果"
+                min={1}
+                value={draft.selection.limit}
+                onChange={(limit) =>
+                  change((current) => ({
+                    ...current,
+                    selection: { ...current.selection, limit },
+                  }))
+                }
+              />
+              <label
+                id="delivery"
+                className="scroll-mt-12 grid gap-1 text-sm text-[var(--app-text-muted)]"
+              >
+                <span>投递方式</span>
+                <select
+                  className={inputClass()}
+                  value={draft.delivery.type}
+                  onChange={(event) =>
+                    change((current) => ({
+                      ...current,
+                      delivery:
+                        event.target.value === "FEISHU"
+                          ? { type: "FEISHU", webhookUrl: "" }
+                          : { type: "SAVE_ONLY" },
+                    }))
+                  }
+                >
+                  <option value="SAVE_ONLY">仅保存站内结果</option>
+                  <option value="FEISHU">飞书摘要</option>
+                </select>
+              </label>
+              {draft.delivery.type === "FEISHU" ? (
+                <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
+                  <span>飞书 Webhook</span>
+                  <input
+                    className={inputClass()}
+                    type="url"
+                    autoComplete="off"
+                    placeholder={
+                      draft.delivery.maskedWebhook ??
+                      "https://open.feishu.cn/open-apis/bot/v2/hook/..."
+                    }
+                    value={draft.delivery.webhookUrl ?? ""}
+                    onChange={(event) =>
+                      change((current) => ({
+                        ...current,
+                        delivery: {
+                          ...current.delivery,
+                          type: "FEISHU",
+                          webhookUrl: event.target.value,
+                        },
                       }))
                     }
                   />
                 </label>
-                <NumberField
-                  label="分值"
-                  min={0}
-                  value={rule.points}
-                  onChange={(points) =>
-                    change((current) => ({
-                      ...current,
-                      rules: current.rules.map((item, ruleIndex) =>
-                        ruleIndex === index ? { ...item, points } : item,
-                      ),
-                    }))
-                  }
-                />
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    className="app-button app-button-icon"
-                    title="复制规则"
-                    onClick={() =>
-                      change((current) => ({
-                        ...current,
-                        rules: [
-                          ...current.rules.slice(0, index + 1),
-                          {
-                            ...structuredClone(rule),
-                            id: ruleId(),
-                            name: `${rule.name} 副本`,
-                          },
-                          ...current.rules.slice(index + 1),
-                        ],
-                      }))
-                    }
-                  >
-                    <Copy size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    className="app-button app-button-icon"
-                    title="移除规则"
-                    disabled={draft.rules.length === 1}
-                    onClick={() => removeRule(index)}
-                  >
-                    <Trash2 size={15} />
-                  </button>
+              ) : null}
+            </div>
+            <div className="mt-5 border-t border-[var(--app-border-soft)] pt-4">
+              <h3 className="text-sm font-semibold text-[var(--app-text-strong)]">
+                启用摘要
+              </h3>
+              <dl className="mt-2 grid gap-x-5 gap-y-2 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                <div>
+                  <dt className="text-[var(--app-text-subtle)]">任务</dt>
+                  <dd className="text-[var(--app-text-strong)]">
+                    {draft.name || "未命名任务"}
+                  </dd>
                 </div>
-              </div>
-              <div className="mt-4">
-                <ConditionEditor
-                  value={rule.condition}
-                  path={`rules.${index}.condition`}
-                  onChange={(condition) =>
-                    change((current) => ({
-                      ...current,
-                      rules: current.rules.map((item, ruleIndex) =>
-                        ruleIndex === index ? { ...item, condition } : item,
-                      ),
-                    }))
-                  }
-                />
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="border-b border-[var(--app-border-soft)] px-4 py-5 sm:px-6">
-        <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
-          指标参数
-        </h2>
-        <div className="mt-3 grid gap-5 lg:grid-cols-2">
-          <fieldset className="grid grid-cols-3 gap-3">
-            <legend className="mb-2 text-sm font-medium">MACD</legend>
-            {(["fast", "slow", "signal"] as const).map((key) => (
-              <NumberField
-                key={key}
-                label={key}
-                min={2}
-                value={draft.indicatorParams.macd[key]}
-                onChange={(value) =>
-                  change((current) => ({
-                    ...current,
-                    indicatorParams: {
-                      ...current.indicatorParams,
-                      macd: { ...current.indicatorParams.macd, [key]: value },
-                    },
-                  }))
-                }
-              />
-            ))}
-          </fieldset>
-          <fieldset className="grid grid-cols-3 gap-3">
-            <legend className="mb-2 text-sm font-medium">KDJ</legend>
-            {(["period", "kSmoothing", "dSmoothing"] as const).map((key) => (
-              <NumberField
-                key={key}
-                label={key}
-                min={1}
-                value={draft.indicatorParams.kdj[key]}
-                onChange={(value) =>
-                  change((current) => ({
-                    ...current,
-                    indicatorParams: {
-                      ...current.indicatorParams,
-                      kdj: { ...current.indicatorParams.kdj, [key]: value },
-                    },
-                  }))
-                }
-              />
-            ))}
-          </fieldset>
-        </div>
-      </section>
-
-      <section className="border-b border-[var(--app-border-soft)] px-4 py-5 sm:px-6">
-        <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
-          调度
-        </h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>预设</span>
-            <select
-              className={inputClass()}
-              onChange={(event) => {
-                const preset =
-                  schedulePresets[
-                    event.target.value as keyof typeof schedulePresets
-                  ];
-                if (preset)
-                  change((current) => ({
-                    ...current,
-                    schedule: {
-                      ...current.schedule,
-                      ...preset,
-                      weekdays:
-                        "weekdays" in preset ? preset.weekdays : undefined,
-                    },
-                  }));
-              }}
-              defaultValue="TRADING_DAY_CLOSE"
-            >
-              <option value="TRADING_DAY_CLOSE">交易日收盘后</option>
-              <option value="DAILY_MORNING">每天盘前</option>
-              <option value="WEEKLY">每周五</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>时间</span>
-            <input
-              className={inputClass()}
-              type="time"
-              value={draft.schedule.time}
-              onChange={(event) =>
-                change((current) => ({
-                  ...current,
-                  schedule: { ...current.schedule, time: event.target.value },
-                }))
-              }
-            />
-          </label>
-          <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>时区</span>
-            <select
-              className={inputClass()}
-              value={draft.schedule.timezone}
-              onChange={(event) =>
-                change((current) => ({
-                  ...current,
-                  schedule: {
-                    ...current.schedule,
-                    timezone: event.target.value,
-                  },
-                }))
-              }
-            >
-              <option value="Asia/Shanghai">Asia/Shanghai</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>市场日历</span>
-            <select
-              className={inputClass()}
-              value={draft.schedule.marketCalendar ?? "SSE"}
-              onChange={(event) =>
-                change((current) => ({
-                  ...current,
-                  schedule: {
-                    ...current.schedule,
-                    marketCalendar: event.target.value,
-                  },
-                }))
-              }
-            >
-              <option value="SSE">上交所</option>
-              <option value="SZSE">深交所</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>开始时间（可选）</span>
-            <input
-              className={inputClass()}
-              type="datetime-local"
-              value={draft.schedule.startAt?.slice(0, 16) ?? ""}
-              onChange={(event) =>
-                change((current) => ({
-                  ...current,
-                  schedule: {
-                    ...current.schedule,
-                    startAt: event.target.value
-                      ? new Date(event.target.value).toISOString()
-                      : undefined,
-                  },
-                }))
-              }
-            />
-          </label>
-          <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>结束时间（可选）</span>
-            <input
-              className={inputClass()}
-              type="datetime-local"
-              value={draft.schedule.endAt?.slice(0, 16) ?? ""}
-              onChange={(event) =>
-                change((current) => ({
-                  ...current,
-                  schedule: {
-                    ...current.schedule,
-                    endAt: event.target.value
-                      ? new Date(event.target.value).toISOString()
-                      : undefined,
-                  },
-                }))
-              }
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="border-t border-[var(--app-border-soft)] px-4 py-5 sm:px-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
-              评分预览
-            </h2>
-            <p className="mt-1 text-sm text-[var(--app-text-muted)]">
-              预览在后台运行，可继续编辑；实质修改并保存后旧预览自动失效。
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="app-button"
-              disabled={
-                previewMutation.isPending ||
-                (draft.universe.type === "all_a_shares" &&
-                  previewSampleInput.trim().length === 0)
-              }
-              onClick={() => void runPreview()}
-            >
-              运行预览
-            </button>
+                <div>
+                  <dt className="text-[var(--app-text-subtle)]">调度</dt>
+                  <dd className="text-[var(--app-text-strong)]">
+                    {draft.schedule.time} · {draft.schedule.timezone}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--app-text-subtle)]">范围</dt>
+                  <dd className="text-[var(--app-text-strong)]">
+                    {draft.universe.type === "all_a_shares"
+                      ? "全部 A 股"
+                      : `${draft.universe.stockInputs.length} 只股票`}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--app-text-subtle)]">评分</dt>
+                  <dd className="text-[var(--app-text-strong)]">
+                    {draft.rules.length} 条规则，最低 {draft.selection.minScore}{" "}
+                    分
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--app-text-subtle)]">投递</dt>
+                  <dd className="text-[var(--app-text-strong)]">
+                    {draft.delivery.type === "FEISHU"
+                      ? "站内结果与飞书摘要"
+                      : "仅保存站内结果"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--app-text-subtle)]">保存状态</dt>
+                  <dd className="text-[var(--app-text-strong)]">{status}</dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+          <div className="flex justify-between border-t border-[var(--app-border-soft)] px-4 py-4 sm:px-6">
+            <Link className="app-button" href="/scheduled-tasks">
+              返回任务列表
+            </Link>
             <button
               type="button"
               className="app-button app-button-primary"
-              disabled={
-                !previewQuery.data?.canActivate ||
-                !previewQuery.data.valid ||
-                activateMutation.isPending
-              }
-              onClick={() => void activate()}
+              disabled={saveMutation.isPending}
+              onClick={() => void persist()}
             >
-              启用任务
+              <Save size={16} />
+              保存草稿
             </button>
           </div>
-        </div>
-        {draft.universe.type === "all_a_shares" ? (
-          <label className="mt-4 grid max-w-xl gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>全部 A 股预览样本（1 至 20 只）</span>
-            <textarea
-              className="min-h-20 border border-[var(--app-border)] bg-[var(--app-surface)] p-2.5 text-sm outline-none focus:border-[var(--app-accent-strong)]"
-              value={previewSampleInput}
-              placeholder="600519 000001"
-              onChange={(event) => setPreviewSampleInput(event.target.value)}
-            />
-          </label>
-        ) : null}
-        {previewMutation.error ||
-        previewQuery.error ||
-        activateMutation.error ? (
-          <div className="mt-4">
-            <InlineNotice
-              tone="danger"
-              description={
-                previewMutation.error?.message ??
-                previewQuery.error?.message ??
-                activateMutation.error?.message ??
-                "评分预览失败"
-              }
-            />
-          </div>
-        ) : null}
-        {previewQuery.data ? (
-          <div className="mt-4 border-y border-[var(--app-border-soft)] py-4">
-            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--app-text-muted)]">
-              <span>状态：{previewQuery.data.status}</span>
-              <span>版本：{previewQuery.data.taskVersion}</span>
-              <span>
-                数据截止：{previewQuery.data.dataCutoff ?? "等待执行"}
-              </span>
-              {!previewQuery.data.valid ? (
-                <span className="text-amber-700">草稿已变化，此预览已失效</span>
-              ) : null}
-            </div>
-            {previewQuery.data.warnings.length ? (
-              <ul className="mt-3 list-disc pl-5 text-sm text-amber-700">
-                {previewQuery.data.warnings.map((warning, index) => (
-                  <li key={`${String(warning)}-${index}`}>{String(warning)}</li>
-                ))}
-              </ul>
-            ) : null}
-            {previewQuery.data.results.length ? (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="text-[var(--app-text-muted)]">
-                    <tr>
-                      <th className="py-2 pr-4">样本股票</th>
-                      <th className="py-2 pr-4">总分</th>
-                      <th className="py-2 pr-4">规则得分</th>
-                      <th className="py-2">叶子条件状态</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {previewQuery.data.results.map((result) => {
-                      const ruleResults = asRecord(result.ruleResults);
-                      return (
-                        <tr
-                          key={result.stockCode}
-                          className="border-t border-[var(--app-border-soft)]"
-                        >
-                          <td className="py-2 pr-4">
-                            {result.stockName}（{result.stockCode}）
-                          </td>
-                          <td className="py-2 pr-4">
-                            {result.score} / {result.maxScore}
-                          </td>
-                          <td className="py-2 pr-4">
-                            {Object.entries(ruleResults)
-                              .map(([ruleId, value]) => {
-                                const detail = asRecord(value);
-                                return `${ruleId}: ${String(detail.awardedPoints ?? 0)}`;
-                              })
-                              .join("；") || "-"}
-                          </td>
-                          <td className="py-2">
-                            {Object.entries(ruleResults)
-                              .flatMap(([ruleId, value]) =>
-                                leafStatuses(asRecord(value).conditionTree).map(
-                                  (status) => `${ruleId} / ${status}`,
-                                ),
-                              )
-                              .join("；") || "-"}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </section>
-
-      <section className="px-4 py-5 sm:px-6">
-        <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
-          筛选与投递
-        </h2>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <NumberField
-            label="最低分"
-            min={0}
-            value={draft.selection.minScore}
-            onChange={(minScore) =>
-              change((current) => ({
-                ...current,
-                selection: { ...current.selection, minScore },
-              }))
-            }
-          />
-          <NumberField
-            label="最多结果"
-            min={1}
-            value={draft.selection.limit}
-            onChange={(limit) =>
-              change((current) => ({
-                ...current,
-                selection: { ...current.selection, limit },
-              }))
-            }
-          />
-          <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-            <span>投递方式</span>
-            <select
-              className={inputClass()}
-              value={draft.delivery.type}
-              onChange={(event) =>
-                change((current) => ({
-                  ...current,
-                  delivery:
-                    event.target.value === "FEISHU"
-                      ? { type: "FEISHU", webhookUrl: "" }
-                      : { type: "SAVE_ONLY" },
-                }))
-              }
-            >
-              <option value="SAVE_ONLY">仅保存站内结果</option>
-              <option value="FEISHU">飞书摘要</option>
-            </select>
-          </label>
-          {draft.delivery.type === "FEISHU" ? (
-            <label className="grid gap-1 text-sm text-[var(--app-text-muted)]">
-              <span>飞书 Webhook</span>
-              <input
-                className={inputClass()}
-                type="url"
-                autoComplete="off"
-                placeholder={
-                  draft.delivery.maskedWebhook ??
-                  "https://open.feishu.cn/open-apis/bot/v2/hook/..."
-                }
-                value={draft.delivery.webhookUrl ?? ""}
-                onChange={(event) =>
-                  change((current) => ({
-                    ...current,
-                    delivery: {
-                      ...current.delivery,
-                      type: "FEISHU",
-                      webhookUrl: event.target.value,
-                    },
-                  }))
-                }
-              />
-            </label>
-          ) : null}
-        </div>
-      </section>
-      <div className="flex justify-between border-t border-[var(--app-border-soft)] px-4 py-4 sm:px-6">
-        <Link className="app-button" href="/scheduled-tasks">
-          返回任务列表
-        </Link>
-        <button
-          type="button"
-          className="app-button app-button-primary"
-          disabled={saveMutation.isPending}
-          onClick={() => void persist()}
-        >
-          <Save size={16} />
-          保存草稿
-        </button>
+        </main>
       </div>
     </WorkspaceShell>
   );
