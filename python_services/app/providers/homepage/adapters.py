@@ -582,6 +582,7 @@ class HomepageProviderAdapter:
             normalization_rules_version=self.normalization_rules_version,
             errors=tuple(errors),
             authority=authority,
+            observation_period=_collect_observation_period(observations),
             upstream_as_of=_first_page_value(pages, "upstream_as_of") or _latest_assertion_time(assertions, "upstream_as_of"),
             source_published_at=_first_page_value(pages, "source_published_at") or _latest_assertion_time(assertions, "source_published_at"),
             replay=replay,
@@ -856,6 +857,15 @@ def _normalized_key(value: str) -> str:
 def _latest_assertion_time(assertions: Sequence[SourceAssertion], field_name: str) -> datetime | None:
     values = [getattr(item, field_name) for item in assertions if getattr(item, field_name) is not None]
     return max(values) if values else None
+
+
+def _collect_observation_period(observations: Sequence[NormalizedObservation]) -> Mapping[str, Any]:
+    periods = {
+        item.identity_key: item.observation_period
+        for item in observations
+        if item.observation_period
+    }
+    return {"byObservation": periods} if periods else {}
 
 
 def _cutoff_reached(actual: DataCutoff | None, target: DataCutoff | None) -> bool:

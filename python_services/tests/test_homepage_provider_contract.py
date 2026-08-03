@@ -67,6 +67,7 @@ def test_three_adapters_return_the_same_success_contract_shape(adapter) -> None:
     assert result.coverage.missing_scope == {}
     assert len(result.observations) == 1
     assert result.observations[0].value_text == "10.50"
+    assert result.observation_period["byObservation"]
     assert result.source_assertions[0].source_key == adapter.provider_key
     assert result.replay is not None
     assert result.replay.idempotency_key
