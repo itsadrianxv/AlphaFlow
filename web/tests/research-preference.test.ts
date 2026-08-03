@@ -31,6 +31,7 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
   private readonly states = new Map<string, ResearchPreferenceState>();
   private readonly snapshots = new Map<string, ResearchPreferenceSnapshot>();
   private readonly removedLevels = new Map<string, "REGULAR" | "FOCUS">();
+  private readonly commands = new Map<string, string>();
 
   async getCurrent(userId: string) {
     return structuredClone(this.states.get(userId) ?? emptyState(userId));
@@ -43,6 +44,11 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
   async applyCommand(userId: string, command: ResearchPreferenceCommand) {
     const current = await this.getCurrent(userId);
     if (current.lastCommandId === command.commandId) return current;
+    const recordedUserId = this.commands.get(command.commandId);
+    if (recordedUserId) {
+      if (recordedUserId !== userId) throw new Error("command belongs to another user");
+      return current;
+    }
     const next = structuredClone(current);
     next.lastCommandId = command.commandId;
     if (command.type === "ADD") {
@@ -99,6 +105,7 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
     }
     next.items = sortItems(next.items);
     this.states.set(userId, next);
+    this.commands.set(command.commandId, userId);
     return structuredClone(next);
   }
 
@@ -262,5 +269,27 @@ describe("显式研究关注与冻结偏好", () => {
     expect(restored.items).toEqual([
       { targetType: "COMPANY", targetKey: "000001.SZ", level: "FOCUS" },
     ]);
+  });
+
+  it("旧命令在后续变更后重放也不会重新修改当前态", async () => {
+    const repository = new MemoryResearchPreferenceRepository();
+    const service = new ResearchPreferenceService(repository);
+    await service.add("user-1", {
+      commandId: "add-1",
+      target: { targetType: "COMPANY", targetKey: "000001.SZ" },
+    });
+    await service.remove("user-1", {
+      commandId: "remove-1",
+      target: { targetType: "COMPANY", targetKey: "000001.SZ" },
+    });
+    await service.restore("user-1", {
+      commandId: "restore-1",
+      target: { targetType: "COMPANY", targetKey: "000001.SZ" },
+    });
+    await service.remove("user-1", {
+      commandId: "remove-1",
+      target: { targetType: "COMPANY", targetKey: "000001.SZ" },
+    });
+    expect((await service.getCurrent("user-1")).items).toHaveLength(1);
   });
 });
