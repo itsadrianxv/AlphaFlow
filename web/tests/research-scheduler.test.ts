@@ -232,6 +232,34 @@ describe("研究调度 module", () => {
     expect(failed.terminalReason).toBe("NON_RETRYABLE_FAILURE");
   });
 
+  it("同一目标时间区间内未尝试任务优先于重试任务", () => {
+    const clock = new TestClock();
+    const scheduler = createScheduler(clock);
+    const retried = enqueue(scheduler, "retry-order-1", "INTERACTIVE", {
+      fairnessKey: "retry-order",
+    });
+    const first = scheduler.claim("pool-provider", "worker-a")!;
+    scheduler.settle(retried.id, first.task.fencingToken, {
+      disposition: "RETRY",
+      errorClass: "TEMPORARY",
+      retryAfterMs: 100,
+    });
+    const fresh = enqueue(scheduler, "retry-order-2", "INTERACTIVE", {
+      fairnessKey: "retry-order",
+    });
+    clock.advance(100);
+    const freshClaim = scheduler.claim("pool-provider", "worker-b");
+    expect(freshClaim?.task.id).toBe(fresh.id);
+    scheduler.settle(fresh.id, freshClaim!.task.fencingToken, {
+      disposition: "COMPLETED",
+      resultContractVersion: "1.0",
+      result: {},
+    });
+    expect(scheduler.claim("pool-provider", "worker-c")?.task.id).toBe(
+      retried.id,
+    );
+  });
+
   it("租约过期后回收许可，旧持有者不能结算", () => {
     const clock = new TestClock();
     const scheduler = createScheduler(clock);
@@ -277,6 +305,19 @@ describe("研究调度 module", () => {
     });
     expect(reopened.state).toBe("OPEN");
     expect(reopened.halfOpenProbeTaskId).toBeNull();
+  });
+
+  it("半开探测 lease 过期后可以重新探测", () => {
+    const clock = new TestClock();
+    const scheduler = createScheduler(clock, 2);
+    scheduler.recordOutcome("pool-provider", { kind: "RATE_LIMITED" });
+    clock.advance(60_000);
+    enqueue(scheduler, "probe-expired-1", "INTERACTIVE");
+    expect(scheduler.claim("pool-provider", "worker-a")).not.toBeNull();
+    clock.advance(1_001);
+
+    expect(scheduler.claim("pool-provider", "worker-b")).not.toBeNull();
+    expect(scheduler.getCircuit("pool-provider")?.state).toBe("HALF_OPEN");
   });
 
   it("健康成功 20 次且持续健康后增加并发，429 立即减半并冷却", () => {
