@@ -1,5 +1,6 @@
 import {
   type ResearchPreferenceExplanation,
+  type ResearchPreferenceChannels,
   type ResearchPreferenceImportCandidate,
   type ResearchPreferenceItem,
   type ResearchPreferenceMatchInput,
@@ -56,9 +57,7 @@ export class ResearchPreferenceService {
   async listImportCandidates(
     userId: string,
   ): Promise<ResearchPreferenceImportCandidate[]> {
-    const list = this.repository.listImportCandidates;
-    if (!list) return [];
-    return list.call(this.repository, requireUserId(userId));
+    return this.repository.listImportCandidates(requireUserId(userId));
   }
 
   execute(
@@ -163,7 +162,7 @@ export class ResearchPreferenceService {
     userId: string,
     input: {
       commandId: string;
-      channels: Partial<ResearchPreferenceState>;
+      channels: Partial<ResearchPreferenceChannels>;
     },
   ): Promise<ResearchPreferenceState> {
     const channels = {

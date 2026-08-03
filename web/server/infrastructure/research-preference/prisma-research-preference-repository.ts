@@ -136,6 +136,17 @@ export class PrismaResearchPreferenceRepository
             return toState(preference, userId);
           }
 
+          const recordedCommand =
+            await tx.researchPreferenceCommand.findUnique({
+              where: { commandId: command.commandId },
+            });
+          if (recordedCommand) {
+            if (recordedCommand.userId !== userId) {
+              throw new Error("研究偏好命令标识已属于其他用户");
+            }
+            return toState(preference, userId);
+          }
+
           const now = new Date();
           switch (command.type) {
             case "ADD":
@@ -262,6 +273,15 @@ export class PrismaResearchPreferenceRepository
               },
             },
           });
+          await tx.researchPreferenceCommand.create({
+            data: {
+              id: randomUUID(),
+              commandId: command.commandId,
+              userId,
+              commandType: command.type,
+              payloadJson: command as unknown as Prisma.InputJsonValue,
+            },
+          });
           return toState(updated, userId);
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -362,6 +382,7 @@ export class PrismaResearchPreferenceRepository
               where: { id: preference.id },
             });
           }
+          await tx.researchPreferenceCommand.deleteMany({ where: { userId } });
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       ),
@@ -375,7 +396,12 @@ export class PrismaResearchPreferenceRepository
       try {
         return await operation();
       } catch (error) {
-        if (!isSerializationError(error) || attempt === 2) throw error;
+        if (
+          (!isSerializationError(error) && !isUniqueConstraintError(error)) ||
+          attempt === 2
+        ) {
+          throw error;
+        }
       }
     }
     throw new Error("研究偏好写入重试耗尽");

@@ -1,7 +1,5 @@
 import type {
-  ResearchPreferenceExplanation,
   ResearchPreferenceImportCandidate,
-  ResearchPreferenceMatchInput,
   ResearchPreferenceSnapshot,
   ResearchPreferenceState,
 } from "~/contracts/research-preference";
@@ -12,9 +10,7 @@ import type {
 
 export interface ResearchPreferenceRepository {
   getCurrent(userId: string): Promise<ResearchPreferenceState>;
-  listImportCandidates?(
-    userId: string,
-  ): Promise<ResearchPreferenceImportCandidate[]>;
+  listImportCandidates(userId: string): Promise<ResearchPreferenceImportCandidate[]>;
   applyCommand(
     userId: string,
     command: ResearchPreferenceCommand,
@@ -31,18 +27,3 @@ export interface ResearchPreferenceRepository {
   ): Promise<ResearchPreferenceSnapshot | null>;
   deletePersonalData(userId: string, deletedAt: Date): Promise<void>;
 }
-
-export interface ResearchPreferenceExplanationRepository {
-  getSnapshotForUser(
-    userId: string,
-    snapshotId: string,
-  ): Promise<ResearchPreferenceSnapshot | null>;
-}
-
-export type PreferenceExplanationInput = {
-  userId: string;
-  snapshotId: string;
-  candidates: ResearchPreferenceMatchInput[];
-};
-
-export type PreferenceExplanationResult = ResearchPreferenceExplanation;
