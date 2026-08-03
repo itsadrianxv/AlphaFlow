@@ -11,7 +11,6 @@ import { overviewInsightsRouter } from "~/server/api/routers/overview-insights";
 import { postRouter } from "~/server/api/routers/post";
 import { researchPreferenceRouter } from "~/server/api/routers/research-preference";
 import { researchTargetRouter } from "~/server/api/routers/research-target";
-import { researchPreferenceRouter } from "~/server/api/routers/research-preference";
 import { scheduledTaskRouter } from "~/server/api/routers/scheduled-task";
 import { screeningRouter } from "~/server/api/routers/screening";
 import { timingRouter } from "~/server/api/routers/timing";
