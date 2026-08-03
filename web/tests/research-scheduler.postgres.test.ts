@@ -145,4 +145,106 @@ describePostgres("研究调度 PostgreSQL 契约", () => {
     expect(restarted.successStreak).toBe(0);
     expect(restarted.healthySince).toBeNull();
   });
+
+  it("PostgreSQL claim 序列按 5:3:1 调度等级权重分配", async () => {
+    const { poolId, value } = await scheduler(9);
+    for (let index = 0; index < 9; index += 1) {
+      await enqueue(value, poolId, key(`interactive-${index}`), "INTERACTIVE");
+      if (index < 6) {
+        await enqueue(value, poolId, key(`time-critical-${index}`), "TIME_CRITICAL");
+      }
+      if (index < 3) {
+        await enqueue(value, poolId, key(`background-${index}`), "BACKGROUND");
+      }
+    }
+
+    const claimed = [];
+    for (let index = 0; index < 9; index += 1) {
+      const claim = await value.claim(poolId, `worker-${index}`);
+      expect(claim).not.toBeNull();
+      claimed.push(claim!.task.schedulingTier);
+    }
+
+    expect(claimed.filter((tier) => tier === "INTERACTIVE")).toHaveLength(5);
+    expect(claimed.filter((tier) => tier === "TIME_CRITICAL")).toHaveLength(3);
+    expect(claimed.filter((tier) => tier === "BACKGROUND")).toHaveLength(1);
+  });
+
+  it("RETRY 结算尊重 Retry-After 并在数据库保存原因字段", async () => {
+    let now = new Date("2026-08-03T01:00:00.000Z");
+    const poolId = key("pool");
+    poolIds.push(poolId);
+    await db.$executeRawUnsafe(
+      `INSERT INTO "ResearchResourcePool" ("id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency")
+       VALUES ($1, $2, 'PROVIDER', 2, 1)`,
+      poolId,
+      key("pool-key"),
+    );
+    const value = new PostgresResearchScheduler(db, {
+      now: () => now,
+      leaseMs: 10_000,
+      permitLeaseMs: 10_000,
+      retryDelaysMs: [100],
+    });
+    const task = await enqueue(value, poolId, key("retry-after"));
+    const first = await value.claim(poolId, "worker-a");
+    expect(first).not.toBeNull();
+    await value.settle(task.id, first!.task.fencingToken, {
+      disposition: "RETRY",
+      errorClass: "HTTP_429",
+      retryable: true,
+      retryAfterMs: 700,
+    });
+    const retrying = await db.researchTask.findUniqueOrThrow({
+      where: { id: task.id },
+    });
+    expect(retrying.status).toBe("RETRY_WAIT");
+    expect(retrying.errorClass).toBe("HTTP_429");
+    expect(retrying.retryability).toBe("RETRYABLE");
+    expect(retrying.nextAttemptAt?.getTime()).toBe(now.getTime() + 700);
+    expect(await value.claim(poolId, "worker-b")).toBeNull();
+
+    now = new Date(now.getTime() + 701);
+    expect((await value.claim(poolId, "worker-b"))?.task.id).toBe(task.id);
+  });
+
+  it("熔断 Retry-After 后半开状态只允许一个探测任务", async () => {
+    let now = new Date("2026-08-03T02:00:00.000Z");
+    const poolId = key("pool");
+    poolIds.push(poolId);
+    await db.$executeRawUnsafe(
+      `INSERT INTO "ResearchResourcePool" ("id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency")
+       VALUES ($1, $2, 'PROVIDER', 4, 2)`,
+      poolId,
+      key("pool-key"),
+    );
+    const value = new PostgresResearchScheduler(db, {
+      now: () => now,
+      leaseMs: 10_000,
+      permitLeaseMs: 10_000,
+    });
+    await enqueue(value, poolId, key("probe-a"));
+    await enqueue(value, poolId, key("probe-b"));
+
+    const opened = await value.recordOutcome(poolId, {
+      kind: "RATE_LIMITED",
+      retryAfterMs: 500,
+      at: now,
+    });
+    expect(opened.state).toBe("OPEN");
+    expect(await value.claim(poolId, "worker-before-retry")).toBeNull();
+
+    now = new Date(now.getTime() + 501);
+    const probe = await value.claim(poolId, "worker-probe");
+    expect(probe).not.toBeNull();
+    expect((await value.getCircuit(poolId))?.state).toBe("HALF_OPEN");
+    expect(await value.claim(poolId, "worker-second-probe")).toBeNull();
+
+    await value.settle(probe!.task.id, probe!.task.fencingToken, {
+      disposition: "COMPLETED",
+      resultContractVersion: "1.0",
+      result: { ok: true },
+    });
+    expect((await value.getCircuit(poolId))?.state).toBe("CLOSED");
+  });
 });

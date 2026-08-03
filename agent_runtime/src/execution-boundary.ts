@@ -125,10 +125,11 @@ function parseNetworkPolicy(raw: unknown): AgentNetworkPolicy {
       ? (raw as Record<string, unknown>)
       : {};
   const schemes = Array.isArray(value.allowedSchemes)
-    ? value.allowedSchemes.filter(
-        (scheme): scheme is "http" | "https" =>
-          scheme === "http" || scheme === "https",
-      )
+    ? value.allowedSchemes.flatMap((scheme): Array<"http" | "https"> => {
+        if (scheme === "http" || scheme === "http:") return ["http"];
+        if (scheme === "https" || scheme === "https:") return ["https"];
+        return [];
+      })
     : DEFAULT_NETWORK_POLICY.allowedSchemes;
 
   return {
@@ -139,7 +140,9 @@ function parseNetworkPolicy(raw: unknown): AgentNetworkPolicy {
     denyPrivateNetwork:
       typeof value.denyPrivateNetwork === "boolean"
         ? value.denyPrivateNetwork
-        : DEFAULT_NETWORK_POLICY.denyPrivateNetwork,
+        : typeof value.allowPrivateNetwork === "boolean"
+          ? !value.allowPrivateNetwork
+          : DEFAULT_NETWORK_POLICY.denyPrivateNetwork,
     allowCredentials: false,
     allowedSchemes: schemes.length > 0 ? schemes : DEFAULT_NETWORK_POLICY.allowedSchemes,
   };
@@ -201,7 +204,9 @@ export function createExecutionBoundary(
         : request.runId,
     skillIds: [...new Set(request.skillIds ?? [request.skillId])],
     allowedCapabilities: normalizeCapabilities(request),
-    networkPolicy: parseNetworkPolicy(rawBoundary.networkPolicy),
+    networkPolicy: parseNetworkPolicy(
+      rawBoundary.networkPolicy ?? request.networkPolicy,
+    ),
     budget: parseBudget(rawBoundary.budget, config),
     model: {
       provider: config.modelProvider,

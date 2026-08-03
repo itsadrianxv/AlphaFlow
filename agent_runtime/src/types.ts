@@ -61,6 +61,12 @@ export type StartRunRequest = {
   allowedCapabilities?: string[];
   capabilityConstraints?: Record<string, unknown>;
   executionBoundary?: Record<string, unknown>;
+  networkPolicy?: {
+    allowPublicHttp?: boolean;
+    allowPrivateNetwork?: boolean;
+    allowCredentialedUrls?: boolean;
+    allowedSchemes?: string[];
+  };
 };
 
 export type ScheduledTaskRunRequest = {

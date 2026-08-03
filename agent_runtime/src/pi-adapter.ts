@@ -624,6 +624,14 @@ export class PiAdapter {
       userId: request.userId,
       maxToolCalls: boundary.budget.maxToolCalls,
       toolTimeoutMs: this.config.toolTimeoutMs,
+      networkPolicy: {
+        allowPublicHttp: boundary.networkPolicy.allowPublicHttp,
+        allowPrivateNetwork: !boundary.networkPolicy.denyPrivateNetwork,
+        allowCredentialedUrls: boundary.networkPolicy.allowCredentials,
+        allowedSchemes: boundary.networkPolicy.allowedSchemes.map(
+          (scheme) => `${scheme}:`,
+        ),
+      },
       capabilityConstraints: request.capabilityConstraints,
     });
     const setupTools = request.conversationId

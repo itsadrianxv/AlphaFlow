@@ -93,6 +93,9 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
     executionBoundary: isRecord(value.executionBoundary)
       ? value.executionBoundary
       : undefined,
+    networkPolicy: isRecord(value.networkPolicy)
+      ? value.networkPolicy
+      : undefined,
   };
 }
 

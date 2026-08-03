@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DeterministicController } from "~/server/application/agent-runtime/deterministic-controller";
+import {
+  DeterministicController,
+  settleAgentControllerOutput,
+} from "~/server/application/agent-runtime/deterministic-controller";
 
 const context = {
   runId: "run_1",
@@ -41,6 +44,43 @@ describe("DeterministicController", () => {
     });
   });
 
+  it("拒绝 Agent 直接结算外部投递和权威写入", () => {
+    const controller = new DeterministicController();
+    const externalDelivery = controller.settle(
+      intent({
+        intentId: "intent_delivery",
+        intentType: "SEND_EXTERNAL_COPY",
+        requiredCapabilities: ["delivery.request"],
+        permission: "delivery:request",
+        sideEffect: {
+          kind: "EXTERNAL_DELIVERY",
+          channel: "feishu",
+          targetRefIds: ["target_1"],
+        },
+      }),
+      context,
+    );
+    expect(externalDelivery).toMatchObject({
+      status: "REJECTED",
+      intentId: "intent_delivery",
+    });
+
+    const authoritativeWrite = controller.settle(
+      intent({
+        intentId: "intent_write",
+        sideEffect: {
+          kind: "AUTHORITATIVE_WRITE",
+          targetRefIds: ["target_1"],
+        },
+      }),
+      context,
+    );
+    expect(authoritativeWrite).toMatchObject({
+      status: "REJECTED",
+      intentId: "intent_write",
+    });
+  });
+
   it("含糊、批量、扩大分发、受限资源和不可恢复操作需要二次确认", () => {
     const controller = new DeterministicController();
     const decision = controller.settle(
@@ -49,12 +89,9 @@ describe("DeterministicController", () => {
         ambiguity: "AMBIGUOUS",
         batchSize: 2,
         reversible: false,
-        intentType: "SEND_EXTERNAL_COPY",
-        requiredCapabilities: ["delivery.request"],
-        permission: "delivery:request",
+        intentType: "UPDATE_RESEARCH_FOCUS",
         sideEffect: {
-          kind: "EXTERNAL_DELIVERY",
-          channel: "feishu",
+          kind: "PREFERENCE_CHANGE",
           targetRefIds: ["target_1"],
           irreversible: true,
           expandsDistribution: true,
@@ -147,5 +184,82 @@ describe("DeterministicController", () => {
     expect(decision.status === "REJECTED" ? decision.reasons : []).toContain(
       "research_only 拒绝买卖、持有、加减仓、仓位、入场价、目标价、止损价或订单计划",
     );
+  });
+});
+
+const baseOutput = {
+  schemaVersion: "agent-controller-output.v1",
+  ambiguity: "UNAMBIGUOUS",
+  reversible: true,
+  batchSize: 1,
+  targetRefIds: ["target-1"],
+} as const;
+
+describe("deterministic controller", () => {
+  it("不让单义外部投递从 Agent 输出直接结算", () => {
+    const decision = settleAgentControllerOutput({
+      ...baseOutput,
+      intent: "REQUEST_EXTERNAL_DELIVERY",
+      sideEffect: {
+        kind: "EXTERNAL_DELIVERY",
+        channel: "email",
+        targetRefIds: ["target-1"],
+        payload: { subject: "外部副本" },
+      },
+    });
+
+    expect(decision).toMatchObject({
+      status: "REJECTED",
+      requestedIntent: "REQUEST_EXTERNAL_DELIVERY",
+    });
+    expect(JSON.stringify(decision)).not.toContain("email");
+  });
+
+  it("不让权威写入 sideEffect 从 Agent 输出直通结算", () => {
+    const decision = settleAgentControllerOutput({
+      ...baseOutput,
+      intent: "REQUEST_AUTHORITATIVE_WRITE",
+      sideEffect: {
+        kind: "AUTHORITATIVE_WRITE",
+        payload: { table: "ResearchPreference", op: "DELETE" },
+      },
+    });
+
+    expect(decision).toMatchObject({
+      status: "REJECTED",
+      requestedIntent: "REQUEST_AUTHORITATIVE_WRITE",
+    });
+    expect(JSON.stringify(decision)).not.toContain("ResearchPreference");
+  });
+
+  it("含糊或批量的普通意图需要二次确认", () => {
+    expect(
+      settleAgentControllerOutput({
+        ...baseOutput,
+        intent: "PROPOSE_RESEARCH_UPDATE",
+        ambiguity: "AMBIGUOUS",
+      }),
+    ).toMatchObject({ status: "NEEDS_SECOND_CONFIRMATION" });
+
+    expect(
+      settleAgentControllerOutput({
+        ...baseOutput,
+        intent: "PROPOSE_RESEARCH_UPDATE",
+        batchSize: 2,
+      }),
+    ).toMatchObject({ status: "NEEDS_SECOND_CONFIRMATION" });
+  });
+
+  it("只结算可撤销、单义、非外部副作用的有界意图", () => {
+    expect(
+      settleAgentControllerOutput({
+        ...baseOutput,
+        intent: "PROPOSE_RESEARCH_UPDATE",
+      }),
+    ).toEqual({
+      status: "SETTLED",
+      intent: "PROPOSE_RESEARCH_UPDATE",
+      targetRefIds: ["target-1"],
+    });
   });
 });
