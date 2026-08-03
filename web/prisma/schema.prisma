@@ -2003,9 +2003,40 @@ model ResearchInboxEntry {
   preferenceSnapshot          ResearchPreferenceSnapshot?       @relation(fields: [preferenceSnapshotId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   history                     ResearchInboxEntryHistory[]
   feedback                    ResearchInboxFeedback?
+  externalCopy                ResearchExternalCopy?
 
   @@index([userId, state, createdAt])
   @@index([eventRevisionId])
+}
+
+model ResearchExternalCopy {
+  id             String             @id @default(cuid())
+  entryId        String             @unique
+  idempotencyKey String             @unique
+  channel        String             @default("FEISHU")
+  payloadJson    Json
+  status         String             @default("PENDING")
+  attempts       Int                @default(0)
+  firstAttemptAt DateTime?          @db.Timestamptz(3)
+  retryDeadline  DateTime           @db.Timestamptz(3)
+  nextAttemptAt  DateTime?          @db.Timestamptz(3)
+  sentAt         DateTime?          @db.Timestamptz(3)
+  lastErrorCode  String?
+  createdAt      DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+  entry          ResearchInboxEntry @relation(fields: [entryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([channel, status, nextAttemptAt], map: "ResearchExternalCopy_delivery_idx")
+}
+
+model ResearchDeliveryCircuit {
+  id                  String   @id @default(cuid())
+  channel             String   @unique
+  state               String   @default("CLOSED")
+  consecutiveFailures Int      @default(0)
+  openCount           Int      @default(0)
+  retryAfter          DateTime? @db.Timestamptz(3)
+  updatedAt           DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 }
 
 model ResearchInboxEntryHistory {
