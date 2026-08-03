@@ -41,6 +41,7 @@ export class AgentRuntimeRunStore {
         prompt: request.prompt,
         skillIds: request.skillIds,
         context: request.context,
+        executionBoundary: request.executionBoundary,
       },
       createdAt: now,
       events: [],
@@ -197,6 +198,23 @@ export class AgentRuntimeRunStore {
     this.scheduleCleanup(runId);
   }
 
+  recordAudit(runId: string, audit: Record<string, unknown>) {
+    const run = this.runs.get(runId);
+    if (!run) {
+      return;
+    }
+
+    run.audit = audit;
+    this.appendEvent(runId, "run.audit.recorded", {
+      boundary: audit.boundary,
+      stopReason: audit.stopReason,
+      usage: audit.usage,
+      toolSummaryCount: Array.isArray(audit.toolSummaries)
+        ? audit.toolSummaries.length
+        : 0,
+    });
+  }
+
   markFailed(runId: string, errorCode: string, errorMessage: string) {
     const run = this.runs.get(runId);
     if (!run) {
@@ -327,6 +345,7 @@ export class AgentRuntimeRunStore {
       title: run.title,
       input: run.input,
       finalOutput: run.finalOutput,
+      audit: run.audit,
       errorCode: run.errorCode,
       errorMessage: run.errorMessage,
       createdAt: run.createdAt,

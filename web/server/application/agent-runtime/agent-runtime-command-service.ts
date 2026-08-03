@@ -10,6 +10,7 @@ export type StartAgentRuntimeRunCommand = {
   userMessageId?: string;
   assistantMessageId?: string;
   context?: Record<string, unknown>;
+  executionBoundary?: Record<string, unknown>;
   idempotencyKey?: string;
 };
 

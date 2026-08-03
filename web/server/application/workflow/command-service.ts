@@ -66,6 +66,7 @@ export type StartPiAgentRunCommand = {
   userMessageId?: string;
   assistantMessageId?: string;
   context?: Record<string, unknown>;
+  executionBoundary?: Record<string, unknown>;
   templateVersion?: number;
   idempotencyKey?: string;
 };
@@ -221,6 +222,7 @@ export class WorkflowCommandService {
         userMessageId: command.userMessageId,
         assistantMessageId: command.assistantMessageId,
         context: command.context,
+        executionBoundary: command.executionBoundary,
       },
       idempotencyKey:
         command.idempotencyKey ??
