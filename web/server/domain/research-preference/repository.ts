@@ -10,7 +10,9 @@ import type {
 
 export interface ResearchPreferenceRepository {
   getCurrent(userId: string): Promise<ResearchPreferenceState>;
-  listImportCandidates(userId: string): Promise<ResearchPreferenceImportCandidate[]>;
+  listImportCandidates(
+    userId: string,
+  ): Promise<ResearchPreferenceImportCandidate[]>;
   applyCommand(
     userId: string,
     command: ResearchPreferenceCommand,
