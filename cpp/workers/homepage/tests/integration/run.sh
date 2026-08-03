@@ -12,16 +12,15 @@ trap cleanup EXIT
 
 insert_task() {
   id=$1
-  scope=${2:-DEFAULT}
-  fingerprint=${3:-NULL}
+  scope=${2:-BASELINE}
   $compose exec -T postgres-test psql -U postgres -d homepage_worker_test -v ON_ERROR_STOP=1 -c \
-    "INSERT INTO \"HomePageGenerationTask\"(id,\"generationKey\",scope,\"preferenceFingerprint\") VALUES('$id','$id','$scope',$fingerprint)" >/dev/null
+    "INSERT INTO \"HomepageDataManifest\"(id,\"manifestKey\",scope,\"activationSequence\") VALUES('manifest-$id','manifest-$id','$scope',1); INSERT INTO \"HomepageGenerationTask\"(id,\"generationKey\",\"manifestId\",\"activationSequence\",\"inputHash\") VALUES('$id','$id','manifest-$id',1,'sha256:input')" >/dev/null
 }
 publish() {
   $compose exec -T redis-test redis-cli XADD homepage:generation '*' schemaVersion 1 executionId "$1" enqueuedAt 2026-08-01T00:00:00Z >/dev/null
 }
 status_of() {
-  $compose exec -T postgres-test psql -U postgres -d homepage_worker_test -Atc "SELECT status::text FROM \"HomePageGenerationTask\" WHERE id='$1'"
+  $compose exec -T postgres-test psql -U postgres -d homepage_worker_test -Atc "SELECT status FROM \"HomepageGenerationTask\" WHERE id='$1'"
 }
 wait_status() {
   id=$1 expected=$2 limit=${3:-25} attempt=0
@@ -38,16 +37,16 @@ insert_task homepage-success
 publish homepage-success
 publish homepage-success
 wait_status homepage-success SUCCEEDED
-[ "$($compose exec -T postgres-test psql -U postgres -d homepage_worker_test -Atc "SELECT COUNT(*) FROM \"HomePageSnapshot\" WHERE \"generationTaskId\"='homepage-success'")" = "1" ]
+[ "$($compose exec -T postgres-test psql -U postgres -d homepage_worker_test -Atc "SELECT COUNT(*) FROM \"HomepageSnapshot\" WHERE \"generationTaskId\"='homepage-success'")" = "1" ]
 
 insert_task homepage-retry
 publish homepage-retry
 wait_status homepage-retry RETRY_WAIT
 [ "$($compose exec -T redis-test redis-cli XPENDING homepage:generation homepage-worker | head -n 1)" -ge "1" ]
-$compose exec -T postgres-test psql -U postgres -d homepage_worker_test -c "UPDATE \"HomePageGenerationTask\" SET \"nextAttemptAt\"=NOW() WHERE id='homepage-retry'" >/dev/null
+$compose exec -T postgres-test psql -U postgres -d homepage_worker_test -c "UPDATE \"HomepageGenerationTask\" SET \"nextAttemptAt\"=NOW() WHERE id='homepage-retry'" >/dev/null
 wait_status homepage-retry SUCCEEDED
 
-insert_task homepage-obsolete PERSONALIZED "'old-fingerprint'"
+insert_task homepage-obsolete PERSONALIZED
 publish homepage-obsolete
 wait_status homepage-obsolete CANCELLED
 
@@ -57,7 +56,7 @@ wait_status homepage-delay RUNNING 10
 $compose kill --signal SIGKILL worker-test
 $compose up --detach worker-test
 wait_status homepage-delay SUCCEEDED 20
-[ "$($compose exec -T postgres-test psql -U postgres -d homepage_worker_test -Atc "SELECT \"fencingToken\" FROM \"HomePageGenerationTask\" WHERE id='homepage-delay'")" -ge "2" ]
+[ "$($compose exec -T postgres-test psql -U postgres -d homepage_worker_test -Atc "SELECT \"fencingToken\" FROM \"HomepageGenerationTask\" WHERE id='homepage-delay'")" -ge "2" ]
 
 insert_task homepage-redis-delay-window
 publish homepage-redis-delay-window

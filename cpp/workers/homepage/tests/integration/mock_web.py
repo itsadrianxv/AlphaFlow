@@ -36,9 +36,22 @@ class Handler(BaseHTTPRequestHandler):
             self.write_json(500, {"message": "temporary"})
             return
         if "obsolete" in task_id:
-            self.write_json(409, {"message": "偏好指纹已过期"})
+            self.write_json(200, {"kind": "obsolete"})
             return
-        self.write_json(200, {"payload": {"taskId": task_id}, "dataAsOf": "2026-08-01"})
+        self.write_json(200, {
+            "kind": "generated",
+            "taskId": task_id,
+            "manifestId": f"manifest-{task_id}",
+            "activationSequence": "1",
+            "promotionMode": "PROMOTABLE",
+            "generationInputContractVersion": "1.0",
+            "generatorDefinitionVersion": "1.0",
+            "payloadSchemaVersion": "1.0",
+            "inputHash": "sha256:input",
+            "payloadHash": "sha256:payload",
+            "payload": {"taskId": task_id},
+            "dataCoverage": [],
+        })
 
     def log_message(self, *_args: object) -> None:
         return

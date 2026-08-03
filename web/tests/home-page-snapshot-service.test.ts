@@ -1,17 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const mocks = vi.hoisted(() => ({
-  resolveSelection: vi.fn(),
-  publishTask: vi.fn(),
-}));
-
-vi.mock("~/server/application/homepage/home-page-selection", () => ({
-  resolveHomePageSelection: mocks.resolveSelection,
-}));
-vi.mock("~/server/application/homepage/home-page-task-stream", () => ({
-  publishHomePageGenerationTask: mocks.publishTask,
-}));
-
 import { getHomePageSnapshot } from "~/server/application/homepage/home-page-snapshot-service";
 
 const payload = {
@@ -26,105 +13,97 @@ const payload = {
   impactMapping: null,
 };
 
-function snapshot(input: {
+function projection(input: {
   id: string;
-  scope: "DEFAULT" | "PERSONALIZED";
-  baselineDefaultSnapshotId?: string | null;
+  scope: "BASELINE" | "PERSONALIZED";
+  manifestId: string;
+  userId?: string | null;
+  baseManifestId?: string | null;
+  activationSequence?: bigint;
 }) {
   return {
-    ...input,
-    userId: input.scope === "PERSONALIZED" ? "user-1" : null,
-    preferenceFingerprint: input.scope === "PERSONALIZED" ? "fp-1" : null,
-    baselineDefaultSnapshotId: input.baselineDefaultSnapshotId ?? null,
-    payload,
-    dataAsOf: "20260801",
-    generatedAt: new Date("2026-08-01T08:30:00.000Z"),
+    id: `${input.id}:projection`,
+    scope: input.scope,
+    userId: input.userId ?? null,
+    activationSequence: input.activationSequence ?? 1n,
+    snapshot: {
+      id: input.id,
+      scope: input.scope,
+      userId: input.userId ?? null,
+      manifestId: input.manifestId,
+      payloadJson: payload,
+      dataCoverageJson: [{ datasetKey: "market_heatmap" }],
+      generatedAt: new Date("2026-08-01T08:30:00.000Z"),
+      manifest: { baseManifestId: input.baseManifestId ?? null },
+    },
   };
 }
 
 describe("首页快照读取", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.publishTask.mockResolvedValue({
-      createdAt: "2026-08-01T09:00:00.000Z",
-    });
   });
 
-  it("无个性化偏好时只返回默认快照", async () => {
-    mocks.resolveSelection.mockResolvedValue({
-      personalized: false,
-      fingerprint: "empty",
-      selection: {},
-    });
+  it("无个性化投影时读取专业市场基线当前投影", async () => {
     const db = {
-      homePageSnapshot: { findFirst: vi.fn(async () => snapshot({ id: "default-1", scope: "DEFAULT" })) },
-      homePageGenerationTask: { findFirst: vi.fn(), upsert: vi.fn(), updateMany: vi.fn() },
-    };
-
-    const result = await getHomePageSnapshot(db as never, "user-1");
-
-    expect(result).toMatchObject({
-      snapshotId: "default-1",
-      source: "DEFAULT",
-      personalizationPending: false,
-    });
-    expect(db.homePageGenerationTask.upsert).not.toHaveBeenCalled();
-  });
-
-  it("当前指纹无快照时回退默认并入队", async () => {
-    mocks.resolveSelection.mockResolvedValue({
-      personalized: true,
-      fingerprint: "fp-1",
-      selection: { company: { id: "company-1" } },
-    });
-    const defaultSnapshot = snapshot({ id: "default-1", scope: "DEFAULT" });
-    const task = { id: "task-1", status: "PENDING", eventPublishedAt: null };
-    const db = {
-      homePageSnapshot: {
-        findFirst: vi.fn().mockResolvedValueOnce(defaultSnapshot).mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "default-1" }),
-      },
-      homePageGenerationTask: {
-        upsert: vi.fn(async () => task),
-        updateMany: vi.fn(async () => ({ count: 1 })),
-        findFirst: vi.fn(),
-      },
-    };
-
-    const result = await getHomePageSnapshot(db as never, "user-1");
-
-    expect(result).toMatchObject({
-      source: "DEFAULT",
-      personalizationPending: true,
-      isRefreshing: true,
-    });
-    expect(db.homePageGenerationTask.upsert).toHaveBeenCalledTimes(1);
-  });
-
-  it("跨日优先旧个性化快照并按新默认基线刷新", async () => {
-    mocks.resolveSelection.mockResolvedValue({
-      personalized: true,
-      fingerprint: "fp-1",
-      selection: { industry: { id: "industry-1" } },
-    });
-    const personalized = snapshot({
-      id: "personalized-1",
-      scope: "PERSONALIZED",
-      baselineDefaultSnapshotId: "default-old",
-    });
-    const task = { id: "task-2", status: "PENDING", eventPublishedAt: new Date() };
-    const db = {
-      homePageSnapshot: {
+      homepageCurrentSnapshotProjection: {
         findFirst: vi
           .fn()
-          .mockResolvedValueOnce(snapshot({ id: "default-new", scope: "DEFAULT" }))
-          .mockResolvedValueOnce(personalized)
-          .mockResolvedValueOnce({ id: "default-new" }),
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(projection({ id: "baseline-1", scope: "BASELINE", manifestId: "manifest-base" })),
       },
-      homePageGenerationTask: {
-        upsert: vi.fn(async () => task),
-        updateMany: vi.fn(async () => ({ count: 0 })),
-        findFirst: vi.fn(),
+      homepageGenerationTask: { findFirst: vi.fn(async () => null) },
+    };
+
+    const result = await getHomePageSnapshot(db as never, "user-1");
+
+    expect(result).toMatchObject({
+      snapshotId: "baseline-1",
+      source: "BASELINE",
+      manifestId: "manifest-base",
+      baselineOutdated: false,
+      refreshInProgress: false,
+      personalizationPending: false,
+    });
+  });
+
+  it("个性化未就绪但存在任务时回退基线并标记 pending", async () => {
+    const db = {
+      homepageCurrentSnapshotProjection: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(projection({ id: "baseline-1", scope: "BASELINE", manifestId: "manifest-base" })),
       },
+      homepageGenerationTask: { findFirst: vi.fn(async () => ({ id: "task-1" })) },
+    };
+
+    const result = await getHomePageSnapshot(db as never, "user-1");
+
+    expect(result).toMatchObject({
+      source: "BASELINE",
+      refreshInProgress: true,
+      personalizationPending: true,
+    });
+  });
+
+  it("旧个性化基线仍可服务但标记父基线过期", async () => {
+    const db = {
+      homepageCurrentSnapshotProjection: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce(
+            projection({
+              id: "personalized-1",
+              scope: "PERSONALIZED",
+              userId: "user-1",
+              manifestId: "manifest-personal",
+              baseManifestId: "manifest-old-base",
+            }),
+          )
+          .mockResolvedValueOnce(projection({ id: "baseline-2", scope: "BASELINE", manifestId: "manifest-new-base" })),
+      },
+      homepageGenerationTask: { findFirst: vi.fn(async () => ({ id: "task-2" })) },
     };
 
     const result = await getHomePageSnapshot(db as never, "user-1");
@@ -132,8 +111,8 @@ describe("首页快照读取", () => {
     expect(result).toMatchObject({
       snapshotId: "personalized-1",
       source: "PERSONALIZED",
-      isStale: true,
-      isRefreshing: true,
+      baselineOutdated: true,
+      refreshInProgress: true,
       personalizationPending: false,
     });
   });

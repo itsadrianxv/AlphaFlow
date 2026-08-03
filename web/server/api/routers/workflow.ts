@@ -277,15 +277,15 @@ export const workflowRouter = createTRPCRouter({
           baseResult = baseRun.result;
         }
       } else if (input.baseSnapshotId) {
-        const snapshot = await ctx.db.homePageSnapshot.findFirst({
+        const snapshot = await ctx.db.homepageSnapshot.findFirst({
           where: {
             id: input.baseSnapshotId,
-            OR: [{ scope: "DEFAULT" }, { userId }],
+            OR: [{ scope: "BASELINE" }, { userId }],
           },
-          select: { payload: true },
+          select: { payloadJson: true },
         });
-        const payload = isRecord(snapshot?.payload)
-          ? snapshot.payload
+        const payload = isRecord(snapshot?.payloadJson)
+          ? snapshot.payloadJson
           : undefined;
         if (isRecord(payload?.impactMapping)) {
           baseResult = payload.impactMapping;
