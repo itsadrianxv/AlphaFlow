@@ -131,7 +131,9 @@ TEST_F(AcquisitionRepositoryContractTest, ClaimRenewAndSuccessfulSettlementAreId
       R"SQL(SELECT attempt.status, manifest."gateStatus",
                    (SELECT COUNT(*) FROM "HomepageDataManifestItemSettlement"),
                    (SELECT COUNT(*) FROM "DataObservationRevision"),
-                   (SELECT COUNT(*) FROM "SourceAssertion")
+                   (SELECT COUNT(*) FROM "SourceAssertion"),
+                   (SELECT COUNT(*) FROM "ResearchRuntimeObservation" WHERE stage='acquisition'),
+                   (SELECT "observationContextJson"->>'taskId' FROM "ResearchRuntimeObservation" WHERE stage='acquisition' LIMIT 1)
             FROM "HomepageDataManifestItemAttempt" attempt
             JOIN "HomepageDataManifestItem" item ON item.id=attempt."manifestItemId"
             JOIN "HomepageDataManifest" manifest ON manifest.id=item."manifestId"
@@ -142,6 +144,8 @@ TEST_F(AcquisitionRepositoryContractTest, ClaimRenewAndSuccessfulSettlementAreId
   EXPECT_EQ(row[0][2].as<int>(), 1);
   EXPECT_EQ(row[0][3].as<int>(), 1);
   EXPECT_EQ(row[0][4].as<int>(), 1);
+  EXPECT_EQ(row[0][5].as<int>(), 1);
+  EXPECT_EQ(row[0][6].as<std::string>(), message.run_id);
 }
 
 TEST_F(AcquisitionRepositoryContractTest, StaleFencingCannotWriteBusinessRowsAndTerminalFailureSettlesReason) {
@@ -164,7 +168,8 @@ TEST_F(AcquisitionRepositoryContractTest, StaleFencingCannotWriteBusinessRowsAnd
   pqxx::read_transaction read(connection);
   auto row = read.exec_params(
       R"SQL(SELECT attempt.status, attempt."errorClass", settlement."settlementStatus", settlement."errorClass",
-                   (SELECT COUNT(*) FROM "DataObservationRevision")
+                   (SELECT COUNT(*) FROM "DataObservationRevision"),
+                   (SELECT success FROM "ResearchRuntimeObservation" WHERE stage='acquisition' AND "observationContextJson"->>'taskId'=$1)
             FROM "HomepageDataManifestItemAttempt" attempt
             JOIN "HomepageDataManifestItemSettlement" settlement ON settlement."settledAttemptId"=attempt.id
             WHERE attempt.id=$1)SQL",
@@ -174,5 +179,6 @@ TEST_F(AcquisitionRepositoryContractTest, StaleFencingCannotWriteBusinessRowsAnd
   EXPECT_EQ(row[0][2].as<std::string>(), "FAILED");
   EXPECT_EQ(row[0][3].as<std::string>(), "contract_incompatible");
   EXPECT_EQ(row[0][4].as<int>(), 0);
+  EXPECT_FALSE(row[0][5].as<bool>());
 }
 }  // namespace

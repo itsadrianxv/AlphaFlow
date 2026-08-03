@@ -8,6 +8,7 @@ import type {
   ResearchDistributionStore,
 } from "~/server/application/research-distribution/research-distribution-service";
 import { DELIVERY_RETRY_BUDGET_MS } from "~/server/domain/scheduling/policies";
+import { LeaseLostError } from "~/server/domain/scheduling/types";
 
 type CopyRow = {
   id: string;
@@ -21,6 +22,9 @@ type CopyRow = {
   nextAttemptAt: Date | null;
   sentAt: Date | null;
   lastErrorCode: string | null;
+  claimToken: string | null;
+  claimExpiresAt: Date | null;
+  fencingToken: bigint;
 };
 
 type CircuitRow = {
@@ -33,6 +37,7 @@ type CircuitRow = {
 const copyColumns = Prisma.sql`
   "id", "entryId", "idempotencyKey", "payloadJson", "status", "attempts",
   "firstAttemptAt", "retryDeadline", "nextAttemptAt", "sentAt", "lastErrorCode"
+  , "claimToken", "claimExpiresAt", "fencingToken"
 `;
 
 export class PrismaResearchDistributionStore
@@ -93,6 +98,57 @@ export class PrismaResearchDistributionStore
     return mapCopy(rows[0]);
   }
 
+  async claimCopy(id: string, now: Date, leaseMs: number) {
+    const claimToken = randomUUID();
+    const rows = await this.db.$queryRaw<CopyRow[]>(Prisma.sql`
+      UPDATE "ResearchExternalCopy"
+         SET "status" = 'SENDING',
+             "attempts" = "attempts" + 1,
+             "firstAttemptAt" = COALESCE("firstAttemptAt", ${now}),
+             "nextAttemptAt" = NULL,
+             "claimToken" = ${claimToken},
+             "claimExpiresAt" = ${new Date(now.getTime() + leaseMs)},
+             "fencingToken" = "fencingToken" + 1,
+             "updatedAt" = CURRENT_TIMESTAMP
+       WHERE "id" = ${id}
+         AND (
+           (
+             "status" IN ('PENDING', 'RETRY_WAIT', 'DEFERRED_CIRCUIT', 'CONFIG_BLOCKED')
+             AND ("nextAttemptAt" IS NULL OR "nextAttemptAt" <= ${now})
+           ) OR (
+             "status" = 'SENDING'
+             AND ("claimExpiresAt" IS NULL OR "claimExpiresAt" <= ${now})
+           )
+         )
+      RETURNING ${copyColumns}
+    `);
+    return rows[0] ? mapCopy(rows[0]) : null;
+  }
+
+  async settleCopy(copy: FeishuCopy) {
+    if (!copy.claimToken) throw new LeaseLostError();
+    const rows = await this.db.$queryRaw<CopyRow[]>(Prisma.sql`
+      UPDATE "ResearchExternalCopy"
+         SET "status" = ${copy.status},
+             "attempts" = ${copy.attempts},
+             "firstAttemptAt" = ${asDate(copy.firstAttemptAt)},
+             "retryDeadline" = ${new Date(copy.retryDeadline)},
+             "nextAttemptAt" = ${asDate(copy.nextAttemptAt)},
+             "sentAt" = ${asDate(copy.sentAt)},
+             "lastErrorCode" = ${copy.lastErrorCode},
+             "claimToken" = NULL,
+             "claimExpiresAt" = NULL,
+             "updatedAt" = CURRENT_TIMESTAMP
+       WHERE "id" = ${copy.id}
+         AND "status" = 'SENDING'
+         AND "claimToken" = ${copy.claimToken}
+         AND "fencingToken" = ${BigInt(copy.fencingToken)}
+      RETURNING ${copyColumns}
+    `);
+    if (!rows[0]) throw new LeaseLostError();
+    return mapCopy(rows[0]);
+  }
+
   async getCircuit() {
     await this.ensureCircuit();
     const rows = await this.db.$queryRaw<CircuitRow[]>(Prisma.sql`
@@ -142,6 +198,9 @@ function mapCopy(row: CopyRow): FeishuCopy {
     nextAttemptAt: row.nextAttemptAt?.toISOString() ?? null,
     sentAt: row.sentAt?.toISOString() ?? null,
     lastErrorCode: row.lastErrorCode,
+    claimToken: row.claimToken,
+    claimExpiresAt: row.claimExpiresAt?.toISOString() ?? null,
+    fencingToken: row.fencingToken.toString(),
   };
 }
 

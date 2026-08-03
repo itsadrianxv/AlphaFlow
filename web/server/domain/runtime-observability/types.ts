@@ -76,7 +76,22 @@ export type RuntimeObservationInput = Partial<RuntimeDimension> & {
   usage?: RuntimeUsage | null;
   delivery?: DeliveryObservation | null;
   errorClass?: string | null;
+  context?: RuntimeObservationContext | null;
   recordedAt?: Date;
+};
+
+export type RuntimeObservationContext = {
+  phase?: "STARTED" | "COMPLETED" | "FAILED";
+  taskId?: string;
+  taskType?: string;
+  inputContractVersion?: string;
+  inputHash?: string;
+  resultContractVersion?: string;
+  resultHash?: string;
+  authoritativeObjectIds?: string[];
+  retryAttempt?: number;
+  fencingToken?: string;
+  degradedReason?: string;
 };
 
 export type RuntimeObservation = {
@@ -108,6 +123,7 @@ export type RuntimeObservation = {
   usage: Required<RuntimeUsage>;
   delivery: DeliveryObservation | null;
   errorClass: string | null;
+  context: RuntimeObservationContext | null;
   recordedAt: Date;
 };
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { homepageMarketBaselineSchema } from "~/contracts/homepage-market-baseline";
 import { marketHeatmapSnapshotSchema } from "~/contracts/market-heatmap";
 
 export const homePagePayloadSchema = z.object({
@@ -18,6 +19,7 @@ export const homePageSnapshotEnvelopeSchema = z.object({
   refreshInProgress: z.boolean(),
   personalizationPending: z.boolean(),
   payload: homePagePayloadSchema,
+  marketBaseline: homepageMarketBaselineSchema,
 });
 
 export type HomePagePayload = z.infer<typeof homePagePayloadSchema>;

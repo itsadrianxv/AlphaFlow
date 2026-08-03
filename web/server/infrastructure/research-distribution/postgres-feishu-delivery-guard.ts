@@ -20,14 +20,16 @@ export class PostgresFeishuDeliveryGuard implements FeishuDeliveryGuard {
   ) {}
 
   async run(_copyId: string, operation: () => Promise<void>) {
+    let permitId: string;
     try {
-      await this.scheduler.acquireNestedPermit({
+      const permit = await this.scheduler.acquireNestedPermit({
         taskId: this.context.taskId,
         resourcePoolId: this.context.resourcePoolId,
         holderId: this.context.holderId,
         fencingToken: this.context.fencingToken,
         permitKey: this.context.permitKey,
       });
+      permitId = permit.id;
     } catch (error) {
       if (!(error instanceof ResourcePermitUnavailableError)) throw error;
       const circuit = await this.scheduler.getCircuit(
@@ -61,6 +63,13 @@ export class PostgresFeishuDeliveryGuard implements FeishuDeliveryGuard {
           : { kind: "FAILURE" },
       );
       throw error;
+    } finally {
+      await this.scheduler.releasePermit(
+        permitId,
+        this.context.holderId,
+        this.context.fencingToken,
+        "feishu_delivery_finished",
+      );
     }
   }
 }

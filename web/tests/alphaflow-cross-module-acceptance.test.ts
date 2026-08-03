@@ -245,6 +245,8 @@ function distributionCandidate(
     directPreferenceMatch: true,
     directFocusMatch: true,
     preferenceSnapshot: snapshot,
+    globalAssessmentId: "global-assessment-fixture",
+    relevanceAssessmentId: "relevance-assessment-fixture",
     sourceIdentityVerified: true,
     coreFactEvidenceQualified: true,
     anomalyOnly: false,
@@ -351,6 +353,43 @@ function homepageInput(gateStatus: "READY" | "READY_WITH_LIMITATION") {
   return { ...base, inputHash: sha256Canonical(base) } as HomepageGenerationInput;
 }
 
+function marketBaselineSnapshots() {
+  const domains = ["market", "flow", "company", "news", "expectation", "calendar"];
+  return ["PRE_MARKET", "INTRADAY", "POST_MARKET", "FORWARD"].map(
+    (phase, phaseIndex) => ({
+      id: `market-snapshot-${phase}`,
+      manifestId: `market-manifest-${phase}`,
+      activationSequence: BigInt(phaseIndex + 1),
+      generatedAt: NOW,
+      manifest: {
+        targetContextKey: `2026-08-03:${phase}`,
+        targetContextJson: { phase, targetTradeDate: "2026-08-03" },
+        gateStatus: "READY",
+        items: domains.map((domain) => ({
+          datasetKey: `fixture.${domain}`,
+          required: domain === "market",
+          factScopeJson: { baselineDomain: domain },
+          settlement: {
+            targetDataCutoffKey: "trade_date",
+            targetDataCutoffJson: { key: "trade_date", value: "2026-08-03" },
+            actualDataCutoffKey: "trade_date",
+            actualDataCutoffJson: { key: "trade_date", value: "2026-08-03" },
+            settlementStatus: "EMPTY",
+            providerResultStatus: "empty",
+            qualityStatus: "NORMAL",
+            qualityFlags: [],
+            limitations: [],
+            requestedScopeJson: {},
+            coveredScopeJson: {},
+            missingScopeJson: {},
+            revisions: [],
+          },
+        })),
+      },
+    }),
+  );
+}
+
 describe("F04 跨 module 验收场景", () => {
   it("场景 1：盘前全局基线对不同用户保持四阶段六域的相同集合与顺序", async () => {
     const generated = generateHomepageDraft(homepageInput("READY"));
@@ -376,6 +415,7 @@ describe("F04 跨 module 验收场景", () => {
           query.where.scope === "PERSONALIZED" ? null : baselineProjection,
       },
       homepageGenerationTask: { findFirst: async () => null },
+      homepageSnapshot: { findMany: async () => marketBaselineSnapshots() },
     };
     const [withoutFocus, withFocus] = await Promise.all([
       getHomePageSnapshot(db as never, "user-without-focus"),
@@ -688,6 +728,7 @@ describe("F04 跨 module 验收场景", () => {
             query.where.scope === "PERSONALIZED" ? null : baselineProjection,
         },
         homepageGenerationTask: { findFirst: async () => ({ id: newClaim.task.id }) },
+        homepageSnapshot: { findMany: async () => marketBaselineSnapshots() },
       } as never,
       "user-1",
     );

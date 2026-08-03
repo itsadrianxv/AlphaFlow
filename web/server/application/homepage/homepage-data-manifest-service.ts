@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
+import {
+  HOMEPAGE_GENERATION_INPUT_CONTRACT_VERSION,
+  HOMEPAGE_GENERATOR_DEFINITION_VERSION,
+  HOMEPAGE_PAYLOAD_SCHEMA_VERSION,
+} from "~/server/application/homepage/home-page-generation";
 
 type HomepageManifestScope = "BASELINE" | "PERSONALIZED";
 type HomepageGateStatus =
@@ -43,6 +48,8 @@ type CreateManifestInput = {
 type SettlementInput = {
   attemptId: string;
   fencingToken: bigint | number;
+  selectedRevisionId?: string;
+  observationRevisionIds?: string[];
   providerResultStatus: ProviderResultStatus;
   requestedScopeJson: Prisma.InputJsonValue;
   coveredScopeJson: Prisma.InputJsonValue;
@@ -177,7 +184,7 @@ export function resolveHomepageGateStatus(
 ): HomepageGateStatus {
   const required = items.filter((item) => item.required);
 
-  if (required.some((item) => !item.settlement)) {
+  if (items.some((item) => !item.settlement)) {
     return "PENDING";
   }
   if (required.some((item) => !itemPassesGate(item))) {
@@ -328,11 +335,20 @@ export class HomepageDataManifestService {
       });
       if (existing) return existing;
 
+      const selectedRevisionId = input.selectedRevisionId ?? null;
+      const observationRevisionIds = [
+        ...new Set([
+          ...(selectedRevisionId ? [selectedRevisionId] : []),
+          ...(input.observationRevisionIds ?? []),
+        ]),
+      ];
+
       const settlement = await tx.homepageDataManifestItemSettlement.create({
         data: {
           manifestItemId: attempt.manifestItemId,
           settledAttemptId: attempt.id,
           settledFencingToken: BigInt(input.fencingToken),
+          selectedRevisionId,
           settlementStatus: settlementStatus(attempt.manifestItem, input),
           providerResultStatus: input.providerResultStatus,
           requestedScopeJson: input.requestedScopeJson,
@@ -349,6 +365,14 @@ export class HomepageDataManifestService {
           errorClass: input.errorClass,
           retryability: input.retryability,
           settledAt: new Date(),
+          revisions: {
+            create: observationRevisionIds.map(
+              (observationRevisionId, ordinal) => ({
+                observationRevisionId,
+                ordinal,
+              }),
+            ),
+          },
         },
       });
       await tx.homepageDataManifestItemAttempt.update({
@@ -380,15 +404,14 @@ export class HomepageDataManifestService {
             generationKey: `homepage-manifest:${manifest.id}`,
             manifestId: manifest.id,
             activationSequence: manifest.activationSequence,
-            generationInputContractVersion: "homepage-generation-input.v1",
-            generatorDefinitionVersion: manifest.definitionVersion,
-            payloadSchemaVersion: "homepage-payload.v1",
-            promotionMode:
-              manifest.scope === "BASELINE" ? "BASELINE" : "PERSONALIZED",
-            schedulingTier: "BACKGROUND",
-            resourcePoolKey: "homepage-generator",
+            generationInputContractVersion:
+              HOMEPAGE_GENERATION_INPUT_CONTRACT_VERSION,
+            generatorDefinitionVersion: HOMEPAGE_GENERATOR_DEFINITION_VERSION,
+            payloadSchemaVersion: HOMEPAGE_PAYLOAD_SCHEMA_VERSION,
+            promotionMode: "PROMOTABLE",
+            schedulingTier: "TIME_CRITICAL",
+            resourcePoolKey: "homepage-generation",
             fairnessKey: manifest.userId ?? "baseline",
-            inputHash: sha256({ manifestId: manifest.id, gateStatus }),
           },
           update: {},
         });

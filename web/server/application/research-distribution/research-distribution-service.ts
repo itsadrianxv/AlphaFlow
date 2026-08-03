@@ -103,6 +103,7 @@ export class FeishuDeliveryError extends Error {
 
 export type FeishuCopyStatus =
   | "PENDING"
+  | "SENDING"
   | "RETRY_WAIT"
   | "DEFERRED_CIRCUIT"
   | "SENT"
@@ -121,6 +122,9 @@ export type FeishuCopy = {
   nextAttemptAt: string | null;
   sentAt: string | null;
   lastErrorCode: string | null;
+  claimToken: string | null;
+  claimExpiresAt: string | null;
+  fencingToken: string;
 };
 
 export type FeishuCircuit = {
@@ -138,6 +142,8 @@ export interface ResearchDistributionStore {
   }): Promise<{ copy: FeishuCopy; created: boolean }>;
   getCopy(id: string): Promise<FeishuCopy | null>;
   getCopyByKey(idempotencyKey: string): Promise<FeishuCopy | null>;
+  claimCopy(id: string, now: Date, leaseMs: number): Promise<FeishuCopy | null>;
+  settleCopy(copy: FeishuCopy): Promise<FeishuCopy>;
   saveCopy(copy: FeishuCopy): Promise<FeishuCopy>;
   getCircuit(): Promise<FeishuCircuit>;
   saveCircuit(circuit: FeishuCircuit): Promise<FeishuCircuit>;
@@ -182,6 +188,9 @@ export class InMemoryResearchDistributionStore
       nextAttemptAt: null,
       sentAt: null,
       lastErrorCode: null,
+      claimToken: null,
+      claimExpiresAt: null,
+      fencingToken: "0",
     };
     this.copies.set(copy.id, copy);
     this.copyIdByKey.set(copy.idempotencyKey, copy.id);
@@ -203,6 +212,53 @@ export class InMemoryResearchDistributionStore
     return structuredClone(copy);
   }
 
+  async claimCopy(id: string, now: Date, leaseMs: number) {
+    const copy = this.copies.get(id);
+    if (!copy || copy.status === "SENT" || copy.status === "FAILED")
+      return null;
+    if (copy.nextAttemptAt && new Date(copy.nextAttemptAt) > now) return null;
+    if (
+      copy.status === "SENDING" &&
+      copy.claimExpiresAt &&
+      new Date(copy.claimExpiresAt) > now
+    ) {
+      return null;
+    }
+    const fencingToken = (BigInt(copy.fencingToken) + 1n).toString();
+    const claimed: FeishuCopy = {
+      ...copy,
+      status: "SENDING",
+      attempts: copy.attempts + 1,
+      firstAttemptAt: copy.firstAttemptAt ?? now.toISOString(),
+      nextAttemptAt: null,
+      claimToken: `copy-claim:${copy.id}:${fencingToken}`,
+      claimExpiresAt: new Date(now.getTime() + leaseMs).toISOString(),
+      fencingToken,
+    };
+    this.copies.set(id, structuredClone(claimed));
+    return structuredClone(claimed);
+  }
+
+  async settleCopy(copy: FeishuCopy) {
+    const current = this.copies.get(copy.id);
+    if (
+      !current ||
+      current.status !== "SENDING" ||
+      !copy.claimToken ||
+      current.claimToken !== copy.claimToken ||
+      current.fencingToken !== copy.fencingToken
+    ) {
+      throw new LeaseLostError();
+    }
+    const settled = {
+      ...copy,
+      claimToken: null,
+      claimExpiresAt: null,
+    };
+    this.copies.set(copy.id, structuredClone(settled));
+    return structuredClone(settled);
+  }
+
   async getCircuit() {
     return structuredClone(this.circuit);
   }
@@ -222,6 +278,7 @@ export class ResearchDistributionService {
       feishu?: FeishuDeliveryPort;
       feishuGuard?: FeishuDeliveryGuard;
       inboxLink?: (entryId: string) => string;
+      deliveryLeaseMs?: number;
     } = {
       clock: () => new Date(),
     },
@@ -393,30 +450,6 @@ export class ResearchDistributionService {
   private async attemptFeishuCopy(copy: FeishuCopy): Promise<FeishuCopy> {
     const now = this.dependencies.clock();
     if (copy.status === "SENT" || copy.status === "FAILED") return copy;
-    const feishu = this.dependencies.feishu;
-    const feishuGuard = this.dependencies.feishuGuard;
-    if (!feishu || !feishuGuard) {
-      return this.store.saveCopy({
-        ...copy,
-        status: "CONFIG_BLOCKED",
-        lastErrorCode: !feishu
-          ? "FEISHU_PORT_NOT_CONFIGURED"
-          : "FEISHU_PERMIT_GUARD_NOT_CONFIGURED",
-      });
-    }
-    const circuit = await this.store.getCircuit();
-    if (circuit.state === "OPEN") {
-      if (!circuit.retryAfter || new Date(circuit.retryAfter) > now) {
-        return this.store.saveCopy({
-          ...copy,
-          status: "DEFERRED_CIRCUIT",
-          nextAttemptAt: circuit.retryAfter,
-        });
-      }
-      circuit.state = "HALF_OPEN";
-      circuit.retryAfter = null;
-      await this.store.saveCircuit(circuit);
-    }
     if (copy.nextAttemptAt && new Date(copy.nextAttemptAt) > now) return copy;
     if (
       copy.attempts >= DELIVERY_MAX_ATTEMPTS ||
@@ -429,13 +462,36 @@ export class ResearchDistributionService {
         lastErrorCode: copy.lastErrorCode ?? "DELIVERY_BUDGET_EXHAUSTED",
       });
     }
-
-    const attempted: FeishuCopy = {
-      ...copy,
-      attempts: copy.attempts + 1,
-      firstAttemptAt: copy.firstAttemptAt ?? now.toISOString(),
-      nextAttemptAt: null,
-    };
+    const attempted = await this.store.claimCopy(
+      copy.id,
+      now,
+      this.dependencies.deliveryLeaseMs ?? 60_000,
+    );
+    if (!attempted) return (await this.store.getCopy(copy.id)) ?? copy;
+    const feishu = this.dependencies.feishu;
+    const feishuGuard = this.dependencies.feishuGuard;
+    if (!feishu || !feishuGuard) {
+      return this.store.settleCopy({
+        ...attempted,
+        status: "CONFIG_BLOCKED",
+        lastErrorCode: !feishu
+          ? "FEISHU_PORT_NOT_CONFIGURED"
+          : "FEISHU_PERMIT_GUARD_NOT_CONFIGURED",
+      });
+    }
+    const circuit = await this.store.getCircuit();
+    if (circuit.state === "OPEN") {
+      if (!circuit.retryAfter || new Date(circuit.retryAfter) > now) {
+        return this.store.settleCopy({
+          ...attempted,
+          status: "DEFERRED_CIRCUIT",
+          nextAttemptAt: circuit.retryAfter,
+        });
+      }
+      circuit.state = "HALF_OPEN";
+      circuit.retryAfter = null;
+      await this.store.saveCircuit(circuit);
+    }
     try {
       await feishuGuard.run(attempted.id, () => feishu.send(attempted.payload));
       await this.store.saveCircuit({
@@ -444,14 +500,24 @@ export class ResearchDistributionService {
         openCount: circuit.openCount,
         retryAfter: null,
       });
-      return this.store.saveCopy({
+      return this.store.settleCopy({
         ...attempted,
         status: "SENT",
         sentAt: now.toISOString(),
         lastErrorCode: null,
       });
     } catch (error) {
-      if (error instanceof LeaseLostError) throw error;
+      if (error instanceof LeaseLostError) {
+        await this.store
+          .settleCopy({
+            ...attempted,
+            status: "RETRY_WAIT",
+            nextAttemptAt: now.toISOString(),
+            lastErrorCode: "FEISHU_PERMIT_LEASE_LOST",
+          })
+          .catch(() => undefined);
+        throw error;
+      }
       const deliveryError =
         error instanceof FeishuDeliveryError
           ? error
@@ -475,7 +541,7 @@ export class ResearchDistributionService {
         deliveryError.code.startsWith("FEISHU_BUSINESS_")
           ? "CONFIG_BLOCKED"
           : "FAILED";
-      return this.store.saveCopy({
+      return this.store.settleCopy({
         ...attempted,
         status: exhausted ? terminalStatus : "RETRY_WAIT",
         nextAttemptAt: exhausted

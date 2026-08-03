@@ -303,3 +303,71 @@ def test_normalized_result_hash_excludes_ingestion_clock_fields() -> None:
     second = ScriptedHomepageProviderAdapter({"fixture": [_record()] }).fetch(_request(idempotency_key="two"))
 
     assert first.result_hash == second.result_hash
+
+
+class _BaselineTushareClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str | None]] = []
+
+    def get_market_snapshot(self, target_date):
+        self.calls.append(("market_snapshot", target_date))
+        return [_record()]
+
+    def get_stock_universe(self):
+        return []
+
+    def get_stock_snapshot(self, _stock_code):
+        return {}
+
+    def get_stock_batch(self, _stock_codes):
+        return []
+
+    def get_stock_bars(self, **_kwargs):
+        return []
+
+    def get_concept_catalog(self):
+        return []
+
+    def get_concept_constituents(self, *_args):
+        return []
+
+    def get_hot_concept_boards(self, **_kwargs):
+        return []
+
+    def get_market_heatmap_snapshot(self, **_kwargs):
+        return {}
+
+    def get_market_money_flow(self, target_date):
+        self.calls.append(("market_money_flow", target_date))
+        return [_record()]
+
+    def get_company_actions(self, target_date):
+        self.calls.append(("company_actions", target_date))
+        return [_record()]
+
+    def get_expectation_changes(self, target_date):
+        self.calls.append(("expectation_changes", target_date))
+        return [_record()]
+
+    def get_event_calendar(self, target_date):
+        self.calls.append(("event_calendar", target_date))
+        return [_record()]
+
+
+@pytest.mark.parametrize(
+    "dataset_key",
+    [
+        "market_money_flow",
+        "company_actions",
+        "expectation_changes",
+        "event_calendar",
+    ],
+)
+def test_tushare_baseline_datasets_use_explicit_production_client_methods(dataset_key) -> None:
+    client = _BaselineTushareClient()
+    adapter = TushareHomepageProviderAdapter(client=client)
+
+    result = adapter.fetch(_request(dataset_key))
+
+    assert result.result_status == ResultStatus.SUCCESS
+    assert client.calls == [(dataset_key, "2026-08-01")]

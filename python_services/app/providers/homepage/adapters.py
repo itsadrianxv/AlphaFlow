@@ -629,6 +629,10 @@ class TushareHomepageProviderAdapter(HomepageProviderAdapter):
             "concept_constituents": lambda request, _cursor: client.get_concept_constituents(str(request.requested_scope.get("conceptName") or request.requested_scope.get("concept_name") or ""), request.requested_scope.get("conceptCode") or request.requested_scope.get("concept_code")),
             "hot_concept_boards": lambda request, _cursor: client.get_hot_concept_boards(limit=request.page_size),
             "market_heatmap": lambda request, _cursor: client.get_market_heatmap_snapshot(limit=request.page_size, prefer_intraday=bool(request.requested_scope.get("preferIntraday", request.requested_scope.get("prefer_intraday", False)))),
+            "market_money_flow": lambda request, _cursor: _dated_page(request, client.get_market_money_flow(_scope_date(request))),
+            "company_actions": lambda request, _cursor: _dated_page(request, client.get_company_actions(_scope_date(request))),
+            "expectation_changes": lambda request, _cursor: _dated_page(request, client.get_expectation_changes(_scope_date(request))),
+            "event_calendar": lambda request, _cursor: _dated_page(request, client.get_event_calendar(_scope_date(request))),
         }
         loaders.update(datasets or {})
         capabilities = {key: DatasetCapability(key, description=f"TuShare {key} 规范化数据集") for key in loaders}
@@ -782,6 +786,15 @@ def _bars_as_records(value: Any) -> Any:
     if hasattr(value, "to_dict") and callable(value.to_dict):
         return value.to_dict(orient="records")
     return value
+
+
+def _dated_page(request: HomepageDataItemRequest, value: Any) -> AdapterPage:
+    target_date = _scope_date(request)
+    return AdapterPage(
+        items=tuple(value or ()),
+        covered_scope=request.requested_scope,
+        actual_data_cutoff=DataCutoff("trade_date", target_date) if target_date else None,
+    )
 
 
 def _first_page_value(pages: Sequence[AdapterPage], field_name: str) -> datetime | None:

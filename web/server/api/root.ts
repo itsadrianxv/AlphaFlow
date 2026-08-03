@@ -1,3 +1,4 @@
+import { agentConfirmationRouter } from "~/server/api/routers/agent-confirmation";
 import { agentRuntimeRouter } from "~/server/api/routers/agent-runtime";
 import { collectionRouter } from "~/server/api/routers/collection";
 import { companyOverviewRouter } from "~/server/api/routers/company-overview";
@@ -11,6 +12,7 @@ import { overviewInsightsRouter } from "~/server/api/routers/overview-insights";
 import { postRouter } from "~/server/api/routers/post";
 import { researchInboxRouter } from "~/server/api/routers/research-inbox";
 import { researchPreferenceRouter } from "~/server/api/routers/research-preference";
+import { researchRadarRouter } from "~/server/api/routers/research-radar";
 import { researchTargetRouter } from "~/server/api/routers/research-target";
 import { runtimeObservabilityRouter } from "~/server/api/routers/runtime-observability";
 import { scheduledTaskRouter } from "~/server/api/routers/scheduled-task";
@@ -26,6 +28,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
+  agentConfirmation: agentConfirmationRouter,
   collection: collectionRouter,
   agentRuntime: agentRuntimeRouter,
   companyOverview: companyOverviewRouter,
@@ -41,6 +44,7 @@ export const appRouter = createTRPCRouter({
   runtimeObservability: runtimeObservabilityRouter,
   researchInbox: researchInboxRouter,
   researchPreference: researchPreferenceRouter,
+  researchRadar: researchRadarRouter,
   screening: screeningRouter,
   scheduledTask: scheduledTaskRouter,
   timing: timingRouter,

@@ -92,6 +92,8 @@ function candidate(
     directPreferenceMatch: true,
     directFocusMatch: true,
     preferenceSnapshot: preference(),
+    globalAssessmentId: "global-assessment-1",
+    relevanceAssessmentId: "relevance-assessment-1",
     sourceIdentityVerified: true,
     coreFactEvidenceQualified: true,
     anomalyOnly: false,
@@ -521,7 +523,7 @@ describe("Feishu 副本 application seam", () => {
     expect((await inbox.list("user-1", "PENDING")).items).toHaveLength(6);
     expect(failed.every((item) => item.externalCopy?.status === "RETRY_WAIT")).toBe(true);
     await expect(store.getCircuit()).resolves.toMatchObject({ state: "OPEN" });
-    expect(deferred.externalCopy).toMatchObject({ status: "DEFERRED_CIRCUIT", attempts: 0 });
+    expect(deferred.externalCopy).toMatchObject({ status: "DEFERRED_CIRCUIT", attempts: 1 });
     expect(feishu.payloads).toHaveLength(5);
 
     clock = new Date(clock.getTime() + 60_000);
@@ -552,6 +554,9 @@ describe("Feishu 副本 application seam", () => {
       },
       getCopy: (id) => delegate.getCopy(id),
       getCopyByKey: (key) => delegate.getCopyByKey(key),
+      claimCopy: (id, claimedAt, leaseMs) =>
+        delegate.claimCopy(id, claimedAt, leaseMs),
+      settleCopy: (copy) => delegate.settleCopy(copy),
       saveCopy: (copy) => delegate.saveCopy(copy),
       getCircuit: () => delegate.getCircuit(),
       saveCircuit: (circuit) => delegate.saveCircuit(circuit),
@@ -620,8 +625,9 @@ describe("Feishu 副本 application seam", () => {
     );
     const entry = (await inbox.list("user-1", "PENDING")).items[0]!;
     await expect(store.getCopyByKey(`feishu:${entry.id}`)).resolves.toMatchObject({
-      status: "PENDING",
-      attempts: 0,
+      status: "RETRY_WAIT",
+      attempts: 1,
+      lastErrorCode: "FEISHU_PERMIT_LEASE_LOST",
     });
   });
 });

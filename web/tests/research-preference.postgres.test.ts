@@ -142,8 +142,6 @@ describePostgres("研究偏好 application/repository PostgreSQL 契约", () => 
       expect(rows[0]?.userId).toBeNull();
       expect(rows[0]?.personalDataDeletedAt).toBeInstanceOf(Date);
     } finally {
-      await db.$executeRaw`DELETE FROM "ResearchPreferenceSnapshotItem" WHERE "snapshotId" IN (SELECT "id" FROM "ResearchPreferenceSnapshot" WHERE "userId" IS NULL AND "personalDataDeletedAt" IS NOT NULL)`;
-      await db.$executeRaw`DELETE FROM "ResearchPreferenceSnapshot" WHERE "userId" IS NULL AND "personalDataDeletedAt" IS NOT NULL`;
       await db.user.delete({ where: { id: userId } }).catch(() => undefined);
     }
   });
@@ -186,12 +184,13 @@ describePostgres("研究偏好 application/repository PostgreSQL 契约", () => 
       target: { targetType: "THEME", targetKey: "储能" },
       level: "FOCUS",
     });
+    const removeCommandId = key("remove-once");
     await service.remove(userId, {
-      commandId: "remove-once",
+      commandId: removeCommandId,
       target: { targetType: "THEME", targetKey: "储能" },
     });
     await service.remove(userId, {
-      commandId: "remove-once",
+      commandId: removeCommandId,
       target: { targetType: "THEME", targetKey: "储能" },
     });
     expect((await service.getCurrent(userId)).items).toEqual([]);
