@@ -83,7 +83,7 @@ function callerWithSnapshot(snapshot: unknown) {
         })),
       },
       workflowRun: { findFirst: vi.fn() },
-      homePageSnapshot: { findFirst: vi.fn(async () => snapshot) },
+      homepageSnapshot: { findFirst: vi.fn(async () => snapshot) },
     },
     session: {
       user: { id: "user-1", sessionVersion: 0 },

@@ -1,6 +1,5 @@
 import { env } from "~/env";
-import { HomePagePayloadGenerator } from "~/server/application/homepage/home-page-payload-generator";
-import { resolveHomePageSelection } from "~/server/application/homepage/home-page-selection";
+import { runHomepageGeneration } from "~/server/application/homepage/home-page-generation";
 import { db } from "~/server/db";
 
 export async function POST(
@@ -15,32 +14,38 @@ export async function POST(
     return Response.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
   const { taskId } = await context.params;
-  const task = await db.homePageGenerationTask.findUnique({
+  const task = await db.homepageGenerationTask.findUnique({
     where: { id: taskId },
+    select: { status: true, workerId: true, fencingToken: true },
   });
   if (!task) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
-  if (task.status !== "RUNNING") {
+  if (task.status !== "RUNNING" || !task.workerId) {
     return Response.json({ error: "TASK_NOT_RUNNING" }, { status: 409 });
   }
-  if (task.scope === "PERSONALIZED" && task.userId) {
-    const current = await resolveHomePageSelection(db, task.userId);
-    if (current.fingerprint !== task.preferenceFingerprint) {
-      return Response.json({ error: "STALE_PREFERENCE" }, { status: 409 });
-    }
+  const result = await runHomepageGeneration(db, {
+    taskId,
+    workerId: task.workerId,
+    fencingToken: task.fencingToken.toString(),
+  });
+  if (result.kind === "generated") {
+    return Response.json({
+      payload: result.payload,
+      dataAsOf: result.payload.heatmap.tradeDate,
+    });
   }
-  try {
+  if (result.kind === "obsolete") {
+    return Response.json({ error: "TASK_NOT_RUNNING" }, { status: 409 });
+  }
+  if (result.kind === "retryable_failure") {
     return Response.json(
-      await new HomePagePayloadGenerator().generate({
-        selectionJson: task.selectionJson,
-      }),
+      { error: result.errorCode, details: result.details },
+      { status: 503 },
     );
-  } catch (error) {
+  }
+  if (result.kind === "terminal_failure") {
     return Response.json(
-      {
-        error: "GENERATION_FAILED",
-        message: error instanceof Error ? error.message : String(error),
-      },
-      { status: 502 },
+      { error: result.errorCode, details: result.details },
+      { status: 422 },
     );
   }
 }

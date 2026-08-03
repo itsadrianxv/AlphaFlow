@@ -591,7 +591,7 @@ async function recoverDatabaseEvents() {
 }
 
 async function scheduleHomePageDefault() {
-  const snapshot = await db.homePageSnapshot.findFirst({
+  const snapshot = await db.homepageSnapshot.findFirst({
     where: { scope: "DEFAULT" },
     orderBy: { generatedAt: "desc" },
     select: { id: true },
@@ -621,7 +621,7 @@ async function scheduleHomePageDefault() {
 }
 
 async function recoverHomePageTaskEvents() {
-  const tasks = await db.homePageGenerationTask.findMany({
+  const tasks = await db.homepageGenerationTask.findMany({
     where: {
       status: { in: ["PENDING", "RETRY_WAIT"] },
       eventPublishedAt: null,
@@ -633,7 +633,7 @@ async function recoverHomePageTaskEvents() {
   for (const task of tasks) {
     try {
       const published = await publishHomePageGenerationTask(task.id, commands);
-      await db.homePageGenerationTask.updateMany({
+      await db.homepageGenerationTask.updateMany({
         where: { id: task.id, eventPublishedAt: null },
         data: { eventPublishedAt: new Date(published.createdAt) },
       });

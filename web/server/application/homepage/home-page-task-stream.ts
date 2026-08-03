@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import Redis from "ioredis";
 import { env } from "~/env";
 
@@ -14,18 +13,16 @@ export async function publishHomePageGenerationTask(
   taskId: string,
   streamPublisher: Pick<Redis, "xadd"> = getPublisher(),
 ) {
-  const createdAt = new Date().toISOString();
+  const enqueuedAt = new Date().toISOString();
   await streamPublisher.xadd(
     streamName,
     "*",
     "schemaVersion",
     "1",
-    "eventId",
-    randomUUID(),
-    "runId",
+    "executionId",
     taskId,
-    "createdAt",
-    createdAt,
+    "enqueuedAt",
+    enqueuedAt,
   );
-  return { streamName, createdAt };
+  return { streamName, createdAt: enqueuedAt };
 }

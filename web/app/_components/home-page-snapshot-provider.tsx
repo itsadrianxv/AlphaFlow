@@ -9,6 +9,20 @@ const HomePageSnapshotContext = createContext<
   | undefined
 >(undefined);
 
+function isRefreshInProgress(data: HomePageSnapshotEnvelope | undefined) {
+  return data && "refreshInProgress" in data
+    ? data.refreshInProgress
+    : data?.isRefreshing;
+}
+
+function currentDataLabel(data: HomePageSnapshotEnvelope | undefined) {
+  if (!data) return "-";
+  if ("dataCoverage" in data) {
+    return data.dataCoverage.items[0]?.actualDataCutoffKey ?? "unknown";
+  }
+  return data.dataAsOf;
+}
+
 export function HomePageSnapshotProvider({
   children,
 }: {
@@ -26,9 +40,9 @@ export function HomePageSnapshotProvider({
         isError: query.isError,
       }}
     >
-      {query.data?.isRefreshing ? (
+      {isRefreshInProgress(query.data) ? (
         <div className="border-b border-[var(--app-border-soft)] px-4 py-2 text-xs text-[var(--app-text-muted)]">
-          个性化数据更新中 · 当前数据日期 {query.data.dataAsOf}
+          个性化数据更新中 · 当前数据日期 {currentDataLabel(query.data)}
         </div>
       ) : null}
       {children}

@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
+import {
+  HOMEPAGE_GENERATION_INPUT_CONTRACT_VERSION,
+  HOMEPAGE_GENERATOR_DEFINITION_VERSION,
+  HOMEPAGE_PAYLOAD_SCHEMA_VERSION,
+} from "~/server/application/homepage/home-page-generation";
 
 type HomepageManifestScope = "BASELINE" | "PERSONALIZED";
 type HomepageGateStatus =
@@ -374,21 +379,28 @@ export class HomepageDataManifestService {
         data: { gateStatus },
       });
       if (gateStatus === "READY" || gateStatus === "READY_WITH_LIMITATION") {
+        const generationKey = [
+          "homepage",
+          manifest.id,
+          HOMEPAGE_GENERATION_INPUT_CONTRACT_VERSION,
+          HOMEPAGE_GENERATOR_DEFINITION_VERSION,
+          HOMEPAGE_PAYLOAD_SCHEMA_VERSION,
+          "PROMOTABLE",
+        ].join(":");
         await tx.homepageGenerationTask.upsert({
-          where: { manifestId: manifest.id },
+          where: { generationKey },
           create: {
-            generationKey: `homepage-manifest:${manifest.id}`,
+            generationKey,
             manifestId: manifest.id,
             activationSequence: manifest.activationSequence,
-            generationInputContractVersion: "homepage-generation-input.v1",
-            generatorDefinitionVersion: manifest.definitionVersion,
-            payloadSchemaVersion: "homepage-payload.v1",
-            promotionMode:
-              manifest.scope === "BASELINE" ? "BASELINE" : "PERSONALIZED",
+            generationInputContractVersion:
+              HOMEPAGE_GENERATION_INPUT_CONTRACT_VERSION,
+            generatorDefinitionVersion: HOMEPAGE_GENERATOR_DEFINITION_VERSION,
+            payloadSchemaVersion: HOMEPAGE_PAYLOAD_SCHEMA_VERSION,
+            promotionMode: "PROMOTABLE",
             schedulingTier: "BACKGROUND",
-            resourcePoolKey: "homepage-generator",
+            resourcePoolKey: "homepage-generation",
             fairnessKey: manifest.userId ?? "baseline",
-            inputHash: sha256({ manifestId: manifest.id, gateStatus }),
           },
           update: {},
         });

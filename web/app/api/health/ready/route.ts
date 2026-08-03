@@ -2,14 +2,14 @@ import { db } from "~/server/db";
 
 export async function GET() {
   try {
-    const snapshot = await db.homePageSnapshot.findFirst({
-      where: { scope: "DEFAULT" },
-      select: { id: true },
+    const projection = await db.homepageCurrentSnapshotProjection.findFirst({
+      where: { scope: "BASELINE", userId: null },
+      select: { snapshotId: true },
     });
-    return snapshot
-      ? Response.json({ status: "ready", snapshotId: snapshot.id })
+    return projection
+      ? Response.json({ status: "ready", snapshotId: projection.snapshotId })
       : Response.json(
-          { status: "waiting_for_default_snapshot" },
+          { status: "waiting_for_baseline_snapshot" },
           { status: 503 },
         );
   } catch {
