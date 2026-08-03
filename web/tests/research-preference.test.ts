@@ -32,6 +32,7 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
   private readonly snapshots = new Map<string, ResearchPreferenceSnapshot>();
   private readonly removedLevels = new Map<string, "REGULAR" | "FOCUS">();
   private readonly commands = new Map<string, string>();
+  private readonly clearedTargets = new Set<string>();
 
   async getCurrent(userId: string) {
     return structuredClone(this.states.get(userId) ?? emptyState(userId));
@@ -87,7 +88,11 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
     }
     if (command.type === "RESTORE") {
       // The in-memory adapter models the same observable restore contract as PostgreSQL.
-      if (!next.items.some((item) => item.targetType === command.target.targetType && item.targetKey === command.target.targetKey)) {
+      const targetKey = `${userId}:${command.target.targetType}:${command.target.targetKey}`;
+      if (
+        !this.clearedTargets.has(targetKey) &&
+        !next.items.some((item) => item.targetType === command.target.targetType && item.targetKey === command.target.targetKey)
+      ) {
         next.items.push({
           ...command.target,
           level:
@@ -100,8 +105,19 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
     if (command.type === "SET_ENABLED") next.enabled = command.enabled;
     if (command.type === "SET_CHANNELS") Object.assign(next, command.channels);
     if (command.type === "CLEAR") {
+      for (const item of next.items) {
+        this.clearedTargets.add(
+          `${userId}:${item.targetType}:${item.targetKey}`,
+        );
+      }
+      for (const key of this.removedLevels.keys()) {
+        if (key.startsWith(`${userId}:`)) this.clearedTargets.add(key);
+      }
       next.items = [];
       next.enabled = false;
+      for (const key of this.removedLevels.keys()) {
+        if (key.startsWith(`${userId}:`)) this.removedLevels.delete(key);
+      }
     }
     next.items = sortItems(next.items);
     this.states.set(userId, next);
@@ -145,6 +161,15 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
       this.snapshots.set(key, snapshot);
     }
     this.states.delete(userId);
+    for (const [commandId, commandUserId] of this.commands) {
+      if (commandUserId === userId) this.commands.delete(commandId);
+    }
+    for (const key of this.removedLevels.keys()) {
+      if (key.startsWith(`${userId}:`)) this.removedLevels.delete(key);
+    }
+    for (const key of this.clearedTargets) {
+      if (key.startsWith(`${userId}:`)) this.clearedTargets.delete(key);
+    }
   }
 }
 
@@ -246,6 +271,11 @@ describe("显式研究关注与冻结偏好", () => {
     const emptySnapshot = await service.freeze("user-1");
     expect(emptySnapshot.items).toEqual([]);
     expect((await repository.getSnapshotForUser("user-1", oldSnapshot.id))?.items).toHaveLength(1);
+    const attemptedRestore = await service.restore("user-1", {
+      commandId: "restore-after-clear-1",
+      target: { targetType: "COMPANY", targetKey: "000001.SZ" },
+    });
+    expect(attemptedRestore.items).toEqual([]);
     await service.deletePersonalData("user-1");
     expect(await repository.getSnapshotForUser("user-1", oldSnapshot.id)).toBeNull();
   });

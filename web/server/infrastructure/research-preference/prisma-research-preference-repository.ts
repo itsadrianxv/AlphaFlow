@@ -253,9 +253,9 @@ export class PrismaResearchPreferenceRepository
               });
               break;
             case "CLEAR":
-              await tx.researchPreferenceItem.updateMany({
-                where: { preferenceId: preference.id, removedAt: null },
-                data: { removedAt: now },
+              // 清除是不可恢复的隐私动作；不能留下可由 RESTORE 找回的软删除关注。
+              await tx.researchPreferenceItem.deleteMany({
+                where: { preferenceId: preference.id },
               });
               await tx.researchPreference.update({
                 where: { id: preference.id },
@@ -353,6 +353,18 @@ export class PrismaResearchPreferenceRepository
     await this.withSerializableRetry(async () =>
       this.prisma.$transaction(
         async (tx) => {
+          // 相关性评估会保存命中的关注和冻结输入；保留历史评估行，但先清除可识别的偏好输入。
+          await tx.researchEventRelevanceAssessment.updateMany({
+            where: { userId, personalDataDeletedAt: null },
+            data: {
+              userId: null,
+              matchedPreferencesJson: Prisma.JsonNull,
+              dimensionJson: Prisma.JsonNull,
+              inputSnapshotJson: Prisma.JsonNull,
+              personalDataDeletedAt: deletedAt,
+            },
+          });
+
           const snapshots = await tx.researchPreferenceSnapshot.findMany({
             where: { userId, personalDataDeletedAt: null },
             select: { id: true },
