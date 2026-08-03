@@ -118,6 +118,9 @@ class AdapterPage:
                 terminal_error=value.errors[0] if value.errors else None,
             )
         if isinstance(value, Mapping):
+            page_keys = {"items", "records", "nextCursor", "next_cursor", "coveredScope", "covered_scope", "missingScope", "missing_scope", "actualDataCutoff", "actual_data_cutoff", "terminalError", "error"}
+            if not page_keys.intersection(value):
+                return cls(items=(value,))
             raw_items = value.get("items") or value.get("records") or value.get("data") or ()
             if isinstance(raw_items, Mapping):
                 raw_items = [raw_items]
@@ -260,6 +263,10 @@ def _observation_from_record(record: Mapping[str, Any], *, dataset_key: str, sou
         value_type = "json"
     if value is not None and value_type in {"decimal", "number", "numeric"}:
         value = normalize_decimal(value)
+        value_type = "decimal"
+    elif value is None and value_json is not None and value_type in {"decimal", "number", "numeric"}:
+        value = normalize_decimal(value_json)
+        value_json = None
         value_type = "decimal"
     elif value is not None and not isinstance(value, str) and value_json is None:
         value_json = value
@@ -530,6 +537,13 @@ class HomepageProviderAdapter:
             covered_scope=covered_scope,
             missing_scope=missing_scope,
         )
+        if not observations and not errors and actual_cutoff is None:
+            errors.append(ProviderError(
+                error_class="invalid_response",
+                retryability=Retryability.NON_RETRYABLE,
+                message="合法 empty 结果必须保留请求范围已覆盖证明和实际数据截止点",
+                code="EMPTY_RESULT_MISSING_CUTOFF",
+            ))
         if errors and not observations:
             result_status = ResultStatus.ERROR
             quality = QualityStatus.ISOLATED if all(item.error_class in {"unsupported_dataset", "contract_incompatible", "normalization_failed", "invalid_response", "replay_unavailable"} for item in errors) else QualityStatus.DEGRADED
@@ -606,7 +620,13 @@ class TushareHomepageProviderAdapter(HomepageProviderAdapter):
         loaders: dict[str, PageLoader] = {
             "market_snapshot": lambda request, _cursor: client.get_market_snapshot(_scope_date(request)),
             "stock_universe": lambda _request, _cursor: client.get_stock_universe(),
+            "stock_snapshot": lambda request, _cursor: client.get_stock_snapshot(str(request.requested_scope.get("stockCode") or request.requested_scope.get("stock_code") or "")),
+            "stock_batch": lambda request, _cursor: client.get_stock_batch([str(item) for item in request.requested_scope.get("stockCodes", request.requested_scope.get("stock_codes", ())) ]),
             "daily_bars": lambda request, _cursor: _bars_as_records(client.get_stock_bars(stock_code=str(request.requested_scope.get("stockCode") or request.requested_scope.get("stock_code") or ""), start_date=request.requested_scope.get("startDate") or request.requested_scope.get("start_date"), end_date=request.requested_scope.get("endDate") or request.requested_scope.get("end_date"), adjust=str(request.requested_scope.get("adjust") or "qfq"))),
+            "concept_catalog": lambda _request, _cursor: client.get_concept_catalog(),
+            "concept_constituents": lambda request, _cursor: client.get_concept_constituents(str(request.requested_scope.get("conceptName") or request.requested_scope.get("concept_name") or ""), request.requested_scope.get("conceptCode") or request.requested_scope.get("concept_code")),
+            "hot_concept_boards": lambda request, _cursor: client.get_hot_concept_boards(limit=request.page_size),
+            "market_heatmap": lambda request, _cursor: client.get_market_heatmap_snapshot(limit=request.page_size, prefer_intraday=bool(request.requested_scope.get("preferIntraday", request.requested_scope.get("prefer_intraday", False)))),
         }
         loaders.update(datasets or {})
         capabilities = {key: DatasetCapability(key, description=f"TuShare {key} 规范化数据集") for key in loaders}

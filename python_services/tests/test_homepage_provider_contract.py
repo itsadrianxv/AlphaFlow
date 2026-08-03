@@ -84,6 +84,15 @@ def test_empty_is_a_non_retryable_terminal_result_without_fake_observation() -> 
     assert result.errors == ()
 
 
+def test_empty_without_cutoff_proof_is_invalid_instead_of_being_silently_accepted() -> None:
+    adapter = ScriptedHomepageProviderAdapter({"fixture": [AdapterPage(items=(), covered_scope={"tradeDate": "2026-08-01"})]})
+
+    result = adapter.fetch(_request())
+
+    assert result.result_status == ResultStatus.ERROR
+    assert result.errors[0].code == "EMPTY_RESULT_MISSING_CUTOFF"
+
+
 def test_partial_cutoff_is_degraded_and_exposes_missing_scope() -> None:
     adapter = ScriptedHomepageProviderAdapter({"fixture": [AdapterPage(items=(_record(),), actual_data_cutoff=DataCutoff("trade_date", "2026-07-31"))]})
 
