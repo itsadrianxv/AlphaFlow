@@ -17,6 +17,7 @@
 
 #include "concurrency/blocking_queue.hpp"
 #include "messaging/stream_transport.hpp"
+#include "task_lifecycle/resource_permit.hpp"
 #include "task_lifecycle/types.hpp"
 
 namespace task_lifecycle {
@@ -28,6 +29,7 @@ struct WorkerConfig {
   std::chrono::milliseconds heartbeat_interval{30000};
   std::chrono::milliseconds recovery_interval{1000};
   int max_attempts{3};
+  std::shared_ptr<ResourcePermitProvider> permit_provider;
   std::vector<std::chrono::seconds> retry_delays{
       std::chrono::seconds(10), std::chrono::seconds(30), std::chrono::seconds(90)};
 };
@@ -58,6 +60,9 @@ class TypedLifecycleWorker final : public Worker {
     if (!config_.transport) throw std::invalid_argument("stream transport is required");
     if (config_.worker_threads == 0) throw std::invalid_argument("worker_threads must be positive");
     if (config_.queue_capacity == 0) throw std::invalid_argument("queue_capacity must be positive");
+    if (config_.queue_capacity > config_.worker_threads * 2) {
+      throw std::invalid_argument("queue_capacity cannot exceed twice worker_threads");
+    }
     if (config_.max_attempts <= 0) throw std::invalid_argument("max_attempts must be positive");
   }
 
@@ -145,8 +150,19 @@ class TypedLifecycleWorker final : public Worker {
     while (auto queued = queue_.pop()) {
       const Lease lease{queued->task.message.run_id, queued->task.fencing_token};
       std::optional<ExecutionResult<Result>> result;
+      std::optional<ResourcePermitLease> permit;
       try {
-        result = executor_(queued->task, queued->stop_source->get_token());
+        if (config_.permit_provider) {
+          permit = config_.permit_provider->acquire(lease, queued->stop_source->get_token());
+          if (!permit) {
+            result = RetryableFailure{
+                Failure{"RESOURCE_PERMIT_UNAVAILABLE", "资源许可暂不可用"}};
+          }
+          if (permit) set_permit(lease, *permit);
+        }
+        if (!result && !queued->stop_source->stop_requested()) {
+          result = executor_(queued->task, queued->stop_source->get_token());
+        }
       } catch (const std::exception& error) {
         result = RetryableFailure{Failure{"WORKER_INTERNAL_ERROR", error.what()}};
       }
@@ -157,6 +173,14 @@ class TypedLifecycleWorker final : public Worker {
           queued->stop_source->request_stop();
         } catch (const std::exception& error) {
           std::cerr << "task settlement failed: " << error.what() << '\n';
+        }
+      }
+      if (permit && config_.permit_provider) {
+        try {
+          config_.permit_provider->release(*permit,
+                                           queued->stop_source->stop_requested() ? "cancelled" : "settled");
+        } catch (const std::exception& error) {
+          std::cerr << "resource permit release failed: " << error.what() << '\n';
         }
       }
       remove_active(lease);
@@ -203,6 +227,21 @@ class TypedLifecycleWorker final : public Worker {
           std::cerr << "heartbeat failed: " << error.what() << '\n';
         }
       }
+      if (config_.permit_provider) {
+        const auto permit_snapshot = active_permit_snapshot();
+        if (!permit_snapshot.empty()) {
+          try {
+            const auto renewed = config_.permit_provider->renew(permit_snapshot);
+            for (const auto& permit : permit_snapshot) {
+              if (std::find(renewed.begin(), renewed.end(), permit) == renewed.end()) {
+                cancel({permit.task_id, permit.fencing_token});
+              }
+            }
+          } catch (const std::exception& error) {
+            std::cerr << "resource permit heartbeat failed: " << error.what() << '\n';
+          }
+        }
+      }
       interruptible_wait(config_.heartbeat_interval);
     }
   }
@@ -213,6 +252,23 @@ class TypedLifecycleWorker final : public Worker {
     result.reserve(active_.size());
     for (const auto& [task_id, active] : active_) result.push_back({task_id, active.fencing_token});
     return result;
+  }
+
+  std::vector<ResourcePermitLease> active_permit_snapshot() const {
+    std::vector<ResourcePermitLease> result;
+    std::lock_guard lock(active_mutex_);
+    for (const auto& [_, active] : active_) {
+      if (active.permit) result.push_back(*active.permit);
+    }
+    return result;
+  }
+
+  void set_permit(const Lease& lease, const ResourcePermitLease& permit) {
+    std::lock_guard lock(active_mutex_);
+    const auto found = active_.find(lease.task_id);
+    if (found != active_.end() && found->second.fencing_token == lease.fencing_token) {
+      found->second.permit = permit;
+    }
   }
 
   void cancel(const Lease& lease) {
@@ -242,6 +298,7 @@ class TypedLifecycleWorker final : public Worker {
   struct ActiveTask {
     std::int64_t fencing_token;
     std::shared_ptr<std::stop_source> stop_source;
+    std::optional<ResourcePermitLease> permit;
   };
 
   WorkerConfig config_;

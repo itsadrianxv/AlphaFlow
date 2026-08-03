@@ -366,5 +366,73 @@ TEST(TaskLifecycleWorkerTest, NeverExceedsConfiguredConcurrency) {
   EXPECT_EQ(state->max_active, 2);
 }
 
+TEST(TaskLifecycleWorkerTest, AcquiresRenewsAndReleasesGlobalResourcePermit) {
+  struct PermitState {
+    std::mutex mutex;
+    int acquired{};
+    int renewed{};
+    int released{};
+    bool active{};
+  };
+
+  class PermitProvider final : public ResourcePermitProvider {
+   public:
+    explicit PermitProvider(std::shared_ptr<PermitState> state) : state_(std::move(state)) {}
+
+    std::optional<ResourcePermitLease> acquire(const Lease& task,
+                                               std::stop_token stop_token) override {
+      if (stop_token.stop_requested()) return std::nullopt;
+      std::lock_guard lock(state_->mutex);
+      ++state_->acquired;
+      state_->active = true;
+      return ResourcePermitLease{task.task_id, "provider", task.task_id + ":permit",
+                                 "worker", task.fencing_token};
+    }
+
+    std::vector<ResourcePermitLease> renew(
+        const std::vector<ResourcePermitLease>& permits) override {
+      std::lock_guard lock(state_->mutex);
+      state_->renewed += static_cast<int>(permits.size());
+      return permits;
+    }
+
+    void release(const ResourcePermitLease&, std::string_view) override {
+      std::lock_guard lock(state_->mutex);
+      ++state_->released;
+      state_->active = false;
+    }
+
+   private:
+    std::shared_ptr<PermitState> state_;
+  };
+
+  auto transport = std::make_shared<TransportState>();
+  auto repository = std::make_shared<RepositoryState>();
+  auto permit_state = std::make_shared<PermitState>();
+  repository->audit = transport->audit;
+  {
+    std::lock_guard lock(transport->mutex);
+    transport->fresh.push_back(message());
+  }
+  WorkerConfig worker_config = config(transport);
+  worker_config.permit_provider = std::make_shared<PermitProvider>(permit_state);
+  auto worker = make_worker<std::string, int>(
+      worker_config, MemoryRepository(repository), [](const auto&, std::stop_token) {
+        return ExecutionResult<int>{Completed<int>{1}};
+      });
+  std::thread thread([&] { worker->run(); });
+  ASSERT_TRUE(wait_until([&] {
+    std::lock_guard lock(repository->mutex);
+    return repository->settlements == 1;
+  }));
+  worker->request_stop();
+  thread.join();
+
+  std::lock_guard lock(permit_state->mutex);
+  EXPECT_EQ(permit_state->acquired, 1);
+  EXPECT_EQ(permit_state->released, 1);
+  EXPECT_FALSE(permit_state->active);
+}
+
 }  // namespace
 }  // namespace task_lifecycle
