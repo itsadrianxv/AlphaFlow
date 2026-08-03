@@ -102,6 +102,7 @@ describePostgres("研究偏好 application/repository PostgreSQL 契约", () => 
       await service.clear(userId, key("clear"));
       expect((await service.getCurrent(userId)).items).toEqual([]);
       expect((await service.freeze(userId)).items).toEqual([]);
+      expect(await repository.getSnapshotForUser(userId, snapshot.id)).toBeNull();
       await service.restore(userId, {
         commandId: key("restore-after-clear"),
         target: { targetType: "THEME", targetKey: "储能" },

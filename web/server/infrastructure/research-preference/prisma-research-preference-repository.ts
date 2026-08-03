@@ -257,6 +257,7 @@ export class PrismaResearchPreferenceRepository
               await tx.researchPreferenceItem.deleteMany({
                 where: { preferenceId: preference.id },
               });
+              await redactUnreferencedSnapshots(tx, userId, now);
               await tx.researchPreference.update({
                 where: { id: preference.id },
                 data: { enabled: false },
@@ -358,9 +359,9 @@ export class PrismaResearchPreferenceRepository
             where: { userId, personalDataDeletedAt: null },
             data: {
               userId: null,
-              matchedPreferencesJson: Prisma.JsonNull,
-              dimensionJson: Prisma.JsonNull,
-              inputSnapshotJson: Prisma.JsonNull,
+              matchedPreferencesJson: Prisma.DbNull,
+              dimensionJson: Prisma.DbNull,
+              inputSnapshotJson: Prisma.DbNull,
               personalDataDeletedAt: deletedAt,
             },
           });
@@ -374,7 +375,7 @@ export class PrismaResearchPreferenceRepository
               where: { id: snapshot.id },
               data: {
                 userId: null,
-                normalizedItemsJson: Prisma.JsonNull,
+                normalizedItemsJson: Prisma.DbNull,
                 personalDataDeletedAt: deletedAt,
               },
             });
@@ -418,6 +419,44 @@ export class PrismaResearchPreferenceRepository
       }
     }
     throw new Error("研究偏好写入重试耗尽");
+  }
+}
+
+async function redactUnreferencedSnapshots(
+  tx: TransactionClient,
+  userId: string,
+  deletedAt: Date,
+): Promise<void> {
+  const snapshots = await tx.researchPreferenceSnapshot.findMany({
+    where: { userId, personalDataDeletedAt: null },
+    select: {
+      id: true,
+      _count: {
+        select: {
+          relevanceAssessments: true,
+          inboxEntries: true,
+          tasks: true,
+          auditRecords: true,
+        },
+      },
+    },
+  });
+  for (const snapshot of snapshots) {
+    const isReferenced = Object.values(snapshot._count).some(
+      (count) => count > 0,
+    );
+    if (isReferenced) continue;
+    await tx.researchPreferenceSnapshot.update({
+      where: { id: snapshot.id },
+      data: {
+        userId: null,
+        normalizedItemsJson: Prisma.DbNull,
+        personalDataDeletedAt: deletedAt,
+      },
+    });
+    await tx.researchPreferenceSnapshotItem.deleteMany({
+      where: { snapshotId: snapshot.id },
+    });
   }
 }
 

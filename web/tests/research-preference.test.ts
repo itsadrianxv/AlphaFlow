@@ -115,6 +115,13 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
       }
       next.items = [];
       next.enabled = false;
+      for (const [key, snapshot] of this.snapshots) {
+        if (snapshot.userId !== userId) continue;
+        snapshot.userId = "";
+        snapshot.items = [];
+        snapshot.personalDataDeletedAt = new Date();
+        this.snapshots.set(key, snapshot);
+      }
       for (const key of this.removedLevels.keys()) {
         if (key.startsWith(`${userId}:`)) this.removedLevels.delete(key);
       }
@@ -128,7 +135,9 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
   async createOrGetSnapshot(userId: string, input: ResearchPreferenceSnapshotInput, contentHash: string, frozenAt: Date) {
     const key = `${userId}:${contentHash}`;
     const existing = this.snapshots.get(key);
-    if (existing) return structuredClone(existing);
+    if (existing && existing.userId === userId && !existing.personalDataDeletedAt) {
+      return structuredClone(existing);
+    }
     const snapshot: ResearchPreferenceSnapshot = {
       id: randomUUID(),
       userId,
@@ -257,7 +266,7 @@ describe("显式研究关注与冻结偏好", () => {
     ]);
   });
 
-  it("清除只影响未来冻结，旧快照仍可验证但隐私删除后不可访问", async () => {
+  it("清除删除当前关注与可删除快照，隐私删除后历史输入不可访问", async () => {
     const repository = new MemoryResearchPreferenceRepository();
     const service = new ResearchPreferenceService(repository);
     await service.add("user-1", {
@@ -270,7 +279,7 @@ describe("显式研究关注与冻结偏好", () => {
     expect(cleared.items).toEqual([]);
     const emptySnapshot = await service.freeze("user-1");
     expect(emptySnapshot.items).toEqual([]);
-    expect((await repository.getSnapshotForUser("user-1", oldSnapshot.id))?.items).toHaveLength(1);
+    expect(await repository.getSnapshotForUser("user-1", oldSnapshot.id)).toBeNull();
     const attemptedRestore = await service.restore("user-1", {
       commandId: "restore-after-clear-1",
       target: { targetType: "COMPANY", targetKey: "000001.SZ" },
