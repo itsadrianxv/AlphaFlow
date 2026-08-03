@@ -9,6 +9,7 @@ import { marketContextRouter } from "~/server/api/routers/market-context";
 import { mindMapRouter } from "~/server/api/routers/mind-map";
 import { overviewInsightsRouter } from "~/server/api/routers/overview-insights";
 import { postRouter } from "~/server/api/routers/post";
+import { researchInboxRouter } from "~/server/api/routers/research-inbox";
 import { researchPreferenceRouter } from "~/server/api/routers/research-preference";
 import { researchTargetRouter } from "~/server/api/routers/research-target";
 import { scheduledTaskRouter } from "~/server/api/routers/scheduled-task";
@@ -36,6 +37,7 @@ export const appRouter = createTRPCRouter({
   overviewInsights: overviewInsightsRouter,
   post: postRouter,
   researchTarget: researchTargetRouter,
+  researchInbox: researchInboxRouter,
   researchPreference: researchPreferenceRouter,
   screening: screeningRouter,
   scheduledTask: scheduledTaskRouter,
