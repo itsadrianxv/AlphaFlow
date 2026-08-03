@@ -137,4 +137,12 @@ describePostgres("研究调度 PostgreSQL 契约", () => {
     const allowed = await value.allowConfiguration(poolId);
     expect(allowed.state).toBe("CLOSED");
   });
+
+  it("重启资源池时保守恢复到单并发", async () => {
+    const { poolId, value } = await scheduler(3);
+    const restarted = await value.restartPool(poolId);
+    expect(restarted.currentConcurrency).toBe(1);
+    expect(restarted.successStreak).toBe(0);
+    expect(restarted.healthySince).toBeNull();
+  });
 });

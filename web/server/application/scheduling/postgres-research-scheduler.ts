@@ -342,14 +342,25 @@ export class PostgresResearchScheduler {
          WHERE "resourcePoolId" = ${poolId} AND "status" = 'ACTIVE' AND "leaseExpiresAt" <= ${now}
       `);
       await tx.$executeRaw(Prisma.sql`
-        UPDATE "ResearchTask"
-           SET "status" = CASE WHEN "attempts" < "maxAttempts" AND "retryDeadline" > ${now}
-                               THEN 'RETRY_WAIT' ELSE 'FAILED' END,
-               "nextAttemptAt" = CASE WHEN "attempts" < "maxAttempts" AND "retryDeadline" > ${now}
-                                      THEN ${now} ELSE NULL END,
-               "workerId" = NULL, "leaseExpiresAt" = NULL, "heartbeatAt" = NULL,
-               "errorClass" = 'LEASE_EXPIRED', "updatedAt" = ${now}
-         WHERE "resourcePoolId" = ${poolId} AND "status" = 'RUNNING' AND "leaseExpiresAt" <= ${now}
+        WITH expired_tasks AS (
+          UPDATE "ResearchTask"
+             SET "status" = CASE WHEN "attempts" < "maxAttempts" AND "retryDeadline" > ${now}
+                                 THEN 'RETRY_WAIT' ELSE 'FAILED' END,
+                 "nextAttemptAt" = CASE WHEN "attempts" < "maxAttempts" AND "retryDeadline" > ${now}
+                                        THEN ${now} ELSE NULL END,
+                 "workerId" = NULL, "leaseExpiresAt" = NULL, "heartbeatAt" = NULL,
+                 "errorClass" = 'LEASE_EXPIRED',
+                 "retryability" = CASE WHEN "attempts" < "maxAttempts" AND "retryDeadline" > ${now}
+                                       THEN 'RETRYABLE' ELSE 'NON_RETRYABLE' END,
+                 "terminalReason" = CASE WHEN "attempts" < "maxAttempts" AND "retryDeadline" > ${now}
+                                         THEN NULL ELSE 'RETRY_BUDGET_EXHAUSTED' END,
+                 "updatedAt" = ${now}
+           WHERE "resourcePoolId" = ${poolId} AND "status" = 'RUNNING' AND "leaseExpiresAt" <= ${now}
+          RETURNING "id"
+        )
+        UPDATE "ResearchResourcePermit"
+           SET "status" = 'EXPIRED', "releasedAt" = ${now}, "releaseReason" = 'task_lease_expired'
+         WHERE "taskId" IN (SELECT "id" FROM expired_tasks) AND "status" = 'ACTIVE'
       `);
       const circuits = await this.ensureCircuit(tx, poolId, now);
       const circuit = circuits[0];
@@ -369,6 +380,29 @@ export class PostgresResearchScheduler {
         circuit.state = "HALF_OPEN";
         circuit.version += 1n;
         circuit.updatedAt = now;
+      }
+      if (circuit.state === "HALF_OPEN" && circuit.halfOpenProbeTaskId) {
+        const probeRows = await tx.$queryRaw<
+          Array<{ status: ResearchTask["status"]; leaseExpiresAt: Date | null }>
+        >(Prisma.sql`
+          SELECT "status", "leaseExpiresAt"
+            FROM "ResearchTask" WHERE "id" = ${circuit.halfOpenProbeTaskId}
+        `);
+        const probe = probeRows[0];
+        if (
+          !probe ||
+          probe.status !== "RUNNING" ||
+          !probe.leaseExpiresAt ||
+          probe.leaseExpiresAt <= now
+        ) {
+          await tx.$executeRaw(Prisma.sql`
+            UPDATE "ResearchCircuitBreaker"
+               SET "halfOpenProbeTaskId" = NULL, "updatedAt" = ${now}
+             WHERE "resourcePoolId" = ${poolId} AND "state" = 'HALF_OPEN'
+               AND "halfOpenProbeTaskId" = ${circuit.halfOpenProbeTaskId}
+          `);
+          circuit.halfOpenProbeTaskId = null;
+        }
       }
       if (circuit.state === "HALF_OPEN" && circuit.halfOpenProbeTaskId)
         return null;
@@ -444,6 +478,7 @@ export class PostgresResearchScheduler {
           .filter((row) => row.fairnessKey === fairnessKey)
           .sort(
             (left, right) =>
+              Number(left.attempts > 0) - Number(right.attempts > 0) ||
               left.createdAt.getTime() - right.createdAt.getTime(),
           ),
       )[0];
@@ -748,6 +783,21 @@ export class PostgresResearchScheduler {
     return rows[0] ? poolFromRow(rows[0]) : null;
   }
 
+  async restartPool(poolId: string): Promise<ResourcePool> {
+    const now = this.now();
+    const rows = await this.db.$queryRaw<PoolRow[]>(Prisma.sql`
+      UPDATE "ResearchResourcePool"
+         SET "currentConcurrency" = 1, "successStreak" = 0,
+             "healthySince" = NULL, "cooldownUntil" = NULL,
+             "controlVersion" = "controlVersion" + 1, "updatedAt" = ${now}
+       WHERE "id" = ${poolId}
+      RETURNING "id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency",
+        "controlVersion", "lastHealthyAt", "healthySince", "successStreak", "latencyBaselineMs", "cooldownUntil"
+    `);
+    if (!rows[0]) throw new SchedulingInvariantError("资源池不存在");
+    return poolFromRow(rows[0]);
+  }
+
   async getCircuit(poolId: string): Promise<CircuitBreaker | null> {
     const rows = await this.db.$queryRaw<CircuitRow[]>(Prisma.sql`
       SELECT "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
@@ -813,32 +863,41 @@ export class PostgresResearchScheduler {
     poolId: string,
     reason: string,
   ): Promise<CircuitBreaker> {
-    const rows = await this.db.$queryRaw<CircuitRow[]>(Prisma.sql`
-      UPDATE "ResearchCircuitBreaker" SET "state" = 'CONFIG_BLOCKED', "blockedReason" = ${reason},
-             "retryAfter" = NULL, "halfOpenProbeTaskId" = NULL, "version" = "version" + 1,
-             "updatedAt" = ${this.now()}
-       WHERE "resourcePoolId" = ${poolId}
-      RETURNING "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
-        "windowFailures", "openCount", "retryAfter", "halfOpenProbeTaskId", "blockedReason", "updatedAt"
-    `);
-    if (!rows[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
-    return circuitFromRow(rows[0]);
+    const now = this.now();
+    return this.db.$transaction(async (tx) => {
+      const circuits = await this.ensureCircuit(tx, poolId, now);
+      if (!circuits[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
+      const rows = await tx.$queryRaw<CircuitRow[]>(Prisma.sql`
+        UPDATE "ResearchCircuitBreaker" SET "state" = 'CONFIG_BLOCKED', "blockedReason" = ${reason},
+               "retryAfter" = NULL, "halfOpenProbeTaskId" = NULL, "version" = "version" + 1,
+               "updatedAt" = ${now}
+         WHERE "resourcePoolId" = ${poolId}
+        RETURNING "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
+          "windowFailures", "openCount", "retryAfter", "halfOpenProbeTaskId", "blockedReason", "updatedAt"
+      `);
+      if (!rows[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
+      return circuitFromRow(rows[0]);
+    });
   }
 
   async allowConfiguration(poolId: string): Promise<CircuitBreaker> {
     const now = this.now();
-    const rows = await this.db.$queryRaw<CircuitRow[]>(Prisma.sql`
-      UPDATE "ResearchCircuitBreaker"
-         SET "state" = 'CLOSED', "blockedReason" = NULL, "retryAfter" = NULL,
-             "halfOpenProbeTaskId" = NULL, "consecutiveFailures" = 0,
-             "windowAttempts" = 0, "windowFailures" = 0, "version" = "version" + 1,
-             "updatedAt" = ${now}
-       WHERE "resourcePoolId" = ${poolId}
-      RETURNING "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
-        "windowFailures", "openCount", "retryAfter", "halfOpenProbeTaskId", "blockedReason", "updatedAt"
-    `);
-    if (!rows[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
-    return circuitFromRow(rows[0]);
+    return this.db.$transaction(async (tx) => {
+      const circuits = await this.ensureCircuit(tx, poolId, now);
+      if (!circuits[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
+      const rows = await tx.$queryRaw<CircuitRow[]>(Prisma.sql`
+        UPDATE "ResearchCircuitBreaker"
+           SET "state" = 'CLOSED', "blockedReason" = NULL, "retryAfter" = NULL,
+               "halfOpenProbeTaskId" = NULL, "consecutiveFailures" = 0,
+               "windowAttempts" = 0, "windowFailures" = 0, "version" = "version" + 1,
+               "updatedAt" = ${now}
+         WHERE "resourcePoolId" = ${poolId}
+        RETURNING "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
+          "windowFailures", "openCount", "retryAfter", "halfOpenProbeTaskId", "blockedReason", "updatedAt"
+      `);
+      if (!rows[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
+      return circuitFromRow(rows[0]);
+    });
   }
 
   async recordAdaptiveOutcome(

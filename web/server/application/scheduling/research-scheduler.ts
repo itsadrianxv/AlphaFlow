@@ -353,6 +353,17 @@ export class ResearchScheduler {
       circuit.version += 1n;
       circuit.updatedAt = now;
     }
+    if (circuit.state === "HALF_OPEN" && circuit.halfOpenProbeTaskId) {
+      const probe = this.tasks.get(circuit.halfOpenProbeTaskId);
+      if (
+        !probe ||
+        probe.status !== "RUNNING" ||
+        !probe.leaseExpiresAt ||
+        probe.leaseExpiresAt <= now
+      ) {
+        circuit.halfOpenProbeTaskId = null;
+      }
+    }
     if (circuit.state === "HALF_OPEN" && circuit.halfOpenProbeTaskId)
       return null;
 
@@ -835,13 +846,17 @@ export class ResearchScheduler {
       const match = urgent
         .filter((task) => task.fairnessKey === fairnessKey)
         .sort(
-          (left, right) => left.createdAt.getTime() - right.createdAt.getTime(),
+          (left, right) =>
+            Number(left.attempts > 0) - Number(right.attempts > 0) ||
+            left.createdAt.getTime() - right.createdAt.getTime(),
         )[0];
       if (match) return match;
     }
     return (
       urgent.sort(
-        (left, right) => left.createdAt.getTime() - right.createdAt.getTime(),
+        (left, right) =>
+          Number(left.attempts > 0) - Number(right.attempts > 0) ||
+          left.createdAt.getTime() - right.createdAt.getTime(),
       )[0] ?? null
     );
   }
