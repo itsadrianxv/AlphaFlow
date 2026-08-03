@@ -1,0 +1,39 @@
+#pragma once
+
+#include <stop_token>
+#include <optional>
+#include <compare>
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "task_lifecycle/types.hpp"
+
+namespace task_lifecycle {
+
+struct ResourcePermitLease {
+  std::string task_id;
+  std::string resource_pool_key;
+  std::string permit_key;
+  std::string holder_id;
+  std::int64_t fencing_token{};
+
+  auto operator<=>(const ResourcePermitLease&) const = default;
+};
+
+/**
+ * Short-lived global permit seam. Implementations persist leases in the
+ * authoritative store; the worker only coordinates acquire/renew/release.
+ */
+class ResourcePermitProvider {
+ public:
+  virtual ~ResourcePermitProvider() = default;
+  virtual std::optional<ResourcePermitLease> acquire(const Lease& task,
+                                                     std::stop_token stop_token) = 0;
+  virtual std::vector<ResourcePermitLease> renew(
+      const std::vector<ResourcePermitLease>& permits) = 0;
+  virtual void release(const ResourcePermitLease& permit, std::string_view reason) = 0;
+};
+
+}  // namespace task_lifecycle
