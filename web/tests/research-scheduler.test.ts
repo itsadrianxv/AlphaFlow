@@ -22,11 +22,17 @@ class TestClock implements SchedulerClock {
   }
 }
 
-function createScheduler(clock: TestClock, currentConcurrency = 1, hardConcurrency = 4) {
+function createScheduler(
+  clock: TestClock,
+  currentConcurrency = 1,
+  hardConcurrency = 4,
+  maxUserConcurrencyPerPool = 1,
+) {
   const scheduler = new ResearchScheduler({
     clock,
     leaseMs: 1_000,
     permitLeaseMs: 500,
+    maxUserConcurrencyPerPool,
     retryDelaysMs: [100, 200, 300],
   });
   scheduler.registerPool({
@@ -98,6 +104,35 @@ describe("研究调度 module", () => {
     expect(secondClaim?.task.userId).toBe("user-b");
   });
 
+  it("尊重资源池配置的同用户并发上限", () => {
+    const clock = new TestClock();
+    const scheduler = createScheduler(clock, 3, 4, 2);
+    enqueue(scheduler, "user-limit-1", "INTERACTIVE", { userId: "user-a" });
+    enqueue(scheduler, "user-limit-2", "INTERACTIVE", { userId: "user-a" });
+    enqueue(scheduler, "user-limit-3", "INTERACTIVE", { userId: "user-a" });
+
+    expect(scheduler.claim("pool-provider", "worker-a")).not.toBeNull();
+    expect(scheduler.claim("pool-provider", "worker-b")).not.toBeNull();
+    expect(scheduler.claim("pool-provider", "worker-c")).toBeNull();
+  });
+
+  it("同等级先领取目标完成时间更紧迫的任务", () => {
+    const clock = new TestClock();
+    const scheduler = createScheduler(clock, 1);
+    const later = enqueue(scheduler, "urgency-later", "INTERACTIVE", {
+      targetCompletionAt: new Date(clock.now().getTime() + 60 * 60_000),
+      fairnessKey: "a",
+    });
+    enqueue(scheduler, "urgency-sooner", "INTERACTIVE", {
+      targetCompletionAt: new Date(clock.now().getTime() + 60_000),
+      fairnessKey: "b",
+    });
+
+    expect(scheduler.claim("pool-provider", "worker-a")?.task.id).not.toBe(
+      later.id,
+    );
+  });
+
   it("嵌套调用共用资源许可并拒绝旧 fencing", () => {
     const clock = new TestClock();
     const scheduler = createScheduler(clock, 3);
@@ -120,6 +155,15 @@ describe("研究调度 module", () => {
         fencingToken: claim!.task.fencingToken - 1n,
       }),
     ).toThrow(LeaseLostError);
+  });
+
+  it("配置阻断不会被资源结果自动解除", () => {
+    const clock = new TestClock();
+    const scheduler = createScheduler(clock);
+    scheduler.blockConfiguration("pool-provider", "credential_missing");
+    scheduler.recordOutcome("pool-provider", { kind: "RATE_LIMITED" });
+    expect(scheduler.getCircuit("pool-provider")?.state).toBe("CONFIG_BLOCKED");
+    expect(scheduler.allowConfiguration("pool-provider").state).toBe("CLOSED");
   });
 
   it("背压按等级返回繁忙、合并和暂停，并保留最老任务年龄", () => {
