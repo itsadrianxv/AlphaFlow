@@ -8,6 +8,7 @@ import {
   defaultMaxAttempts,
   defaultRetryDeadline,
   retryDelayMs,
+  urgencyBucket,
   weightedTierOrder,
 } from "~/server/domain/scheduling/policies";
 import {
@@ -409,22 +410,28 @@ export class PostgresResearchScheduler {
       const activeUserCounts = new Map(
         activeUsers.map((row) => [row.userId, Number(row.count)]),
       );
-      const availableTiers = new Set(rows.map((row) => row.schedulingTier));
-      const tier = weightedTierOrder(
-        availableTiers,
-        BigInt(pool.controlVersion),
-      )[0];
-      if (!tier) return null;
-      const candidates = rows.filter((row) => row.schedulingTier === tier);
-      const eligible = candidates.filter((row) => {
+      const eligible = rows.filter((row) => {
         if (!row.userId) return true;
         return (
           (activeUserCounts.get(row.userId) ?? 0) <
           this.maxUserConcurrencyPerPool
         );
       });
+      const availableTiers = new Set(eligible.map((row) => row.schedulingTier));
+      const tier = weightedTierOrder(
+        availableTiers,
+        BigInt(pool.controlVersion),
+      )[0];
+      if (!tier) return null;
+      const candidates = eligible.filter((row) => row.schedulingTier === tier);
+      const urgency = Math.min(
+        ...candidates.map((row) => urgencyBucket(row.targetCompletionAt, now)),
+      );
+      const urgentCandidates = candidates.filter(
+        (row) => urgencyBucket(row.targetCompletionAt, now) === urgency,
+      );
       const fairnessKeys = [
-        ...new Set(eligible.map((row) => row.fairnessKey)),
+        ...new Set(urgentCandidates.map((row) => row.fairnessKey)),
       ].sort();
       const fairnessStart = Number(
         BigInt(pool.controlVersion) % BigInt(Math.max(1, fairnessKeys.length)),
@@ -433,7 +440,7 @@ export class PostgresResearchScheduler {
         .slice(fairnessStart)
         .concat(fairnessKeys.slice(0, fairnessStart));
       const candidate = orderedFairnessKeys.flatMap((fairnessKey) =>
-        eligible
+        urgentCandidates
           .filter((row) => row.fairnessKey === fairnessKey)
           .sort(
             (left, right) =>

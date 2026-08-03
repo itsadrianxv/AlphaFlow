@@ -127,4 +127,14 @@ describePostgres("研究调度 PostgreSQL 契约", () => {
       fencingToken: claim!.task.fencingToken,
     })).rejects.toThrow(/目标资源池/);
   });
+
+  it("配置阻断保持阻断，显式允许后才恢复", async () => {
+    const { poolId, value } = await scheduler(1);
+    const blocked = await value.blockConfiguration(poolId, "credential_missing");
+    expect(blocked.state).toBe("CONFIG_BLOCKED");
+    const unchanged = await value.recordOutcome(poolId, { kind: "RATE_LIMITED" });
+    expect(unchanged.state).toBe("CONFIG_BLOCKED");
+    const allowed = await value.allowConfiguration(poolId);
+    expect(allowed.state).toBe("CLOSED");
+  });
 });
