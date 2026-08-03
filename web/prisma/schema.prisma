@@ -2203,3 +2203,104 @@ model ResearchAuditRecord {
   @@index([entityType, entityId, occurredAt], map: "ResearchAuditRecord_entity_idx")
   @@index([taskId, occurredAt], map: "ResearchAuditRecord_taskId_idx")
 }
+
+model ResearchRuntimeObservation {
+  id                String    @id @default(cuid())
+  idempotencyKey    String    @unique
+  metricKind        String
+  sourceKey         String?
+  datasetKey        String?
+  stage             String?
+  resourcePoolKey   String?
+  tradingDate       String?
+  sourceClockAt     DateTime? @db.Timestamptz(3)
+  sourceClockKind   String?
+  productClockAt    DateTime? @db.Timestamptz(3)
+  readyAt           DateTime  @db.Timestamptz(3)
+  actualDataCutoff  DateTime? @db.Timestamptz(3)
+  targetDataCutoff  DateTime? @db.Timestamptz(3)
+  sourceLatencyMs   Int?
+  productLatencyMs  Int?
+  deliveryLatencyMs Int?
+  dataCutoffMet     Boolean?
+  sourceTargetMs    Int?
+  productTargetMs   Int?
+  deliveryTargetMs  Int?
+  backlogAgeMs      Int?
+  backlogTargetMs   Int?
+  success           Boolean   @default(true)
+  degraded          Boolean   @default(false)
+  permitState       String?
+  permitWaitMs      Int?
+  permitHeldMs      Int?
+  circuitState      String?
+  previousConcurrency Int?
+  currentConcurrency  Int?
+  hardConcurrency     Int?
+  adaptiveReason      String?
+  cooldownUntil       DateTime? @db.Timestamptz(3)
+  usageRequests     Int       @default(0)
+  usageInputTokens  Int       @default(0)
+  usageOutputTokens Int       @default(0)
+  usageCostMicros   Int       @default(0)
+  deliveryChannel   String?
+  deliveryStatus    String?
+  deliveryAttempt   Int?
+  errorClass        String?
+  recordedAt        DateTime  @default(now()) @db.Timestamptz(3)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([sourceKey, datasetKey, stage, recordedAt], map: "ResearchRuntimeObservation_segment_idx")
+  @@index([resourcePoolKey, recordedAt], map: "ResearchRuntimeObservation_resource_idx")
+  @@index([tradingDate, recordedAt], map: "ResearchRuntimeObservation_trading_date_idx")
+}
+
+model ResearchRuntimeBreach {
+  id               String    @id @default(cuid())
+  idempotencyKey   String    @unique
+  observationId    String
+  kind             String
+  observedMs       Int?
+  targetMs         Int?
+  actualDataCutoff DateTime? @db.Timestamptz(3)
+  targetDataCutoff DateTime? @db.Timestamptz(3)
+  tradingDate      String?
+  reason           String
+  occurredAt       DateTime  @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([observationId], map: "ResearchRuntimeBreach_observation_idx")
+  @@index([kind, tradingDate, occurredAt], map: "ResearchRuntimeBreach_kind_idx")
+}
+
+model ResearchRuntimeAlert {
+  id               String   @id @default(cuid())
+  idempotencyKey   String   @unique
+  observationId    String
+  kind             String
+  thresholdPercent Int
+  observedMs       Int?
+  targetMs         Int?
+  tradingDate      String?
+  message          String
+  occurredAt       DateTime @db.Timestamptz(3)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([observationId], map: "ResearchRuntimeAlert_observation_idx")
+  @@index([kind, thresholdPercent, tradingDate], map: "ResearchRuntimeAlert_threshold_idx")
+}
+
+model ResearchReleaseEvaluation {
+  id                   String   @id @default(cuid())
+  evaluationKey        String   @unique
+  allowed              Boolean
+  checksJson           Json
+  hardGateFailuresJson Json
+  manualChecksJson     Json
+  runtimeBreachesJson  Json
+  degradationJson      Json
+  checkedAt            DateTime @db.Timestamptz(3)
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([allowed, checkedAt], map: "ResearchReleaseEvaluation_allowed_idx")
+}

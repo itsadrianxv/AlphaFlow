@@ -12,6 +12,7 @@ import { postRouter } from "~/server/api/routers/post";
 import { researchInboxRouter } from "~/server/api/routers/research-inbox";
 import { researchPreferenceRouter } from "~/server/api/routers/research-preference";
 import { researchTargetRouter } from "~/server/api/routers/research-target";
+import { runtimeObservabilityRouter } from "~/server/api/routers/runtime-observability";
 import { scheduledTaskRouter } from "~/server/api/routers/scheduled-task";
 import { screeningRouter } from "~/server/api/routers/screening";
 import { timingRouter } from "~/server/api/routers/timing";
@@ -37,6 +38,7 @@ export const appRouter = createTRPCRouter({
   overviewInsights: overviewInsightsRouter,
   post: postRouter,
   researchTarget: researchTargetRouter,
+  runtimeObservability: runtimeObservabilityRouter,
   researchInbox: researchInboxRouter,
   researchPreference: researchPreferenceRouter,
   screening: screeningRouter,
