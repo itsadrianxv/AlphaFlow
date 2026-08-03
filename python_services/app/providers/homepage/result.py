@@ -1,13 +1,14 @@
-"""External data providers。"""
+"""兼容性导出：Provider 结果契约集中定义在 :mod:`contracts`。"""
 
-from .homepage import (
-    AdapterPage,
+from .contracts import (
+    AuthoritySelection,
+    CANONICALIZATION_VERSION,
+    CONTRACT_VERSION,
     DataCutoff,
     HomepageDataItemRequest,
     HomepageDataItemResult,
-    HomepageProviderAdapter,
-    MinishareHomepageProviderAdapter,
     NormalizedObservation,
+    NORMALIZATION_RULES_VERSION,
     ProviderError,
     QualityStatus,
     ReplayContext,
@@ -15,19 +16,21 @@ from .homepage import (
     ResultStatus,
     Retryability,
     ScopeCoverage,
-    ScriptedHomepageProviderAdapter,
     SourceAssertion,
-    TushareHomepageProviderAdapter,
+    canonical_json,
+    normalize_decimal,
+    sha256_hash,
 )
 
 __all__ = [
-    "AdapterPage",
+    "AuthoritySelection",
+    "CANONICALIZATION_VERSION",
+    "CONTRACT_VERSION",
     "DataCutoff",
     "HomepageDataItemRequest",
     "HomepageDataItemResult",
-    "HomepageProviderAdapter",
-    "MinishareHomepageProviderAdapter",
     "NormalizedObservation",
+    "NORMALIZATION_RULES_VERSION",
     "ProviderError",
     "QualityStatus",
     "ReplayContext",
@@ -35,7 +38,8 @@ __all__ = [
     "ResultStatus",
     "Retryability",
     "ScopeCoverage",
-    "ScriptedHomepageProviderAdapter",
     "SourceAssertion",
-    "TushareHomepageProviderAdapter",
+    "canonical_json",
+    "normalize_decimal",
+    "sha256_hash",
 ]
