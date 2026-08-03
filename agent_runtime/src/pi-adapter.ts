@@ -23,6 +23,11 @@ import {
 } from "./execution-boundary";
 import { PythonGatewayClient } from "./python-gateway-client";
 import { RestrictedExecutionEnv } from "./restricted-env";
+import {
+  buildImmediateResearchCandidateSeeds,
+  buildResearchOnlySystemInstruction,
+  enforceResearchOnlyFinalText,
+} from "./research-only-policy";
 import type { SkillRegistry } from "./skill-registry";
 import { createInternalTools, STANDARD_INTERNAL_TOOL_NAMES } from "./tool-policy";
 import { createScheduledTaskSetupTools, SCHEDULED_TASK_SETUP_TOOL_NAMES } from "./scheduled-task-setup-tools";
@@ -126,8 +131,9 @@ function resolveSystemPrompt(now = new Date()) {
     "当用户提到“我的收藏”“我的行业”“我的公司”“我的自选股”“已有笔记”或“已保存报告”时，优先使用内部投研对象工具读取当前用户授权范围内的对象。",
     "仅在用户明确提出分析、比较、补充、风险、催化、跟踪指标或类似请求时，才基于投研对象继续调用行情、财务、事件、资金流等市场数据工具；普通列举或查看请求不要主动补行情财务。",
     "内部投研对象工具是只读工具，不得声称已经保存、修改、删除或加入收藏；如果用户要求保存，只输出可保存的文本草稿并说明当前运行不会写入收藏。",
+    buildResearchOnlySystemInstruction(),
     "默认使用中文输出，并在涉及数据、网页或筛选结果时说明来源。",
-    "不得输出买卖建议、收益保证或确定性投资承诺。",
+    "不得输出收益保证或确定性投资承诺。",
   ].join("\n");
 }
 
@@ -722,13 +728,29 @@ export class PiAdapter {
         this.store.markCancelled(request.runId, "cancel_requested");
         return;
       }
-      const text = extractMessageText(assistantMessage);
+      const rawText = extractMessageText(assistantMessage);
+      const researchOnly = enforceResearchOnlyFinalText({
+        prompt: request.prompt,
+        text: rawText,
+      });
+      const text = researchOnly.text;
+      const candidateSeeds = buildImmediateResearchCandidateSeeds({
+        runId: request.runId,
+        prompt: request.prompt,
+        toolSummaries: eventState.toolSummaries ?? [],
+      });
       const finalOutput = {
         text,
         skillId: request.skillId,
         skillIds,
         generatedAt: new Date().toISOString(),
         context: asJsonObject(request.context),
+        researchOnly: {
+          mode: "research_only",
+          blockedExecutableRequest: researchOnly.blocked,
+          categories: researchOnly.categories,
+          removedLineCount: researchOnly.removedLineCount,
+        },
       };
       if (executionId) {
         await this.webInternalClient.persistScheduledTaskResult(executionId, { runId: request.runId, status: "SUCCEEDED", ...parseScheduledOutput(text) });
@@ -741,11 +763,20 @@ export class PiAdapter {
         contentType: "text/markdown",
         payload: finalOutput,
       });
+      if (candidateSeeds.length > 0) {
+        this.store.appendEvent(request.runId, "candidate_seed.queued", {
+          mode: "post_response_async",
+          idempotent: true,
+          count: candidateSeeds.length,
+          seedKeys: candidateSeeds.map((seed) => seed.seedKey),
+        });
+      }
       this.recordAudit({
         boundary,
         state: eventState,
         stopReason: "completed",
         structuredOutput: finalOutput,
+        followUpObjects: candidateSeeds,
       });
       this.store.markSucceeded(request.runId, finalOutput);
     } catch (error) {

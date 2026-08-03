@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { violatesResearchOnly } from "~/server/application/agent-runtime/research-only-policy";
 
 const SUPPORTED_SCHEMA_VERSION = "agent-intent.v1";
 
@@ -135,6 +136,11 @@ export class DeterministicController {
 
     const intent = parsed.data;
     const reasons: string[] = [];
+    if (violatesResearchOnly(intent)) {
+      reasons.push(
+        "research_only 拒绝买卖、持有、加减仓、仓位、入场价、目标价、止损价或订单计划",
+      );
+    }
     if (intent.runId !== context.runId) {
       reasons.push("意图 runId 与当前运行不一致");
     }

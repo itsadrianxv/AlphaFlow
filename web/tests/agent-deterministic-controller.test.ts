@@ -122,4 +122,30 @@ describe("DeterministicController", () => {
       ]),
     );
   });
+
+  it("统一 research_only 约束拒绝结构化交易动作、仓位和价格指令", () => {
+    const controller = new DeterministicController();
+
+    const decision = controller.settle(
+      intent({
+        intentId: "intent_trade",
+        intentType: "NO_SIDE_EFFECT",
+        requiredCapabilities: [],
+        permission: "researchPreference:write",
+        proposedWrite: {
+          action: "买入",
+          positionSize: "三成仓",
+          entryPrice: "25 元",
+          targetPrice: "30 元",
+          stopLossPrice: "22 元",
+        },
+      }),
+      context,
+    );
+
+    expect(decision.status).toBe("REJECTED");
+    expect(decision.status === "REJECTED" ? decision.reasons : []).toContain(
+      "research_only 拒绝买卖、持有、加减仓、仓位、入场价、目标价、止损价或订单计划",
+    );
+  });
 });
