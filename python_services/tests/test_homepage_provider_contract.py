@@ -60,6 +60,7 @@ def test_three_adapters_return_the_same_success_contract_shape(adapter) -> None:
     assert result.result_status == ResultStatus.SUCCESS
     assert result.quality_status == QualityStatus.NORMAL
     assert result.dataset_key == "fixture"
+    assert result.provider_version == "1.0"
     assert result.contract_version == "1.0"
     assert result.normalization_rules_version == "1.0"
     assert result.coverage.requested_scope == {"tradeDate": "2026-08-01"}
@@ -67,6 +68,7 @@ def test_three_adapters_return_the_same_success_contract_shape(adapter) -> None:
     assert result.coverage.missing_scope == {}
     assert len(result.observations) == 1
     assert result.observations[0].value_text == "10.50"
+    assert result.observation_period["byObservation"]
     assert result.source_assertions[0].source_key == adapter.provider_key
     assert result.replay is not None
     assert result.replay.idempotency_key
@@ -84,6 +86,15 @@ def test_empty_is_a_non_retryable_terminal_result_without_fake_observation() -> 
     assert result.errors == ()
 
 
+def test_empty_without_cutoff_proof_is_invalid_instead_of_being_silently_accepted() -> None:
+    adapter = ScriptedHomepageProviderAdapter({"fixture": [AdapterPage(items=(), covered_scope={"tradeDate": "2026-08-01"})]})
+
+    result = adapter.fetch(_request())
+
+    assert result.result_status == ResultStatus.ERROR
+    assert result.errors[0].code == "EMPTY_RESULT_MISSING_CUTOFF"
+
+
 def test_partial_cutoff_is_degraded_and_exposes_missing_scope() -> None:
     adapter = ScriptedHomepageProviderAdapter({"fixture": [AdapterPage(items=(_record(),), actual_data_cutoff=DataCutoff("trade_date", "2026-07-31"))]})
 
@@ -92,6 +103,52 @@ def test_partial_cutoff_is_degraded_and_exposes_missing_scope() -> None:
     assert result.result_status == ResultStatus.DEGRADED
     assert result.quality_status == QualityStatus.DEGRADED
     assert result.missing_scope["dataCutoff"] == {"key": "trade_date", "value": "2026-08-01"}
+
+
+def test_business_date_is_used_as_cutoff_when_page_does_not_supply_one() -> None:
+    adapter = ScriptedHomepageProviderAdapter({"fixture": [AdapterPage(items=(_record(),))]})
+
+    result = adapter.fetch(_request())
+
+    assert result.result_status == ResultStatus.SUCCESS
+    assert result.actual_data_cutoff == DataCutoff("trade_date", "2026-08-01")
+
+
+def test_catalog_rows_without_a_single_value_are_retained_as_json_observations() -> None:
+    adapter = ScriptedHomepageProviderAdapter(
+        {
+            "fixture": [
+                AdapterPage(
+                    items=(
+                        {
+                            "sourceRecordKey": "stock-1",
+                            "subjectType": "stock",
+                            "subjectKey": "600001",
+                            "metricCatalogId": "stock_profile",
+                            "stockName": "测试公司",
+                            "industry": "软件",
+                            "tradeDate": "2026-08-01",
+                        },
+                    )
+                )
+            ]
+        }
+    )
+
+    result = adapter.fetch(_request())
+
+    assert result.result_status == ResultStatus.SUCCESS
+    assert result.observations[0].value_type == "json"
+    assert result.observations[0].value_json["stockName"] == "测试公司"
+
+
+def test_scripted_adapter_accepts_a_plain_record_list_as_one_page() -> None:
+    adapter = ScriptedHomepageProviderAdapter({"fixture": [_record(1), _record(2)]})
+
+    result = adapter.fetch(_request())
+
+    assert result.result_status == ResultStatus.SUCCESS
+    assert len(result.observations) == 2
 
 
 @pytest.mark.parametrize(
@@ -167,6 +224,7 @@ def test_idempotent_retry_returns_the_exact_same_result_and_conflicting_reuse_is
     assert replay.result_hash == first.result_hash
     assert conflicting.result_status == ResultStatus.ERROR
     assert conflicting.errors[0].error_class == "duplicate_response"
+    assert adapter.fetch(first_request) is first
 
 
 def test_replay_without_an_existing_result_is_explicitly_unavailable() -> None:
@@ -213,3 +271,35 @@ def test_result_json_round_trip_preserves_sources_authority_and_replay_hash() ->
     assert restored.authority.strategy_version == "authority-2"
     assert restored.replay is not None
     assert restored.replay.normalized_result_hash == result.result_hash
+
+
+def test_scripted_adapter_can_replay_a_prebuilt_versioned_result_without_reinterpreting_it() -> None:
+    source_adapter = ScriptedHomepageProviderAdapter({"fixture": [AdapterPage(items=(_record(),))]})
+    original = source_adapter.fetch(_request())
+    replay_adapter = ScriptedHomepageProviderAdapter({"fixture": [original]})
+
+    replayed = replay_adapter.fetch(_request())
+
+    assert replayed is original
+    assert replayed.source_assertions == original.source_assertions
+    assert replayed.result_hash == original.result_hash
+
+
+def test_result_and_quality_statuses_are_independent_contract_dimensions() -> None:
+    adapter = ScriptedHomepageProviderAdapter({"fixture": [AdapterPage(items=(_record(),))]})
+    result = adapter.fetch(_request())
+
+    # 通过序列化改写后仍应接受 success/degraded 组合。
+    payload = result.to_dict()
+    payload["qualityStatus"] = QualityStatus.DEGRADED.value
+    restored = type(result).from_dict(payload)
+
+    assert restored.result_status == ResultStatus.SUCCESS
+    assert restored.quality_status == QualityStatus.DEGRADED
+
+
+def test_normalized_result_hash_excludes_ingestion_clock_fields() -> None:
+    first = ScriptedHomepageProviderAdapter({"fixture": [_record()] }).fetch(_request(idempotency_key="one"))
+    second = ScriptedHomepageProviderAdapter({"fixture": [_record()] }).fetch(_request(idempotency_key="two"))
+
+    assert first.result_hash == second.result_hash

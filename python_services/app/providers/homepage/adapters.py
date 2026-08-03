@@ -98,14 +98,18 @@ class AdapterPage:
     upstream_as_of: datetime | None = None
     source_published_at: datetime | None = None
     terminal_error: ProviderError | None = None
+    prebuilt_result: HomepageDataItemResult | None = None
 
     @classmethod
     def from_value(cls, value: Any) -> "AdapterPage":
         if isinstance(value, cls):
             return value
+        if value is None:
+            raise ProviderAdapterException("Provider 未返回页面结果", error_class="invalid_response", retryability=Retryability.NON_RETRYABLE)
         if isinstance(value, HomepageDataItemResult):
             return cls(
-                items=value.observations,
+                prebuilt_result=value,
+                items=(),
                 covered_scope=value.covered_scope,
                 missing_scope=value.missing_scope,
                 actual_data_cutoff=value.actual_data_cutoff,
@@ -114,6 +118,9 @@ class AdapterPage:
                 terminal_error=value.errors[0] if value.errors else None,
             )
         if isinstance(value, Mapping):
+            page_keys = {"items", "records", "nextCursor", "next_cursor", "coveredScope", "covered_scope", "missingScope", "missing_scope", "actualDataCutoff", "actual_data_cutoff", "terminalError", "error"}
+            if not page_keys.intersection(value):
+                return cls(items=(value,))
             raw_items = value.get("items") or value.get("records") or value.get("data") or ()
             if isinstance(raw_items, Mapping):
                 raw_items = [raw_items]
@@ -250,8 +257,16 @@ def _observation_from_record(record: Mapping[str, Any], *, dataset_key: str, sou
         value = _first(record, "value", "amount", "close", "current", "content", "title")
     value_type = _text(_first(record, "valueType", "value_type") or ("decimal" if isinstance(value, (int, float, Decimal)) else "json"))
     missing_reason = _first(record, "missingReason", "missing_reason")
+    if value is None and value_json is None and not missing_reason:
+        # 目录/主体类数据没有单一数值，整个规范化字段集作为 JSON payload 保留。
+        value_json = dict(record)
+        value_type = "json"
     if value is not None and value_type in {"decimal", "number", "numeric"}:
         value = normalize_decimal(value)
+        value_type = "decimal"
+    elif value is None and value_json is not None and value_type in {"decimal", "number", "numeric"}:
+        value = normalize_decimal(value_json)
+        value_json = None
         value_type = "decimal"
     elif value is not None and not isinstance(value, str) and value_json is None:
         value_json = value
@@ -346,7 +361,6 @@ class HomepageProviderAdapter:
                 provider_version=self.provider_version,
                 normalization_rules_version=self.normalization_rules_version,
             )
-            self._result_cache[request.idempotency_key or ""] = (request.request_fingerprint or "", result)
             return result
 
         if request.replay_mode == ReplayMode.REPLAY:
@@ -362,7 +376,6 @@ class HomepageProviderAdapter:
                 provider_version=self.provider_version,
                 normalization_rules_version=self.normalization_rules_version,
             )
-            self._result_cache[request.idempotency_key or ""] = (request.request_fingerprint or "", result)
             return result
 
         if not self.supports_dataset(request.dataset_key):
@@ -411,6 +424,23 @@ class HomepageProviderAdapter:
                 errors.append(exc.to_error())
                 break
             pages.append(page)
+            if page.prebuilt_result is not None:
+                result = page.prebuilt_result
+                if result.dataset_key != request.dataset_key or result.provider_key != self.provider_key:
+                    result = HomepageDataItemResult.error_result(
+                        request=request,
+                        provider_key=self.provider_key,
+                        error=ProviderError(
+                            error_class="contract_incompatible",
+                            retryability=Retryability.NON_RETRYABLE,
+                            message="脚本结果的 datasetKey/providerKey 与请求不一致",
+                            code="PREBUILT_RESULT_IDENTITY_MISMATCH",
+                        ),
+                        provider_version=self.provider_version,
+                        normalization_rules_version=self.normalization_rules_version,
+                    )
+                self._result_cache[request.idempotency_key or ""] = (request.request_fingerprint or "", result)
+                return result
             if page.terminal_error:
                 errors.append(page.terminal_error)
                 break
@@ -487,8 +517,8 @@ class HomepageProviderAdapter:
                     content_hash=seen_assertions.get(source_record_key) or sha256_hash(record),
                     request_params_hash=sha256_hash(request.request_params),
                     provider_version=self.provider_version,
-                    upstream_as_of=_first_page_value(pages, "upstream_as_of"),
-                    source_published_at=_first_page_value(pages, "source_published_at"),
+                    upstream_as_of=_first_page_value(pages, "upstream_as_of") or _record_time(record, "upstreamAsOf", "upstream_as_of", "asOf", "as_of"),
+                    source_published_at=_first_page_value(pages, "source_published_at") or _record_time(record, "sourcePublishedAt", "source_published_at", "publishedAt", "published_at", "pub_time"),
                     fetched_at=datetime.now(UTC),
                 )
                 if assertion.assertion_key not in {current.assertion_key for current in assertions}:
@@ -496,7 +526,7 @@ class HomepageProviderAdapter:
 
         covered_scope = _merge_scope([page.covered_scope for page in pages], fallback=request.requested_scope if pagination_exhausted and not errors else {})
         missing_scope = _merge_scope([page.missing_scope for page in pages])
-        actual_cutoff = _latest_cutoff([page.actual_data_cutoff for page in pages])
+        actual_cutoff = _latest_cutoff([page.actual_data_cutoff for page in pages]) or _infer_cutoff(raw_items, request)
         target_reached = _cutoff_reached(actual_cutoff, request.target_data_cutoff)
         if not target_reached and request.target_data_cutoff is not None:
             missing_scope = {**missing_scope, "dataCutoff": request.target_data_cutoff.to_dict()}
@@ -507,6 +537,13 @@ class HomepageProviderAdapter:
             covered_scope=covered_scope,
             missing_scope=missing_scope,
         )
+        if not observations and not errors and actual_cutoff is None:
+            errors.append(ProviderError(
+                error_class="invalid_response",
+                retryability=Retryability.NON_RETRYABLE,
+                message="合法 empty 结果必须保留请求范围已覆盖证明和实际数据截止点",
+                code="EMPTY_RESULT_MISSING_CUTOFF",
+            ))
         if errors and not observations:
             result_status = ResultStatus.ERROR
             quality = QualityStatus.ISOLATED if all(item.error_class in {"unsupported_dataset", "contract_incompatible", "normalization_failed", "invalid_response", "replay_unavailable"} for item in errors) else QualityStatus.DEGRADED
@@ -534,6 +571,7 @@ class HomepageProviderAdapter:
         result = HomepageDataItemResult(
             dataset_key=request.dataset_key,
             provider_key=self.provider_key,
+            provider_version=self.provider_version,
             result_status=result_status,
             quality_status=quality,
             coverage=coverage,
@@ -545,8 +583,9 @@ class HomepageProviderAdapter:
             normalization_rules_version=self.normalization_rules_version,
             errors=tuple(errors),
             authority=authority,
-            upstream_as_of=_first_page_value(pages, "upstream_as_of"),
-            source_published_at=_first_page_value(pages, "source_published_at"),
+            observation_period=_collect_observation_period(observations),
+            upstream_as_of=_first_page_value(pages, "upstream_as_of") or _latest_assertion_time(assertions, "upstream_as_of"),
+            source_published_at=_first_page_value(pages, "source_published_at") or _latest_assertion_time(assertions, "source_published_at"),
             replay=replay,
         )
         self._result_cache[request.idempotency_key or ""] = (request.request_fingerprint or "", result)
@@ -583,7 +622,13 @@ class TushareHomepageProviderAdapter(HomepageProviderAdapter):
         loaders: dict[str, PageLoader] = {
             "market_snapshot": lambda request, _cursor: client.get_market_snapshot(_scope_date(request)),
             "stock_universe": lambda _request, _cursor: client.get_stock_universe(),
+            "stock_snapshot": lambda request, _cursor: client.get_stock_snapshot(str(request.requested_scope.get("stockCode") or request.requested_scope.get("stock_code") or "")),
+            "stock_batch": lambda request, _cursor: client.get_stock_batch([str(item) for item in request.requested_scope.get("stockCodes", request.requested_scope.get("stock_codes", ())) ]),
             "daily_bars": lambda request, _cursor: _bars_as_records(client.get_stock_bars(stock_code=str(request.requested_scope.get("stockCode") or request.requested_scope.get("stock_code") or ""), start_date=request.requested_scope.get("startDate") or request.requested_scope.get("start_date"), end_date=request.requested_scope.get("endDate") or request.requested_scope.get("end_date"), adjust=str(request.requested_scope.get("adjust") or "qfq"))),
+            "concept_catalog": lambda _request, _cursor: client.get_concept_catalog(),
+            "concept_constituents": lambda request, _cursor: client.get_concept_constituents(str(request.requested_scope.get("conceptName") or request.requested_scope.get("concept_name") or ""), request.requested_scope.get("conceptCode") or request.requested_scope.get("concept_code")),
+            "hot_concept_boards": lambda request, _cursor: client.get_hot_concept_boards(limit=request.page_size),
+            "market_heatmap": lambda request, _cursor: client.get_market_heatmap_snapshot(limit=request.page_size, prefer_intraday=bool(request.requested_scope.get("preferIntraday", request.requested_scope.get("prefer_intraday", False)))),
         }
         loaders.update(datasets or {})
         capabilities = {key: DatasetCapability(key, description=f"TuShare {key} 规范化数据集") for key in loaders}
@@ -648,7 +693,8 @@ class ScriptedHomepageProviderAdapter(HomepageProviderAdapter):
                 queue: list[Any] = [script]
             else:
                 try:
-                    queue = list(script)
+                    entries = list(script)
+                    queue = entries if entries and all(_looks_like_page(item) for item in entries) else [AdapterPage(items=tuple(entries))]
                 except TypeError:
                     queue = [script]
             self._scripts[key] = queue
@@ -689,6 +735,14 @@ def _capability(dataset_key: str, value: DatasetCapability | Mapping[str, Any] |
             supports_pagination=bool(value.get("supportsPagination", value.get("supports_pagination", True))),
         )
     return DatasetCapability(dataset_key=dataset_key, dataset_payload_version=str(value or "1.0"))
+
+
+def _looks_like_page(value: Any) -> bool:
+    if isinstance(value, (AdapterPage, HomepageDataItemResult, ProviderError, ProviderAdapterException)):
+        return True
+    if isinstance(value, Mapping):
+        return any(key in value for key in ("items", "records", "data", "nextCursor", "next_cursor", "terminalError", "error"))
+    return False
 
 
 def _compatible_major(requested: str, supported: str) -> bool:
@@ -756,6 +810,63 @@ def _latest_cutoff(values: Iterable[DataCutoff | None]) -> DataCutoff | None:
         if selected is None or (value.key == selected.key and value.value > selected.value):
             selected = value
     return selected
+
+
+def _infer_cutoff(items: Sequence[Any], request: HomepageDataItemRequest) -> DataCutoff | None:
+    """从记录的业务日期推导截止点，不把抓取时间冒充数据截止点。"""
+
+    candidates: list[tuple[str, str]] = []
+    preferred_key = request.target_data_cutoff.key if request.target_data_cutoff else None
+    for item in items:
+        try:
+            record = _mapping(item)
+        except ProviderAdapterException:
+            continue
+        period = record.get("observationPeriod") or record.get("observation_period")
+        if isinstance(period, Mapping):
+            record = {**period, **record}
+        for key in ("tradeDate", "trade_date", "date", "periodEnd", "period_end", "publishedAt", "published_at", "pub_time"):
+            value = record.get(key)
+            if value in (None, ""):
+                continue
+            text = str(value)
+            if preferred_key and _normalized_key(key) == _normalized_key(preferred_key):
+                candidates.append((preferred_key, text))
+                break
+            if preferred_key is None:
+                candidates.append(("published_at" if "published" in key or key == "pub_time" else "trade_date", text))
+                break
+    if not candidates:
+        return None
+    key = preferred_key or candidates[0][0]
+    values = [value for candidate_key, value in candidates if candidate_key == key]
+    return DataCutoff(key, max(values)) if values else None
+
+
+def _record_time(record: Mapping[str, Any], *keys: str) -> datetime | None:
+    for key in keys:
+        value = record.get(key)
+        if value not in (None, ""):
+            return _parse_datetime(value)
+    return None
+
+
+def _normalized_key(value: str) -> str:
+    return value.replace("_", "").lower()
+
+
+def _latest_assertion_time(assertions: Sequence[SourceAssertion], field_name: str) -> datetime | None:
+    values = [getattr(item, field_name) for item in assertions if getattr(item, field_name) is not None]
+    return max(values) if values else None
+
+
+def _collect_observation_period(observations: Sequence[NormalizedObservation]) -> Mapping[str, Any]:
+    periods = {
+        item.identity_key: item.observation_period
+        for item in observations
+        if item.observation_period
+    }
+    return {"byObservation": periods} if periods else {}
 
 
 def _cutoff_reached(actual: DataCutoff | None, target: DataCutoff | None) -> bool:
