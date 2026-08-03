@@ -48,6 +48,66 @@ function createToolGuard(maxToolCalls: number) {
   };
 }
 
+function parseIpv4(hostname: string) {
+  const parts = hostname.split(".");
+  if (parts.length !== 4) {
+    return null;
+  }
+  const octets = parts.map((part) => Number(part));
+  if (octets.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return null;
+  }
+  return octets;
+}
+
+function isPrivateHostname(hostname: string) {
+  const normalized = hostname.toLowerCase();
+  if (
+    normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized === "0.0.0.0" ||
+    normalized === "::1" ||
+    normalized.startsWith("127.") ||
+    normalized.startsWith("169.254.") ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd") ||
+    normalized.startsWith("fe80:")
+  ) {
+    return true;
+  }
+
+  const ipv4 = parseIpv4(normalized);
+  if (!ipv4) {
+    return false;
+  }
+  const first = ipv4[0]!;
+  const second = ipv4[1]!;
+  return (
+    first === 10 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168)
+  );
+}
+
+export function assertPublicHttpUrl(rawUrl: string) {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error("PUBLIC_WEB_URL_INVALID: 只能读取有效的公开 HTTP(S) URL");
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("PUBLIC_WEB_URL_SCHEME_FORBIDDEN: 只能读取 HTTP(S) URL");
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error("PUBLIC_WEB_URL_CREDENTIALS_FORBIDDEN: 公开网页读取不能携带凭据");
+  }
+  if (isPrivateHostname(parsed.hostname)) {
+    throw new Error("PUBLIC_WEB_URL_PRIVATE_FORBIDDEN: 不允许访问本机、内网或链路本地地址");
+  }
+}
+
 function withTimeout(signal: AbortSignal | undefined, timeoutMs: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -244,6 +304,7 @@ export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
       }),
       execute: async (_toolCallId, params, signal) => {
         const input = params as { url: string };
+        assertPublicHttpUrl(input.url);
         return callPython(
           "internal_web_fetch",
           "/api/v1/capabilities/web/fetch",

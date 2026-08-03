@@ -11,6 +11,7 @@ export type AgentRuntimeEventType =
   | "run.started"
   | "run.boundary.frozen"
   | "run.audit.recorded"
+  | "candidate_seed.queued"
   | "agent.message.start"
   | "agent.message.delta"
   | "agent.message"
