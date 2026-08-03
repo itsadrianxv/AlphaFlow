@@ -584,6 +584,7 @@ export class PiAdapter {
       userId: request.userId,
       maxToolCalls: this.config.maxToolCallsPerRun,
       toolTimeoutMs: this.config.toolTimeoutMs,
+      networkPolicy: request.networkPolicy,
       capabilityConstraints: request.capabilityConstraints,
     });
     const setupTools = request.conversationId

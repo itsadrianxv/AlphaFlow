@@ -11,7 +11,22 @@ type ToolFactoryOptions = {
   userId: string;
   maxToolCalls: number;
   toolTimeoutMs: number;
+  networkPolicy?: AgentNetworkPolicy;
   capabilityConstraints?: Record<string, unknown>;
+};
+
+export type AgentNetworkPolicy = {
+  allowPublicHttp?: boolean;
+  allowPrivateNetwork?: boolean;
+  allowCredentialedUrls?: boolean;
+  allowedSchemes?: string[];
+};
+
+const DEFAULT_NETWORK_POLICY: Required<AgentNetworkPolicy> = {
+  allowPublicHttp: true,
+  allowPrivateNetwork: false,
+  allowCredentialedUrls: false,
+  allowedSchemes: ["http:", "https:"],
 };
 
 export const STANDARD_INTERNAL_TOOL_NAMES = [
@@ -61,6 +76,71 @@ function withTimeout(signal: AbortSignal | undefined, timeoutMs: number) {
       signal?.removeEventListener("abort", abort);
     },
   };
+}
+
+function normalizeNetworkPolicy(policy?: AgentNetworkPolicy): Required<AgentNetworkPolicy> {
+  return {
+    ...DEFAULT_NETWORK_POLICY,
+    ...policy,
+    allowedSchemes: policy?.allowedSchemes ?? DEFAULT_NETWORK_POLICY.allowedSchemes,
+  };
+}
+
+function isPrivateHostname(hostname: string) {
+  const normalized = hostname.toLowerCase();
+  if (normalized === "localhost" || normalized.endsWith(".localhost")) {
+    return true;
+  }
+  if (normalized === "0.0.0.0" || normalized === "::" || normalized === "::1") {
+    return true;
+  }
+
+  const ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const octets = ipv4.slice(1).map(Number);
+    if (octets.some((octet) => octet < 0 || octet > 255)) {
+      return true;
+    }
+    const a = octets[0] ?? -1;
+    const b = octets[1] ?? -1;
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+    );
+  }
+
+  return (
+    normalized.startsWith("[fc") ||
+    normalized.startsWith("[fd") ||
+    normalized.startsWith("[fe80") ||
+    normalized === "[::1]"
+  );
+}
+
+function assertNetworkAllowed(rawUrl: string, policy: AgentNetworkPolicy | undefined) {
+  const normalizedPolicy = normalizeNetworkPolicy(policy);
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error(`NETWORK_POLICY_BLOCKED: URL 无法解析: ${rawUrl}`);
+  }
+
+  if (!normalizedPolicy.allowedSchemes.includes(url.protocol)) {
+    throw new Error(`NETWORK_POLICY_BLOCKED: 不允许的 URL scheme: ${url.protocol}`);
+  }
+  if (!normalizedPolicy.allowPublicHttp) {
+    throw new Error("NETWORK_POLICY_BLOCKED: 当前执行边界未授权公开网页访问");
+  }
+  if (!normalizedPolicy.allowCredentialedUrls && (url.username || url.password)) {
+    throw new Error("NETWORK_POLICY_BLOCKED: URL 不得包含凭据");
+  }
+  if (!normalizedPolicy.allowPrivateNetwork && isPrivateHostname(url.hostname)) {
+    throw new Error("NETWORK_POLICY_BLOCKED: 不得访问本机或私网地址");
+  }
 }
 
 export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
@@ -244,6 +324,7 @@ export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
       }),
       execute: async (_toolCallId, params, signal) => {
         const input = params as { url: string };
+        assertNetworkAllowed(input.url, options.networkPolicy);
         return callPython(
           "internal_web_fetch",
           "/api/v1/capabilities/web/fetch",
