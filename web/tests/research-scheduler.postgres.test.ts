@@ -251,4 +251,40 @@ describePostgres("研究调度 PostgreSQL 契约", () => {
     });
     expect((await value.getCircuit(poolId))?.state).toBe("CLOSED");
   });
+
+  it("取消任务需要当前 fencing token", async () => {
+    const { poolId, value } = await scheduler(1);
+    const task = await enqueue(value, poolId, key("cancel"));
+    const claimed = await value.claim(poolId, "worker-a");
+    await expect(
+      value.cancel(task.id, claimed!.task.fencingToken - 1n),
+    ).rejects.toBeInstanceOf(LeaseLostError);
+    const cancelled = await value.cancel(
+      task.id,
+      claimed!.task.fencingToken,
+      "user_cancelled",
+    );
+    expect(cancelled.status).toBe("CANCELLED");
+    expect(cancelled.terminalReason).toBe("user_cancelled");
+  });
+
+  it("普通成功结算不会绕过已打开的熔断冷却", async () => {
+    const { poolId, value } = await scheduler(1);
+    const task = await enqueue(value, poolId, key("circuit-success"));
+    const claimed = await value.claim(poolId, "worker-a");
+    await value.recordOutcome(poolId, { kind: "RATE_LIMITED" });
+    const opened = await value.getCircuit(poolId);
+    await value.recordOutcome(poolId, { kind: "SUCCESS" });
+    const stillOpen = await value.getCircuit(poolId);
+    expect(stillOpen?.state).toBe("OPEN");
+    expect(stillOpen?.retryAfter).toEqual(opened?.retryAfter);
+    await value.settle(task.id, claimed!.task.fencingToken, {
+      disposition: "COMPLETED",
+      resultContractVersion: "1.0",
+      result: {},
+    });
+    const circuit = await value.getCircuit(poolId);
+    expect(circuit?.state).toBe("OPEN");
+    expect(circuit?.retryAfter).not.toBeNull();
+  });
 });

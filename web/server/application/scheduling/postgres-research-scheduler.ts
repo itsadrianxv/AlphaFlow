@@ -198,8 +198,8 @@ function queryTask(
 }
 
 /**
- * PostgreSQL adapter for the scheduling module. Every mutating operation uses
- * one transaction and keeps PostgreSQL as the source of task/permit truth.
+ * 调度模块的 PostgreSQL adapter。每个变更操作使用单个事务，并以 PostgreSQL
+ * 作为任务和资源许可事实的权威来源。
  */
 export class PostgresResearchScheduler {
   private readonly now: () => Date;
@@ -757,14 +757,26 @@ export class PostgresResearchScheduler {
       if (status === "SUCCEEDED") {
         await tx.$executeRaw(Prisma.sql`
           UPDATE "ResearchCircuitBreaker"
-             SET "state" = CASE WHEN "state" = 'HALF_OPEN' THEN 'CLOSED' ELSE "state" END,
-                 "halfOpenProbeTaskId" = NULL, "consecutiveFailures" = 0,
+             SET "state" = 'CLOSED', "halfOpenProbeTaskId" = NULL,
+                 "consecutiveFailures" = 0,
                  "windowAttempts" = 0, "windowFailures" = 0, "retryAfter" = NULL,
                  "version" = "version" + 1, "updatedAt" = ${now}
-           WHERE "resourcePoolId" = ${task.resourcePoolId}
+           WHERE "resourcePoolId" = ${task.resourcePoolId} AND "state" = 'HALF_OPEN'
         `);
       }
       return taskFromRow(updated[0]);
+    });
+  }
+
+  async cancel(
+    taskId: string,
+    fencingToken: bigint,
+    reason = "cancelled",
+  ): Promise<ResearchTask> {
+    return this.settle(taskId, fencingToken, {
+      disposition: "CANCELLED",
+      errorClass: "TASK_CANCELLED",
+      terminalReason: reason,
     });
   }
 
@@ -847,7 +859,9 @@ export class PostgresResearchScheduler {
                "consecutiveFailures" = ${nextConsecutive}, "windowAttempts" = ${nextAttempts},
                "windowFailures" = ${nextFailures},
                "openCount" = CASE WHEN ${shouldOpen} THEN "openCount" + 1 ELSE "openCount" END,
-               "retryAfter" = CASE WHEN ${shouldOpen} THEN ${new Date(now.getTime() + delay)} ELSE NULL END,
+               "retryAfter" = CASE WHEN ${shouldOpen} THEN ${new Date(now.getTime() + delay)}
+                                    WHEN "state" = 'OPEN' THEN "retryAfter"
+                                    ELSE NULL END,
                "halfOpenProbeTaskId" = NULL,
                "version" = "version" + 1, "updatedAt" = ${now}
          WHERE "resourcePoolId" = ${poolId}
@@ -866,7 +880,8 @@ export class PostgresResearchScheduler {
     const now = this.now();
     return this.db.$transaction(async (tx) => {
       const circuits = await this.ensureCircuit(tx, poolId, now);
-      if (!circuits[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
+      if (!circuits[0])
+        throw new SchedulingInvariantError("资源池熔断器不存在");
       const rows = await tx.$queryRaw<CircuitRow[]>(Prisma.sql`
         UPDATE "ResearchCircuitBreaker" SET "state" = 'CONFIG_BLOCKED', "blockedReason" = ${reason},
                "retryAfter" = NULL, "halfOpenProbeTaskId" = NULL, "version" = "version" + 1,
@@ -884,7 +899,8 @@ export class PostgresResearchScheduler {
     const now = this.now();
     return this.db.$transaction(async (tx) => {
       const circuits = await this.ensureCircuit(tx, poolId, now);
-      if (!circuits[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
+      if (!circuits[0])
+        throw new SchedulingInvariantError("资源池熔断器不存在");
       const rows = await tx.$queryRaw<CircuitRow[]>(Prisma.sql`
         UPDATE "ResearchCircuitBreaker"
            SET "state" = 'CLOSED', "blockedReason" = NULL, "retryAfter" = NULL,

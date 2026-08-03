@@ -320,7 +320,7 @@ class TypedLifecycleWorker final : public Worker {
   std::condition_variable stop_changed_;
 };
 
-}  // namespace detail
+}  // 命名空间 detail
 
 template <typename Input, typename Result, typename Repository, typename Executor>
 std::unique_ptr<Worker> make_worker(WorkerConfig config, Repository repository, Executor executor) {
@@ -328,4 +328,4 @@ std::unique_ptr<Worker> make_worker(WorkerConfig config, Repository repository, 
       std::move(config), std::move(repository), std::move(executor));
 }
 
-}  // namespace task_lifecycle
+}  // 命名空间 task_lifecycle

@@ -115,8 +115,8 @@ function hashResult(result: unknown): string {
 }
 
 /**
- * PostgreSQL-compatible scheduling semantics used by application tests and
- * by adapters that need deterministic decisions before opening a transaction.
+ * 与 PostgreSQL 兼容的调度语义，供 application 测试以及需要在开启事务前
+ * 做确定性决策的 adapter 使用。
  */
 export class ResearchScheduler {
   private readonly clock: SchedulerClock;

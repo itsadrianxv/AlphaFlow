@@ -1,6 +1,6 @@
--- F02: keep scheduler runtime facts authoritative in PostgreSQL.
--- Task identity remains immutable after admission; runtime state is changed by
--- the claim/renew/settle adapters using fencing predicates.
+-- F02：让调度运行时事实以 PostgreSQL 为权威来源。
+-- 任务身份在准入后保持不可变；运行时状态由带 fencing 谓词的
+-- claim/renew/settle adapter 修改。
 
 ALTER TABLE "ResearchResourcePool"
   ADD COLUMN IF NOT EXISTS "healthySince" TIMESTAMPTZ(3),

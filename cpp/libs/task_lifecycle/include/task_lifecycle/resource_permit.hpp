@@ -23,8 +23,8 @@ struct ResourcePermitLease {
 };
 
 /**
- * Short-lived global permit seam. Implementations persist leases in the
- * authoritative store; the worker only coordinates acquire/renew/release.
+ * 短期全局资源许可接口。实现负责将租约持久化到权威存储，Worker
+ * 只协调获取、续租和释放。
  */
 class ResourcePermitProvider {
  public:
@@ -36,4 +36,4 @@ class ResourcePermitProvider {
   virtual void release(const ResourcePermitLease& permit, std::string_view reason) = 0;
 };
 
-}  // namespace task_lifecycle
+}  // 命名空间 task_lifecycle
