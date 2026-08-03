@@ -9,6 +9,8 @@ export type AgentRunStatus =
 export type AgentRuntimeEventType =
   | "run.created"
   | "run.started"
+  | "run.boundary.frozen"
+  | "run.audit.recorded"
   | "agent.message.start"
   | "agent.message.delta"
   | "agent.message"
@@ -57,6 +59,7 @@ export type StartRunRequest = {
   sessionSeed?: AgentRuntimeSeedMessage[];
   allowedCapabilities?: string[];
   capabilityConstraints?: Record<string, unknown>;
+  executionBoundary?: Record<string, unknown>;
 };
 
 export type ScheduledTaskRunRequest = {
@@ -100,8 +103,10 @@ export type AgentRunSnapshot = {
     prompt: string;
     skillIds?: string[];
     context?: Record<string, unknown>;
+    executionBoundary?: Record<string, unknown>;
   };
   finalOutput?: Record<string, unknown>;
+  audit?: Record<string, unknown>;
   errorCode?: string;
   errorMessage?: string;
   createdAt: string;

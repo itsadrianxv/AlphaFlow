@@ -1,8 +1,8 @@
 import {
+  RunCancelledError,
   WORKFLOW_ERROR_CODES,
   WorkflowDomainError,
   WorkflowPauseError,
-  RunCancelledError,
 } from "~/server/domain/workflow/errors";
 import type {
   PiAgentRunGraphState,
@@ -33,7 +33,11 @@ function isTerminalRuntimeEvent(type: string) {
 }
 
 function parseUserInputRequest(payload: Record<string, unknown> | undefined) {
-  if (!payload || typeof payload.question !== "string" || !payload.question.trim()) {
+  if (
+    !payload ||
+    typeof payload.question !== "string" ||
+    !payload.question.trim()
+  ) {
     return undefined;
   }
 
@@ -243,6 +247,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
       conversationId: state.agentInput.conversationId,
       userMessageId: state.agentInput.userMessageId,
       assistantMessageId: state.agentInput.assistantMessageId,
+      executionBoundary: state.agentInput.executionBoundary,
     };
     const nextState: PiAgentRunGraphState = {
       ...state,
@@ -285,6 +290,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
         prompt: task.prompt,
         title: task.title,
         context: state.agentInput.context,
+        executionBoundary: task.executionBoundary,
         sessionSeed: task.conversationId
           ? await this.deps.agentConversationRepository?.getSeedMessages(
               task.conversationId,
@@ -315,7 +321,6 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
     }
     let runtimeEvents = [...state.runtimeEvents];
     let toolCallCount = state.toolCallCount;
-    let terminalEventType: string | undefined;
     let waitingForInput = state.waitingForInput;
 
     try {
@@ -369,7 +374,8 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
         });
 
         if (event.type === "run.waiting_for_input") {
-          const request = parseUserInputRequest(event.payload) ?? waitingForInput;
+          const request =
+            parseUserInputRequest(event.payload) ?? waitingForInput;
           if (request) {
             throw new WorkflowPauseError(
               "Pi agent 正在等待用户补充信息",
@@ -385,7 +391,6 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
         }
 
         if (isTerminalRuntimeEvent(event.type)) {
-          terminalEventType = event.type;
           break;
         }
       }
