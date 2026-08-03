@@ -32,6 +32,7 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
   private readonly snapshots = new Map<string, ResearchPreferenceSnapshot>();
   private readonly removedLevels = new Map<string, "REGULAR" | "FOCUS">();
   private readonly commands = new Map<string, string>();
+  private readonly clearedTargets = new Set<string>();
 
   async getCurrent(userId: string) {
     return structuredClone(this.states.get(userId) ?? emptyState(userId));
@@ -87,7 +88,11 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
     }
     if (command.type === "RESTORE") {
       // The in-memory adapter models the same observable restore contract as PostgreSQL.
-      if (!next.items.some((item) => item.targetType === command.target.targetType && item.targetKey === command.target.targetKey)) {
+      const targetKey = `${userId}:${command.target.targetType}:${command.target.targetKey}`;
+      if (
+        !this.clearedTargets.has(targetKey) &&
+        !next.items.some((item) => item.targetType === command.target.targetType && item.targetKey === command.target.targetKey)
+      ) {
         next.items.push({
           ...command.target,
           level:
@@ -100,8 +105,26 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
     if (command.type === "SET_ENABLED") next.enabled = command.enabled;
     if (command.type === "SET_CHANNELS") Object.assign(next, command.channels);
     if (command.type === "CLEAR") {
+      for (const item of next.items) {
+        this.clearedTargets.add(
+          `${userId}:${item.targetType}:${item.targetKey}`,
+        );
+      }
+      for (const key of this.removedLevels.keys()) {
+        if (key.startsWith(`${userId}:`)) this.clearedTargets.add(key);
+      }
       next.items = [];
       next.enabled = false;
+      for (const [key, snapshot] of this.snapshots) {
+        if (snapshot.userId !== userId) continue;
+        snapshot.userId = "";
+        snapshot.items = [];
+        snapshot.personalDataDeletedAt = new Date();
+        this.snapshots.set(key, snapshot);
+      }
+      for (const key of this.removedLevels.keys()) {
+        if (key.startsWith(`${userId}:`)) this.removedLevels.delete(key);
+      }
     }
     next.items = sortItems(next.items);
     this.states.set(userId, next);
@@ -112,7 +135,9 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
   async createOrGetSnapshot(userId: string, input: ResearchPreferenceSnapshotInput, contentHash: string, frozenAt: Date) {
     const key = `${userId}:${contentHash}`;
     const existing = this.snapshots.get(key);
-    if (existing) return structuredClone(existing);
+    if (existing && existing.userId === userId && !existing.personalDataDeletedAt) {
+      return structuredClone(existing);
+    }
     const snapshot: ResearchPreferenceSnapshot = {
       id: randomUUID(),
       userId,
@@ -145,6 +170,15 @@ class MemoryResearchPreferenceRepository implements ResearchPreferenceRepository
       this.snapshots.set(key, snapshot);
     }
     this.states.delete(userId);
+    for (const [commandId, commandUserId] of this.commands) {
+      if (commandUserId === userId) this.commands.delete(commandId);
+    }
+    for (const key of this.removedLevels.keys()) {
+      if (key.startsWith(`${userId}:`)) this.removedLevels.delete(key);
+    }
+    for (const key of this.clearedTargets) {
+      if (key.startsWith(`${userId}:`)) this.clearedTargets.delete(key);
+    }
   }
 }
 
@@ -232,7 +266,7 @@ describe("显式研究关注与冻结偏好", () => {
     ]);
   });
 
-  it("清除只影响未来冻结，旧快照仍可验证但隐私删除后不可访问", async () => {
+  it("清除删除当前关注与可删除快照，隐私删除后历史输入不可访问", async () => {
     const repository = new MemoryResearchPreferenceRepository();
     const service = new ResearchPreferenceService(repository);
     await service.add("user-1", {
@@ -245,7 +279,12 @@ describe("显式研究关注与冻结偏好", () => {
     expect(cleared.items).toEqual([]);
     const emptySnapshot = await service.freeze("user-1");
     expect(emptySnapshot.items).toEqual([]);
-    expect((await repository.getSnapshotForUser("user-1", oldSnapshot.id))?.items).toHaveLength(1);
+    expect(await repository.getSnapshotForUser("user-1", oldSnapshot.id)).toBeNull();
+    const attemptedRestore = await service.restore("user-1", {
+      commandId: "restore-after-clear-1",
+      target: { targetType: "COMPANY", targetKey: "000001.SZ" },
+    });
+    expect(attemptedRestore.items).toEqual([]);
     await service.deletePersonalData("user-1");
     expect(await repository.getSnapshotForUser("user-1", oldSnapshot.id)).toBeNull();
   });

@@ -1,14 +1,15 @@
 import { agentRuntimeRouter } from "~/server/api/routers/agent-runtime";
+import { collectionRouter } from "~/server/api/routers/collection";
 import { companyOverviewRouter } from "~/server/api/routers/company-overview";
 import { evidenceContextRouter } from "~/server/api/routers/evidence-context";
 import { heatmapRouter } from "~/server/api/routers/heatmap";
 import { homepageRouter } from "~/server/api/routers/homepage";
 import { intelligenceRouter } from "~/server/api/routers/intelligence";
 import { marketContextRouter } from "~/server/api/routers/market-context";
-import { collectionRouter } from "~/server/api/routers/collection";
 import { mindMapRouter } from "~/server/api/routers/mind-map";
 import { overviewInsightsRouter } from "~/server/api/routers/overview-insights";
 import { postRouter } from "~/server/api/routers/post";
+import { researchPreferenceRouter } from "~/server/api/routers/research-preference";
 import { researchTargetRouter } from "~/server/api/routers/research-target";
 import { researchPreferenceRouter } from "~/server/api/routers/research-preference";
 import { scheduledTaskRouter } from "~/server/api/routers/scheduled-task";
