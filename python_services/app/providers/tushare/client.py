@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import UTC, date, datetime, timedelta
 import hashlib
+import json
 import re
 from typing import Any
 
@@ -306,6 +307,81 @@ class TushareProviderClient:
             "dataQuality": evidence["dataQuality"],
             "warnings": evidence["warnings"],
         }
+
+    def get_market_money_flow(self, target_date: str | None) -> list[dict[str, Any]]:
+        return self._homepage_records(
+            [("moneyflow_mkt_dc", {"trade_date": _compact_date(target_date)})],
+            target_date=target_date,
+        )
+
+    def get_company_actions(self, target_date: str | None) -> list[dict[str, Any]]:
+        compact = _compact_date(target_date)
+        return self._homepage_records(
+            [
+                ("repurchase", {"ann_date": compact}),
+                ("express", {"ann_date": compact}),
+            ],
+            target_date=target_date,
+        )
+
+    def get_expectation_changes(self, target_date: str | None) -> list[dict[str, Any]]:
+        compact = _compact_date(target_date)
+        return self._homepage_records(
+            [
+                ("report_rc", {"report_date": compact}),
+                ("forecast", {"ann_date": compact}),
+            ],
+            target_date=target_date,
+        )
+
+    def get_event_calendar(self, target_date: str | None) -> list[dict[str, Any]]:
+        compact = _compact_date(target_date)
+        return self._homepage_records(
+            [
+                ("disclosure_date", {"ann_date": compact}),
+                ("share_float", {"ann_date": compact}),
+                ("dividend", {"ann_date": compact}),
+            ],
+            target_date=target_date,
+        )
+
+    def _homepage_records(
+        self,
+        requests: list[tuple[str, dict[str, str]]],
+        *,
+        target_date: str | None,
+    ) -> list[dict[str, Any]]:
+        records: list[dict[str, Any]] = []
+        for dataset, params in requests:
+            frame = self._raw_frame(
+                dataset,
+                **{key: value for key, value in params.items() if value},
+            )
+            for _, row in frame.iterrows():
+                raw = {
+                    str(key): _json_safe(value)
+                    for key, value in row.to_dict().items()
+                }
+                subject_key = str(raw.get("ts_code") or raw.get("index_code") or "CN-A")
+                business_date = _format_ymd(
+                    raw.get("trade_date")
+                    or raw.get("report_date")
+                    or raw.get("ann_date")
+                    or target_date
+                )
+                identity_payload = json.dumps(raw, ensure_ascii=False, sort_keys=True)
+                records.append(
+                    {
+                        **raw,
+                        "sourceRecordKey": f"{dataset}:{hashlib.sha256(identity_payload.encode('utf-8')).hexdigest()}",
+                        "subjectType": "stock" if raw.get("ts_code") else "market",
+                        "subjectKey": subject_key,
+                        "metricCatalogId": dataset,
+                        "tradeDate": business_date,
+                        "observationPeriod": {"tradeDate": business_date},
+                    }
+                )
+        return records
 
     def get_concept_catalog(self) -> list[dict]:
         frame = self._raw_frame("ths_index", exchange="A", type="N")
@@ -981,6 +1057,23 @@ def _format_ymd(value: Any) -> str:
     if len(text) == 8 and text.isdigit():
         return f"{text[:4]}-{text[4:6]}-{text[6:8]}"
     return text
+
+
+def _compact_date(value: str | None) -> str:
+    return str(value or "").replace("-", "").strip()
+
+
+def _json_safe(value: Any) -> Any:
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if hasattr(value, "item") and callable(value.item):
+        return value.item()
+    return value
 
 
 def _infer_sw_level(index_code: Any) -> str:

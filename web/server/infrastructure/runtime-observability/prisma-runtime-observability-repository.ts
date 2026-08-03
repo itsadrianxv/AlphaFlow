@@ -53,6 +53,7 @@ type ObservationRow = {
   deliveryStatus: string | null;
   deliveryAttempt: number | null;
   errorClass: string | null;
+  observationContextJson: unknown | null;
   recordedAt: Date;
 };
 
@@ -104,7 +105,7 @@ const observationColumns = Prisma.sql`
   "permitState", "permitWaitMs", "permitHeldMs", "circuitState", "usageRequests",
   "previousConcurrency", "currentConcurrency", "hardConcurrency", "adaptiveReason", "cooldownUntil",
   "usageInputTokens", "usageOutputTokens", "usageCostMicros", "deliveryChannel",
-  "deliveryStatus", "deliveryAttempt", "errorClass", "recordedAt"
+  "deliveryStatus", "deliveryAttempt", "errorClass", "observationContextJson", "recordedAt"
 `;
 
 const breachColumns = Prisma.sql`
@@ -148,7 +149,7 @@ export class PrismaRuntimeObservabilityRepository
         "previousConcurrency", "currentConcurrency", "hardConcurrency", "adaptiveReason", "cooldownUntil",
         "usageRequests",
         "usageInputTokens", "usageOutputTokens", "usageCostMicros", "deliveryChannel",
-        "deliveryStatus", "deliveryAttempt", "errorClass", "recordedAt", "createdAt"
+        "deliveryStatus", "deliveryAttempt", "errorClass", "observationContextJson", "recordedAt", "createdAt"
       ) VALUES (
         ${observation.id}, ${observation.idempotencyKey}, ${observation.metricKind},
         ${observation.dimension.source}, ${observation.dimension.dataset},
@@ -168,6 +169,7 @@ export class PrismaRuntimeObservabilityRepository
         ${observation.usage.inputTokens}, ${observation.usage.outputTokens}, ${observation.usage.costMicros},
         ${observation.delivery?.channel ?? null}, ${observation.delivery?.status ?? null},
         ${observation.delivery?.attempt ?? null}, ${observation.errorClass},
+        CAST(${observation.context ? JSON.stringify(observation.context) : null} AS JSONB),
         ${observation.recordedAt}, CURRENT_TIMESTAMP
       ) ON CONFLICT ("idempotencyKey") DO NOTHING
     `);
@@ -275,6 +277,31 @@ export class PrismaRuntimeObservabilityRepository
     `);
     return rows.map(mapReleaseEvaluation);
   }
+
+  async listAuthoritativeRuntimeBreachKeys() {
+    const [breaches, failedStages] = await Promise.all([
+      this.db.$queryRaw<Array<{ id: string; kind: string }>>(Prisma.sql`
+        SELECT "id", "kind"
+          FROM "ResearchRuntimeBreach"
+         ORDER BY "occurredAt" ASC, "id" ASC
+      `),
+      this.db.$queryRaw<
+        Array<{ id: string; stage: string | null; errorClass: string | null }>
+      >(Prisma.sql`
+        SELECT "id", "stage", "errorClass"
+          FROM "ResearchRuntimeObservation"
+         WHERE "success" = FALSE OR "degraded" = TRUE
+         ORDER BY "recordedAt" ASC, "id" ASC
+      `),
+    ]);
+    return [
+      ...breaches.map((item) => `${item.kind}:${item.id}`),
+      ...failedStages.map(
+        (item) =>
+          `STAGE:${item.stage ?? "unknown"}:${item.errorClass ?? "DEGRADED"}:${item.id}`,
+      ),
+    ];
+  }
 }
 
 function mapObservation(row: ObservationRow): RuntimeObservation {
@@ -355,6 +382,7 @@ function mapObservation(row: ObservationRow): RuntimeObservation {
         }
       : null,
     errorClass: row.errorClass,
+    context: row.observationContextJson as RuntimeObservation["context"],
     recordedAt: row.recordedAt,
   };
 }

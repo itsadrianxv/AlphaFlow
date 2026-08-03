@@ -97,4 +97,32 @@ export class WebInternalClient {
     if (!response.ok) throw new Error(`Scheduled task result persistence failed: ${response.status}`);
     return response.json();
   }
+
+  async enqueueResearchCandidateSeed(body: Record<string, unknown>) {
+    if (!this.apiSecret) throw new Error("缺少 ALPHAFLOW_INTERNAL_API_SECRET");
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(
+          `${this.baseUrl}/api/internal/research-production/candidate-seeds`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Alphaflow-Internal-Secret": this.apiSecret,
+            },
+            body: JSON.stringify(body),
+          },
+        );
+        if (response.ok) return response.json() as Promise<unknown>;
+        const detail = await response.text().catch(() => "");
+        throw new Error(
+          `Candidate seed enqueue failed: ${response.status}${detail ? ` - ${detail}` : ""}`,
+        );
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  }
 }

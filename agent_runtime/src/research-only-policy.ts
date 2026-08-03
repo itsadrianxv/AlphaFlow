@@ -138,6 +138,7 @@ export function buildImmediateResearchCandidateSeeds(params: {
     };
     return {
       kind: "immediate_research_candidate_seed",
+      contractVersion: "research-candidate-seed.v1",
       seedKey: hashSeed(seedInput),
       source: "post_response_async",
       idempotencyKey: hashSeed({
@@ -145,6 +146,19 @@ export function buildImmediateResearchCandidateSeeds(params: {
         toolName: summary.toolName,
         inputSummary: summary.inputSummary,
       }),
+      triggerSource: "IMMEDIATE_RESEARCH",
+      runId: params.runId,
+      scope: "IMMEDIATE_RESEARCH",
+      subject: { type: "RESEARCH_RUN", key: params.runId },
+      question: "依据本次公开材料执行 research_only 研究事件候选分析",
+      outputMode: "research_only",
+      sourceReferences: [
+        {
+          sourceType: "PUBLIC_WEB",
+          sourceKey: summarizeValue(summary.inputSummary, 500),
+          summary: seedInput.outputSummary,
+        },
+      ],
       materialSummary: seedInput.outputSummary,
       writesSynchronously: false,
       targetStores: ["candidate_seed_queue"],

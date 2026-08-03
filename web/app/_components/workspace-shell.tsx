@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, ShieldCheck } from "lucide-react";
+import { Inbox, Radar, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, {
@@ -47,6 +47,7 @@ export type WorkspaceSection =
   | "watchlists"
   | "companyResearch"
   | "researchInbox"
+  | "researchRadar"
   | "researchTargets"
   | "mindMaps"
   | "scheduledTasks"
@@ -110,6 +111,12 @@ const sidebarNavItems: Array<{
     href: "/research-inbox",
     label: "研究收件箱",
     icon: Inbox,
+  },
+  {
+    key: "researchRadar",
+    href: "/research-radar",
+    label: "研究雷达",
+    icon: Radar,
   },
   {
     key: "researchTargets",

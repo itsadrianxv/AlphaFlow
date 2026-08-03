@@ -39,7 +39,7 @@ const char* update_gate_sql() {
     ),
     projected AS (
       SELECT CASE
-        WHEN EXISTS (SELECT 1 FROM states WHERE required AND "settlementStatus" IS NULL) THEN 'PENDING'
+        WHEN EXISTS (SELECT 1 FROM states WHERE "settlementStatus" IS NULL) THEN 'PENDING'
         WHEN EXISTS (
           SELECT 1 FROM states
           WHERE required AND NOT (
@@ -147,11 +147,38 @@ void AcquisitionRepository::settle(const AcquisitionTask& task, AcquisitionSettl
     const auto updated = transaction.exec_params(
         R"SQL(UPDATE "HomepageDataManifestItemAttempt"
                SET status='RETRY_WAIT', "nextAttemptAt"=NOW()+($4 * INTERVAL '1 second'),
+                   "eventPublishedAt"=NULL,
                    "errorClass"=$3, retryability='RETRYABLE', "workerId"=NULL,
                    "leaseExpiresAt"=NULL, "updatedAt"=NOW()
                WHERE id=$1 AND "fencingToken"=$2 AND "workerId"=$5 AND status='RUNNING')SQL",
         task.message.run_id, task.fencing_token, failure.code, settlement.retry_delay.count(), config_.worker_id);
     if (updated.affected_rows() != 1) throw task_lifecycle::LeaseLost("写入采集重试状态时 lease 已失效");
+    transaction.exec_params(
+        R"SQL(
+          INSERT INTO "ResearchRuntimeObservation" (
+            id, "idempotencyKey", "metricKind", "sourceKey", "datasetKey", stage,
+            "resourcePoolKey", "productClockAt", "readyAt", success, degraded,
+            "errorClass", "observationContextJson"
+          )
+          VALUES (
+            'runtime:' || md5($1 || ':' || $2::text || ':retry'),
+            'acquisition-attempt:' || $1 || ':' || $2::text || ':retry',
+            'DATA', $3, $4, 'acquisition', $3, NOW(), NOW(), false, true, $5,
+            jsonb_build_object(
+              'taskId', $1,
+              'taskType', 'homepage-data-acquisition',
+              'inputContractVersion', $6,
+              'inputHash', $7,
+              'authoritativeObjectIds', jsonb_build_array($1),
+              'retryAttempt', $8,
+              'fencingToken', $2::text,
+              'degradedReason', $5
+            )
+          )
+          ON CONFLICT ("idempotencyKey") DO NOTHING
+        )SQL",
+        task.message.run_id, task.fencing_token, task.input.provider_key, task.input.dataset_key,
+        failure.code, task.input.provider_contract_version, task.input.request_fingerprint, task.attempt);
     transaction.commit();
     return;
   }
@@ -317,12 +344,14 @@ void AcquisitionRepository::settle(const AcquisitionTask& task, AcquisitionSettl
             FROM current_state
             ON CONFLICT ("revisionDedupKey") DO NOTHING
             RETURNING id, "observationId"
-          ),
-          all_revisions AS (
-            SELECT r.id, r."observationId"
-            FROM "DataObservationRevision" r
-            JOIN prepared p ON p.revision_dedup_key = r."revisionDedupKey"
-          )
+           ),
+           all_revisions AS (
+             SELECT id, "observationId" FROM inserted
+             UNION
+             SELECT r.id, r."observationId"
+             FROM "DataObservationRevision" r
+             JOIN prepared p ON p.revision_dedup_key = r."revisionDedupKey"
+           )
           UPDATE "DataObservation" o
           SET "currentRevisionId" = all_revisions.id
           FROM all_revisions
@@ -469,6 +498,47 @@ void AcquisitionRepository::settle(const AcquisitionTask& task, AcquisitionSettl
   if (updated.affected_rows() != 1) throw task_lifecycle::LeaseLost("写入采集终态时 lease 已失效");
 
   if (!settled.empty()) transaction.exec_params(update_gate_sql(), task.input.manifest_item_id);
+  transaction.exec_params(
+      R"SQL(
+        INSERT INTO "ResearchRuntimeObservation" (
+          id, "idempotencyKey", "metricKind", "sourceKey", "datasetKey", stage,
+          "resourcePoolKey", "productClockAt", "readyAt", success, degraded,
+          "errorClass", "observationContextJson"
+        )
+        SELECT
+          'runtime:' || md5('acquisition-settlement:' || attempt.id),
+          'acquisition-settlement:' || attempt.id,
+          'DATA', attempt."providerKey", item."datasetKey", 'acquisition',
+          attempt."providerKey", COALESCE(attempt."startedAt", NOW()), NOW(),
+          attempt.status = 'SUCCEEDED', settlement."settlementStatus" = 'DEGRADED',
+          settlement."errorClass",
+          jsonb_strip_nulls(jsonb_build_object(
+            'taskId', attempt.id,
+            'taskType', 'homepage-data-acquisition',
+            'inputContractVersion', attempt."providerContractVersion",
+            'inputHash', attempt."requestFingerprint",
+            'resultContractVersion', ($2::jsonb)->>'contractVersion',
+            'resultHash', NULLIF(($2::jsonb)->>'resultHash', ''),
+            'authoritativeObjectIds',
+              jsonb_build_array(attempt.id, settlement.id) ||
+              CASE WHEN settlement."selectedRevisionId" IS NULL
+                THEN '[]'::jsonb
+                ELSE jsonb_build_array(settlement."selectedRevisionId")
+              END,
+            'retryAttempt', attempt.attempts,
+            'fencingToken', attempt."fencingToken"::text,
+            'degradedReason', CASE
+              WHEN settlement."settlementStatus" <> 'READY' THEN settlement."settlementStatus"
+              ELSE NULL
+            END
+          ))
+        FROM "HomepageDataManifestItemAttempt" attempt
+        JOIN "HomepageDataManifestItem" item ON item.id = attempt."manifestItemId"
+        JOIN "HomepageDataManifestItemSettlement" settlement ON settlement."settledAttemptId" = attempt.id
+        WHERE attempt.id = $1
+        ON CONFLICT ("idempotencyKey") DO NOTHING
+      )SQL",
+      task.message.run_id, envelope_text);
   transaction.commit();
 }
 

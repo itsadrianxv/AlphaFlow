@@ -85,9 +85,10 @@ describe("Feishu 投递 F02 许可 guard", () => {
 
   it("校验已 claim 的 PostgreSQL 许可并记录资源池成功结果", async () => {
     const acquireNestedPermit = vi.fn().mockResolvedValue({ id: "permit-1" });
+    const releasePermit = vi.fn().mockResolvedValue(undefined);
     const recordOutcome = vi.fn().mockResolvedValue({});
     const guard = new PostgresFeishuDeliveryGuard(
-      { acquireNestedPermit, recordOutcome } as never,
+      { acquireNestedPermit, releasePermit, recordOutcome } as never,
       context,
     );
     const operation = vi.fn().mockResolvedValue(undefined);
@@ -104,6 +105,34 @@ describe("Feishu 投递 F02 许可 guard", () => {
     expect(recordOutcome).toHaveBeenCalledWith("pool-feishu", {
       kind: "SUCCESS",
     });
+    expect(releasePermit).toHaveBeenCalledWith(
+      "permit-1",
+      "worker-1",
+      3n,
+      "feishu_delivery_finished",
+    );
+  });
+
+  it("外部发送失败后仍释放 PostgreSQL 许可", async () => {
+    const acquireNestedPermit = vi.fn().mockResolvedValue({ id: "permit-2" });
+    const releasePermit = vi.fn().mockResolvedValue(undefined);
+    const recordOutcome = vi.fn().mockResolvedValue({});
+    const guard = new PostgresFeishuDeliveryGuard(
+      { acquireNestedPermit, releasePermit, recordOutcome } as never,
+      context,
+    );
+
+    await expect(
+      guard.run("copy-2", async () => {
+        throw new FeishuDeliveryError("FEISHU_HTTP_503", true);
+      }),
+    ).rejects.toMatchObject({ code: "FEISHU_HTTP_503" });
+    expect(releasePermit).toHaveBeenCalledWith(
+      "permit-2",
+      "worker-1",
+      3n,
+      "feishu_delivery_finished",
+    );
   });
 
   it("资源池熔断时不调用外部发送并返回可重试结构化错误", async () => {

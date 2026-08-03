@@ -94,8 +94,36 @@ function validateDistribution(input: CreateResearchInboxEntryInput) {
       "站内权威记录必须且只能引用一个分发主体",
     );
   }
+  if (input.eventRevisionId) {
+    if (!["EVENT", "CORRECTION", "RETRACTION"].includes(input.entryKind)) {
+      throw new ResearchInboxValidationError(
+        "事件修订只能创建事件、更正或撤回记录",
+      );
+    }
+    if (
+      !input.globalAssessmentId ||
+      !input.relevanceAssessmentId ||
+      !input.preferenceSnapshotId
+    ) {
+      throw new ResearchInboxValidationError(
+        "事件记录必须绑定全局评估、用户相关性评估和偏好快照",
+      );
+    }
+  }
   if ((input.entryKind === "BRIEFING") !== Boolean(input.briefingTaskId)) {
     throw new ResearchInboxValidationError("简报记录与简报任务引用不一致");
+  }
+  if (
+    input.candidateId &&
+    input.entryKind !== "CANDIDATE_PENDING_VERIFICATION"
+  ) {
+    throw new ResearchInboxValidationError("候选主体只能创建待核实记录");
+  }
+  if (
+    input.entryKind === "CANDIDATE_PENDING_VERIFICATION" &&
+    !input.candidateId
+  ) {
+    throw new ResearchInboxValidationError("待核实记录必须绑定候选主体");
   }
 }
 

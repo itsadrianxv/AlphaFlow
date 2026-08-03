@@ -121,7 +121,33 @@ export type AssessmentResult<T> = {
   validationErrors?: string[];
 };
 
-export class InMemoryResearchAssessmentStore {
+type MaybePromise<T> = T | Promise<T>;
+
+export interface ResearchAssessmentRepository {
+  saveGlobal(
+    input: Omit<SavedGlobalAssessment, "id" | "createdAt">,
+  ): MaybePromise<SavedGlobalAssessment>;
+  getGlobalByHash(
+    inputHash: string,
+  ): MaybePromise<SavedGlobalAssessment | undefined>;
+  getLatestGlobal(
+    eventRevisionId: string,
+  ): MaybePromise<SavedGlobalAssessment | undefined>;
+  saveRelevance(
+    input: Omit<SavedRelevanceAssessment, "id" | "createdAt">,
+  ): MaybePromise<SavedRelevanceAssessment>;
+  getRelevanceByHash(
+    inputHash: string,
+  ): MaybePromise<SavedRelevanceAssessment | undefined>;
+  getLatestRelevance(
+    eventRevisionId: string,
+    userId: string,
+  ): MaybePromise<SavedRelevanceAssessment | undefined>;
+}
+
+export class InMemoryResearchAssessmentStore
+  implements ResearchAssessmentRepository
+{
   private readonly globalByHash = new Map<string, SavedGlobalAssessment>();
   private readonly globalByRevision = new Map<string, SavedGlobalAssessment>();
   private readonly relevanceByHash = new Map<
@@ -200,7 +226,7 @@ export class ResearchAssessmentContractError extends Error {
 export class ResearchAssessmentService {
   constructor(
     private readonly llm: ResearchAssessmentLlmAdapter,
-    private readonly store = new InMemoryResearchAssessmentStore(),
+    private readonly store: ResearchAssessmentRepository = new InMemoryResearchAssessmentStore(),
   ) {}
 
   async assessGlobal(
@@ -212,7 +238,7 @@ export class ResearchAssessmentService {
       inputSnapshot,
       route: routeIdentity("GLOBAL"),
     });
-    const cached = this.store.getGlobalByHash(inputHash);
+    const cached = await this.store.getGlobalByHash(inputHash);
     if (cached) return { status: "CACHED", assessment: cached };
 
     try {
@@ -223,7 +249,7 @@ export class ResearchAssessmentService {
       );
       return {
         status: "CREATED",
-        assessment: this.store.saveGlobal({
+        assessment: await this.store.saveGlobal({
           eventRevisionId: eventRevision.revisionId,
           inputHash,
           output: assessed.output,
@@ -231,7 +257,9 @@ export class ResearchAssessmentService {
         }),
       };
     } catch (error) {
-      const previous = this.store.getLatestGlobal(eventRevision.revisionId);
+      const previous = await this.store.getLatestGlobal(
+        eventRevision.revisionId,
+      );
       if (previous) {
         return {
           status: "STALE_RETAINED",
@@ -270,7 +298,7 @@ export class ResearchAssessmentService {
       inputSnapshot,
       route: routeIdentity("RELEVANCE"),
     });
-    const cached = this.store.getRelevanceByHash(inputHash);
+    const cached = await this.store.getRelevanceByHash(inputHash);
     if (cached) return { status: "CACHED", assessment: cached };
 
     try {
@@ -290,7 +318,7 @@ export class ResearchAssessmentService {
       );
       return {
         status: "CREATED",
-        assessment: this.store.saveRelevance({
+        assessment: await this.store.saveRelevance({
           eventRevisionId: input.eventRevision.revisionId,
           userId: input.userId,
           preferenceSnapshotId: input.preferenceSnapshot.id,
@@ -302,7 +330,7 @@ export class ResearchAssessmentService {
         }),
       };
     } catch (error) {
-      const previous = this.store.getLatestRelevance(
+      const previous = await this.store.getLatestRelevance(
         input.eventRevision.revisionId,
         input.userId,
       );

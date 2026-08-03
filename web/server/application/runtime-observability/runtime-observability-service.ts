@@ -29,6 +29,7 @@ export interface RuntimeObservabilityRepository {
     evaluation: RuntimeReleaseEvaluationRecord,
   ): Promise<RuntimeReleaseEvaluationRecord>;
   listReleaseEvaluations(): Promise<RuntimeReleaseEvaluationRecord[]>;
+  listAuthoritativeRuntimeBreachKeys?(): Promise<string[]>;
 }
 
 export type RuntimeRecordResult = RuntimeObservation & {
@@ -70,6 +71,14 @@ function cloneObservation(observation: RuntimeObservation): RuntimeObservation {
       : null,
     usage: { ...observation.usage },
     delivery: observation.delivery ? { ...observation.delivery } : null,
+    context: observation.context
+      ? {
+          ...observation.context,
+          authoritativeObjectIds: observation.context.authoritativeObjectIds
+            ? [...observation.context.authoritativeObjectIds]
+            : undefined,
+        }
+      : null,
     recordedAt: new Date(observation.recordedAt.getTime()),
   };
 }
@@ -167,6 +176,12 @@ export class InMemoryRuntimeObservabilityRepository
 
   async listReleaseEvaluations() {
     return [...this.releaseEvaluations.values()].map(cloneReleaseEvaluation);
+  }
+
+  async listAuthoritativeRuntimeBreachKeys() {
+    return [...this.breaches.values()].map(
+      (breach) => `${breach.kind}:${breach.id}`,
+    );
   }
 }
 
@@ -566,6 +581,14 @@ export class RuntimeObservabilityService {
       },
       delivery: input.delivery ? { ...input.delivery } : null,
       errorClass: input.errorClass ?? null,
+      context: input.context
+        ? {
+            ...input.context,
+            authoritativeObjectIds: input.context.authoritativeObjectIds
+              ? [...input.context.authoritativeObjectIds]
+              : undefined,
+          }
+        : null,
       recordedAt: input.recordedAt
         ? new Date(input.recordedAt.getTime())
         : new Date(),
@@ -708,6 +731,15 @@ export class RuntimeObservabilityService {
 
   async listReleaseEvaluations() {
     return this.repository.listReleaseEvaluations();
+  }
+
+  async listAuthoritativeRuntimeBreachKeys() {
+    if (this.repository.listAuthoritativeRuntimeBreachKeys) {
+      return this.repository.listAuthoritativeRuntimeBreachKeys();
+    }
+    return (await this.repository.listBreaches()).map(
+      (breach) => `${breach.kind}:${breach.id}`,
+    );
   }
 
   private async withOutcomes(observation: RuntimeObservation) {

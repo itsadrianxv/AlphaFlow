@@ -2,10 +2,23 @@ import { randomUUID } from "node:crypto";
 import { type Prisma, PrismaClient } from "@prisma/client";
 import Redis from "ioredis";
 import { homePageDueDateCandidates } from "../../server/application/homepage/home-page-schedule";
-import { enqueueHomePageTask } from "../../server/application/homepage/home-page-snapshot-service";
 import { publishHomePageGenerationTask } from "../../server/application/homepage/home-page-task-stream";
+import { HomepageBaselineBootstrap } from "../../server/application/homepage/homepage-baseline-bootstrap";
+import {
+  BRIEFING_POOL_KEY,
+  BriefingProductionScheduler,
+} from "../../server/application/research-distribution/briefing-production-worker";
+import {
+  FEISHU_POOL_KEY,
+  FeishuDueCopyScheduler,
+} from "../../server/application/research-distribution/feishu-due-copy-worker";
+import {
+  CANDIDATE_POOL_KEY,
+  CandidateProductionScheduler,
+} from "../../server/application/research-production/candidate-production";
 import { publishDefinitiveTaskRun } from "../../server/application/scheduled-task/definitive-task-run-stream";
 import { submitScheduledTaskExecution } from "../../server/application/scheduled-task/scheduled-task-execution-service";
+import { PostgresResearchScheduler } from "../../server/application/scheduling/postgres-research-scheduler";
 import {
   scheduledTaskDeliverySpecSchema,
   scheduledTaskOutputSpecSchema,
@@ -44,6 +57,20 @@ const pythonUrl =
 const commands = new Redis(redisUrl, { maxRetriesPerRequest: 3 });
 const reader = new Redis(redisUrl, { maxRetriesPerRequest: null });
 const recovery = new Redis(redisUrl, { maxRetriesPerRequest: 3 });
+const homepageBaselineBootstrap = new HomepageBaselineBootstrap(db, commands);
+const researchScheduler = new PostgresResearchScheduler(db);
+const candidateProductionScheduler = new CandidateProductionScheduler(
+  db,
+  researchScheduler,
+);
+const feishuDueCopyScheduler = new FeishuDueCopyScheduler(
+  db,
+  researchScheduler,
+);
+const briefingProductionScheduler = new BriefingProductionScheduler(
+  db,
+  researchScheduler,
+);
 
 type StreamEvent = {
   eventType: string;
@@ -607,18 +634,6 @@ async function recoverDatabaseEvents() {
 }
 
 async function scheduleHomePageDefault() {
-  const snapshot = await db.homepageSnapshot.findFirst({
-    where: { scope: "BASELINE" },
-    orderBy: { generatedAt: "desc" },
-    select: { id: true },
-  });
-  if (!snapshot) {
-    await enqueueHomePageTask(db, {
-      scope: "BASELINE",
-      triggerReason: "BOOTSTRAP",
-    });
-    return;
-  }
   let targetTradeDate: string | undefined;
   for (const candidate of homePageDueDateCandidates()) {
     if (await isTradingDay(candidate.replaceAll("-", ""), "SSE")) {
@@ -627,10 +642,27 @@ async function scheduleHomePageDefault() {
     }
   }
   if (!targetTradeDate) return;
-  await enqueueHomePageTask(db, {
-    scope: "BASELINE",
-    triggerReason: "DEFAULT_DAILY",
+  const result = await homepageBaselineBootstrap.ensureTradingDay({
+    targetTradeDate,
   });
+  for (const failure of result.publishFailures) {
+    console.error(
+      `[scheduler] homepage acquisition publish failed attempt=${failure.attemptId}`,
+      failure.message,
+    );
+  }
+}
+
+async function recoverHomePageAcquisitionEvents() {
+  const result =
+    await homepageBaselineBootstrap.recoverUnpublishedAttempts(batchSize);
+  for (const failure of result.publishFailures) {
+    console.error(
+      `[scheduler] homepage acquisition recovery failed attempt=${failure.attemptId}`,
+      failure.message,
+    );
+  }
+  await homepageBaselineBootstrap.recoverReadyManifests(batchSize);
 }
 
 async function recoverHomePageTaskEvents() {
@@ -656,6 +688,44 @@ async function recoverHomePageTaskEvents() {
   }
 }
 
+async function scheduleResearchCandidateProduction() {
+  const pool = await db.researchResourcePool.findUnique({
+    where: { poolKey: CANDIDATE_POOL_KEY },
+  });
+  if (!pool) throw new Error(`候选生产资源池未迁移：${CANDIDATE_POOL_KEY}`);
+  await candidateProductionScheduler.scheduleAuthorityInputs({
+    poolId: pool.id,
+    limit: batchSize,
+  });
+}
+
+async function scheduleResearchFeishuCopies() {
+  const pool = await db.researchResourcePool.findUnique({
+    where: { poolKey: FEISHU_POOL_KEY },
+  });
+  if (!pool) throw new Error(`Feishu 资源池未迁移：${FEISHU_POOL_KEY}`);
+  await feishuDueCopyScheduler.scheduleDueCopies({
+    poolId: pool.id,
+    limit: batchSize,
+  });
+}
+
+async function scheduleResearchBriefings() {
+  const pool = await db.researchResourcePool.findUnique({
+    where: { poolKey: BRIEFING_POOL_KEY },
+  });
+  if (!pool) throw new Error(`简报资源池未迁移：${BRIEFING_POOL_KEY}`);
+  const targetDate = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Asia/Shanghai",
+  });
+  if (!(await isTradingDay(targetDate.replaceAll("-", ""), "SSE"))) return;
+  await briefingProductionScheduler.scheduleDueBriefings({
+    poolId: pool.id,
+    now: new Date(),
+    tradingDate: targetDate,
+  });
+}
+
 async function main() {
   assertDeliveryTargetSecretsConfigured();
   try {
@@ -679,6 +749,37 @@ async function main() {
         console.error("[scheduler] homepage schedule failed", error),
       ),
     60_000,
+  );
+  setInterval(
+    () =>
+      void recoverHomePageAcquisitionEvents().catch((error) =>
+        console.error(
+          "[scheduler] homepage acquisition event recovery failed",
+          error,
+        ),
+      ),
+    5_000,
+  );
+  setInterval(
+    () =>
+      void scheduleResearchBriefings().catch((error) =>
+        console.error("[scheduler] research briefing schedule failed", error),
+      ),
+    5_000,
+  );
+  setInterval(
+    () =>
+      void scheduleResearchFeishuCopies().catch((error) =>
+        console.error("[scheduler] research Feishu schedule failed", error),
+      ),
+    5_000,
+  );
+  setInterval(
+    () =>
+      void scheduleResearchCandidateProduction().catch((error) =>
+        console.error("[scheduler] research candidate schedule failed", error),
+      ),
+    5_000,
   );
   setInterval(
     () =>
@@ -712,7 +813,11 @@ async function main() {
   void recoverPending();
   void claimAndSubmit();
   void scheduleHomePageDefault();
+  void recoverHomePageAcquisitionEvents();
   void recoverHomePageTaskEvents();
+  void scheduleResearchCandidateProduction();
+  void scheduleResearchFeishuCopies();
+  void scheduleResearchBriefings();
 }
 
 void main().catch((error) => {

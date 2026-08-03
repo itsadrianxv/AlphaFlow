@@ -390,6 +390,7 @@ export class PiAdapter {
   private readonly sessionRepo: JsonlSessionRepo;
   private readonly scheduledEvents: ScheduledTaskEventPublisher;
   private readonly executions = new Map<string, Promise<void>>();
+  private readonly candidateSeedOutboxRoot: string;
 
   constructor(
     private readonly config: AgentRuntimeConfig,
@@ -399,6 +400,10 @@ export class PiAdapter {
     this.pythonGatewayClient = new PythonGatewayClient(config);
     this.webInternalClient = new WebInternalClient(config);
     this.scheduledEvents = new ScheduledTaskEventPublisher(config);
+    this.candidateSeedOutboxRoot = path.resolve(
+      config.sessionRoot,
+      "candidate-seed-outbox",
+    );
     const sessionEnv = new RestrictedExecutionEnv({
       cwd: process.cwd(),
       readRoots: [process.cwd(), path.resolve(config.sessionRoot)],
@@ -525,6 +530,7 @@ export class PiAdapter {
   }
 
   private async runTurn(request: StartRunRequest, turnGeneration: number) {
+    await this.recoverCandidateSeedOutbox();
     const skillIds = resolveSkillIds(request);
     const boundary = createExecutionBoundary(
       { ...request, skillIds },
@@ -772,11 +778,16 @@ export class PiAdapter {
         payload: finalOutput,
       });
       if (candidateSeeds.length > 0) {
+        const enqueueResults = await Promise.all(
+          candidateSeeds.map((seed) => this.enqueueCandidateSeed(seed)),
+        );
         this.store.appendEvent(request.runId, "candidate_seed.queued", {
           mode: "post_response_async",
           idempotent: true,
           count: candidateSeeds.length,
           seedKeys: candidateSeeds.map((seed) => seed.seedKey),
+          accepted: enqueueResults.length,
+          pendingRecovery: 0,
         });
       }
       this.recordAudit({
@@ -821,6 +832,38 @@ export class PiAdapter {
       this.store.markFailed(request.runId, "PI_AGENT_FAILED", message);
     } finally {
       await env.cleanup();
+    }
+  }
+
+  private async enqueueCandidateSeed(seed: Record<string, unknown>) {
+    const seedKey = String(seed.seedKey ?? "");
+    if (!seedKey) throw new Error("candidate seed 缺少稳定 seedKey");
+    await fs.mkdir(this.candidateSeedOutboxRoot, { recursive: true });
+    const filePath = path.join(
+      this.candidateSeedOutboxRoot,
+      `${Buffer.from(seedKey, "utf8").toString("base64url")}.json`,
+    );
+    await fs.writeFile(filePath, JSON.stringify(seed), { encoding: "utf8" });
+    await this.webInternalClient.enqueueResearchCandidateSeed(seed);
+    await fs.unlink(filePath).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+  }
+
+  private async recoverCandidateSeedOutbox() {
+    const files = await fs
+      .readdir(this.candidateSeedOutboxRoot)
+      .catch((error: NodeJS.ErrnoException) => {
+        if (error.code === "ENOENT") return [];
+        throw error;
+      });
+    for (const file of files.filter((item) => item.endsWith(".json")).sort()) {
+      const filePath = path.join(this.candidateSeedOutboxRoot, file);
+      const seed = JSON.parse(
+        await fs.readFile(filePath, { encoding: "utf8" }),
+      ) as Record<string, unknown>;
+      await this.webInternalClient.enqueueResearchCandidateSeed(seed);
+      await fs.unlink(filePath);
     }
   }
 

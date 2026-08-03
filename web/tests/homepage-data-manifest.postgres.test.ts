@@ -56,10 +56,52 @@ describePostgres("首页数据清单 PostgreSQL 契约", () => {
   }
 
   async function settle(attemptId: string, fencingToken = 1, overrides: Partial<Parameters<HomepageDataManifestService["settleAttempt"]>[0]> = {}) {
+    const providerResultStatus = overrides.providerResultStatus ?? "success";
+    let selectedRevisionId = overrides.selectedRevisionId;
+    if (
+      !selectedRevisionId &&
+      providerResultStatus !== "error" &&
+      providerResultStatus !== "empty"
+    ) {
+      const observation = await db.dataObservation.create({
+        data: {
+          identityKey: key("observation-identity"),
+          canonicalizationVersion: "observation.v1",
+          subjectType: "MARKET",
+          subjectKey: "CN-A",
+          metricCatalogId: "daily_price",
+          observationKind: "INSTANT",
+          observationDate: new Date("2026-08-03T00:00:00.000Z"),
+        },
+      });
+      const revision = await db.dataObservationRevision.create({
+        data: {
+          observationId: observation.id,
+          revisionNo: 1,
+          revisionDedupKey: key("revision-dedup"),
+          canonicalizationVersion: "observation.v1",
+          valueType: "TEXT",
+          valueText: "首页清单契约观测",
+          qualityStatus: "NORMAL",
+          valueHash: `sha256:${"1".repeat(64)}`,
+          normalizationRulesVersion: "rules-v1",
+          normalizedAt: new Date("2026-08-03T00:01:00.000Z"),
+        },
+      });
+      selectedRevisionId = revision.id;
+      await db.dataObservation.update({
+        where: { id: observation.id },
+        data: { currentRevisionId: revision.id },
+      });
+    }
     return service.settleAttempt({
       attemptId,
       fencingToken,
-      providerResultStatus: overrides.providerResultStatus ?? "success",
+      selectedRevisionId,
+      observationRevisionIds: selectedRevisionId
+        ? [selectedRevisionId]
+        : undefined,
+      providerResultStatus,
       requestedScopeJson: overrides.requestedScopeJson ?? {},
       coveredScopeJson: overrides.coveredScopeJson ?? {},
       missingScopeJson: overrides.missingScopeJson ?? [],
@@ -101,7 +143,8 @@ describePostgres("首页数据清单 PostgreSQL 契约", () => {
         item({ itemKey: key("optional"), required: false }),
       ],
     });
-    const [requiredItem, optionalItem] = created.items;
+    const requiredItem = created.items.find((item) => item.required);
+    const optionalItem = created.items.find((item) => !item.required);
     const requiredAttempt = requiredItem?.attempts[0];
     const optionalAttempt = optionalItem?.attempts[0];
     expect(requiredAttempt).toBeDefined();
@@ -111,7 +154,7 @@ describePostgres("首页数据清单 PostgreSQL 契约", () => {
     await settle(requiredAttempt?.id ?? "");
     expect(
       await db.homepageDataManifest.findUnique({ where: { id: created.id } }),
-    ).toMatchObject({ gateStatus: "READY_WITH_LIMITATION" });
+    ).toMatchObject({ gateStatus: "PENDING" });
 
     await claimAttempt(optionalAttempt?.id ?? "");
     await settle(optionalAttempt?.id ?? "", 1, {

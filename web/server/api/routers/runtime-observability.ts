@@ -51,26 +51,32 @@ export const runtimeObservabilityRouter = createTRPCRouter({
     .input(
       z.object({
         checks: z.array(runtimeReleaseCheckSchema),
-        runtimeBreaches: z.array(z.string().trim().min(1)),
       }),
     )
-    .query(async ({ ctx, input }) => service(ctx.db).evaluateRelease(input)),
+    .query(async ({ ctx, input }) => {
+      const runtime = service(ctx.db);
+      return runtime.evaluateRelease({
+        checks: input.checks,
+        runtimeBreaches: await runtime.listAuthoritativeRuntimeBreachKeys(),
+      });
+    }),
 
   recordRelease: protectedProcedure
     .input(
       z.object({
         evaluationKey: z.string().trim().min(1).max(200),
         checks: z.array(runtimeReleaseCheckSchema),
-        runtimeBreaches: z.array(z.string().trim().min(1)),
         checkedAt: z.string().datetime({ offset: true }).optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) =>
-      service(ctx.db).recordReleaseEvaluation({
+    .mutation(async ({ ctx, input }) => {
+      const runtime = service(ctx.db);
+      return runtime.recordReleaseEvaluation({
         ...input,
+        runtimeBreaches: await runtime.listAuthoritativeRuntimeBreachKeys(),
         checkedAt: input.checkedAt ? new Date(input.checkedAt) : undefined,
-      }),
-    ),
+      });
+    }),
 
   releaseHistory: protectedProcedure.query(async ({ ctx }) =>
     service(ctx.db).listReleaseEvaluations(),

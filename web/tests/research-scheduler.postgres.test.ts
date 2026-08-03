@@ -39,9 +39,10 @@ describePostgres("研究调度 PostgreSQL 契约", () => {
     poolIds.push(poolId);
     await db.$executeRawUnsafe(
       `INSERT INTO "ResearchResourcePool" ("id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency")
-       VALUES ($1, $2, 'PROVIDER', 4, $3)`,
+       VALUES ($1, $2, 'PROVIDER', $3, $4)`,
       poolId,
       key("pool-key"),
+      Math.max(4, currentConcurrency),
       currentConcurrency,
     );
     return {
@@ -232,9 +233,12 @@ describePostgres("研究调度 PostgreSQL 契约", () => {
       at: now,
     });
     expect(opened.state).toBe("OPEN");
+    expect(opened.retryAfter).toEqual(
+      new Date(now.getTime() + 60_000),
+    );
     expect(await value.claim(poolId, "worker-before-retry")).toBeNull();
 
-    now = new Date(now.getTime() + 501);
+    now = new Date(opened.retryAfter!.getTime() + 1);
     const probe = await value.claim(poolId, "worker-probe");
     expect(probe).not.toBeNull();
     expect((await value.getCircuit(poolId))?.state).toBe("HALF_OPEN");

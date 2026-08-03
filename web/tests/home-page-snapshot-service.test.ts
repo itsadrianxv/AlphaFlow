@@ -1,6 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getHomePageSnapshot } from "~/server/application/homepage/home-page-snapshot-service";
 
+vi.mock(
+  "~/server/application/homepage/homepage-market-baseline-read-model",
+  () => ({
+    readHomepageMarketBaseline: vi.fn(async () => ({
+      contractVersion: "professional-market-baseline.v1",
+      defaultPhase: "POST_MARKET",
+      phases: [],
+    })),
+  }),
+);
+
 const payload = {
   heatmap: {
     tradeDate: "20260801",

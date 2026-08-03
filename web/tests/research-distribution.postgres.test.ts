@@ -22,7 +22,6 @@ describePostgres("研究分发 PostgreSQL 副本契约", () => {
   });
   const entryIds: string[] = [];
   const userIds: string[] = [];
-  const eventIds: string[] = [];
 
   afterAll(async () => {
     await db.$disconnect();
@@ -46,10 +45,6 @@ describePostgres("研究分发 PostgreSQL 副本契约", () => {
     for (const userId of userIds.splice(0)) {
       await db.$executeRawUnsafe(`DELETE FROM "User" WHERE "id" = $1`, userId);
     }
-    for (const eventId of eventIds.splice(0)) {
-      await db.researchEventRevision.deleteMany({ where: { eventId } });
-      await db.researchEvent.delete({ where: { id: eventId } });
-    }
     await db.$executeRawUnsafe(
       `UPDATE "ResearchDeliveryCircuit"
           SET "state" = 'CLOSED', "consecutiveFailures" = 0,
@@ -66,7 +61,6 @@ describePostgres("研究分发 PostgreSQL 副本契约", () => {
     const idempotencyKey = `feishu:${entryId}`;
     userIds.push(userId);
     entryIds.push(entryId);
-    eventIds.push(eventId);
     await db.user.create({ data: { id: userId } });
     await db.researchEvent.create({
       data: {
@@ -141,5 +135,95 @@ describePostgres("研究分发 PostgreSQL 副本契约", () => {
       retryAfter: "2026-08-03T00:01:00.000Z",
     });
     await expect(store.getCircuit()).resolves.toEqual(circuit);
+  });
+
+  it("并发 worker 只有一个能领取副本，旧 fencing 不能覆盖成功状态", async () => {
+    const userId = key("copy-claim-user");
+    const entryId = key("copy-claim-entry");
+    const eventId = key("copy-claim-event");
+    const eventRevisionId = key("copy-claim-revision");
+    userIds.push(userId);
+    entryIds.push(entryId);
+    await db.user.create({ data: { id: userId } });
+    await db.researchEvent.create({
+      data: {
+        id: eventId,
+        eventKey: key("copy-claim-event-key"),
+        canonicalizationVersion: "v1",
+        subjectType: "COMPANY",
+        subjectKey: "000001.SZ",
+      },
+    });
+    await db.researchEventRevision.create({
+      data: {
+        id: eventRevisionId,
+        eventId,
+        revisionNo: 1,
+        revisionDedupKey: key("copy-claim-revision-dedup"),
+        revisionKind: "CONFIRMED",
+        title: "研究事件",
+        summary: "摘要",
+        narrativeJson: {},
+        uncertaintyJson: {},
+        counterEvidenceJson: {},
+        occurredAt: new Date("2026-08-03T00:00:00.000Z"),
+        knownAt: new Date("2026-08-03T00:00:00.000Z"),
+      },
+    });
+    await db.$executeRawUnsafe(
+      `INSERT INTO "ResearchInboxEntry" (
+         "id", "distributionKey", "userId", "eventRevisionId", "highestChannel", "entryKind",
+         "title", "summary", "bodyJson", "createdAt", "updatedAt"
+       ) VALUES ($1, $2, $3, $4, 'URGENT_ALERT', 'EVENT', '研究事件', '摘要', '{}'::jsonb, NOW(), NOW())`,
+      entryId,
+      key("copy-claim-gate"),
+      userId,
+      eventRevisionId,
+    );
+    const store = new PrismaResearchDistributionStore(db);
+    const queued = await store.createCopy({
+      entryId,
+      now: new Date("2026-08-03T00:00:00.000Z"),
+      payload: {
+        idempotencyKey: `feishu:${entryId}`,
+        title: "研究事件",
+        reason: "确定性门控",
+        status: "已核实",
+        inboxLink: `/research-inbox?entry=${entryId}`,
+      },
+    });
+
+    const claims = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        store.claimCopy(
+          queued.copy.id,
+          new Date("2026-08-03T00:00:01.000Z"),
+          60_000,
+        ),
+      ),
+    );
+    const claimed = claims.filter((claim) => claim !== null);
+    expect(claimed).toHaveLength(1);
+    const claim = claimed[0]!;
+    const sent = await store.settleCopy({
+      ...claim,
+      status: "SENT",
+      sentAt: "2026-08-03T00:00:02.000Z",
+      lastErrorCode: null,
+    });
+    expect(sent.status).toBe("SENT");
+
+    await expect(
+      store.settleCopy({
+        ...claim,
+        status: "RETRY_WAIT",
+        nextAttemptAt: "2026-08-03T00:01:00.000Z",
+        lastErrorCode: "FEISHU_HTTP_503",
+      }),
+    ).rejects.toThrow();
+    await expect(store.getCopy(claim.id)).resolves.toMatchObject({
+      status: "SENT",
+      sentAt: "2026-08-03T00:00:02.000Z",
+    });
   });
 });

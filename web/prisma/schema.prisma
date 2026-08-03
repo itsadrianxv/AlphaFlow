@@ -104,7 +104,9 @@ model User {
   researchInboxEntries          ResearchInboxEntry[]
   researchInboxFeedback         ResearchInboxFeedback[]
   researchTasks                 ResearchTask[]
+  briefingScopes                ResearchBriefingScope[]
   researchAuditRecords          ResearchAuditRecord[]
+  agentConfirmationTokens       AgentConfirmationToken[]
 }
 
 enum LlmTaskExecutionStatus {
@@ -1243,8 +1245,8 @@ model TimingKronosForecastSnapshot {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   workflowRun WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, stockCode, asOfDate, timeframe, modelName, predictionLength, inputBarsHash])
-  @@index([userId, stockCode, asOfDate, timeframe])
+  @@unique([userId, stockCode, asOfDate, timeframe, modelName, predictionLength, inputBarsHash], map: "TimingKronos_user_stock_date_model_input_key")
+  @@index([userId, stockCode, asOfDate, timeframe], map: "TimingKronos_user_stock_date_timeframe_idx")
   @@index([workflowRunId])
   @@index([sourceType, sourceId])
 }
@@ -1326,6 +1328,26 @@ model AgentArtifact {
   @@index([kind, createdAt])
 }
 
+model AgentConfirmationToken {
+  id                   String    @id @default(cuid())
+  tokenHash            String    @unique
+  userId               String
+  intentId             String
+  intentType           String
+  objectIdentityHash   String
+  canonicalPayloadHash String
+  channel              String
+  sideEffectKind       String
+  nonceHash            String    @unique
+  expiresAt            DateTime  @db.Timestamptz(3)
+  consumedAt           DateTime? @db.Timestamptz(3)
+  consumedResultHash   String?
+  createdAt            DateTime  @default(now()) @db.Timestamptz(3)
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId, intentId, expiresAt])
+}
+
 model AgentConversation {
   id                            String                       @id @default(cuid())
   userId                        String
@@ -1366,7 +1388,6 @@ model AgentConversationMessage {
 
   @@unique([conversationId, sequence])
   @@index([conversationId, createdAt])
-  @@index([workflowRunId])
 }
 
 // F01 权威研究信息模型。跨行检查、部分索引和不可变触发器由 PostgreSQL 迁移维护。
@@ -1910,6 +1931,7 @@ model ResearchPreferenceSnapshot {
   relevanceAssessments  ResearchEventRelevanceAssessment[]
   inboxEntries          ResearchInboxEntry[]
   tasks                 ResearchTask[]
+  briefingScopes        ResearchBriefingScope[]
   auditRecords          ResearchAuditRecord[]
 
   @@unique([userId, contentHash])
@@ -1975,7 +1997,7 @@ model ResearchEventRelevanceAssessment {
 
 model ResearchInboxEntry {
   id                          String                            @id @default(cuid())
-  distributionKey             String                            @unique
+  distributionKey             String
   userId                      String
   eventRevisionId             String?
   candidateId                 String?
@@ -2007,6 +2029,7 @@ model ResearchInboxEntry {
 
   @@index([userId, state, createdAt])
   @@index([eventRevisionId])
+  @@unique([userId, distributionKey])
 }
 
 model ResearchExternalCopy {
@@ -2022,11 +2045,15 @@ model ResearchExternalCopy {
   nextAttemptAt  DateTime?          @db.Timestamptz(3)
   sentAt         DateTime?          @db.Timestamptz(3)
   lastErrorCode  String?
+  claimToken     String?            @unique
+  claimExpiresAt DateTime?          @db.Timestamptz(3)
+  fencingToken   BigInt             @default(0)
   createdAt      DateTime           @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
   entry          ResearchInboxEntry @relation(fields: [entryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([channel, status, nextAttemptAt], map: "ResearchExternalCopy_delivery_idx")
+  @@index([status, claimExpiresAt], map: "ResearchExternalCopy_claim_idx")
 }
 
 model ResearchDeliveryCircuit {
@@ -2131,10 +2158,39 @@ model ResearchTask {
   circuitProbes         ResearchCircuitBreaker[]
   auditRecords          ResearchAuditRecord[]
   briefingEntries       ResearchInboxEntry[]
+  briefingScope         ResearchBriefingScope?
 
   @@index([resourcePoolId, status, schedulingTier, targetCompletionAt, nextAttemptAt, createdAt], map: "ResearchTask_claim_idx")
   @@index([resourcePoolId, schedulingTier, fairnessKey, createdAt], map: "ResearchTask_fairness_idx")
+  @@index([resourcePoolId, status, createdAt], map: "ResearchTask_pool_status_created_idx")
+  @@index([resourcePoolId, status, targetCompletionAt, fairnessKey, createdAt], map: "ResearchTask_pool_status_target_idx")
   @@index([status, leaseExpiresAt], map: "ResearchTask_lease_idx")
+}
+
+model ResearchBriefingScope {
+  id                    String                      @id @default(cuid())
+  taskId                String                      @unique
+  userId                String
+  preferenceSnapshotId  String
+  tradingDate           String
+  slot                  String
+  contractVersion       String
+  inputHash             String
+  inputJson             Json
+  includedIdsJson       Json
+  mandatoryIdsJson      Json
+  draftJson             Json?
+  draftHash             String?
+  status                String                      @default("FROZEN")
+  publishedAt           DateTime?                   @db.Timestamptz(3)
+  createdAt             DateTime                    @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                    @default(now()) @updatedAt @db.Timestamptz(3)
+  task                  ResearchTask                @relation(fields: [taskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  user                  User                        @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  preferenceSnapshot    ResearchPreferenceSnapshot @relation(fields: [preferenceSnapshotId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([userId, tradingDate, slot])
+  @@index([tradingDate, slot, status])
 }
 
 model ResearchResourcePermit {
@@ -2154,6 +2210,7 @@ model ResearchResourcePermit {
   task           ResearchTask         @relation(fields: [taskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 
   @@index([resourcePoolId, status, leaseExpiresAt], map: "ResearchResourcePermit_pool_status_lease_idx")
+  @@index([taskId, status, leaseExpiresAt], map: "ResearchResourcePermit_active_task_idx")
 }
 
 model ResearchCircuitBreaker {
@@ -2247,6 +2304,7 @@ model ResearchRuntimeObservation {
   deliveryStatus    String?
   deliveryAttempt   Int?
   errorClass        String?
+  observationContextJson Json?
   recordedAt        DateTime  @default(now()) @db.Timestamptz(3)
   createdAt         DateTime  @default(now()) @db.Timestamptz(3)
 

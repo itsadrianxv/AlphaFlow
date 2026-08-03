@@ -1,0 +1,2 @@
+-- Superseded by 20260803_zzzz_research_inbox_reference_guards so the trigger
+-- is installed after ResearchBriefingScope exists.
