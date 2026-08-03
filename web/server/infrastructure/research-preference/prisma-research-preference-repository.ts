@@ -136,10 +136,11 @@ export class PrismaResearchPreferenceRepository
             return toState(preference, userId);
           }
 
-          const recordedCommand =
-            await tx.researchPreferenceCommand.findUnique({
+          const recordedCommand = await tx.researchPreferenceCommand.findUnique(
+            {
               where: { commandId: command.commandId },
-            });
+            },
+          );
           if (recordedCommand) {
             if (recordedCommand.userId !== userId) {
               throw new Error("研究偏好命令标识已属于其他用户");

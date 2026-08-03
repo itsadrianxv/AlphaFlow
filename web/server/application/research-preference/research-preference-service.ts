@@ -1,6 +1,6 @@
 import {
-  type ResearchPreferenceExplanation,
   type ResearchPreferenceChannels,
+  type ResearchPreferenceExplanation,
   type ResearchPreferenceImportCandidate,
   type ResearchPreferenceItem,
   type ResearchPreferenceMatchInput,
