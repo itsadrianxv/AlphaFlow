@@ -168,6 +168,7 @@ enum AgentConversationRoutingMode {
 enum ScheduledTaskExecutionTrigger {
   SCHEDULED
   MANUAL
+  PREVIEW
 }
 
 enum ScheduledTaskEditDraftSource {
@@ -351,6 +352,8 @@ model ScheduledTaskExecution {
   status            ScheduledTaskExecutionStatus  @default(PENDING)
   trigger           ScheduledTaskExecutionTrigger @default(SCHEDULED)
   deliveryRequested Boolean                       @default(false)
+  executionPlanOverride Json?
+  previewSourceFingerprint String?
   idempotencyKey    String?                       @unique
   workerId          String?
   fencingToken      BigInt                        @default(0)

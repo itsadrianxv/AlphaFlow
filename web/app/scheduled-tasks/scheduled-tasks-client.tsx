@@ -285,6 +285,8 @@ export function ScheduledTasksClient() {
                 <tbody>
                   {tasks.map((task) => {
                     const version = task.versions[0];
+                    const recent = task.executions[0];
+                    const recentResult = asRecord(recent?.result);
                     const meta = statusMeta[task.status];
                     return (
                       <tr key={task.id}>
@@ -304,6 +306,18 @@ export function ScheduledTasksClient() {
                           </div>
                           <div className="mt-1 text-xs text-[var(--app-text-subtle)]">
                             {task.timezone}
+                          </div>
+                          <div className="mt-1 text-xs text-[var(--app-text-subtle)]">
+                            最近执行：{formatDate(recent?.completedAt ?? null)}
+                            {recentResult.asOfDate
+                              ? ` · 数据截止 ${String(recentResult.asOfDate)}`
+                              : ""}
+                            {typeof recentResult.selectedCount === "number"
+                              ? ` · 入选 ${recentResult.selectedCount} 只`
+                              : ""}
+                            {recent?.deliveries[0]?.status
+                              ? ` · 投递 ${recent.deliveries[0].status}`
+                              : ""}
                           </div>
                         </td>
                         <td>

@@ -138,6 +138,17 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function leafStatuses(value: unknown): string[] {
+  const node = asRecord(value);
+  if (node.kind === "LEAF")
+    return [
+      `${String(node.timeframe)}.${String(node.metric)}: ${String(node.status)}`,
+    ];
+  return Array.isArray(node.children)
+    ? node.children.flatMap(leafStatuses)
+    : [];
+}
+
 function inputClass() {
   return "h-9 w-full border border-[var(--app-border)] bg-[var(--app-surface)] px-2.5 text-sm text-[var(--app-text-strong)] outline-none focus:border-[var(--app-accent-strong)]";
 }
@@ -449,6 +460,8 @@ export function ScoringTaskBuilder() {
   >([]);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [stockSearchKeyword, setStockSearchKeyword] = useState("");
+  const [previewSampleInput, setPreviewSampleInput] = useState("");
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [removedRule, setRemovedRule] = useState<{
     rule: Rule;
     index: number;
@@ -461,6 +474,20 @@ export function ScoringTaskBuilder() {
     { enabled: Boolean(initialTaskId) },
   );
   const saveMutation = api.scheduledTask.saveScoringDraft.useMutation();
+  const previewMutation = api.scheduledTask.startScoringPreview.useMutation();
+  const activateMutation = api.scheduledTask.activateDraft.useMutation();
+  const previewQuery = api.scheduledTask.getScoringPreview.useQuery(
+    { previewId: previewId ?? "" },
+    {
+      enabled: Boolean(previewId),
+      refetchInterval: (query) =>
+        ["SUCCEEDED", "FAILED", "CANCELLED"].includes(
+          String(query.state.data?.status),
+        )
+          ? false
+          : 1500,
+    },
+  );
   const stockSearch = api.screening.searchStocks.useQuery(
     { keyword: stockSearchKeyword, limit: 8 },
     { enabled: stockSearchKeyword.trim().length > 0 },
@@ -489,7 +516,7 @@ export function ScoringTaskBuilder() {
   };
 
   const persist = async () => {
-    if (saveMutation.isPending) return;
+    if (saveMutation.isPending) return null;
     const savingRevision = revisionRef.current;
     const result = await saveMutation.mutateAsync({
       taskId,
@@ -499,7 +526,7 @@ export function ScoringTaskBuilder() {
     });
     if (!result.saved) {
       setIssues(result.issues);
-      return;
+      return null;
     }
     setIssues([]);
     setTaskId(result.taskId);
@@ -516,6 +543,7 @@ export function ScoringTaskBuilder() {
     }
     if (!taskId)
       router.replace(`/scheduled-tasks/builder?taskId=${result.taskId}`);
+    return result;
   };
   const persistRef = useRef(persist);
   persistRef.current = persist;
@@ -525,6 +553,35 @@ export function ScoringTaskBuilder() {
     const timer = window.setTimeout(() => void persistRef.current(), 800);
     return () => window.clearTimeout(timer);
   }, [draft, dirty]);
+
+  const runPreview = async () => {
+    const saved = dirty || !taskId || !version ? await persist() : null;
+    const activeTaskId = saved?.taskId ?? taskId;
+    const activeVersion = saved?.version ?? version;
+    if (!activeTaskId || !activeVersion) return;
+    const sampleStockCodes = previewSampleInput
+      .split(/[\s,，]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const result = await previewMutation.mutateAsync({
+      taskId: activeTaskId,
+      expectedVersion: activeVersion,
+      sampleStockCodes:
+        draft.universe.type === "all_a_shares" ? sampleStockCodes : undefined,
+      idempotencyKey: `preview-${crypto.randomUUID()}`,
+    });
+    setPreviewId(result.previewId);
+  };
+
+  const activate = async () => {
+    if (!taskId || !version || !previewId) return;
+    await activateMutation.mutateAsync({
+      taskId,
+      expectedVersion: version,
+      previewId,
+    });
+    router.push(`/scheduled-tasks/${taskId}`);
+  };
 
   const removeRule = (index: number) =>
     change((current) => {
@@ -1025,6 +1082,141 @@ export function ScoringTaskBuilder() {
             />
           </label>
         </div>
+      </section>
+
+      <section className="border-t border-[var(--app-border-soft)] px-4 py-5 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--app-text-strong)]">
+              评分预览
+            </h2>
+            <p className="mt-1 text-sm text-[var(--app-text-muted)]">
+              预览在后台运行，可继续编辑；实质修改并保存后旧预览自动失效。
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="app-button"
+              disabled={
+                previewMutation.isPending ||
+                (draft.universe.type === "all_a_shares" &&
+                  previewSampleInput.trim().length === 0)
+              }
+              onClick={() => void runPreview()}
+            >
+              运行预览
+            </button>
+            <button
+              type="button"
+              className="app-button app-button-primary"
+              disabled={
+                !previewQuery.data?.canActivate ||
+                !previewQuery.data.valid ||
+                activateMutation.isPending
+              }
+              onClick={() => void activate()}
+            >
+              启用任务
+            </button>
+          </div>
+        </div>
+        {draft.universe.type === "all_a_shares" ? (
+          <label className="mt-4 grid max-w-xl gap-1 text-sm text-[var(--app-text-muted)]">
+            <span>全部 A 股预览样本（1 至 20 只）</span>
+            <textarea
+              className="min-h-20 border border-[var(--app-border)] bg-[var(--app-surface)] p-2.5 text-sm outline-none focus:border-[var(--app-accent-strong)]"
+              value={previewSampleInput}
+              placeholder="600519 000001"
+              onChange={(event) => setPreviewSampleInput(event.target.value)}
+            />
+          </label>
+        ) : null}
+        {previewMutation.error ||
+        previewQuery.error ||
+        activateMutation.error ? (
+          <div className="mt-4">
+            <InlineNotice
+              tone="danger"
+              description={
+                previewMutation.error?.message ??
+                previewQuery.error?.message ??
+                activateMutation.error?.message ??
+                "评分预览失败"
+              }
+            />
+          </div>
+        ) : null}
+        {previewQuery.data ? (
+          <div className="mt-4 border-y border-[var(--app-border-soft)] py-4">
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--app-text-muted)]">
+              <span>状态：{previewQuery.data.status}</span>
+              <span>版本：{previewQuery.data.taskVersion}</span>
+              <span>
+                数据截止：{previewQuery.data.dataCutoff ?? "等待执行"}
+              </span>
+              {!previewQuery.data.valid ? (
+                <span className="text-amber-700">草稿已变化，此预览已失效</span>
+              ) : null}
+            </div>
+            {previewQuery.data.warnings.length ? (
+              <ul className="mt-3 list-disc pl-5 text-sm text-amber-700">
+                {previewQuery.data.warnings.map((warning, index) => (
+                  <li key={`${String(warning)}-${index}`}>{String(warning)}</li>
+                ))}
+              </ul>
+            ) : null}
+            {previewQuery.data.results.length ? (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="text-[var(--app-text-muted)]">
+                    <tr>
+                      <th className="py-2 pr-4">样本股票</th>
+                      <th className="py-2 pr-4">总分</th>
+                      <th className="py-2 pr-4">规则得分</th>
+                      <th className="py-2">叶子条件状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewQuery.data.results.map((result) => {
+                      const ruleResults = asRecord(result.ruleResults);
+                      return (
+                        <tr
+                          key={result.stockCode}
+                          className="border-t border-[var(--app-border-soft)]"
+                        >
+                          <td className="py-2 pr-4">
+                            {result.stockName}（{result.stockCode}）
+                          </td>
+                          <td className="py-2 pr-4">
+                            {result.score} / {result.maxScore}
+                          </td>
+                          <td className="py-2 pr-4">
+                            {Object.entries(ruleResults)
+                              .map(([ruleId, value]) => {
+                                const detail = asRecord(value);
+                                return `${ruleId}: ${String(detail.awardedPoints ?? 0)}`;
+                              })
+                              .join("；") || "-"}
+                          </td>
+                          <td className="py-2">
+                            {Object.entries(ruleResults)
+                              .flatMap(([ruleId, value]) =>
+                                leafStatuses(asRecord(value).conditionTree).map(
+                                  (status) => `${ruleId} / ${status}`,
+                                ),
+                              )
+                              .join("；") || "-"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </section>
 
       <section className="px-4 py-5 sm:px-6">

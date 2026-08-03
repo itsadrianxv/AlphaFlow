@@ -7,6 +7,7 @@ import { ScheduledTaskDraftController } from "~/server/application/scheduled-tas
 import { ScheduledTaskEditService } from "~/server/application/scheduled-task/scheduled-task-edit-service";
 import { ScheduledTaskExecutionService } from "~/server/application/scheduled-task/scheduled-task-execution-service";
 import { ScheduledTaskScoringDraftService } from "~/server/application/scheduled-task/scheduled-task-scoring-draft-service";
+import { ScheduledTaskScoringLifecycleService } from "~/server/application/scheduled-task/scheduled-task-scoring-lifecycle-service";
 import { ScheduledTaskSetupService } from "~/server/application/scheduled-task/scheduled-task-setup-service";
 import { WorkflowCommandService } from "~/server/application/workflow/command-service";
 import {
@@ -33,7 +34,7 @@ function taskError(error: unknown): never {
   ) {
     throw new TRPCError({ code: "NOT_FOUND", message: "定时任务不存在" });
   }
-  if (message === "EDIT_VERSION_CONFLICT") {
+  if (["EDIT_VERSION_CONFLICT", "PREVIEW_VERSION_CONFLICT"].includes(message)) {
     throw new TRPCError({
       code: "CONFLICT",
       message: "任务版本已更新，请基于最新版本重新预览",
@@ -44,6 +45,14 @@ function taskError(error: unknown): never {
     NEXT_RUN_UNAVAILABLE: "无法计算下一次执行时间",
     NO_CHANGES: "没有检测到配置变更",
     DRAFT_NOT_CONFIRMABLE: "候选修改尚未通过验证",
+    PREVIEW_NOT_FOUND: "评分预览不存在",
+    PREVIEW_REQUIRED: "首次启用前必须运行当前版本的评分预览",
+    PREVIEW_NOT_EVALUABLE: "全部预览样本均无法评估，不能启用任务",
+    PREVIEW_SAMPLE_REQUIRED: "全部 A 股预览必须选择 1 至 20 只样本",
+    PREVIEW_SAMPLE_LIMIT: "评分预览最多选择 20 只样本",
+    PREVIEW_SAMPLE_INVALID: "预览样本必须使用六位股票代码",
+    PREVIEW_SAMPLE_DUPLICATED: "预览样本不能重复",
+    PREVIEW_SAMPLE_OUTSIDE_UNIVERSE: "预览样本不在当前指定股票范围内",
   };
   throw new TRPCError({
     code: "BAD_REQUEST",
@@ -76,6 +85,41 @@ export const scheduledTaskRouter = createTRPCRouter({
           expectedVersion: input.expectedVersion,
           idempotencyKey: input.idempotencyKey,
           value: input.value,
+        });
+      } catch (error) {
+        taskError(error);
+      }
+    }),
+  startScoringPreview: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string().cuid(),
+        expectedVersion: z.number().int().positive(),
+        sampleStockCodes: z.array(z.string()).max(20).optional(),
+        idempotencyKey: z.string().min(8).max(128),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new ScheduledTaskScoringLifecycleService(
+          ctx.db,
+        ).startPreview({
+          userId: ctx.session.user.id,
+          ...input,
+        });
+      } catch (error) {
+        taskError(error);
+      }
+    }),
+  getScoringPreview: protectedProcedure
+    .input(z.object({ previewId: z.string().cuid() }))
+    .query(async ({ ctx, input }) => {
+      try {
+        return await new ScheduledTaskScoringLifecycleService(
+          ctx.db,
+        ).getPreview({
+          userId: ctx.session.user.id,
+          previewId: input.previewId,
         });
       } catch (error) {
         taskError(error);
@@ -171,7 +215,21 @@ export const scheduledTaskRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
     const tasks = await ctx.db.scheduledTask.findMany({
       where: { userId: ctx.session.user.id, status: { not: "DRAFT" } },
-      include: { versions: { orderBy: { version: "desc" } } },
+      include: {
+        versions: { orderBy: { version: "desc" } },
+        executions: {
+          where: { trigger: { not: "PREVIEW" } },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: {
+            deliveries: {
+              select: { status: true, targetType: true },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+            },
+          },
+        },
+      },
       orderBy: { updatedAt: "desc" },
     });
     return tasks.map((task) => ({
@@ -190,7 +248,21 @@ export const scheduledTaskRouter = createTRPCRouter({
           userId: ctx.session.user.id,
           status: { not: "DRAFT" },
         },
-        include: { versions: { orderBy: { version: "desc" } } },
+        include: {
+          versions: { orderBy: { version: "desc" } },
+          executions: {
+            where: { trigger: { not: "PREVIEW" } },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            include: {
+              deliveries: { orderBy: { createdAt: "desc" }, take: 1 },
+              scoreResults: {
+                orderBy: { rank: "asc" },
+                take: 20,
+              },
+            },
+          },
+        },
       });
       const version = task?.versions.find(
         (item) => item.version === task.currentVersion,
@@ -256,6 +328,7 @@ export const scheduledTaskRouter = createTRPCRouter({
           taskVersion: { select: { version: true } },
           evidence: { orderBy: { createdAt: "asc" } },
           deliveries: { orderBy: { createdAt: "asc" } },
+          scoreResults: { orderBy: { rank: "asc" } },
         },
       });
       if (!execution)
@@ -446,6 +519,7 @@ export const scheduledTaskRouter = createTRPCRouter({
       z.object({
         taskId: z.string().cuid(),
         expectedVersion: z.number().int().positive(),
+        previewId: z.string().cuid().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -466,6 +540,33 @@ export const scheduledTaskRouter = createTRPCRouter({
           code: "CONFLICT",
           message: "草稿已更新，请检查最新预览",
         });
+      const executionPlan =
+        version.executionPlan &&
+        typeof version.executionPlan === "object" &&
+        !Array.isArray(version.executionPlan)
+          ? (version.executionPlan as Record<string, unknown>)
+          : {};
+      if (executionPlan.type === "deterministic_scoring") {
+        if (!input.previewId)
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "首次启用前必须运行当前版本的评分预览",
+          });
+        try {
+          const setup = new ScheduledTaskSetupService(ctx.db);
+          return await new ScheduledTaskScoringLifecycleService(
+            ctx.db,
+          ).activate({
+            userId: ctx.session.user.id,
+            taskId: input.taskId,
+            expectedVersion: input.expectedVersion,
+            previewId: input.previewId,
+            resolveNextRunAt: (schedule) => setup.nextRunAt(schedule),
+          });
+        } catch (error) {
+          taskError(error);
+        }
+      }
       const feasibility =
         version.feasibility &&
         typeof version.feasibility === "object" &&
@@ -551,7 +652,7 @@ export const scheduledTaskRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const result = await ctx.db.scheduledTask.updateMany({
         where: { id: input.id, userId: ctx.session.user.id, status: "ACTIVE" },
-        data: { status: "PAUSED" },
+        data: { status: "PAUSED", nextRunAt: null },
       });
       if (!result.count) throw new TRPCError({ code: "NOT_FOUND" });
       return { success: true };
@@ -559,9 +660,26 @@ export const scheduledTaskRouter = createTRPCRouter({
   resume: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      const task = await ctx.db.scheduledTask.findFirst({
+        where: { id: input.id, userId: ctx.session.user.id, status: "PAUSED" },
+        include: { versions: { orderBy: { version: "desc" } } },
+      });
+      const version = task?.versions.find(
+        (item) => item.version === task.currentVersion,
+      );
+      if (!task || !version) throw new TRPCError({ code: "NOT_FOUND" });
+      const schedule = scheduleSpecSchema.parse(version.scheduleSpec);
+      const nextRunAt = await new ScheduledTaskSetupService(ctx.db).nextRunAt(
+        schedule,
+      );
+      if (!nextRunAt)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "无法计算下一次执行时间",
+        });
       const result = await ctx.db.scheduledTask.updateMany({
         where: { id: input.id, userId: ctx.session.user.id, status: "PAUSED" },
-        data: { status: "ACTIVE" },
+        data: { status: "ACTIVE", nextRunAt },
       });
       if (!result.count) throw new TRPCError({ code: "NOT_FOUND" });
       return { success: true };
