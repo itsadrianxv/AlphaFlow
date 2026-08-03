@@ -571,6 +571,7 @@ class HomepageProviderAdapter:
         result = HomepageDataItemResult(
             dataset_key=request.dataset_key,
             provider_key=self.provider_key,
+            provider_version=self.provider_version,
             result_status=result_status,
             quality_status=quality,
             coverage=coverage,

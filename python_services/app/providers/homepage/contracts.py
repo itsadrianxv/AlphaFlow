@@ -487,6 +487,7 @@ class HomepageDataItemResult:
     result_status: ResultStatus
     quality_status: QualityStatus
     coverage: ScopeCoverage
+    provider_version: str = "1.0"
     observations: tuple[NormalizedObservation, ...] = ()
     source_assertions: tuple[SourceAssertion, ...] = ()
     actual_data_cutoff: DataCutoff | None = None
@@ -550,6 +551,14 @@ class HomepageDataItemResult:
         return self.provider_key
 
     @property
+    def providerVersion(self) -> str:
+        return self.provider_version
+
+    @property
+    def datasetPayloadVersion(self) -> str:
+        return self.dataset_payload_version
+
+    @property
     def resultStatus(self) -> ResultStatus:
         return self.result_status
 
@@ -590,6 +599,7 @@ class HomepageDataItemResult:
             "contractVersion": self.contract_version,
             "datasetKey": self.dataset_key,
             "providerKey": self.provider_key,
+            "providerVersion": self.provider_version,
             "datasetPayloadVersion": self.dataset_payload_version,
             "normalizationRulesVersion": self.normalization_rules_version,
             "resultStatus": self.result_status.value if isinstance(self.result_status, ResultStatus) else self.result_status,
@@ -660,6 +670,7 @@ class HomepageDataItemResult:
         return cls(
             dataset_key=request.dataset_key,
             provider_key=provider_key,
+            provider_version=provider_version,
             result_status=ResultStatus.ERROR,
             quality_status=quality_status,
             coverage=ScopeCoverage(requested_scope=request.requested_scope),
@@ -706,6 +717,7 @@ class HomepageDataItemResult:
         return cls(
             dataset_key=str(value.get("datasetKey") or value.get("dataset_key") or ""),
             provider_key=str(value.get("providerKey") or value.get("provider_key") or ""),
+            provider_version=str(value.get("providerVersion") or value.get("provider_version") or "1.0"),
             result_status=value.get("resultStatus") or value.get("result_status") or ResultStatus.ERROR,
             quality_status=value.get("qualityStatus") or value.get("quality_status") or QualityStatus.ISOLATED,
             coverage=coverage,

@@ -60,6 +60,7 @@ def test_three_adapters_return_the_same_success_contract_shape(adapter) -> None:
     assert result.result_status == ResultStatus.SUCCESS
     assert result.quality_status == QualityStatus.NORMAL
     assert result.dataset_key == "fixture"
+    assert result.provider_version == "1.0"
     assert result.contract_version == "1.0"
     assert result.normalization_rules_version == "1.0"
     assert result.coverage.requested_scope == {"tradeDate": "2026-08-01"}
