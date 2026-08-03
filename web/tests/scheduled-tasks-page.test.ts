@@ -18,4 +18,17 @@ describe("定时任务页面", () => {
     expect(source).toContain("scheduledTask.cancel");
     expect(source).toContain("任务状态筛选");
   });
+
+  it("从页面直接进入结构化评分规则构建器", async () => {
+    const listSource = await readFile(path.join(root, "app/scheduled-tasks/scheduled-tasks-client.tsx"), "utf8");
+    const builderSource = await readFile(path.join(root, "app/scheduled-tasks/builder/scoring-task-builder.tsx"), "utf8");
+
+    expect(listSource).toContain('href="/scheduled-tasks/builder"');
+    expect(builderSource).toContain("scheduledTask.saveScoringDraft");
+    expect(builderSource).toContain("screening.searchStocks");
+    expect(builderSource).toContain("800");
+    expect(builderSource).not.toContain("userPrompt");
+    expect(builderSource).not.toContain("Provider");
+    expect(builderSource).not.toContain("Capability");
+  });
 });

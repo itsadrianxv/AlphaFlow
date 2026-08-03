@@ -172,8 +172,7 @@ export function ScheduledTasksClient() {
     [filter, query.data],
   );
   const busy = pause.isPending || resume.isPending || cancel.isPending;
-
-  const createTask = () => {
+  const createAgentTask = () => {
     writePiAgentSelectionDraft({
       text: "我想创建一个定时任务。请先询问我希望持续关注的信息、执行时间和输出方式，然后评估数据能力并生成任务预览，等待我确认后再创建。",
       createdAt: new Date().toISOString(),
@@ -186,17 +185,25 @@ export function ScheduledTasksClient() {
     <WorkspaceShell
       section="scheduledTasks"
       title="定时任务"
-      description="管理由 Agent 创建的信息订阅、执行计划和发送状态。"
+      description="管理评分任务、信息订阅、执行计划和发送状态。"
       titleSize="compact"
       showHistory={false}
       actions={
-        <button
-          type="button"
-          className="app-button app-button-primary"
-          onClick={createTask}
-        >
-          新建任务
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="app-button"
+            onClick={createAgentTask}
+          >
+            Agent 任务
+          </button>
+          <Link
+            href="/scheduled-tasks/builder"
+            className="app-button app-button-primary"
+          >
+            新建评分任务
+          </Link>
+        </div>
       }
     >
       {notice ? <InlineNotice tone="success" description={notice} /> : null}
@@ -249,13 +256,12 @@ export function ScheduledTasksClient() {
               }
               actions={
                 filter === "ALL" ? (
-                  <button
-                    type="button"
+                  <Link
+                    href="/scheduled-tasks/builder"
                     className="app-button app-button-primary"
-                    onClick={createTask}
                   >
                     新建任务
-                  </button>
+                  </Link>
                 ) : undefined
               }
             />

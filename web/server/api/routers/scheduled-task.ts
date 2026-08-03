@@ -3,12 +3,13 @@ import { z } from "zod";
 import { env } from "~/env";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { AgentConversationService } from "~/server/application/agent-runtime/agent-conversation-service";
+import { ScheduledTaskDraftController } from "~/server/application/scheduled-task/scheduled-task-draft-controller";
 import { ScheduledTaskEditService } from "~/server/application/scheduled-task/scheduled-task-edit-service";
 import { ScheduledTaskExecutionService } from "~/server/application/scheduled-task/scheduled-task-execution-service";
+import { ScheduledTaskScoringDraftService } from "~/server/application/scheduled-task/scheduled-task-scoring-draft-service";
 import { ScheduledTaskSetupService } from "~/server/application/scheduled-task/scheduled-task-setup-service";
 import { WorkflowCommandService } from "~/server/application/workflow/command-service";
 import {
-  deterministicExecutionPlanSchema,
   scheduledTaskDeliverySpecSchema,
   scheduledTaskOutputSpecSchema,
   scheduledTaskStructuredEditSchema,
@@ -54,17 +55,60 @@ export const scheduledTaskRouter = createTRPCRouter({
   validateDeterministicPlan: protectedProcedure
     .input(z.object({ plan: z.unknown() }))
     .mutation(({ input }) => {
-      const parsed = deterministicExecutionPlanSchema.safeParse(input.plan);
-      return parsed.success
-        ? { valid: true as const, normalizedPlan: parsed.data, issues: [] }
-        : {
-            valid: false as const,
-            normalizedPlan: null,
-            issues: parsed.error.issues.map((issue) => ({
-              path: issue.path.join("."),
-              message: issue.message,
-            })),
-          };
+      return new ScheduledTaskDraftController().validateExecutionPlan(
+        input.plan,
+      );
+    }),
+  saveScoringDraft: protectedProcedure
+    .input(
+      z.object({
+        taskId: z.string().cuid().optional(),
+        expectedVersion: z.number().int().positive().optional(),
+        idempotencyKey: z.string().min(8).max(128),
+        value: z.unknown(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new ScheduledTaskScoringDraftService(ctx.db).save({
+          userId: ctx.session.user.id,
+          taskId: input.taskId,
+          expectedVersion: input.expectedVersion,
+          idempotencyKey: input.idempotencyKey,
+          value: input.value,
+        });
+      } catch (error) {
+        taskError(error);
+      }
+    }),
+  getScoringDraft: protectedProcedure
+    .input(z.object({ taskId: z.string().cuid() }))
+    .query(async ({ ctx, input }) => {
+      const task = await ctx.db.scheduledTask.findFirst({
+        where: {
+          id: input.taskId,
+          userId: ctx.session.user.id,
+          status: "DRAFT",
+        },
+      });
+      if (!task)
+        throw new TRPCError({ code: "NOT_FOUND", message: "评分草稿不存在" });
+      const version = await ctx.db.scheduledTaskVersion.findUnique({
+        where: {
+          taskId_version: { taskId: task.id, version: task.currentVersion },
+        },
+      });
+      if (!version)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "评分草稿版本不存在",
+        });
+      return {
+        taskId: task.id,
+        version: task.currentVersion,
+        name: task.name,
+        config: version,
+      };
     }),
   updateSetupDraftPlan: protectedProcedure
     .input(
@@ -75,12 +119,14 @@ export const scheduledTaskRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const parsed = deterministicExecutionPlanSchema.safeParse(input.plan);
-      if (!parsed.success)
+      const parsed = new ScheduledTaskDraftController().validateExecutionPlan(
+        input.plan,
+      );
+      if (!parsed.valid)
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: parsed.error.issues
-            .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+          message: parsed.issues
+            .map((issue) => `${issue.path}: ${issue.message}`)
             .join("；"),
         });
       const semantic = await fetch(
@@ -88,13 +134,13 @@ export const scheduledTaskRouter = createTRPCRouter({
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(parsed.data),
+          body: JSON.stringify(parsed.normalizedPlan),
         },
       );
       if (!semantic.ok) {
-        const payload = (await semantic.json().catch(() => null)) as
-          | { message?: string }
-          | null;
+        const payload = (await semantic.json().catch(() => null)) as {
+          message?: string;
+        } | null;
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: payload?.message ?? "评分规则语义校验失败",
@@ -118,9 +164,9 @@ export const scheduledTaskRouter = createTRPCRouter({
             version: input.expectedVersion,
           },
         },
-        data: { executionPlan: parsed.data },
+        data: { executionPlan: parsed.normalizedPlan },
       });
-      return { valid: true as const, normalizedPlan: parsed.data };
+      return { valid: true as const, normalizedPlan: parsed.normalizedPlan };
     }),
   list: protectedProcedure.query(async ({ ctx }) => {
     const tasks = await ctx.db.scheduledTask.findMany({
@@ -238,11 +284,22 @@ export const scheduledTaskRouter = createTRPCRouter({
         where: { executionId: input.executionId },
         orderBy: { rank: "asc" },
         take: input.limit + 1,
-        ...(input.cursor ? { cursor: { executionId_rank: { executionId: input.executionId, rank: input.cursor } }, skip: 1 } : {}),
+        ...(input.cursor
+          ? {
+              cursor: {
+                executionId_rank: {
+                  executionId: input.executionId,
+                  rank: input.cursor,
+                },
+              },
+              skip: 1,
+            }
+          : {}),
       });
       return {
         items: rows.slice(0, input.limit),
-        nextCursor: rows.length > input.limit ? rows[input.limit]?.rank : undefined,
+        nextCursor:
+          rows.length > input.limit ? rows[input.limit]?.rank : undefined,
       };
     }),
   prepareStructuredEdit: protectedProcedure
@@ -430,6 +487,17 @@ export const scheduledTaskRouter = createTRPCRouter({
         });
       }
       const schedule = scheduleSpecSchema.parse(version.scheduleSpec);
+      const planValidation =
+        new ScheduledTaskDraftController().validateExecutionPlan(
+          version.executionPlan,
+        );
+      if (!planValidation.valid)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: planValidation.issues
+            .map((issue) => `${issue.path}: ${issue.message}`)
+            .join("；"),
+        });
       scheduledTaskOutputSpecSchema.parse(version.outputSpec);
       const delivery = scheduledTaskDeliverySpecSchema.parse(
         version.deliverySpec,
