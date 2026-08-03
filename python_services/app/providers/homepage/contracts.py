@@ -540,6 +540,38 @@ class HomepageDataItemResult:
         return self.result_hash
 
     @property
+    def datasetKey(self) -> str:
+        return self.dataset_key
+
+    @property
+    def providerKey(self) -> str:
+        return self.provider_key
+
+    @property
+    def resultStatus(self) -> ResultStatus:
+        return self.result_status
+
+    @property
+    def qualityStatus(self) -> QualityStatus:
+        return self.quality_status
+
+    @property
+    def contractVersion(self) -> str:
+        return self.contract_version
+
+    @property
+    def normalizationRulesVersion(self) -> str:
+        return self.normalization_rules_version
+
+    @property
+    def sourceAssertions(self) -> tuple[SourceAssertion, ...]:
+        return self.source_assertions
+
+    @property
+    def actualDataCutoff(self) -> DataCutoff | None:
+        return self.actual_data_cutoff
+
+    @property
     def requested_scope(self) -> Mapping[str, Any]:
         return self.coverage.requested_scope
 
@@ -562,9 +594,15 @@ class HomepageDataItemResult:
             "qualityStatus": self.quality_status.value if isinstance(self.quality_status, QualityStatus) else self.quality_status,
             "coverage": self.coverage.to_dict(),
             "observations": [item.to_dict() for item in self.observations],
-            "sourceAssertions": [item.to_dict() for item in self.source_assertions],
+            "sourceAssertions": [
+                {key: value for key, value in item.to_dict().items() if key != "fetchedAt"}
+                for item in self.source_assertions
+            ],
             "actualDataCutoff": self.actual_data_cutoff.to_dict() if self.actual_data_cutoff else None,
-            "errors": [item.to_dict() for item in self.errors],
+            "errors": [
+                {key: value for key, value in item.to_dict().items() if key != "occurredAt"}
+                for item in self.errors
+            ],
             "authority": self.authority.to_dict() if self.authority else None,
             "observationPeriod": _canonical_value(self.observation_period),
             "upstreamAsOf": _canonical_value(self.upstream_as_of),
@@ -584,6 +622,12 @@ class HomepageDataItemResult:
     def model_dump(self, *, mode: str = "python", **_: Any) -> dict[str, Any]:
         del mode
         return self.to_dict()
+
+    @classmethod
+    def model_validate(cls, value: Mapping[str, Any] | Self) -> Self:
+        if isinstance(value, cls):
+            return value
+        return cls.from_dict(value)
 
     def dict(self, **kwargs: Any) -> dict[str, Any]:
         return self.model_dump(**kwargs)

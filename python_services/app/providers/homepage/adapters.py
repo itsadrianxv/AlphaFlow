@@ -487,8 +487,8 @@ class HomepageProviderAdapter:
                     content_hash=seen_assertions.get(source_record_key) or sha256_hash(record),
                     request_params_hash=sha256_hash(request.request_params),
                     provider_version=self.provider_version,
-                    upstream_as_of=_first_page_value(pages, "upstream_as_of"),
-                    source_published_at=_first_page_value(pages, "source_published_at"),
+                    upstream_as_of=_first_page_value(pages, "upstream_as_of") or _record_time(record, "upstreamAsOf", "upstream_as_of", "asOf", "as_of"),
+                    source_published_at=_first_page_value(pages, "source_published_at") or _record_time(record, "sourcePublishedAt", "source_published_at", "publishedAt", "published_at", "pub_time"),
                     fetched_at=datetime.now(UTC),
                 )
                 if assertion.assertion_key not in {current.assertion_key for current in assertions}:
@@ -496,7 +496,7 @@ class HomepageProviderAdapter:
 
         covered_scope = _merge_scope([page.covered_scope for page in pages], fallback=request.requested_scope if pagination_exhausted and not errors else {})
         missing_scope = _merge_scope([page.missing_scope for page in pages])
-        actual_cutoff = _latest_cutoff([page.actual_data_cutoff for page in pages])
+        actual_cutoff = _latest_cutoff([page.actual_data_cutoff for page in pages]) or _infer_cutoff(raw_items, request)
         target_reached = _cutoff_reached(actual_cutoff, request.target_data_cutoff)
         if not target_reached and request.target_data_cutoff is not None:
             missing_scope = {**missing_scope, "dataCutoff": request.target_data_cutoff.to_dict()}
@@ -545,8 +545,8 @@ class HomepageProviderAdapter:
             normalization_rules_version=self.normalization_rules_version,
             errors=tuple(errors),
             authority=authority,
-            upstream_as_of=_first_page_value(pages, "upstream_as_of"),
-            source_published_at=_first_page_value(pages, "source_published_at"),
+            upstream_as_of=_first_page_value(pages, "upstream_as_of") or _latest_assertion_time(assertions, "upstream_as_of"),
+            source_published_at=_first_page_value(pages, "source_published_at") or _latest_assertion_time(assertions, "source_published_at"),
             replay=replay,
         )
         self._result_cache[request.idempotency_key or ""] = (request.request_fingerprint or "", result)
@@ -756,6 +756,51 @@ def _latest_cutoff(values: Iterable[DataCutoff | None]) -> DataCutoff | None:
         if selected is None or (value.key == selected.key and value.value > selected.value):
             selected = value
     return selected
+
+
+def _infer_cutoff(items: Sequence[Any], request: HomepageDataItemRequest) -> DataCutoff | None:
+    """从记录的业务日期推导截止点，不把抓取时间冒充数据截止点。"""
+
+    candidates: list[tuple[str, str]] = []
+    preferred_key = request.target_data_cutoff.key if request.target_data_cutoff else None
+    for item in items:
+        try:
+            record = _mapping(item)
+        except ProviderAdapterException:
+            continue
+        for key in ("tradeDate", "trade_date", "date", "periodEnd", "period_end", "publishedAt", "published_at", "pub_time"):
+            value = record.get(key)
+            if value in (None, ""):
+                continue
+            text = str(value)
+            if preferred_key and _normalized_key(key) == _normalized_key(preferred_key):
+                candidates.append((preferred_key, text))
+                break
+            if preferred_key is None:
+                candidates.append(("published_at" if "published" in key or key == "pub_time" else "trade_date", text))
+                break
+    if not candidates:
+        return None
+    key = preferred_key or candidates[0][0]
+    values = [value for candidate_key, value in candidates if candidate_key == key]
+    return DataCutoff(key, max(values)) if values else None
+
+
+def _record_time(record: Mapping[str, Any], *keys: str) -> datetime | None:
+    for key in keys:
+        value = record.get(key)
+        if value not in (None, ""):
+            return _parse_datetime(value)
+    return None
+
+
+def _normalized_key(value: str) -> str:
+    return value.replace("_", "").lower()
+
+
+def _latest_assertion_time(assertions: Sequence[SourceAssertion], field_name: str) -> datetime | None:
+    values = [getattr(item, field_name) for item in assertions if getattr(item, field_name) is not None]
+    return max(values) if values else None
 
 
 def _cutoff_reached(actual: DataCutoff | None, target: DataCutoff | None) -> bool:
