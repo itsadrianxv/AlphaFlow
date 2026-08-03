@@ -78,6 +78,38 @@ describe("首页快照读取", () => {
     });
   });
 
+  it("只有专业市场基线任务时不误报个性化处理中", async () => {
+    const db = {
+      homepageCurrentSnapshotProjection: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(
+            projection({
+              id: "baseline-1",
+              scope: "BASELINE",
+              manifestId: "manifest-base",
+            }),
+          ),
+      },
+      homepageGenerationTask: {
+        findFirst: vi.fn(async (args: { where: { manifest: { scope: string } } }) =>
+          args.where.manifest.scope === "BASELINE"
+            ? { id: "baseline-task-1" }
+            : null,
+        ),
+      },
+    };
+
+    const result = await getHomePageSnapshot(db as never, "user-1");
+
+    expect(result).toMatchObject({
+      source: "BASELINE",
+      refreshInProgress: true,
+      personalizationPending: false,
+    });
+  });
+
   it("个性化未就绪但存在任务时回退基线并标记 pending", async () => {
     const db = {
       homepageCurrentSnapshotProjection: {

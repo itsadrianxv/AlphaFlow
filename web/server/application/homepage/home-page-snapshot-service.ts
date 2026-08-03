@@ -151,24 +151,35 @@ async function findProjection(
   });
 }
 
+async function findActiveTask(
+  db: HomePageDb,
+  scope: HomepageScope,
+  userId?: string,
+) {
+  return db.homepageGenerationTask.findFirst({
+    where: {
+      status: { in: ["PENDING", "RUNNING", "RETRY_WAIT"] },
+      manifest: {
+        scope,
+        ...(scope === "PERSONALIZED" ? { userId } : {}),
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export async function getHomePageSnapshot(db: HomePageDb, userId: string) {
   const [
     personalizedProjection,
     baselineProjection,
-    activeTask,
+    personalizedTask,
+    baselineTask,
     marketBaseline,
   ] = await Promise.all([
     findProjection(db, { scope: "PERSONALIZED", userId }),
     findProjection(db, { scope: "BASELINE", userId: null }),
-    db.homepageGenerationTask.findFirst({
-      where: {
-        status: { in: ["PENDING", "RUNNING", "RETRY_WAIT"] },
-        manifest: {
-          OR: [{ scope: "PERSONALIZED", userId }, { scope: "BASELINE" }],
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    }),
+    findActiveTask(db, "PERSONALIZED", userId),
+    findActiveTask(db, "BASELINE"),
     readHomepageMarketBaseline(db),
   ]);
   if (!baselineProjection) throw new Error("专业市场基线快照尚未就绪");
@@ -186,8 +197,9 @@ export async function getHomePageSnapshot(db: HomePageDb, userId: string) {
     generatedAt: selected.generatedAt.toISOString(),
     dataCoverage: selected.dataCoverageJson,
     baselineOutdated,
-    refreshInProgress: Boolean(activeTask),
-    personalizationPending: !personalizedProjection && Boolean(activeTask),
+    refreshInProgress: Boolean(personalizedTask || baselineTask),
+    personalizationPending:
+      !personalizedProjection && Boolean(personalizedTask),
     payload,
     marketBaseline,
   };
