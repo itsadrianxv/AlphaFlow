@@ -1,0 +1,3 @@
+add_library(data_acquisition_worker_domain INTERFACE)
+target_include_directories(data_acquisition_worker_domain INTERFACE src)
+target_link_libraries(data_acquisition_worker_domain INTERFACE data-acquisition-worker_core)
