@@ -4,7 +4,9 @@ import { Copy, MessageSquare, Plus, Save, Trash2, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { MarkdownContent } from "~/app/_components/markdown-content";
 import { InlineNotice, WorkspaceShell } from "~/app/_components/ui";
+import { splitAgentReasoningSection } from "~/app/agent-runtime/message-display";
 import { isScoringDraftReadyForAutosave } from "~/app/scheduled-tasks/builder/scoring-task-autosave";
 import { SCHEDULED_TASK_WORKBENCH_SECTIONS } from "~/server/domain/scheduled-task/workbench-release-gate";
 import { api } from "~/trpc/react";
@@ -178,6 +180,45 @@ function AgentSendIcon(props: { className?: string }) {
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+function AgentAssistantMessage(props: { content: string; status: string }) {
+  const content = props.content;
+  if (!content) {
+    return (
+      <div className="whitespace-pre-wrap text-sm leading-6">
+        {props.status === "PENDING" || props.status === "STREAMING"
+          ? "正在准备回复"
+          : props.status}
+      </div>
+    );
+  }
+
+  const sections = splitAgentReasoningSection(content);
+
+  return (
+    <>
+      {sections.mainContent ? (
+        <MarkdownContent
+          content={sections.mainContent}
+          compact
+          className="max-w-none [&>*+*]:mt-3"
+        />
+      ) : null}
+      {sections.reasoningContent ? (
+        <details className="mt-4 border-t border-[var(--app-border-soft)] pt-3 text-sm">
+          <summary className="cursor-pointer select-none font-medium text-[var(--app-text-muted)] transition-colors hover:text-[var(--app-text-strong)]">
+            分析过程
+          </summary>
+          <MarkdownContent
+            content={sections.reasoningContent}
+            compact
+            className="mt-3 max-w-none text-[var(--app-text-muted)] [&>*+*]:mt-3"
+          />
+        </details>
+      ) : null}
+    </>
   );
 }
 
@@ -813,10 +854,10 @@ export function ScoringTaskBuilder() {
         </button>
       </div>
 
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+      <div className="lg:pr-[360px]">
         <aside
           aria-label="Agent 辅助"
-          className={`${mobilePane === "agent" ? "flex" : "hidden"} flex-col border-b border-[var(--app-border-soft)] bg-[var(--app-panel)] lg:sticky lg:top-0 lg:order-2 lg:flex lg:h-screen lg:overflow-hidden lg:border-b-0 lg:border-l`}
+          className={`${mobilePane === "agent" ? "flex" : "hidden"} flex-col border-b border-[var(--app-border-soft)] bg-[var(--app-panel)] lg:fixed lg:top-0 lg:right-0 lg:z-30 lg:flex lg:h-screen lg:w-[360px] lg:overflow-hidden lg:border-b-0 lg:border-l`}
         >
           <div className="flex shrink-0 items-center gap-2 border-b border-[var(--app-border-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-text-strong)]">
             <MessageSquare size={16} />
@@ -841,12 +882,16 @@ export function ScoringTaskBuilder() {
                           : "min-w-0 max-w-full text-[var(--app-text-strong)]"
                       }
                     >
-                      <div className="whitespace-pre-wrap text-sm leading-6">
-                        {message.content ||
-                          (message.role === "ASSISTANT"
-                            ? "正在准备回复"
-                            : message.status)}
-                      </div>
+                      {message.role === "ASSISTANT" ? (
+                        <AgentAssistantMessage
+                          content={message.content}
+                          status={message.status}
+                        />
+                      ) : (
+                        <div className="whitespace-pre-wrap text-sm leading-6">
+                          {message.content || message.status}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

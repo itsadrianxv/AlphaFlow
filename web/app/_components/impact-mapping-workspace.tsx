@@ -584,7 +584,7 @@ function NewsAnalysis({
       >
         <ol
           data-testid="impact-news-timeline"
-          className="relative flex h-[26rem] min-w-max items-stretch px-6 py-2"
+          className="relative flex h-[16rem] min-w-max items-stretch px-6 py-2"
         >
           <span
             aria-hidden="true"
@@ -598,12 +598,12 @@ function NewsAnalysis({
                 key={entry.id}
                 className="relative z-10 grid h-full w-56 min-w-56 grid-rows-[1fr_auto_1fr]"
               >
-                <div className="relative flex min-h-0 items-end justify-center pb-4">
+                <div className="relative flex min-h-0 items-end justify-center pb-3">
                   {position === "above" ? (
                     <>
                       <span
                         aria-hidden="true"
-                        className="absolute bottom-0 left-1/2 h-4 w-px -translate-x-1/2 bg-[var(--app-border-strong)]"
+                        className="absolute bottom-0 left-1/2 h-3 w-px -translate-x-1/2 bg-[var(--app-border-strong)]"
                       />
                       <TimelineEventNode
                         entry={entry}
@@ -623,12 +623,12 @@ function NewsAnalysis({
                     }`}
                   />
                 </div>
-                <div className="relative flex min-h-0 items-start justify-center pt-4">
+                <div className="relative flex min-h-0 items-start justify-center pt-3">
                   {position === "below" ? (
                     <>
                       <span
                         aria-hidden="true"
-                        className="absolute left-1/2 top-0 h-4 w-px -translate-x-1/2 bg-[var(--app-border-strong)]"
+                        className="absolute left-1/2 top-0 h-3 w-px -translate-x-1/2 bg-[var(--app-border-strong)]"
                       />
                       <TimelineEventNode
                         entry={entry}

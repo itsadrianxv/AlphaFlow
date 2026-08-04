@@ -1000,9 +1000,6 @@ function TargetContentList(props: {
                                     {note.title}
                                   </p>
                                 ) : null}
-                                <ResearchNoteMindMapLinks
-                                  linkedMindMaps={note.linkedMindMaps}
-                                />
                                 <EditableMarkdownBlock
                                   content={note.contentMarkdown}
                                   saving={noteSaving}
@@ -1012,6 +1009,9 @@ function TargetContentList(props: {
                                     onSaveNote(note, content)
                                   }
                                   onFormat={() => onFormatNote(note)}
+                                />
+                                <ResearchNoteMindMapLinks
+                                  linkedMindMaps={note.linkedMindMaps}
                                 />
                               </>
                             );

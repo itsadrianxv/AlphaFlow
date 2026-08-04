@@ -249,7 +249,7 @@ describe("ImpactMappingWorkspace", () => {
 
   it("所有尺寸使用同一条横向时间轴，并通过悬浮或聚焦展示摘要", () => {
     expect(workspaceSource).toContain('data-testid="impact-news-timeline"');
-    expect(workspaceSource).toContain("h-[26rem] min-w-max");
+    expect(workspaceSource).toContain("h-[16rem] min-w-max");
     expect(workspaceSource).toContain("group-hover:opacity-100");
     expect(workspaceSource).toContain("group-focus-within:opacity-100");
     expect(workspaceSource).not.toContain("md:hidden");

@@ -161,8 +161,10 @@ describe("评分规则构建器 Agent 变更集", () => {
 
     expect(source).toContain("h-10 w-full");
     expect(source).toContain("!py-0");
-    expect(source).toContain("lg:sticky lg:top-0");
-    expect(source).toContain("lg:h-screen lg:overflow-hidden");
+    expect(source).toContain("lg:fixed lg:top-0 lg:right-0");
+    expect(source).toContain("lg:pr-[360px]");
+    expect(source).toContain("lg:h-screen");
+    expect(source).toContain("lg:overflow-hidden");
   });
 
   it("Agent 辅助复用投研智能体消息布局并把输入区固定在底部", async () => {
@@ -180,6 +182,21 @@ describe("评分规则构建器 Agent 变更集", () => {
     expect(source).toContain("shrink-0 border-t");
     expect(source).toContain("h-[93px]");
     expect(source).toContain('aria-label="发送消息"');
+  });
+
+  it("Agent 辅助默认收起分析过程章节", async () => {
+    const source = await readFile(
+      path.resolve(
+        import.meta.dirname,
+        "../app/scheduled-tasks/builder/scoring-task-builder.tsx",
+      ),
+      "utf8",
+    );
+
+    expect(source).toContain("splitAgentReasoningSection");
+    expect(source).toContain("<details");
+    expect(source).toContain("分析过程");
+    expect(source).toContain("reasoningContent");
   });
 
   it("评分构建器 Agent 技能不接收或修改投递凭证", async () => {

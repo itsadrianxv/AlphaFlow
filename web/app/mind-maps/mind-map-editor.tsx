@@ -156,7 +156,12 @@ export type MindMapEditorHandle = {
 type MindMapEditorProps = {
   data: Record<string, unknown>;
   config: MindMapEditorConfig;
-  onChange: (data: MindMapDocumentData) => void;
+  readonly?: boolean;
+  height?: number;
+  restoreView?: boolean;
+  fitOnReady?: boolean;
+  loadingLabel?: string;
+  onChange?: (data: MindMapDocumentData) => void;
   onSelectionChange?: (selection: MindMapSelection) => void;
   onHistoryChange?: (history: MindMapHistoryState) => void;
   onScaleChange?: (scale: number) => void;
@@ -185,13 +190,18 @@ function readSelection(nodes: MindMapActiveNode[]): MindMapSelection {
   };
 }
 
-export const MindMapEditor = forwardRef<
+export const MindMapCanvas = forwardRef<
   MindMapEditorHandle,
   MindMapEditorProps
->(function MindMapEditor(
+>(function MindMapCanvas(
   {
     data,
     config,
+    readonly = false,
+    height,
+    restoreView = true,
+    fitOnReady = false,
+    loadingLabel = "正在加载思维导图编辑器",
     onChange,
     onSelectionChange,
     onHistoryChange,
@@ -218,6 +228,9 @@ export const MindMapEditor = forwardRef<
   });
   const initialDataRef = useRef(data);
   const initialConfigRef = useRef(config);
+  const initialReadonlyRef = useRef(readonly);
+  const initialRestoreViewRef = useRef(restoreView);
+  const initialFitOnReadyRef = useRef(fitOnReady);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -234,7 +247,7 @@ export const MindMapEditor = forwardRef<
 
   const emitData = useCallback(() => {
     const instance = instanceRef.current;
-    if (!instance) return;
+    if (!instance || !callbacksRef.current.onChange) return;
     callbacksRef.current.onChange(normalizeMindMapData(instance.getData(true)));
   }, []);
 
@@ -332,12 +345,13 @@ export const MindMapEditor = forwardRef<
           layout: fullData.layout,
           theme: fullData.theme.template,
           themeConfig: fullData.theme.config,
-          viewData: fullData.view,
+          viewData: initialRestoreViewRef.current ? fullData.view : null,
           fit: true,
           initRootNodePosition: ["center", "center"],
           openRealtimeRenderOnNodeTextEdit: true,
           nodeTextEditZIndex: 70,
           ...initialConfigRef.current,
+          readonly: initialReadonlyRef.current,
         });
         instanceRef.current = instance;
 
@@ -393,23 +407,25 @@ export const MindMapEditor = forwardRef<
           });
         };
 
-        instance.on("data_change", handleDataChange);
-        instance.on("view_data_change", handleViewChange);
-        instance.on("node_active", handleActive);
-        instance.on("back_forward", handleHistory);
+        if (!initialReadonlyRef.current) {
+          instance.on("data_change", handleDataChange);
+          instance.on("view_data_change", handleViewChange);
+          instance.on("node_active", handleActive);
+          instance.on("back_forward", handleHistory);
+          instance.on("search_match_node_list_change", handleSearchList);
+          instance.on("search_info_change", handleSearchInfo);
+          instance.on("painter_start", () =>
+            callbacksRef.current.onPainterChange?.(true),
+          );
+          instance.on("painter_end", () =>
+            callbacksRef.current.onPainterChange?.(false),
+          );
+          instance.on("node_contextmenu", handleContextMenu);
+          instance.on("draw_click", () =>
+            callbacksRef.current.onContextMenu?.(null),
+          );
+        }
         instance.on("scale", handleScale);
-        instance.on("search_match_node_list_change", handleSearchList);
-        instance.on("search_info_change", handleSearchInfo);
-        instance.on("painter_start", () =>
-          callbacksRef.current.onPainterChange?.(true),
-        );
-        instance.on("painter_end", () =>
-          callbacksRef.current.onPainterChange?.(false),
-        );
-        instance.on("node_contextmenu", handleContextMenu);
-        instance.on("draw_click", () =>
-          callbacksRef.current.onContextMenu?.(null),
-        );
 
         resizeObserver = new ResizeObserver(() => instance.resize());
         resizeObserver.observe(containerRef.current);
@@ -420,6 +436,7 @@ export const MindMapEditor = forwardRef<
           activeNodesRef.current = [];
         };
         setLoading(false);
+        if (initialFitOnReadyRef.current) instance.view.fit();
         callbacksRef.current.onScaleChange?.(instance.view.scale);
         callbacksRef.current.onReady?.();
       } catch (error) {
@@ -438,10 +455,15 @@ export const MindMapEditor = forwardRef<
   }, [emitData]);
 
   return (
-    <div className="relative h-full min-h-[560px] overflow-hidden bg-white">
+    <div
+      className={`relative h-full overflow-hidden bg-white ${
+        height === undefined ? "min-h-[560px]" : ""
+      }`}
+      style={height === undefined ? undefined : { height, minHeight: height }}
+    >
       {loading ? (
         <div className="absolute inset-0 z-10 grid place-items-center bg-white text-sm text-neutral-500">
-          正在加载思维导图编辑器
+          {loadingLabel}
         </div>
       ) : null}
       {loadError ? (
@@ -449,7 +471,14 @@ export const MindMapEditor = forwardRef<
           {loadError}
         </div>
       ) : null}
-      <div ref={containerRef} className="h-full min-h-[560px] w-full" />
+      <div
+        ref={containerRef}
+        className={`h-full w-full ${
+          height === undefined ? "min-h-[560px]" : ""
+        }`}
+      />
     </div>
   );
 });
+
+export const MindMapEditor = MindMapCanvas;

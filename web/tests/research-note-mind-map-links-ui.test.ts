@@ -23,16 +23,19 @@ const linkedMindMaps = [
 ];
 
 describe("投研笔记关联导图入口", () => {
-  it("渲染一条笔记关联的全部思维导图入口", () => {
+  it("渲染全部导图标签和当前导图入口", () => {
     const html = renderToStaticMarkup(
       React.createElement(ResearchNoteMindMapLinks, { linkedMindMaps }),
     );
 
     expect(html).toContain("关联思维导图");
     expect(html).toContain('href="/mind-maps/mind-map-1"');
-    expect(html).toContain('href="/mind-maps/mind-map-2"');
+    expect(html).not.toContain('href="/mind-maps/mind-map-2"');
     expect(html).toContain("需求与技术路线");
     expect(html).toContain("证据核验");
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('aria-selected="true"');
+    expect(html).toContain("滚动至此加载导图");
   });
 
   it("笔记没有关联导图时不渲染空区域", () => {
