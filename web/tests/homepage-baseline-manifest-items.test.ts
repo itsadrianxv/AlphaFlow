@@ -11,13 +11,14 @@ describe("首页专业市场基线清单项构造", () => {
       const items = buildHomepageBaselineManifestItems(phase, "2026-08-01");
 
       const newsItem = items.find((item) => item.datasetKey === "news.major");
-      expect(newsItem?.targetDataCutoffKey).toBe("2026-08-01T23:59:59+08:00");
+      expect(newsItem?.targetDataCutoffKey).toBe("published_at");
       expect(newsItem?.targetDataCutoffJson).toEqual({
         key: "published_at",
         value: "2026-08-01T23:59:59+08:00",
       });
 
       const marketItem = items.find((item) => item.datasetKey === "market_snapshot");
+      expect(marketItem?.targetDataCutoffKey).toBe("trade_date");
       expect(marketItem?.targetDataCutoffJson).toEqual({
         key: "trade_date",
         value: "2026-08-01",

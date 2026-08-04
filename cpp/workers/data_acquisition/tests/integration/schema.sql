@@ -142,6 +142,23 @@ CREATE TABLE "DataObservationRevisionInput" (
   PRIMARY KEY("revisionId","inputRevisionId")
 );
 
+CREATE TABLE "ResearchRuntimeObservation" (
+  id TEXT PRIMARY KEY,
+  "idempotencyKey" TEXT UNIQUE NOT NULL,
+  "metricKind" TEXT NOT NULL,
+  "sourceKey" TEXT,
+  "datasetKey" TEXT,
+  stage TEXT,
+  "resourcePoolKey" TEXT,
+  "productClockAt" TIMESTAMPTZ,
+  "readyAt" TIMESTAMPTZ NOT NULL,
+  success BOOLEAN NOT NULL DEFAULT TRUE,
+  degraded BOOLEAN NOT NULL DEFAULT FALSE,
+  "errorClass" TEXT,
+  "observationContextJson" JSONB,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE "HomepageDataManifestItemSettlement" (
   id TEXT PRIMARY KEY,
   "manifestItemId" TEXT UNIQUE NOT NULL REFERENCES "HomepageDataManifestItem"(id) ON DELETE RESTRICT,

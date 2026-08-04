@@ -113,12 +113,13 @@ function displayValue(value: unknown, unit: string | null) {
   return "结构化记录";
 }
 
-function numericValue(value: unknown): number | null {
+export function homepageBaselineNumericValue(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
+  if (!value || typeof value !== "object") return null;
   const source = record(value);
   for (const key of [
     "value",
@@ -128,7 +129,8 @@ function numericValue(value: unknown): number | null {
     "changePercent",
     "net_amount",
   ]) {
-    const parsed = numericValue(source[key]);
+    if (source[key] === value) continue;
+    const parsed = homepageBaselineNumericValue(source[key]);
     if (parsed !== null) return parsed;
   }
   return null;
@@ -326,7 +328,7 @@ export async function readHomepageMarketBaseline(
     const chartPoints = (domainId: HomepageMarketDomainId) =>
       (domains.find((domain) => domain.id === domainId)?.observations ?? [])
         .map((observation) => {
-          const value = numericValue(observation.value);
+          const value = homepageBaselineNumericValue(observation.value);
           return value === null
             ? null
             : {

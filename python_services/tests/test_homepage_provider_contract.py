@@ -110,6 +110,26 @@ def test_partial_cutoff_is_degraded_and_exposes_missing_scope() -> None:
     assert result.missing_scope["dataCutoff"] == {"key": "trade_date", "value": "2026-08-01"}
 
 
+def test_missing_target_cutoff_without_observations_is_a_retryable_error() -> None:
+    adapter = ScriptedHomepageProviderAdapter(
+        {
+            "fixture": [
+                AdapterPage(
+                    items=(),
+                    actual_data_cutoff=DataCutoff("trade_date", "2026-07-31"),
+                )
+            ]
+        }
+    )
+
+    result = adapter.fetch(_request())
+
+    assert result.result_status == ResultStatus.ERROR
+    assert result.quality_status == QualityStatus.DEGRADED
+    assert result.errors[0].error_class == "coverage_incomplete"
+    assert result.errors[0].retryability == Retryability.RETRYABLE
+
+
 def test_business_date_is_used_as_cutoff_when_page_does_not_supply_one() -> None:
     adapter = ScriptedHomepageProviderAdapter({"fixture": [AdapterPage(items=(_record(),))]})
 

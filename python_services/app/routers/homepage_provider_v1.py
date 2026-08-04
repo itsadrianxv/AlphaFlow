@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
@@ -26,6 +27,7 @@ def _require_internal_secret(secret: str | None) -> None:
         raise HTTPException(status_code=401, detail={"code": "UNAUTHORIZED", "message": "内部密钥无效"})
 
 
+@lru_cache(maxsize=3)
 def _adapter_for(provider_key: str):
     if provider_key == "minishare":
         return MinishareHomepageProviderAdapter()

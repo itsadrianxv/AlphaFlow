@@ -525,6 +525,8 @@ class HomepageDataItemResult:
             raise ValueError("error 结果必须包含结构化错误")
         if status == ResultStatus.EMPTY.value and self.observations:
             raise ValueError("empty 结果不能包含规范化观测")
+        if status == ResultStatus.DEGRADED.value and not self.observations:
+            raise ValueError("degraded 结果必须包含至少一个可用规范化观测")
         # 结果状态描述覆盖/可交付性，质量状态描述数据质量；两者必须保持独立。
         _validate_no_non_finite(self.observation_period, path="observationPeriod")
         if self.upstream_as_of is not None:

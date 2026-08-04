@@ -65,7 +65,7 @@ describePostgres("首页专业市场基线自举 PostgreSQL 契约", () => {
       HOMEPAGE_BASELINE_DATASETS.map((item) => item.datasetKey).sort(),
     );
     const newsItem = manifest.items.find((item) => item.datasetKey === "news.major");
-    expect(newsItem?.targetDataCutoffKey).toBe(`${targetTradeDate}T23:59:59+08:00`);
+    expect(newsItem?.targetDataCutoffKey).toBe("published_at");
     expect(newsItem?.targetDataCutoffJson).toEqual({
       key: "published_at",
       value: `${targetTradeDate}T23:59:59+08:00`,

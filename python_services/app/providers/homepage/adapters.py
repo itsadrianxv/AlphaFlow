@@ -544,6 +544,14 @@ class HomepageProviderAdapter:
                 message="合法 empty 结果必须保留请求范围已覆盖证明和实际数据截止点",
                 code="EMPTY_RESULT_MISSING_CUTOFF",
             ))
+        if not observations and not errors and not target_reached and request.target_data_cutoff is not None:
+            errors.append(ProviderError(
+                error_class="coverage_incomplete",
+                retryability=Retryability.RETRYABLE,
+                message="Provider 未返回达到目标数据截止点的可用观测",
+                code="TARGET_CUTOFF_NOT_REACHED",
+                details={"targetDataCutoff": request.target_data_cutoff.to_dict()},
+            ))
         if errors and not observations:
             result_status = ResultStatus.ERROR
             quality = QualityStatus.ISOLATED if all(item.error_class in {"unsupported_dataset", "contract_incompatible", "normalization_failed", "invalid_response", "replay_unavailable"} for item in errors) else QualityStatus.DEGRADED

@@ -16,7 +16,6 @@
     "dev:turbo": "next dev --turbo",
     "postinstall": "prisma generate",
     "preview": "next build && next start",
-    "homepage:bootstrap-baseline": "tsx tooling/bootstrap-homepage-baseline-manifest.ts",
     "screening:reset-legacy-data": "tsx tooling/reset-legacy-screening-data.ts",
     "start": "next start",
     "validate:runtime": "tsx tooling/validate-runtime-env.ts",

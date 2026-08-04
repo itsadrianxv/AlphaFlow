@@ -3,6 +3,12 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.routers.homepage_provider_v1 import _adapter_for
+
+
+def test_homepage_provider_adapter_is_reused_for_same_provider_key() -> None:
+    assert _adapter_for("tushare") is _adapter_for("tushare")
+    assert _adapter_for("minishare") is _adapter_for("minishare")
 
 
 def test_homepage_provider_internal_route_enforces_contract_and_returns_envelope(monkeypatch) -> None:

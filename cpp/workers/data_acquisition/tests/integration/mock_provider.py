@@ -9,6 +9,7 @@ attempts: dict[str, int] = {}
 
 
 def _success(attempt_id: str) -> dict:
+    observation_suffix = "success" if attempt_id == "repeated-success" else attempt_id
     return {
         "contractVersion": "1.0",
         "datasetKey": "fixture",
@@ -21,7 +22,7 @@ def _success(attempt_id: str) -> dict:
         "actualDataCutoff": {"key": "trade_date", "value": "2026-08-01"},
         "observations": [
             {
-                "identityKey": f"obs-{attempt_id}",
+                "identityKey": f"obs-{observation_suffix}",
                 "canonicalizationVersion": "jcs-1",
                 "subjectType": "stock",
                 "subjectKey": "600000.SH",
@@ -37,12 +38,12 @@ def _success(attempt_id: str) -> dict:
         ],
         "sourceAssertions": [
             {
-                "assertionKey": f"assertion-{attempt_id}",
+                "assertionKey": f"assertion-{observation_suffix}",
                 "canonicalizationVersion": "jcs-1",
                 "sourceKey": "test",
                 "datasetKey": "fixture",
                 "sourceRecordKey": "row-1",
-                "observationIdentityKey": f"obs-{attempt_id}",
+                "observationIdentityKey": f"obs-{observation_suffix}",
                 "rawRecord": {"close": "10.50"},
                 "contentHash": "sha256:content",
                 "requestParamsHash": "sha256:request",
@@ -68,7 +69,7 @@ class Handler(BaseHTTPRequestHandler):
         attempt_id = payload.get("attemptId", "unknown")
         attempts[attempt_id] = attempts.get(attempt_id, 0) + 1
 
-        if attempt_id == "retry-then-success" and attempts[attempt_id] == 1:
+        if attempt_id == "always-retry" or (attempt_id == "retry-then-success" and attempts[attempt_id] == 1):
             body = {"code": "rate_limited", "message": "限流", "retryable": True}
             self.send_response(429)
         elif attempt_id == "terminal-error":

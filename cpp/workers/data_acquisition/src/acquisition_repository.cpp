@@ -142,6 +142,12 @@ void AcquisitionRepository::settle(const AcquisitionTask& task, AcquisitionSettl
   pqxx::connection connection(config_.database_url);
   pqxx::work transaction(connection);
 
+  if (settlement.disposition == task_lifecycle::SettlementDisposition::retry &&
+      task.attempt >= config_.max_attempts) {
+    settlement.disposition = task_lifecycle::SettlementDisposition::terminal_failure;
+    settlement.retry_delay = {};
+  }
+
   if (settlement.disposition == task_lifecycle::SettlementDisposition::retry) {
     const auto& failure = *settlement.failure;
     const auto updated = transaction.exec_params(
@@ -167,12 +173,12 @@ void AcquisitionRepository::settle(const AcquisitionTask& task, AcquisitionSettl
             jsonb_build_object(
               'taskId', $1,
               'taskType', 'homepage-data-acquisition',
-              'inputContractVersion', $6,
-              'inputHash', $7,
+              'inputContractVersion', $6::text,
+              'inputHash', $7::text,
               'authoritativeObjectIds', jsonb_build_array($1),
-              'retryAttempt', $8,
+              'retryAttempt', $8::int,
               'fencingToken', $2::text,
-              'degradedReason', $5
+              'degradedReason', $5::text
             )
           )
           ON CONFLICT ("idempotencyKey") DO NOTHING
@@ -298,6 +304,13 @@ void AcquisitionRepository::settle(const AcquisitionTask& task, AcquisitionSettl
             SELECT
               obs,
               o.id AS observation_id,
+              'rev:' || md5(jsonb_build_object(
+                'identityKey', obs->>'identityKey',
+                'valueText', obs->>'valueText',
+                'valueJson', obs->'valueJson',
+                'missingReason', obs->>'missingReason',
+                'normalizationRulesVersion', ($1::jsonb)->>'normalizationRulesVersion'
+              )::text) AS revision_id,
               'sha256:' || md5(jsonb_build_object(
                 'identityKey', obs->>'identityKey',
                 'valueText', obs->>'valueText',
@@ -323,7 +336,7 @@ void AcquisitionRepository::settle(const AcquisitionTask& task, AcquisitionSettl
               "upstreamAsOf", "sourcePublishedAt", "normalizedAt"
             )
             SELECT
-              'rev:' || md5(revision_dedup_key),
+              revision_id,
               observation_id,
               COALESCE(current_revision_no, 0) + 1,
               revision_dedup_key,
@@ -342,6 +355,7 @@ void AcquisitionRepository::settle(const AcquisitionTask& task, AcquisitionSettl
               NULLIF(($1::jsonb)->>'sourcePublishedAt', '')::timestamptz,
               COALESCE(NULLIF(($1::jsonb)->>'normalizedAt', '')::timestamptz, NOW())
             FROM current_state
+            WHERE "currentRevisionId" IS DISTINCT FROM revision_id
             ON CONFLICT ("revisionDedupKey") DO NOTHING
             RETURNING id, "observationId"
            ),

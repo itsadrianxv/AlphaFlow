@@ -46,12 +46,23 @@ publish success
 wait_status success SUCCEEDED
 [ "$($compose exec -T postgres-test psql -U postgres -d acquisition_worker_test -Atc "SELECT COUNT(*) FROM \"HomepageDataManifestItemSettlement\" WHERE \"settledAttemptId\"='success'")" = "1" ]
 
+insert_attempt repeated-success
+publish repeated-success
+wait_status repeated-success SUCCEEDED
+[ "$($compose exec -T postgres-test psql -U postgres -d acquisition_worker_test -Atc "SELECT COUNT(*) FROM \"DataObservationRevision\"")" = "1" ]
+[ "$($compose exec -T postgres-test psql -U postgres -d acquisition_worker_test -Atc "SELECT COUNT(*) FROM \"DataObservationRevision\" WHERE \"supersedesRevisionId\"=id")" = "0" ]
+
 insert_attempt retry-then-success
 publish retry-then-success
 wait_status retry-then-success RETRY_WAIT
 $compose exec -T postgres-test psql -U postgres -d acquisition_worker_test -c "UPDATE \"HomepageDataManifestItemAttempt\" SET \"nextAttemptAt\"=NOW() WHERE id='retry-then-success'" >/dev/null
 wait_status retry-then-success SUCCEEDED
 [ "$($compose exec -T postgres-test psql -U postgres -d acquisition_worker_test -Atc "SELECT attempts FROM \"HomepageDataManifestItemAttempt\" WHERE id='retry-then-success'")" = "2" ]
+
+insert_attempt always-retry
+publish always-retry
+wait_status always-retry FAILED
+[ "$($compose exec -T postgres-test psql -U postgres -d acquisition_worker_test -Atc "SELECT COUNT(*) FROM \"HomepageDataManifestItemSettlement\" WHERE \"settledAttemptId\"='always-retry'")" = "1" ]
 
 insert_attempt terminal-error
 publish terminal-error

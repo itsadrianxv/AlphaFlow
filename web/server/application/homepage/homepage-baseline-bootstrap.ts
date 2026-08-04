@@ -141,7 +141,7 @@ export function buildHomepageBaselineManifestItems(
       requirementVersion: REQUIREMENT_VERSION,
       required: definition.required,
       emptyPolicy: definition.emptyPolicy,
-      targetDataCutoffKey: targetDataCutoffValue,
+      targetDataCutoffKey: targetDataCutoffJson.key,
       targetDataCutoffJson,
       providerKey: definition.providerKey,
       providerContractVersion: PROVIDER_CONTRACT_VERSION,
