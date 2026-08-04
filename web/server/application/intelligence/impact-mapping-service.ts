@@ -16,6 +16,7 @@ import {
   impactScenarioSchema,
 } from "~/server/domain/intelligence/impact-mapping";
 import type { ThemeNewsItem } from "~/server/domain/intelligence/types";
+import { readHomepageNewsRadar } from "~/server/application/homepage/homepage-news-radar";
 import type { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import type { PrismaEvidenceContextRepository } from "~/server/infrastructure/evidence-context/prisma-evidence-context-repository";
 import type { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
@@ -1023,14 +1024,13 @@ export class ImpactMappingService {
       });
       value = run?.result;
     } else if (source.snapshotId) {
-      const snapshot = await this.deps.prisma.homepageSnapshot.findFirst({
-        where: {
-          id: source.snapshotId,
-          OR: [{ scope: "BASELINE" }, { userId }],
-        },
-        select: { payloadJson: true },
-      });
-      value = asObject(snapshot?.payloadJson).impactMapping;
+      value = (
+        await readHomepageNewsRadar(
+          this.deps.prisma,
+          source.snapshotId,
+          userId,
+        )
+      )?.result;
     }
     const result = asObject(value) as Partial<ImpactMappingResult>;
     const event =

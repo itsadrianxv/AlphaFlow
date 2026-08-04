@@ -9,6 +9,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useHomePageSnapshot } from "~/app/_components/home-page-snapshot-provider";
 import {
   buildStockKlinePreviewOption,
   StockKlineHoverCard,
@@ -16,7 +17,6 @@ import {
 import { type ThemeMode, useTheme } from "~/app/_components/theme-provider";
 import { companyOverviewHref } from "~/app/company-research/company-overview-link";
 import type { MarketHeatmapSnapshot } from "~/contracts/market-heatmap";
-import { useHomePageSnapshot } from "~/app/_components/home-page-snapshot-provider";
 import { api } from "~/trpc/react";
 
 type TreeMapDatum = {
@@ -229,7 +229,6 @@ export function buildHeatmapPreviewKlineOption(
 export function MarketHeatmapClient() {
   const router = useRouter();
   const { theme } = useTheme();
-  const [expanded, setExpanded] = useState(false);
   const [hoveredStock, setHoveredStock] = useState<HoveredStock | null>(null);
   const clearHoverTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
@@ -241,13 +240,12 @@ export function MarketHeatmapClient() {
       query.data?.payload.heatmap
         ? {
             ...query.data.payload.heatmap,
-            concepts: getUniqueConcepts(query.data.payload.heatmap.concepts).slice(
-              0,
-              expanded ? 15 : 8,
-            ),
+            concepts: getUniqueConcepts(
+              query.data.payload.heatmap.concepts,
+            ).slice(0, 15),
           }
         : null,
-    [expanded, query.data],
+    [query.data],
   );
   const legendColors = HEATMAP_COLORS[theme];
   const previewBars = api.companyOverview.bars.useQuery(
@@ -333,22 +331,7 @@ export function MarketHeatmapClient() {
   }, [cancelClearHover, router, scheduleClearHover, snapshot, theme]);
 
   return (
-    <section className="pt-2">
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-4">
-        <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-[var(--app-text-strong)]">
-            A 股概念热力图
-          </h1>
-        </div>
-        <button
-          type="button"
-          className="app-button inline-flex items-center gap-2"
-          onClick={() => setExpanded((value) => !value)}
-          disabled={!query.data}
-        >
-          {expanded ? "收起至 8 个概念" : "展开至 15 个概念"}
-        </button>
-      </div>
+    <section className="px-4 pt-4 md:px-6">
       {query.isLoading ? (
         <div className="flex min-h-[680px] items-center justify-center text-sm text-[var(--app-text-muted)]">
           正在读取市场快照…

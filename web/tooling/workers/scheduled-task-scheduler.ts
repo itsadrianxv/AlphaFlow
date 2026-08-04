@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { type Prisma, PrismaClient } from "@prisma/client";
 import Redis from "ioredis";
-import { homePageDueDateCandidates } from "../../server/application/homepage/home-page-schedule";
+import {
+  homePageDueDateCandidates,
+  homePageRevalidationBucket,
+  shanghaiClock,
+} from "../../server/application/homepage/home-page-schedule";
 import { publishHomePageGenerationTask } from "../../server/application/homepage/home-page-task-stream";
-import { HomepageBaselineBootstrap } from "../../server/application/homepage/homepage-baseline-bootstrap";
+import {
+  HomepageBaselineBootstrap,
+  resolveHomepageBaselinePhase,
+} from "../../server/application/homepage/homepage-baseline-bootstrap";
 import {
   BRIEFING_POOL_KEY,
   BriefingProductionScheduler,
@@ -640,18 +647,34 @@ async function recoverDatabaseEvents() {
 }
 
 async function scheduleHomePageDefault() {
+  const now = new Date();
+  const today = shanghaiClock(now).date;
   let targetTradeDate: string | undefined;
-  for (const candidate of homePageDueDateCandidates()) {
+  const candidates = [
+    today,
+    ...homePageDueDateCandidates(now).filter(
+      (candidate) => candidate !== today,
+    ),
+  ];
+  for (const candidate of candidates) {
     if (await isTradingDay(candidate.replaceAll("-", ""), "SSE")) {
       targetTradeDate = candidate;
       break;
     }
   }
   if (!targetTradeDate) return;
-  const result = await homepageBaselineBootstrap.ensureTradingDay({
+  const baseline = await homepageBaselineBootstrap.ensureTradingDay({
     targetTradeDate,
   });
-  for (const failure of result.publishFailures) {
+  const revalidation = await homepageBaselineBootstrap.ensureBaseline({
+    phase: resolveHomepageBaselinePhase(now),
+    targetTradeDate,
+    requestNonce: homePageRevalidationBucket(now),
+  });
+  for (const failure of [
+    ...baseline.publishFailures,
+    ...revalidation.publishFailures,
+  ]) {
     console.error(
       `[scheduler] homepage acquisition publish failed attempt=${failure.attemptId}`,
       failure.message,

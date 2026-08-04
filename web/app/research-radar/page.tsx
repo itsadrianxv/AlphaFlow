@@ -1,7 +1,5 @@
-import { ResearchRadarClient } from "~/app/research-radar/research-radar-client";
-import { requireAuth } from "~/server/auth/require-auth";
+import { redirect } from "next/navigation";
 
-export default async function ResearchRadarPage() {
-  await requireAuth("/research-radar");
-  return <ResearchRadarClient />;
+export default function ResearchRadarPage() {
+  redirect("/settings");
 }

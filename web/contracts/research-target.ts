@@ -49,6 +49,14 @@ export const researchTargetSummarySchema = z.object({
   updatedAt: z.string().nullable(),
 });
 
+export const linkedMindMapSummarySchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().nullable(),
+  nodeId: z.string().nullable(),
+  relationType: z.string().nullable(),
+});
+
 export const researchTargetNoteSchema = z.object({
   id: z.string().min(1),
   targetRef: researchTargetRefSchema,
@@ -58,6 +66,7 @@ export const researchTargetNoteSchema = z.object({
   rawContent: z.string().nullable(),
   source: z.unknown().nullable(),
   tags: z.array(z.string()),
+  linkedMindMaps: z.array(linkedMindMapSummarySchema),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -203,6 +212,7 @@ export type ResearchTargetRef = z.infer<typeof researchTargetRefSchema>;
 export type SavedCompanyDto = z.infer<typeof savedCompanySchema>;
 export type SavedIndustryDto = z.infer<typeof savedIndustrySchema>;
 export type ResearchTargetSummary = z.infer<typeof researchTargetSummarySchema>;
+export type LinkedMindMapSummary = z.infer<typeof linkedMindMapSummarySchema>;
 export type ResearchTargetNote = z.infer<typeof researchTargetNoteSchema>;
 export type FinancialSnapshotDto = z.infer<typeof financialSnapshotSchema>;
 export type ResearchArtifactDto = z.infer<typeof researchArtifactSchema>;

@@ -6,7 +6,6 @@ import {
   HOMEPAGE_PAYLOAD_SCHEMA_VERSION,
 } from "~/server/application/homepage/home-page-generation";
 import { publishHomePageGenerationTask } from "~/server/application/homepage/home-page-task-stream";
-import { readHomepageMarketBaseline } from "~/server/application/homepage/homepage-market-baseline-read-model";
 
 type HomePageDb = PrismaClient;
 
@@ -174,13 +173,11 @@ export async function getHomePageSnapshot(db: HomePageDb, userId: string) {
     baselineProjection,
     personalizedTask,
     baselineTask,
-    marketBaseline,
   ] = await Promise.all([
     findProjection(db, { scope: "PERSONALIZED", userId }),
     findProjection(db, { scope: "BASELINE", userId: null }),
     findActiveTask(db, "PERSONALIZED", userId),
     findActiveTask(db, "BASELINE"),
-    readHomepageMarketBaseline(db),
   ]);
   if (!baselineProjection) throw new Error("专业市场基线快照尚未就绪");
 
@@ -201,6 +198,5 @@ export async function getHomePageSnapshot(db: HomePageDb, userId: string) {
     personalizationPending:
       !personalizedProjection && Boolean(personalizedTask),
     payload,
-    marketBaseline,
   };
 }

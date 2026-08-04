@@ -2,7 +2,6 @@
 
 import { Radar, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { WorkspaceShell } from "~/app/_components/workspace-shell";
 import styles from "~/app/research-radar/research-radar.module.css";
 import { api, type RouterOutputs } from "~/trpc/react";
 
@@ -67,22 +66,24 @@ function RadarRow({ item }: { item: RadarResult["items"][number] }) {
   );
 }
 
-export function ResearchRadarClient() {
+export function ResearchRadarPanel() {
   const query = api.researchRadar.query.useQuery({ capacity: 20 });
   const data = query.data;
 
   return (
-    <WorkspaceShell
-      section="researchRadar"
-      title="研究雷达"
-      description="按当前冻结偏好筛选有效事件，直接关注优先于全局基线容量。"
-      showHistory={false}
-      contentWidth="wide"
-      actions={
+    <section
+      className={styles.surface}
+      aria-labelledby="research-radar-heading"
+    >
+      <header className={styles.panelHeader}>
+        <div>
+          <h2 id="research-radar-heading">投研雷达</h2>
+          <p>按当前冻结偏好筛选有效事件，直接关注优先于全局基线容量。</p>
+        </div>
         <button
           type="button"
-          aria-label="刷新研究雷达"
-          title="刷新研究雷达"
+          aria-label="刷新投研雷达"
+          title="刷新投研雷达"
           className={styles.refresh}
           onClick={() => query.refetch()}
           disabled={query.isFetching}
@@ -93,39 +94,37 @@ export function ResearchRadarClient() {
           />
           <span>刷新</span>
         </button>
-      }
-    >
-      <section className={styles.surface} aria-label="个性化研究雷达结果">
-        <header className={styles.toolbar}>
-          <div>
-            <strong>{data?.items.length ?? 0}</strong>
-            <span> 条个性化事件</span>
-          </div>
-          <div className={styles.snapshot}>
-            {data?.preferenceSnapshotId
-              ? `偏好快照 ${data.preferenceSnapshotId.slice(0, 8)}`
-              : "暂无偏好快照"}
-          </div>
-        </header>
+      </header>
 
-        {query.isLoading ? (
-          <div className={styles.message}>正在读取研究雷达…</div>
-        ) : query.isError ? (
-          <div className={styles.message}>研究雷达读取失败，请稍后重试。</div>
-        ) : data?.items.length ? (
-          <div className={styles.rows}>
-            {data.items.map((item) => (
-              <RadarRow key={item.eventRevisionId} item={item} />
-            ))}
-          </div>
-        ) : (
-          <div className={styles.empty}>
-            <Radar size={20} />
-            <p>当前没有命中冻结偏好的有效事件。</p>
-            <Link href="/research-targets">管理研究关注</Link>
-          </div>
-        )}
-      </section>
-    </WorkspaceShell>
+      <header className={styles.toolbar}>
+        <div>
+          <strong>{data?.items.length ?? 0}</strong>
+          <span> 条个性化事件</span>
+        </div>
+        <div className={styles.snapshot}>
+          {data?.preferenceSnapshotId
+            ? `偏好快照 ${data.preferenceSnapshotId.slice(0, 8)}`
+            : "暂无偏好快照"}
+        </div>
+      </header>
+
+      {query.isLoading ? (
+        <div className={styles.message}>正在读取投研雷达…</div>
+      ) : query.isError ? (
+        <div className={styles.message}>投研雷达读取失败，请稍后重试。</div>
+      ) : data?.items.length ? (
+        <div className={styles.rows}>
+          {data.items.map((item) => (
+            <RadarRow key={item.eventRevisionId} item={item} />
+          ))}
+        </div>
+      ) : (
+        <div className={styles.empty}>
+          <Radar size={20} />
+          <p>当前没有命中冻结偏好的有效事件。</p>
+          <Link href="/research-targets">管理研究关注</Link>
+        </div>
+      )}
+    </section>
   );
 }

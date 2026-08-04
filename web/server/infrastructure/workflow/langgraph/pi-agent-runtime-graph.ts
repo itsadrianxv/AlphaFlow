@@ -248,6 +248,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
       userMessageId: state.agentInput.userMessageId,
       assistantMessageId: state.agentInput.assistantMessageId,
       executionBoundary: state.agentInput.executionBoundary,
+      userSkillDefinitions: state.agentInput.userSkillDefinitions,
     };
     const nextState: PiAgentRunGraphState = {
       ...state,
@@ -291,6 +292,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
         title: task.title,
         context: state.agentInput.context,
         executionBoundary: task.executionBoundary,
+        userSkillDefinitions: task.userSkillDefinitions,
         sessionSeed: task.conversationId
           ? await this.deps.agentConversationRepository?.getSeedMessages(
               task.conversationId,
@@ -464,6 +466,12 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
           runId: state.runId,
           skillId: task.skillId,
           skillIds: task.skillIds,
+          userSkillDefinitions: task.userSkillDefinitions?.map((skill) => ({
+            id: skill.id,
+            versionId: skill.versionId,
+            version: skill.version,
+            contentHash: skill.contentHash,
+          })),
           generatedAt:
             runtimeRun.finalOutput &&
             typeof runtimeRun.finalOutput.generatedAt === "string"

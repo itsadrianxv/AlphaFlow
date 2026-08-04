@@ -2,7 +2,9 @@ import type { AgentHarness } from "@earendil-works/pi-agent-core";
 import { describe, expect, it, vi } from "vitest";
 import {
   isScheduledTaskFlowComplete,
+  mapHarnessEvent,
   registerHarnessEventHandlers,
+  resolveScheduledTaskFlowFailure,
   type HarnessEventState,
 } from "../src/pi-adapter";
 import { AgentRuntimeRunStore } from "../src/run-store";
@@ -98,5 +100,41 @@ describe("ask_user tool", () => {
         scheduledDraftBuilt: true,
       }),
     ).toBe(true);
+  });
+
+  it("确定性工具错误会形成稳定的可见失败终态", () => {
+    const store = new AgentRuntimeRunStore(60_000);
+    const request = {
+      runId: "run_task_not_editable",
+      userId: "user_1",
+      skillId: "scheduled-task-edit",
+      prompt: "修改定时任务",
+    };
+    const state: HarnessEventState = {
+      lastAssistantText: "",
+      scheduledDraftBuilt: false,
+    };
+    store.createOrGet(request);
+    store.markRunning(request.runId);
+
+    mapHarnessEvent(
+      store,
+      request,
+      {
+        type: "tool_result",
+        toolCallId: "call_task_edit",
+        toolName: "build_scheduled_task_edit_draft",
+        input: {},
+        content: [{ type: "text", text: "TASK_NOT_EDITABLE" }],
+        details: { errorCode: "TASK_NOT_EDITABLE" },
+        isError: true,
+      } as never,
+      state,
+    );
+
+    expect(resolveScheduledTaskFlowFailure(state)).toMatchObject({
+      errorCode: "SCHEDULED_TASK_TOOL_FAILED",
+      errorMessage: expect.stringContaining("TASK_NOT_EDITABLE"),
+    });
   });
 });

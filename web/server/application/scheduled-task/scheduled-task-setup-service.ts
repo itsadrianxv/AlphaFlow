@@ -209,13 +209,18 @@ export class ScheduledTaskSetupService {
   }
 
   private async isTradingDay(date: string, market: string) {
+    const tushareDate = date.replaceAll("-", "");
     const payload = asRecord(
       await pythonJson("/api/v1/capabilities/tushare/query-dataset", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           dataset: "trade_cal",
-          params: { exchange: market, start_date: date, end_date: date },
+          params: {
+            exchange: market,
+            start_date: tushareDate,
+            end_date: tushareDate,
+          },
           maxRows: 5,
         }),
       }),

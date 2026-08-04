@@ -12,13 +12,16 @@ const workerId =
   process.env.RESEARCH_CANDIDATE_WORKER_ID ??
   `research-candidate-${process.pid}-${randomUUID()}`;
 const pollMs = Number(process.env.RESEARCH_CANDIDATE_WORKER_POLL_MS ?? 5_000);
+const permitLeaseMs = Number(
+  process.env.RESEARCH_CANDIDATE_PERMIT_LEASE_MS ?? 15 * 60_000,
+);
 
 async function main() {
   const pool = await db.researchResourcePool.findUnique({
     where: { poolKey: CANDIDATE_POOL_KEY },
   });
   if (!pool) throw new Error(`候选生产资源池未迁移：${CANDIDATE_POOL_KEY}`);
-  const scheduler = new PostgresResearchScheduler(db);
+  const scheduler = new PostgresResearchScheduler(db, { permitLeaseMs });
   const worker = new CandidateProductionWorker(
     db,
     scheduler,

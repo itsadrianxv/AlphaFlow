@@ -197,7 +197,7 @@ services:
     volumes:
       - ../web:/repo/web
       - web_node_modules:/repo/web/node_modules
-    command: ["sh", "-c", "npx prisma generate && npm run db:push -- --accept-data-loss"]
+    command: ["sh", "-c", "npx prisma generate && npx prisma migrate deploy"]
 
   screening-worker:
     build:
@@ -498,6 +498,51 @@ services:
       - web_next:/repo/web/.next
     command:
       ["sh", "-c", "npm run validate:runtime && npm run worker:workflow"]
+
+  research-candidate-worker:
+    build:
+      context: ..
+      dockerfile: docker/web/Dockerfile
+      args:
+        SKIP_ENV_VALIDATION: "1"
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_TIMEOUT_MS: ${DEEPSEEK_TIMEOUT_MS:-45000}
+      RESEARCH_CANDIDATE_WORKER_POLL_MS: ${RESEARCH_CANDIDATE_WORKER_POLL_MS:-5000}
+      RESEARCH_CANDIDATE_PERMIT_LEASE_MS: ${RESEARCH_CANDIDATE_PERMIT_LEASE_MS:-900000}
+    volumes:
+      - ../web:/repo/web
+      - web_node_modules:/repo/web/node_modules
+    command: ["sh", "-c", "npx prisma generate && npm run worker:research-candidate"]
+
+  research-briefing-worker:
+    build:
+      context: ..
+      dockerfile: docker/web/Dockerfile
+      args:
+        SKIP_ENV_VALIDATION: "1"
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-stock-screening-boost}
+      RESEARCH_BRIEFING_WORKER_POLL_MS: ${RESEARCH_BRIEFING_WORKER_POLL_MS:-5000}
+    volumes:
+      - ../web:/repo/web
+      - web_node_modules:/repo/web/node_modules
+    command: ["sh", "-c", "npx prisma generate && npm run worker:research-briefing"]
 
   scheduler:
     build:

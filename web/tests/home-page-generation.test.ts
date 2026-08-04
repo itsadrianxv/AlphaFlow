@@ -160,4 +160,34 @@ describe("首页固定输入与确定性生成", () => {
       generateHomepageDraft(changed).payloadHash,
     );
   });
+
+  it("从首页清单中的整体概念快照恢复热力图", () => {
+    const heatmap = {
+      tradeDate: "20260801",
+      marketCapAsOf: "20260801",
+      priceSource: "daily",
+      concepts: [
+        {
+          conceptCode: "885001.TI",
+          conceptName: "算力",
+          hotRank: 1,
+          hotScore: 98,
+          marketCap: 1000,
+          changePercent: 2.5,
+          stocks: [],
+        },
+      ],
+    };
+    const result = generateHomepageDraft(
+      input([
+        item({
+          itemKey: "a:heatmap",
+          datasetKey: "market_heatmap",
+          revisionValue: heatmap,
+        }),
+      ]),
+    );
+
+    expect(result.payload.heatmap).toEqual(heatmap);
+  });
 });

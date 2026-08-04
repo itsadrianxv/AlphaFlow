@@ -11,7 +11,7 @@ import type {
   StartRunRequest,
 } from "./types";
 
-const MAX_BODY_BYTES = 256 * 1024;
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 function sendJson(response: ServerResponse, statusCode: number, body: unknown) {
   response.writeHead(statusCode, {
@@ -82,6 +82,30 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
             role: item.role as "user" | "assistant",
             content: item.content as string,
             skillId: typeof item.skillId === "string" ? item.skillId : undefined,
+          }))
+      : undefined,
+    userSkillDefinitions: Array.isArray(value.userSkillDefinitions)
+      ? value.userSkillDefinitions
+          .filter(
+            (item) =>
+              isRecord(item) &&
+              typeof item.id === "string" &&
+              typeof item.versionId === "string" &&
+              typeof item.version === "number" &&
+              Number.isInteger(item.version) &&
+              typeof item.name === "string" &&
+              typeof item.description === "string" &&
+              typeof item.content === "string" &&
+              typeof item.contentHash === "string",
+          )
+          .map((item) => ({
+            id: item.id as string,
+            versionId: item.versionId as string,
+            version: item.version as number,
+            name: item.name as string,
+            description: item.description as string,
+            content: item.content as string,
+            contentHash: item.contentHash as string,
           }))
       : undefined,
     allowedCapabilities: Array.isArray(value.allowedCapabilities)

@@ -229,16 +229,14 @@ export class WorkflowExecutionService {
   }
 
   async executeRecoverableRunningRun(workerId: string) {
-    const runningRuns = await this.repository.listRunningRuns(10);
+    const run = await this.repository.claimRecoverableRunningRun({
+      workerId,
+      staleBefore: new Date(Date.now() - env.WORKFLOW_NODE_TIMEOUT_MS * 2),
+    });
+    if (!run) return false;
 
-    for (const run of runningRuns) {
-      // A worker may stop after claiming a run but before its first checkpoint.
-      // Such a run has no completed nodes, but is still safe to restart from node 1.
-      await this.executeRun(run.id, workerId, true);
-      return true;
-    }
-
-    return false;
+    await this.executeRun(run.id, workerId, true);
+    return true;
   }
 
   async executeNextPendingRun(workerId: string) {
@@ -340,6 +338,9 @@ export class WorkflowExecutionService {
                   : {}),
                 ...(Array.isArray(run.input.skillIds)
                   ? { skillIds: run.input.skillIds }
+                  : {}),
+                ...(Array.isArray(run.input.userSkillDefinitions)
+                  ? { userSkillDefinitions: run.input.userSkillDefinitions }
                   : {}),
                 ...(typeof run.input.prompt === "string"
                   ? { prompt: run.input.prompt }
@@ -857,6 +858,11 @@ export class WorkflowExecutionService {
         errorCode,
         errorMessage,
       });
+      await this.agentConversationRepository?.markAssistantFailedByRun(
+        runId,
+        errorMessage,
+        errorCode,
+      );
       await this.publishLatestEvent(
         runId,
         state.progressPercent,

@@ -8,6 +8,10 @@ import {
   MAX_SELECTED_SKILLS_MESSAGE,
   normalizeSelectedSkillIds,
 } from "~/server/application/agent-runtime/skill-selection";
+import {
+  USER_SKILL_MAX_CHARS,
+  UserSkillService,
+} from "~/server/application/agent-runtime/user-skill-service";
 import { ScheduledTaskIntentRouter } from "~/server/application/scheduled-task/scheduled-task-intent-router";
 import { WorkflowCommandService } from "~/server/application/workflow/command-service";
 import { isWorkflowDomainError } from "~/server/domain/workflow/errors";
@@ -82,6 +86,23 @@ const runIdInput = z.object({
   runId: z.string().cuid(),
 });
 
+const userSkillIdInput = z.object({
+  skillId: z.string().cuid(),
+});
+
+const userSkillContentInput = z.object({
+  content: z.string().min(1).max(USER_SKILL_MAX_CHARS),
+  filename: z.string().trim().max(240).optional(),
+});
+
+const updateUserSkillInput = userSkillIdInput.extend({
+  content: z.string().min(1).max(USER_SKILL_MAX_CHARS),
+});
+
+const setUserSkillEnabledInput = userSkillIdInput.extend({
+  enabled: z.boolean(),
+});
+
 const conversationListInput = z.object({
   limit: z.number().int().min(1).max(50).default(20),
   cursor: z.string().cuid().optional(),
@@ -129,6 +150,32 @@ function assertSkillsExist(
   }
 }
 
+function toSkillListResponse(
+  runtimeSkills: Awaited<ReturnType<AgentRuntimeClient["listSkills"]>>,
+  userSkills: Awaited<ReturnType<UserSkillService["list"]>>,
+) {
+  return {
+    diagnostics: runtimeSkills.diagnostics,
+    items: [
+      ...runtimeSkills.items,
+      ...userSkills
+        .filter((skill) => skill.enabled)
+        .map((skill) => ({
+          id: skill.id,
+          name: skill.name,
+          description: skill.description,
+          category: "我的 Skill",
+          type: "prompt" as const,
+          permissions: ["prompt"],
+          source: "user" as const,
+          version: skill.version,
+          versionId: skill.versionId,
+          contentHash: skill.contentHash,
+        })),
+    ],
+  };
+}
+
 export const agentRuntimeRouter = createTRPCRouter({
   listSkills: protectedProcedure.query(async ({ ctx }) => {
     try {
@@ -141,11 +188,78 @@ export const agentRuntimeRouter = createTRPCRouter({
         client,
       );
 
-      return await queryService.listSkills();
+      const [runtimeSkills, userSkills] = await Promise.all([
+        queryService.listSkills(),
+        new UserSkillService(ctx.db).list(ctx.session.user.id),
+      ]);
+      return toSkillListResponse(runtimeSkills, userSkills);
     } catch (error) {
       throw mapError(error);
     }
   }),
+
+  listMySkills: protectedProcedure.query(async ({ ctx }) => {
+    try {
+      return await new UserSkillService(ctx.db).list(ctx.session.user.id);
+    } catch (error) {
+      throw mapError(error);
+    }
+  }),
+
+  createSkill: protectedProcedure
+    .input(userSkillContentInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new UserSkillService(ctx.db).create({
+          userId: ctx.session.user.id,
+          content: input.content,
+          filename: input.filename,
+        });
+      } catch (error) {
+        throw mapError(error);
+      }
+    }),
+
+  updateSkill: protectedProcedure
+    .input(updateUserSkillInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new UserSkillService(ctx.db).update({
+          userId: ctx.session.user.id,
+          skillId: input.skillId,
+          content: input.content,
+        });
+      } catch (error) {
+        throw mapError(error);
+      }
+    }),
+
+  setSkillEnabled: protectedProcedure
+    .input(setUserSkillEnabledInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new UserSkillService(ctx.db).setEnabled({
+          userId: ctx.session.user.id,
+          skillId: input.skillId,
+          enabled: input.enabled,
+        });
+      } catch (error) {
+        throw mapError(error);
+      }
+    }),
+
+  deleteSkill: protectedProcedure
+    .input(userSkillIdInput)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        return await new UserSkillService(ctx.db).archive({
+          userId: ctx.session.user.id,
+          skillId: input.skillId,
+        });
+      } catch (error) {
+        throw mapError(error);
+      }
+    }),
 
   listConversations: protectedProcedure
     .input(conversationListInput)
@@ -233,8 +347,20 @@ export const agentRuntimeRouter = createTRPCRouter({
                 skillIds: input.skillIds,
               });
         const agentRuntimeClient = new AgentRuntimeClient();
+        const userSkillService = new UserSkillService(ctx.db);
+        const userSkillDefinitions =
+          !routeToSetup && !routeToEdit
+            ? await userSkillService.resolveRuntimeDefinitions(
+                ctx.session.user.id,
+                selectedSkills.skillIds,
+              )
+            : [];
         if (!routeToSetup && !routeToEdit) {
-          const skills = await agentRuntimeClient.listSkills();
+          const [runtimeSkills, userSkills] = await Promise.all([
+            agentRuntimeClient.listSkills(),
+            userSkillService.list(ctx.session.user.id),
+          ]);
+          const skills = toSkillListResponse(runtimeSkills, userSkills);
           assertSkillsExist(selectedSkills.skillIds, skills);
         }
 
@@ -258,6 +384,7 @@ export const agentRuntimeRouter = createTRPCRouter({
           prompt: input.prompt,
           title: input.title,
           context: input.context,
+          userSkillDefinitions,
           routingMode: routeToEdit
             ? "SCHEDULED_TASK_EDIT"
             : routeToSetup
@@ -290,8 +417,18 @@ export const agentRuntimeRouter = createTRPCRouter({
           skillIds: input.skillIds,
         });
         const agentRuntimeClient = new AgentRuntimeClient();
-        const skills = await agentRuntimeClient.listSkills();
+        const userSkillService = new UserSkillService(ctx.db);
+        const [runtimeSkills, userSkills] = await Promise.all([
+          agentRuntimeClient.listSkills(),
+          userSkillService.list(ctx.session.user.id),
+        ]);
+        const skills = toSkillListResponse(runtimeSkills, userSkills);
         assertSkillsExist(selectedSkills.skillIds, skills);
+        const userSkillDefinitions =
+          await userSkillService.resolveRuntimeDefinitions(
+            ctx.session.user.id,
+            selectedSkills.skillIds,
+          );
 
         const workflowRepository = new PrismaWorkflowRunRepository(ctx.db);
         const workflowCommandService = new WorkflowCommandService(
@@ -311,6 +448,7 @@ export const agentRuntimeRouter = createTRPCRouter({
           userMessageId: input.userMessageId,
           assistantMessageId: input.assistantMessageId,
           context: input.context,
+          userSkillDefinitions,
           idempotencyKey: input.idempotencyKey,
         });
       } catch (error) {

@@ -1,3 +1,4 @@
+import type { UserSkillRuntimeDefinition } from "~/server/application/agent-runtime/user-skill-service";
 import type { WorkflowCommandService } from "~/server/application/workflow/command-service";
 
 export type StartAgentRuntimeRunCommand = {
@@ -11,6 +12,7 @@ export type StartAgentRuntimeRunCommand = {
   assistantMessageId?: string;
   context?: Record<string, unknown>;
   executionBoundary?: Record<string, unknown>;
+  userSkillDefinitions?: UserSkillRuntimeDefinition[];
   idempotencyKey?: string;
 };
 

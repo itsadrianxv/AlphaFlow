@@ -182,7 +182,9 @@ describe("四维评估与个性化研究雷达应用契约", () => {
           request.model === RESEARCH_ASSESSMENT_MODEL &&
           request.temperature === 0 &&
           request.maxInputTokens === 32_000 &&
-          request.maxOutputTokens === 3_000 &&
+          request.maxOutputTokens === 16_384 &&
+          request.messages[0]?.content.includes('"importance"') &&
+          request.messages[0]?.content.includes('"citations"') &&
           !request.repairOf,
       ),
     ).toBe(true);
@@ -216,7 +218,9 @@ describe("四维评估与个性化研究雷达应用契约", () => {
           request.model === RESEARCH_ASSESSMENT_MODEL &&
           request.temperature === 0 &&
           request.maxInputTokens === 8_000 &&
-          request.maxOutputTokens === 1_500 &&
+          request.maxOutputTokens === 16_384 &&
+          request.messages[0]?.content.includes('"matchedPreferences"') &&
+          request.messages[0]?.content.includes('"citations"') &&
           !request.repairOf,
       ),
     ).toBe(true);

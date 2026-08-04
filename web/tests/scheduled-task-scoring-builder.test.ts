@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ScheduledTaskDraftController } from "~/server/application/scheduled-task/scheduled-task-draft-controller";
 import { ScheduledTaskScoringDraftService } from "~/server/application/scheduled-task/scheduled-task-scoring-draft-service";
+import { isScoringDraftReadyForAutosave } from "~/app/scheduled-tasks/builder/scoring-task-autosave";
 
 const baseDraft = {
   name: "多周期评分",
@@ -123,6 +124,37 @@ describe("确定性评分草稿 Controller", () => {
 });
 
 describe("确定性评分草稿保存", () => {
+  it("未填写任务名或规则名时不触发自动保存", () => {
+    expect(isScoringDraftReadyForAutosave(baseDraft)).toBe(true);
+
+    expect(
+      isScoringDraftReadyForAutosave({
+        name: "",
+        rules: [{ name: "" }],
+        universe: { type: "all_a_shares" },
+        delivery: { type: "SAVE_ONLY" },
+      }),
+    ).toBe(false);
+
+    expect(
+      isScoringDraftReadyForAutosave({
+        name: "多周期评分",
+        rules: [{ name: "" }],
+        universe: { type: "all_a_shares" },
+        delivery: { type: "SAVE_ONLY" },
+      }),
+    ).toBe(false);
+
+    expect(
+      isScoringDraftReadyForAutosave({
+        name: "多周期评分",
+        rules: [{ name: "日线 MACD 为正" }],
+        universe: { type: "all_a_shares" },
+        delivery: { type: "SAVE_ONLY" },
+      }),
+    ).toBe(true);
+  });
+
   it("只保存草稿和结构化版本，不创建执行或投递", async () => {
     const created: Record<string, unknown>[] = [];
     const db = {

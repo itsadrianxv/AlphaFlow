@@ -25,6 +25,7 @@ export type DeepSeekRequestOptions = {
   timeoutMs?: number;
   budgetPolicy?: DeepSeekBudgetPolicy;
   maxStructuredOutputRetries?: number;
+  responseFormat?: "json_object";
 };
 
 export type DeepSeekMessage = {
@@ -69,6 +70,29 @@ function extractJsonCandidate(content: string): string {
     return content.trim();
   }
 
+  const opening = content[firstBracketIndex];
+  const closing = opening === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = firstBracketIndex; index < content.length; index += 1) {
+    const character = content[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === '"') inString = false;
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+      continue;
+    }
+    if (character === opening) depth += 1;
+    else if (character === closing) {
+      depth -= 1;
+      if (depth === 0) return content.slice(firstBracketIndex, index + 1);
+    }
+  }
   return content.slice(firstBracketIndex).trim();
 }
 
@@ -266,6 +290,9 @@ export class DeepSeekClient {
             messages: nextMessages,
             temperature: 0.2,
             max_tokens: options?.maxOutputTokens,
+            ...(options?.responseFormat
+              ? { response_format: { type: options.responseFormat } }
+              : {}),
           }),
         });
 
@@ -348,7 +375,7 @@ export class DeepSeekClient {
         raw = await this.complete(
           currentMessages,
           JSON.stringify(fallbackValue),
-          options,
+          { ...options, responseFormat: "json_object" },
         );
       } catch (error) {
         if (!isStructuredOutputRecoverableError(error)) {
@@ -413,7 +440,7 @@ export class DeepSeekClient {
         raw = await this.complete(
           currentMessages,
           JSON.stringify(safeFallback),
-          options,
+          { ...options, responseFormat: "json_object" },
         );
       } catch (error) {
         if (!isStructuredOutputRecoverableError(error)) {
@@ -452,9 +479,13 @@ export class DeepSeekClient {
           ...messages,
           {
             role: "user",
-            content: `Previous JSON did not satisfy the contract. Fix these issues and return JSON only: ${formatSchemaIssues(
-              validated.error,
-            )}`,
+            content: [
+              "Previous JSON did not satisfy the contract.",
+              `Previous output: ${raw}`,
+              `Contract issues: ${formatSchemaIssues(validated.error)}`,
+              `Required fallback shape: ${JSON.stringify(safeFallback)}`,
+              "Fix the previous output and return JSON only.",
+            ].join("\n"),
           },
         ];
       } catch {

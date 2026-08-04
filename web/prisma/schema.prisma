@@ -108,6 +108,7 @@ model User {
   briefingScopes                   ResearchBriefingScope[]
   researchAuditRecords             ResearchAuditRecord[]
   agentConfirmationTokens          AgentConfirmationToken[]
+  userSkills                       UserSkill[]
 }
 
 enum LlmTaskExecutionStatus {
@@ -979,8 +980,8 @@ model TimingResearchReport {
   observationConditions Json
   dataCompleteness      Json
   modelOutlook          Json?
-  riskFlags             String[]
   modelEvidence         Json
+  riskFlags             String[]
   reasoning             Json
   ruleAudit             Json
   createdAt             DateTime @default(now())
@@ -992,8 +993,8 @@ model TimingResearchReport {
   preset         TimingPreset?         @relation(fields: [presetId], references: [id], onDelete: SetNull)
   presetRevision TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
   signalSnapshot TimingSignalSnapshot  @relation(fields: [signalSnapshotId], references: [id], onDelete: Cascade)
-
   forecastSnapshots TimingResearchReportForecastSnapshot[]
+
   @@index([userId, createdAt])
   @@index([workflowRunId])
   @@index([watchListId, createdAt])
@@ -1248,8 +1249,8 @@ model TimingKronosForecastSnapshot {
   id               String   @id @default(cuid())
   userId           String
   workflowRunId    String?
-  stockCode        String
   researchRunId    String
+  stockCode        String
   stockName        String
   timeframe        String   @default("DAILY")
   asOfDate         DateTime
@@ -1279,7 +1280,7 @@ model TimingResearchReportForecastSnapshot {
   reportId   String
   snapshotId String
 
-  report   TimingResearchReport         @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report   TimingResearchReport        @relation(fields: [reportId], references: [id], onDelete: Cascade)
   snapshot TimingKronosForecastSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
 
   @@id([reportId, snapshotId])
@@ -1423,6 +1424,36 @@ model AgentConversationMessage {
 
   @@unique([conversationId, sequence])
   @@index([conversationId, createdAt])
+}
+
+model UserSkill {
+  id            String              @id @default(cuid())
+  userId        String
+  currentVersion Int                @default(1)
+  enabled       Boolean             @default(true)
+  archivedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions      UserSkillVersion[]
+
+  @@index([userId, enabled, updatedAt])
+  @@index([userId, archivedAt, updatedAt])
+}
+
+model UserSkillVersion {
+  id          String   @id @default(cuid())
+  skillId     String
+  version     Int
+  name        String
+  description String
+  content     String
+  contentHash String
+  createdAt   DateTime @default(now())
+  skill       UserSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([skillId, version])
+  @@index([skillId, createdAt])
 }
 
 // F01 权威研究信息模型。跨行检查、部分索引和不可变触发器由 PostgreSQL 迁移维护。

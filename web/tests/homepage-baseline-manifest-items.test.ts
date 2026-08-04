@@ -18,10 +18,17 @@ describe("首页专业市场基线清单项构造", () => {
       });
 
       const marketItem = items.find((item) => item.datasetKey === "market_snapshot");
+      expect(marketItem?.required).toBe(false);
       expect(marketItem?.targetDataCutoffKey).toBe("trade_date");
       expect(marketItem?.targetDataCutoffJson).toEqual({
         key: "trade_date",
         value: "2026-08-01",
+      });
+      const heatmapItem = items.find((item) => item.datasetKey === "market_heatmap");
+      expect(heatmapItem).toMatchObject({
+        providerKey: "tushare",
+        required: true,
+        targetDataCutoffKey: "trade_date",
       });
     },
   );

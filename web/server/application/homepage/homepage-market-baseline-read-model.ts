@@ -167,7 +167,15 @@ export async function readHomepageMarketBaseline(
   const snapshots = await db.homepageSnapshot.findMany({
     where: {
       scope: "BASELINE",
-      manifest: { definitionVersion: "homepage-baseline-manifest.v1" },
+      manifest: {
+        definitionVersion: {
+          in: [
+            "homepage-baseline-manifest.v1",
+            "homepage-baseline-manifest.v2",
+            "homepage-baseline-manifest.v3",
+          ],
+        },
+      },
     },
     orderBy: { activationSequence: "desc" },
     take: 100,
@@ -228,6 +236,7 @@ export async function readHomepageMarketBaseline(
       (typeof snapshot.manifest.items)[number]
     >();
     for (const item of snapshot.manifest.items) {
+      if (item.datasetKey === "market_heatmap") continue;
       const domain = domainFromFactScope(item.factScopeJson);
       if (items.has(domain))
         throw new Error(`首页阶段存在重复信息域: ${phaseId}:${domain}`);

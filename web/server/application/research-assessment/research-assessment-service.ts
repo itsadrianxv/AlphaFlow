@@ -41,7 +41,7 @@ export type FrozenResearchClaim = {
 
 export type FrozenResearchImpact = {
   id: string;
-  subjectType: ResearchPreferenceItem["targetType"];
+  subjectType: string;
   subjectKey: string;
   relation: "DIRECT" | "WEAK";
   materiality: "LOW" | "MEDIUM" | "HIGH";
@@ -469,7 +469,7 @@ function routeIdentity(kind: ResearchAssessmentKind) {
     model: RESEARCH_ASSESSMENT_MODEL,
     temperature: 0 as const,
     maxInputTokens: kind === "GLOBAL" ? 32_000 : 8_000,
-    maxOutputTokens: kind === "GLOBAL" ? 3_000 : 1_500,
+    maxOutputTokens: 16_384,
   };
 }
 
@@ -506,6 +506,9 @@ function buildMessages(kind: ResearchAssessmentKind, inputSnapshot: unknown) {
       content: [
         "你只根据输入中的冻结研究事件、证据、相关研究认知基线和研究偏好评分。",
         "返回 JSON；分数只能是 0、1、2、3、4 或 null。",
+        `完整输出契约模板：${assessmentContractTemplate(kind)}`,
+        "每个评分维度必须是包含 score、reasons、uncertainty 的对象；reasons 必须有 1–3 项，每项包含 text 和至少一个 citations。",
+        "citation.refId 必须原样引用冻结输入中的 revisionId、claim.id、evidence.id、impact.id、cognitiveBaseline.id 或研究偏好身份，refType 必须与其类型匹配。",
         "不得输出总分、渠道建议、买卖动作、仓位、价格指令或输入外事实。",
       ].join("\n"),
     },
@@ -514,6 +517,34 @@ function buildMessages(kind: ResearchAssessmentKind, inputSnapshot: unknown) {
       content: `评估维度：${dimensions}\n冻结输入：${canonicalJson(inputSnapshot)}`,
     },
   ];
+}
+
+function assessmentContractTemplate(kind: ResearchAssessmentKind) {
+  const dimension = {
+    score: "0 | 1 | 2 | 3 | 4 | null",
+    reasons: [
+      {
+        text: "原子判断依据",
+        citations: [
+          {
+            refId: "冻结输入中的合法 ID",
+            refType:
+              "EVENT_REVISION | FACT_CLAIM | EVIDENCE | COGNITIVE_BASELINE | RESEARCH_PREFERENCE | IMPACT_OBJECT",
+          },
+        ],
+      },
+    ],
+    uncertainty: "不确定性说明；没有显著不确定性时也要明确说明",
+  };
+  return JSON.stringify(
+    kind === "GLOBAL"
+      ? {
+          importance: dimension,
+          confidence: dimension,
+          informationNovelty: dimension,
+        }
+      : { relevance: dimension, matchedPreferences: [] },
+  );
 }
 
 function hashAssessmentInput(value: unknown) {

@@ -29,3 +29,8 @@ export function homePageDueDateCandidates(now = new Date(), lookbackDays = 10) {
     return candidate.toISOString().slice(0, 10);
   });
 }
+
+export function homePageRevalidationBucket(now = new Date()) {
+  const clock = shanghaiClock(now);
+  return `${clock.date}T${String(clock.hour).padStart(2, "0")}`;
+}

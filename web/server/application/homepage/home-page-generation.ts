@@ -383,32 +383,55 @@ function revisionsFor(input: HomepageGenerationInput, datasetKey: string) {
 }
 
 function buildHeatmap(input: HomepageGenerationInput) {
-  const concepts = revisionsFor(input, "market_heatmap").map(
-    (revision, index) => {
-      const value =
-        revision.valueJson && typeof revision.valueJson === "object"
-          ? revision.valueJson
-          : {};
-      const record = value as Record<string, unknown>;
-      return {
-        conceptCode: String(record.conceptCode ?? record.id ?? revision.id),
-        conceptName: String(
-          record.conceptName ?? record.name ?? `概念 ${index + 1}`,
-        ),
-        hotRank: Number(record.hotRank ?? index + 1),
-        hotScore:
-          record.hotScore == null
-            ? Number(record.score ?? 0)
-            : Number(record.hotScore),
-        marketCap: Number(record.marketCap ?? 0),
-        changePercent:
-          record.changePercent == null
-            ? Number(record.changePct ?? 0)
-            : Number(record.changePercent),
-        stocks: Array.isArray(record.stocks) ? record.stocks : [],
-      };
-    },
-  );
+  const revisions = revisionsFor(input, "market_heatmap");
+  const snapshot = revisions
+    .map((revision) => revision.valueJson)
+    .find(
+      (value): value is Extract<JsonValue, { [key: string]: JsonValue }> =>
+        Boolean(value) &&
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        Array.isArray((value as Record<string, unknown>).concepts),
+    );
+  if (snapshot) {
+    return {
+      tradeDate: String(snapshot.tradeDate ?? latestCutoff(input.items)),
+      marketCapAsOf: String(
+        snapshot.marketCapAsOf ??
+          snapshot.tradeDate ??
+          latestCutoff(input.items),
+      ),
+      priceSource:
+        snapshot.priceSource === "rt_min"
+          ? ("rt_min" as const)
+          : ("daily" as const),
+      concepts: snapshot.concepts as HomePagePayload["heatmap"]["concepts"],
+    };
+  }
+  const concepts = revisions.map((revision, index) => {
+    const value =
+      revision.valueJson && typeof revision.valueJson === "object"
+        ? revision.valueJson
+        : {};
+    const record = value as Record<string, unknown>;
+    return {
+      conceptCode: String(record.conceptCode ?? record.id ?? revision.id),
+      conceptName: String(
+        record.conceptName ?? record.name ?? `概念 ${index + 1}`,
+      ),
+      hotRank: Number(record.hotRank ?? index + 1),
+      hotScore:
+        record.hotScore == null
+          ? Number(record.score ?? 0)
+          : Number(record.hotScore),
+      marketCap: Number(record.marketCap ?? 0),
+      changePercent:
+        record.changePercent == null
+          ? Number(record.changePct ?? 0)
+          : Number(record.changePercent),
+      stocks: Array.isArray(record.stocks) ? record.stocks : [],
+    };
+  });
   return {
     tradeDate: latestCutoff(input.items),
     marketCapAsOf: latestCutoff(input.items),

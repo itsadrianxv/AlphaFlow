@@ -15,6 +15,7 @@ import {
 import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
 import { companyOverviewHref } from "~/app/company-research/company-overview-link";
+import { ResearchNoteMindMapLinks } from "~/app/research-targets/research-note-mind-map-links";
 import {
   buildResearchTargetSearchResults,
   type ResearchTargetSearchResult,
@@ -999,6 +1000,9 @@ function TargetContentList(props: {
                                     {note.title}
                                   </p>
                                 ) : null}
+                                <ResearchNoteMindMapLinks
+                                  linkedMindMaps={note.linkedMindMaps}
+                                />
                                 <EditableMarkdownBlock
                                   content={note.contentMarkdown}
                                   saving={noteSaving}

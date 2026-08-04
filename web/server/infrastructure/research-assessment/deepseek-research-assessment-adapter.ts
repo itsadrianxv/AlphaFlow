@@ -49,7 +49,10 @@ export class DeepSeekResearchAssessmentAdapter
         inFlight: 0,
       }));
     this.baseUrl = input?.baseUrl ?? env.DEEPSEEK_BASE_URL;
-    this.timeoutMs = input?.timeoutMs ?? env.DEEPSEEK_TIMEOUT_MS;
+    this.timeoutMs = Math.max(
+      input?.timeoutMs ?? env.DEEPSEEK_TIMEOUT_MS,
+      180_000,
+    );
   }
 
   isConfigured() {
@@ -89,6 +92,7 @@ export class DeepSeekResearchAssessmentAdapter
             : request.messages,
           temperature: request.temperature,
           max_tokens: request.maxOutputTokens,
+          response_format: { type: "json_object" },
         }),
       });
       const text = await response.text();

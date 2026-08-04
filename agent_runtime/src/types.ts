@@ -45,6 +45,16 @@ export type SkillSummary = {
   permissions: string[];
 };
 
+export type UserSkillDefinition = {
+  id: string;
+  versionId: string;
+  version: number;
+  name: string;
+  description: string;
+  content: string;
+  contentHash: string;
+};
+
 export type StartRunRequest = {
   runId: string;
   userId: string;
@@ -58,6 +68,7 @@ export type StartRunRequest = {
   title?: string;
   context?: Record<string, unknown>;
   sessionSeed?: AgentRuntimeSeedMessage[];
+  userSkillDefinitions?: UserSkillDefinition[];
   allowedCapabilities?: string[];
   capabilityConstraints?: Record<string, unknown>;
   executionBoundary?: Record<string, unknown>;
@@ -109,6 +120,7 @@ export type AgentRunSnapshot = {
   input: {
     prompt: string;
     skillIds?: string[];
+    userSkillDefinitions?: UserSkillDefinition[];
     context?: Record<string, unknown>;
     executionBoundary?: Record<string, unknown>;
   };

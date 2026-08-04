@@ -1,4 +1,5 @@
 import { WorkflowEventType, WorkflowRunStatus } from "@prisma/client";
+import type { UserSkillRuntimeDefinition } from "~/server/application/agent-runtime/user-skill-service";
 import type { ImpactMappingInput } from "~/server/domain/intelligence/impact-mapping";
 import {
   WORKFLOW_ERROR_CODES,
@@ -67,6 +68,7 @@ export type StartPiAgentRunCommand = {
   assistantMessageId?: string;
   context?: Record<string, unknown>;
   executionBoundary?: Record<string, unknown>;
+  userSkillDefinitions?: UserSkillRuntimeDefinition[];
   templateVersion?: number;
   idempotencyKey?: string;
 };
@@ -223,6 +225,7 @@ export class WorkflowCommandService {
         assistantMessageId: command.assistantMessageId,
         context: command.context,
         executionBoundary: command.executionBoundary,
+        userSkillDefinitions: command.userSkillDefinitions,
       },
       idempotencyKey:
         command.idempotencyKey ??

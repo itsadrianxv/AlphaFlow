@@ -35,6 +35,7 @@ describe("投研收藏搜索", () => {
           rawContent: null,
           source: null,
           tags: [],
+          linkedMindMaps: [],
           createdAt: "2026-07-21T00:00:00.000Z",
           updatedAt: "2026-07-21T00:00:00.000Z",
         },

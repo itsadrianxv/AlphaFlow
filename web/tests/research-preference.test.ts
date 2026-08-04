@@ -266,6 +266,25 @@ describe("显式研究关注与冻结偏好", () => {
     ]);
   });
 
+  it("不可关注的全局影响对象不阻断个性化匹配", () => {
+    const matches = resolvePreferenceMatches(
+      [{ targetType: "COMPANY", targetKey: "300750.SZ", level: "REGULAR" }],
+      [
+        { targetType: "dataset", targetKey: "news.major", relation: "DIRECT" },
+        { targetType: "COMPANY", targetKey: "300750.SZ", relation: "DIRECT" },
+      ],
+    );
+
+    expect(matches).toEqual([
+      {
+        targetType: "COMPANY",
+        targetKey: "300750.SZ",
+        level: "REGULAR",
+        relation: "DIRECT",
+      },
+    ]);
+  });
+
   it("清除删除当前关注与可删除快照，隐私删除后历史输入不可访问", async () => {
     const repository = new MemoryResearchPreferenceRepository();
     const service = new ResearchPreferenceService(repository);

@@ -11,8 +11,10 @@ const HomePageSnapshotContext = createContext<
 
 export function HomePageSnapshotProvider({
   children,
+  showRefreshStatus = true,
 }: {
   children: ReactNode;
+  showRefreshStatus?: boolean;
 }) {
   const query = api.homepage.getSnapshot.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -26,7 +28,7 @@ export function HomePageSnapshotProvider({
         isError: query.isError,
       }}
     >
-      {query.data?.refreshInProgress ? (
+      {showRefreshStatus && query.data?.refreshInProgress ? (
         <div className="border-b border-[var(--app-border-soft)] px-4 py-2 text-xs text-[var(--app-text-muted)]">
           首页快照更新中
         </div>

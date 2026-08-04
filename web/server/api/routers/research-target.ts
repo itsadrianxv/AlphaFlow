@@ -67,6 +67,17 @@ type ResearchNoteRecord = {
   updatedAt: Date;
 };
 
+type MindMapReferenceRecord = {
+  targetId: string;
+  nodeId: string | null;
+  relationType: string | null;
+  mindMap: {
+    id: string;
+    title: string;
+    description: string | null;
+  };
+};
+
 type FinancialSnapshotRecord = {
   id: string;
   userId: string;
@@ -136,6 +147,9 @@ type ResearchTargetDbClient = {
       orderBy?: Record<string, unknown>;
     }): Promise<ResearchNoteRecord | null>;
     findMany(args: Record<string, unknown>): Promise<ResearchNoteRecord[]>;
+  };
+  mindMapReference: {
+    findMany(args: Record<string, unknown>): Promise<MindMapReferenceRecord[]>;
   };
   financialSnapshot: {
     create(args: {
@@ -272,7 +286,16 @@ function buildIndustry(record: SavedIndustryRecord) {
   });
 }
 
-function buildNote(record: ResearchNoteRecord) {
+function buildNote(
+  record: ResearchNoteRecord,
+  linkedMindMaps: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    nodeId: string | null;
+    relationType: string | null;
+  }> = [],
+) {
   return researchTargetNoteSchema.parse({
     id: record.id,
     targetRef: { type: record.targetType, id: record.targetId },
@@ -282,6 +305,7 @@ function buildNote(record: ResearchNoteRecord) {
     rawContent: record.rawContent,
     source: record.sourceJson ?? null,
     tags: record.tags,
+    linkedMindMaps,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   });
@@ -840,7 +864,51 @@ export const researchTargetRouter = createTRPCRouter({
         take: input.limit,
         skip: input.offset,
       });
-      return records.map(buildNote);
+      if (records.length === 0) {
+        return [];
+      }
+
+      const references = await db.mindMapReference.findMany({
+        where: {
+          targetType: "note",
+          targetId: { in: records.map((record) => record.id) },
+          mindMap: { userId: ctx.session.user.id },
+        },
+        orderBy: { createdAt: "asc" },
+        select: {
+          targetId: true,
+          nodeId: true,
+          relationType: true,
+          mindMap: {
+            select: { id: true, title: true, description: true },
+          },
+        },
+      });
+      const mindMapsByNoteId = new Map<
+        string,
+        Array<{
+          id: string;
+          title: string;
+          description: string | null;
+          nodeId: string | null;
+          relationType: string | null;
+        }>
+      >();
+      for (const reference of references) {
+        const linkedMindMaps = mindMapsByNoteId.get(reference.targetId) ?? [];
+        linkedMindMaps.push({
+          id: reference.mindMap.id,
+          title: reference.mindMap.title,
+          description: reference.mindMap.description,
+          nodeId: reference.nodeId,
+          relationType: reference.relationType,
+        });
+        mindMapsByNoteId.set(reference.targetId, linkedMindMaps);
+      }
+
+      return records.map((record) =>
+        buildNote(record, mindMapsByNoteId.get(record.id)),
+      );
     }),
 
   formatNote: protectedProcedure

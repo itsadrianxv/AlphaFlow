@@ -1,14 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getHomePageSnapshot } from "~/server/application/homepage/home-page-snapshot-service";
+import { readHomepageMarketBaseline } from "~/server/application/homepage/homepage-market-baseline-read-model";
 
 vi.mock(
   "~/server/application/homepage/homepage-market-baseline-read-model",
   () => ({
-    readHomepageMarketBaseline: vi.fn(async () => ({
-      contractVersion: "professional-market-baseline.v1",
-      defaultPhase: "POST_MARKET",
-      phases: [],
-    })),
+    readHomepageMarketBaseline: vi.fn(async () => {
+      throw new Error("普通首页读取不应调用完整专业市场基线读模型");
+    }),
   }),
 );
 
@@ -76,6 +75,36 @@ describe("首页快照读取", () => {
       refreshInProgress: false,
       personalizationPending: false,
     });
+    expect(readHomepageMarketBaseline).not.toHaveBeenCalled();
+  });
+
+  it("普通首页读取不会查询历史 100 份完整基线快照", async () => {
+    const db = {
+      homepageCurrentSnapshotProjection: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(
+            projection({
+              id: "baseline-1",
+              scope: "BASELINE",
+              manifestId: "manifest-base",
+            }),
+          ),
+      },
+      homepageGenerationTask: { findFirst: vi.fn(async () => null) },
+      homepageSnapshot: {
+        findMany: vi.fn(async () => {
+          throw new Error("普通首页读取不应查询完整基线历史快照");
+        }),
+      },
+    };
+
+    const result = await getHomePageSnapshot(db as never, "user-1");
+
+    expect(result.payload.heatmap).toEqual(payload.heatmap);
+    expect(result).not.toHaveProperty("marketBaseline");
+    expect(db.homepageSnapshot.findMany).not.toHaveBeenCalled();
   });
 
   it("只有专业市场基线任务时不误报个性化处理中", async () => {

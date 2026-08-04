@@ -636,7 +636,7 @@ class TushareHomepageProviderAdapter(HomepageProviderAdapter):
             "concept_catalog": lambda _request, _cursor: client.get_concept_catalog(),
             "concept_constituents": lambda request, _cursor: client.get_concept_constituents(str(request.requested_scope.get("conceptName") or request.requested_scope.get("concept_name") or ""), request.requested_scope.get("conceptCode") or request.requested_scope.get("concept_code")),
             "hot_concept_boards": lambda request, _cursor: client.get_hot_concept_boards(limit=request.page_size),
-            "market_heatmap": lambda request, _cursor: client.get_market_heatmap_snapshot(limit=request.page_size, prefer_intraday=bool(request.requested_scope.get("preferIntraday", request.requested_scope.get("prefer_intraday", False)))),
+            "market_heatmap": lambda request, _cursor: _dated_page(request, client.get_market_heatmap_snapshot(limit=request.page_size, prefer_intraday=bool(request.requested_scope.get("preferIntraday", request.requested_scope.get("prefer_intraday", False))))),
             "market_money_flow": lambda request, _cursor: _dated_page(request, client.get_market_money_flow(_scope_date(request))),
             "company_actions": lambda request, _cursor: _dated_page(request, client.get_company_actions(_scope_date(request))),
             "expectation_changes": lambda request, _cursor: _dated_page(request, client.get_expectation_changes(_scope_date(request))),

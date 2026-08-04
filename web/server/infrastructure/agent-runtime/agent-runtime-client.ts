@@ -14,6 +14,16 @@ const agentRuntimeSkillSchema = z.object({
   permissions: z.array(z.string()),
 });
 
+const userSkillDefinitionSchema = z.object({
+  id: z.string(),
+  versionId: z.string(),
+  version: z.number().int().positive(),
+  name: z.string(),
+  description: z.string(),
+  content: z.string(),
+  contentHash: z.string(),
+});
+
 const agentRuntimeEventSchema = z.object({
   runId: z.string(),
   sequence: z.number().int(),
@@ -39,6 +49,7 @@ const agentRuntimeRunSchema = z.object({
   input: z.object({
     prompt: z.string(),
     skillIds: z.array(z.string()).optional(),
+    userSkillDefinitions: z.array(userSkillDefinitionSchema).optional(),
     context: z.record(z.unknown()).optional(),
     executionBoundary: z.record(z.unknown()).optional(),
   }),
@@ -83,6 +94,7 @@ export type StartAgentRuntimeRunInput = {
   title?: string;
   context?: Record<string, unknown>;
   executionBoundary?: Record<string, unknown>;
+  userSkillDefinitions?: Array<z.infer<typeof userSkillDefinitionSchema>>;
   sessionSeed?: Array<{
     role: "user" | "assistant";
     content: string;

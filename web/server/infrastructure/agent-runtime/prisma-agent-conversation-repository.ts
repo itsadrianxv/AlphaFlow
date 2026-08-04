@@ -296,7 +296,15 @@ export class PrismaAgentConversationRepository {
         run.status !== WorkflowRunStatus.PAUSED ||
         run.cancellationRequestedAt
       ) {
-        throw new Error("AGENT_WAITING_RUN_NOT_RESUMABLE");
+        await tx.agentConversationMessage.update({
+          where: { id: waitingMessage.id },
+          data: {
+            status: AgentConversationMessageStatus.FAILED,
+            errorCode: "AGENT_WAITING_RUN_NOT_RESUMABLE",
+            errorMessage: "原工作流已不可恢复，已创建新的对话轮次。",
+          },
+        });
+        return null;
       }
 
       const pausedEvent = await tx.workflowEvent.findFirst({
@@ -308,7 +316,15 @@ export class PrismaAgentConversationRepository {
       });
       const pausedPayload = asRecord(pausedEvent?.payload);
       if (pausedPayload.reason !== "user_input_required") {
-        throw new Error("AGENT_WAITING_RUN_NOT_RESUMABLE");
+        await tx.agentConversationMessage.update({
+          where: { id: waitingMessage.id },
+          data: {
+            status: AgentConversationMessageStatus.FAILED,
+            errorCode: "AGENT_WAITING_RUN_NOT_RESUMABLE",
+            errorMessage: "原工作流已不可恢复，已创建新的对话轮次。",
+          },
+        });
+        return null;
       }
 
       const lastMessage = await tx.agentConversationMessage.findFirst({
@@ -584,7 +600,11 @@ export class PrismaAgentConversationRepository {
     });
   }
 
-  async markAssistantFailedByRun(runId: string, reason: string) {
+  async markAssistantFailedByRun(
+    runId: string,
+    reason: string,
+    errorCode = "WORKFLOW_NODE_TIMEOUT",
+  ) {
     return this.prisma.agentConversationMessage.updateMany({
       where: {
         workflowRunId: runId,
@@ -593,12 +613,13 @@ export class PrismaAgentConversationRepository {
           in: [
             AgentConversationMessageStatus.PENDING,
             AgentConversationMessageStatus.STREAMING,
+            AgentConversationMessageStatus.WAITING_FOR_INPUT,
           ],
         },
       },
       data: {
         status: AgentConversationMessageStatus.FAILED,
-        errorCode: "WORKFLOW_NODE_TIMEOUT",
+        errorCode,
         errorMessage: reason,
       },
     });
@@ -612,6 +633,9 @@ export class PrismaAgentConversationRepository {
       payload: Record<string, unknown>;
     },
   ) {
+    await tx.$queryRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${params.runId}, 0))::text`,
+    );
     const latest = await tx.workflowEvent.findFirst({
       where: { runId: params.runId },
       select: { sequence: true },

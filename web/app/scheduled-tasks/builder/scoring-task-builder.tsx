@@ -1,18 +1,11 @@
 "use client";
 
-import {
-  Copy,
-  MessageSquare,
-  Plus,
-  Save,
-  Send,
-  Trash2,
-  Undo2,
-} from "lucide-react";
+import { Copy, MessageSquare, Plus, Save, Trash2, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { InlineNotice, WorkspaceShell } from "~/app/_components/ui";
+import { isScoringDraftReadyForAutosave } from "~/app/scheduled-tasks/builder/scoring-task-autosave";
 import { SCHEDULED_TASK_WORKBENCH_SECTIONS } from "~/server/domain/scheduled-task/workbench-release-gate";
 import { api } from "~/trpc/react";
 
@@ -166,7 +159,26 @@ function leafStatuses(value: unknown): string[] {
 }
 
 function inputClass() {
-  return "h-9 w-full border border-[var(--app-border)] bg-[var(--app-surface)] px-2.5 text-sm text-[var(--app-text-strong)] outline-none focus:border-[var(--app-accent-strong)]";
+  return "h-10 w-full border border-[var(--app-border)] bg-[var(--app-surface)] px-3 !py-0 text-sm leading-5 text-[var(--app-text-strong)] outline-none focus:border-[var(--app-accent-strong)]";
+}
+
+function AgentSendIcon(props: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+      className={props.className}
+    >
+      <path
+        d="M10 15V5m0 0 4 4m-4-4L6 9"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 function NumberField(props: {
@@ -576,7 +588,9 @@ export function ScoringTaskBuilder() {
     setDirty(true);
   };
 
-  const persist = async () => {
+  const persist = async (options: { automatic?: boolean } = {}) => {
+    const automatic = options.automatic === true;
+    if (automatic && !isScoringDraftReadyForAutosave(draft)) return null;
     if (saveMutation.isPending) return null;
     const savingRevision = revisionRef.current;
     const result = await saveMutation.mutateAsync({
@@ -586,7 +600,7 @@ export function ScoringTaskBuilder() {
       value: draft,
     });
     if (!result.saved) {
-      setIssues(result.issues);
+      if (!automatic) setIssues(result.issues);
       return null;
     }
     setIssues([]);
@@ -608,7 +622,7 @@ export function ScoringTaskBuilder() {
       if (retryTimerRef.current !== null)
         window.clearTimeout(retryTimerRef.current);
       retryTimerRef.current = window.setTimeout(
-        () => void persistRef.current(),
+        () => void persistRef.current({ automatic: true }),
         800,
       );
     }
@@ -618,10 +632,12 @@ export function ScoringTaskBuilder() {
   };
   const persistRef = useRef(persist);
   persistRef.current = persist;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: 每次草稿变更都应重新开始防抖计时。
   useEffect(() => {
-    if (!dirty) return;
-    const timer = window.setTimeout(() => void persistRef.current(), 800);
+    if (!dirty || !isScoringDraftReadyForAutosave(draft)) return;
+    const timer = window.setTimeout(
+      () => void persistRef.current({ automatic: true }),
+      800,
+    );
     return () => window.clearTimeout(timer);
   }, [draft, dirty]);
 
@@ -800,56 +816,44 @@ export function ScoringTaskBuilder() {
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <aside
           aria-label="Agent 辅助"
-          className={`${mobilePane === "agent" ? "block" : "hidden"} border-b border-[var(--app-border-soft)] bg-[var(--app-panel)] lg:sticky lg:top-0 lg:order-2 lg:block lg:max-h-screen lg:overflow-y-auto lg:border-b-0 lg:border-l`}
+          className={`${mobilePane === "agent" ? "flex" : "hidden"} flex-col border-b border-[var(--app-border-soft)] bg-[var(--app-panel)] lg:sticky lg:top-0 lg:order-2 lg:flex lg:h-screen lg:overflow-hidden lg:border-b-0 lg:border-l`}
         >
-          <div className="flex items-center gap-2 border-b border-[var(--app-border-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-text-strong)]">
+          <div className="flex shrink-0 items-center gap-2 border-b border-[var(--app-border-soft)] px-4 py-3 text-sm font-semibold text-[var(--app-text-strong)]">
             <MessageSquare size={16} />
             Agent 辅助
           </div>
-          <div className="px-4 py-4">
+          <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-4 py-4">
             {agentConversation.data?.messages.length ? (
-              <div className="max-h-56 space-y-3 overflow-y-auto border-y border-[var(--app-border-soft)] py-3">
+              <div className="grid gap-6">
                 {agentConversation.data.messages.map((message) => (
-                  <div key={message.id} className="text-sm">
-                    <span className="font-medium text-[var(--app-text-strong)]">
-                      {message.role === "USER" ? "你" : "Agent"}
-                    </span>
-                    <p className="mt-1 whitespace-pre-wrap text-[var(--app-text-muted)]">
-                      {String(message.content ?? message.status)}
-                    </p>
+                  <div
+                    key={message.id}
+                    className={
+                      message.role === "USER"
+                        ? "flex justify-end"
+                        : "flex justify-start"
+                    }
+                  >
+                    <div
+                      className={
+                        message.role === "USER"
+                          ? "max-w-[78%] rounded-[18px] bg-[var(--app-panel-strong)] px-4 py-3 text-[var(--app-text-strong)]"
+                          : "min-w-0 max-w-full text-[var(--app-text-strong)]"
+                      }
+                    >
+                      <div className="whitespace-pre-wrap text-sm leading-6">
+                        {message.content ||
+                          (message.role === "ASSISTANT"
+                            ? "正在准备回复"
+                            : message.status)}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             ) : null}
-            <div className="mt-3 flex gap-2">
-              <textarea
-                className="min-h-20 flex-1 resize-y border border-[var(--app-border)] bg-[var(--app-surface)] p-2.5 text-sm outline-none focus:border-[var(--app-accent-strong)]"
-                value={agentPrompt}
-                onChange={(event) => setAgentPrompt(event.target.value)}
-                placeholder="描述需要新增、修改或移除的规则，也可以调整范围、调度和筛选条件"
-              />
-              <button
-                type="button"
-                className="app-button app-button-icon self-end"
-                title="发送给 Agent"
-                disabled={
-                  !taskId ||
-                  !agentPrompt.trim() ||
-                  startAgentMutation.isPending ||
-                  sendAgentMutation.isPending
-                }
-                onClick={() => void sendAgentPrompt()}
-              >
-                <Send size={16} />
-              </button>
-            </div>
-            {!taskId ? (
-              <p className="mt-2 text-xs text-[var(--app-text-subtle)]">
-                先保存草稿后即可使用 Agent 辅助。
-              </p>
-            ) : null}
             {agentDraftQuery.data ? (
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border-soft)] pt-3">
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--app-border-soft)] pt-3">
                 <div className="text-sm text-[var(--app-text-muted)]">
                   Agent 已生成版本 {agentDraftQuery.data.baseVersion}{" "}
                   的结构化变更，可继续逐条编辑后再保存整套草稿。
@@ -900,6 +904,45 @@ export function ScoringTaskBuilder() {
               >
                 回看完整 Agent 会话与审计
               </Link>
+            ) : null}
+          </div>
+          <div className="shrink-0 border-t border-[var(--app-border-soft)] bg-[var(--app-panel)] p-3">
+            <div className="relative rounded-[22px] border border-[var(--app-border-soft)] bg-[var(--app-panel-strong)] transition-[border-color,box-shadow,background-color] focus-within:border-[var(--app-accent-strong)] focus-within:bg-[var(--app-bg-elevated)] focus-within:shadow-[0_0_0_3px_var(--app-focus-ring)]">
+              <textarea
+                className="h-[93px] min-h-0 w-full resize-none overflow-y-auto rounded-[22px] border-0 bg-transparent pt-3 pr-16 pb-12 pl-4 text-sm text-[var(--app-text)] outline-none placeholder:text-[var(--app-text-soft)]"
+                value={agentPrompt}
+                onChange={(event) => setAgentPrompt(event.target.value)}
+                placeholder="描述需要新增、修改或移除的规则"
+                onKeyDown={(event) => {
+                  if (
+                    event.key === "Enter" &&
+                    (event.metaKey || event.ctrlKey)
+                  ) {
+                    event.preventDefault();
+                    void sendAgentPrompt();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                aria-label="发送消息"
+                title="发送"
+                className="absolute right-3 bottom-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--app-primary-border)] bg-[var(--app-primary-surface)] text-[var(--app-on-primary)] transition-colors hover:bg-[var(--app-primary-surface-hover)] disabled:cursor-not-allowed disabled:border-[var(--app-border-soft)] disabled:bg-[var(--app-bg-raised)] disabled:text-[var(--app-text-soft)]"
+                disabled={
+                  !taskId ||
+                  !agentPrompt.trim() ||
+                  startAgentMutation.isPending ||
+                  sendAgentMutation.isPending
+                }
+                onClick={() => void sendAgentPrompt()}
+              >
+                <AgentSendIcon className="h-5 w-5" />
+              </button>
+            </div>
+            {!taskId ? (
+              <p className="mt-2 px-1 text-xs text-[var(--app-text-subtle)]">
+                先保存草稿后即可使用 Agent 辅助。
+              </p>
             ) : null}
           </div>
         </aside>

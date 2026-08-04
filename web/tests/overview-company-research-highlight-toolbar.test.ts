@@ -8,12 +8,10 @@ describe("概览与公司研究页高亮工具栏", () => {
     "utf8",
   );
 
-  it("在已登录概览页使用与研究结果相同的浮动工具栏", () => {
-    expect(overviewSource).toContain(
-      'import { HighlightToNote } from "~/app/_components/highlight-to-note";',
-    );
-    expect(overviewSource).toContain("<HighlightToNote floatingToolbar");
-    expect(overviewSource).toContain('kind: "overview"');
+  it("概览页严格只保留双视图和对话框，不挂载高亮工具栏", () => {
+    expect(overviewSource).not.toContain("HighlightToNote");
+    expect(overviewSource).not.toContain('kind: "overview"');
+    expect(overviewSource).toContain("<OverviewWorkspace signedIn={signedIn} />");
   });
 
   it("在公司研究页使用浮动工具栏并保留研究对象上下文", () => {

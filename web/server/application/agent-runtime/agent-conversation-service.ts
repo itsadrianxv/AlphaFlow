@@ -1,3 +1,4 @@
+import type { UserSkillRuntimeDefinition } from "~/server/application/agent-runtime/user-skill-service";
 import type { WorkflowCommandService } from "~/server/application/workflow/command-service";
 import {
   WORKFLOW_ERROR_CODES,
@@ -19,6 +20,7 @@ export class AgentConversationService {
     skillIds: string[];
     title?: string;
     context?: Record<string, unknown>;
+    userSkillDefinitions?: UserSkillRuntimeDefinition[];
     routingMode?: "AUTO" | "SCHEDULED_TASK_SETUP" | "SCHEDULED_TASK_EDIT";
     scheduledTaskEditTaskId?: string;
     idempotencyKey?: string;
@@ -87,6 +89,7 @@ export class AgentConversationService {
       userMessageId: turn.userMessage.id,
       assistantMessageId: turn.assistantMessage.id,
       context: params.context,
+      userSkillDefinitions: params.userSkillDefinitions,
       idempotencyKey:
         params.idempotencyKey ??
         `pi-agent-message:${params.userId}:${turn.assistantMessage.id}`,

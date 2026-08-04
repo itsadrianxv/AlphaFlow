@@ -2,6 +2,11 @@ import { z } from "zod";
 
 const hashSchema = z.string().regex(/^sha256:[0-9a-f]{64}$/);
 
+export const researchEventClaimTypeSchema = z.enum([
+  "FACT",
+  "RESEARCH_IMPLICATION",
+]);
+
 const materialSchema = z
   .object({
     materialKey: z.string().trim().min(1),
@@ -42,7 +47,7 @@ const evidenceSchema = z
 const claimSchema = z
   .object({
     claimKey: z.string().trim().min(1),
-    claimType: z.string().trim().min(1),
+    claimType: researchEventClaimTypeSchema,
     text: z.string().trim().min(1),
     isInference: z.boolean().default(false),
     evidenceKeys: z.array(z.string().trim().min(1)).min(1),

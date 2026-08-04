@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   buildMarketHeatmapOption,
@@ -24,6 +25,11 @@ const snapshot = {
     },
   ],
 };
+
+const heatmapSource = readFileSync(
+  "app/heatmap/market-heatmap-client.tsx",
+  "utf8",
+);
 
 describe("A 股概念热力图", () => {
   it("用绿色表达下跌、粉色表达上涨、灰色表达平盘", () => {
@@ -80,5 +86,13 @@ describe("A 股概念热力图", () => {
 
     expect(series.type).toBe("candlestick");
     expect(series.data).toEqual([[10, 10.5, 9.8, 11], [10.5, 10.2, 10.1, 10.8]]);
+  });
+
+  it("概览模式固定展示最多 15 个概念且不渲染标题或展开工具", () => {
+    expect(heatmapSource).toContain(").slice(0, 15)");
+    expect(heatmapSource).not.toContain("A 股概念热力图");
+    expect(heatmapSource).not.toContain("展开至 15 个概念");
+    expect(heatmapSource).not.toContain("setExpanded");
+    expect(heatmapSource).toContain("useHomePageSnapshot()");
   });
 });

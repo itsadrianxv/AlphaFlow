@@ -44,3 +44,46 @@ describe("TuShare 股票代码防护", () => {
     }
   });
 });
+
+describe("TuShare 交易日历日期格式", () => {
+  it("调用 trade_cal 前把日期转换为 YYYYMMDD", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          rows: [
+            {
+              exchange: "SSE",
+              cal_date: "20260804",
+              is_open: 1,
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    try {
+      const service = new ScheduledTaskSetupService({} as never);
+      await service.nextRunAt(
+        {
+          type: "TRADING_DAY",
+          time: "18:00",
+          timezone: "Asia/Shanghai",
+          marketCalendar: "SSE",
+        },
+        new Date("2026-08-04T09:00:00.000Z"),
+      );
+
+      const request = fetchMock.mock.calls[0]?.[1];
+      expect(JSON.parse(String(request?.body))).toMatchObject({
+        dataset: "trade_cal",
+        params: {
+          exchange: "SSE",
+          start_date: "20260804",
+          end_date: "20260804",
+        },
+      });
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+});

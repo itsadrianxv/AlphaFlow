@@ -518,6 +518,15 @@ export type PiAgentRunInput = {
   assistantMessageId?: string;
   context?: Record<string, unknown>;
   executionBoundary?: Record<string, unknown>;
+  userSkillDefinitions?: Array<{
+    id: string;
+    versionId: string;
+    version: number;
+    name: string;
+    description: string;
+    content: string;
+    contentHash: string;
+  }>;
 };
 
 export type ScreeningInsightPipelineSessionSnapshot = {
@@ -634,6 +643,7 @@ export type PiAgentRunGraphState = WorkflowGraphState & {
     userMessageId?: string;
     assistantMessageId?: string;
     executionBoundary?: Record<string, unknown>;
+    userSkillDefinitions?: PiAgentRunInput["userSkillDefinitions"];
   };
   waitingForInput?: {
     question: string;

@@ -344,6 +344,11 @@ export class PrismaWorkflowRunRepository {
           items: { type: "string" },
           maxItems: 3,
         },
+        userSkillDefinitions: {
+          type: "array",
+          items: { type: "object" },
+          maxItems: 3,
+        },
         prompt: { type: "string" },
         title: { type: "string" },
         context: { type: "object" },
@@ -523,21 +528,6 @@ export class PrismaWorkflowRunRepository {
           orderBy: [{ createdAt: "asc" }, { nodeKey: "asc" }],
         },
       },
-    });
-  }
-
-  async listRunningRuns(limit = 20) {
-    return this.prisma.workflowRun.findMany({
-      where: {
-        status: WorkflowRunStatus.RUNNING,
-      },
-      include: {
-        template: true,
-      },
-      orderBy: {
-        startedAt: "asc",
-      },
-      take: limit,
     });
   }
 
@@ -750,6 +740,45 @@ export class PrismaWorkflowRunRepository {
         include: {
           template: true,
         },
+      });
+    });
+  }
+
+  async claimRecoverableRunningRun(params: {
+    workerId: string;
+    staleBefore: Date;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const candidates = await tx.$queryRaw<Array<{ id: string }>>(
+        Prisma.sql`
+          SELECT "id"
+          FROM "WorkflowRun"
+          WHERE "status" = CAST(${WorkflowRunStatus.RUNNING} AS "WorkflowRunStatus")
+            AND "updatedAt" < ${params.staleBefore}
+          ORDER BY "updatedAt" ASC, "id" ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT 1
+        `,
+      );
+      const candidateId = candidates[0]?.id;
+      if (!candidateId) return null;
+
+      await tx.workflowRun.update({
+        where: { id: candidateId },
+        data: { updatedAt: new Date() },
+      });
+      await this.createEventTx(tx, {
+        runId: candidateId,
+        eventType: WorkflowEventType.RUN_RESUMED,
+        payload: {
+          reason: "stale_running_recovery",
+          workerId: params.workerId,
+        },
+      });
+
+      return tx.workflowRun.findUnique({
+        where: { id: candidateId },
+        include: { template: true },
       });
     });
   }
@@ -1272,6 +1301,9 @@ export class PrismaWorkflowRunRepository {
       nodeRunId?: string;
     },
   ) {
+    await tx.$queryRaw(
+      Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${params.runId}, 0))::text`,
+    );
     const currentSequence = await tx.workflowEvent.findFirst({
       where: {
         runId: params.runId,

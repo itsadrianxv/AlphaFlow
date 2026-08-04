@@ -177,7 +177,15 @@ export function hasDirectFocusMatch(
 
 export function resolvePreferenceMatches(
   items: readonly ResearchPreferenceItem[],
-  candidates: readonly ResearchPreferenceMatchInput[],
+  candidates: readonly (
+    | ResearchPreferenceMatchInput
+    | {
+        targetType: string;
+        targetKey: string;
+        relation: "DIRECT" | "WEAK";
+        path?: string[];
+      }
+  )[],
 ): ResearchPreferenceMatch[] {
   const byTarget = new Map(
     sortItems(items).map((item) => [targetIdentity(item), item]),
@@ -185,7 +193,9 @@ export function resolvePreferenceMatches(
   const matches = new Map<string, ResearchPreferenceMatch>();
 
   for (const candidate of candidates) {
-    const normalized = normalizeTarget(candidate);
+    const parsedCandidate = researchPreferenceTargetSchema.safeParse(candidate);
+    if (!parsedCandidate.success) continue;
+    const normalized = normalizeTarget(parsedCandidate.data);
     const item = byTarget.get(targetIdentity(normalized));
     if (!item) continue;
     const relation = candidate.relation;

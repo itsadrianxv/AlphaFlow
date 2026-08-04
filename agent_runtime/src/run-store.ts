@@ -40,6 +40,7 @@ export class AgentRuntimeRunStore {
       input: {
         prompt: request.prompt,
         skillIds: request.skillIds,
+        userSkillDefinitions: request.userSkillDefinitions,
         context: request.context,
         executionBoundary: request.executionBoundary,
       },

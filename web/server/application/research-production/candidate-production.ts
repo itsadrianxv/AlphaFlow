@@ -3,6 +3,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import {
   type ResearchProductionInput,
+  researchEventClaimTypeSchema,
   researchProductionInputSchema,
 } from "~/contracts/research-production";
 import type { ResearchAssessmentLlmAdapter } from "~/server/application/research-assessment/research-assessment-service";
@@ -131,7 +132,7 @@ const adjudicationBodySchema = z
         z
           .object({
             claimKey: z.string().min(1),
-            claimType: z.string().min(1),
+            claimType: researchEventClaimTypeSchema,
             text: z.string().min(1),
             isInference: z.boolean().default(false),
             evidenceKeys: z.array(z.string().min(1)).min(1),
@@ -375,7 +376,7 @@ function productionInput(
       ...output.adjudication,
       contractVersion: output.contractVersion,
       model: "deepseek-v4-flash",
-      promptVersion: "candidate-adjudication.prompt.v1",
+      promptVersion: "candidate-adjudication.prompt.v2",
       schemaVersion: output.contractVersion,
     },
   });

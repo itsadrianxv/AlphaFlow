@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, Radar, ShieldCheck } from "lucide-react";
+import { Inbox, Settings as SettingsIcon } from "lucide-react";
 import Link from "next/link";
 /* biome-ignore lint/correctness/noUnusedImports: React is required by the current JSX transform in tests. */
 import React, {
@@ -16,17 +16,14 @@ import {
   CloseIcon,
   CompanyResearchIcon,
   MenuIcon,
-  MoonIcon,
   OverviewIcon,
   ScheduledTasksIcon,
   ScreeningIcon,
   SidebarToggleIcon,
-  SunIcon,
   TimingIcon,
   WatchlistsIcon,
   WorkflowsIcon,
 } from "~/app/_components/sidebar-icons";
-import { useTheme } from "~/app/_components/theme-provider";
 import type { WorkflowStageTab } from "~/app/_components/workflow-stage-config";
 
 export const DESKTOP_SIDEBAR_STORAGE_KEY =
@@ -47,11 +44,10 @@ export type WorkspaceSection =
   | "watchlists"
   | "companyResearch"
   | "researchInbox"
-  | "researchRadar"
   | "researchTargets"
   | "mindMaps"
   | "scheduledTasks"
-  | "account";
+  | "settings";
 
 export type WorkspaceSectionView = "default" | "history";
 
@@ -113,21 +109,9 @@ const sidebarNavItems: Array<{
     icon: Inbox,
   },
   {
-    key: "researchRadar",
-    href: "/research-radar",
-    label: "研究雷达",
-    icon: Radar,
-  },
-  {
     key: "researchTargets",
     href: "/research-targets",
     label: "投研收藏",
-    icon: WatchlistsIcon,
-  },
-  {
-    key: "mindMaps",
-    href: "/mind-maps",
-    label: "思维导图",
     icon: WatchlistsIcon,
   },
   {
@@ -135,12 +119,6 @@ const sidebarNavItems: Array<{
     href: "/scheduled-tasks",
     label: "定时任务",
     icon: ScheduledTasksIcon,
-  },
-  {
-    key: "account",
-    href: "/account/security",
-    label: "账号安全",
-    icon: ShieldCheck,
   },
 ];
 
@@ -153,24 +131,6 @@ function SidebarBrand(props: { onNavigate?: () => void }) {
         AlphaFlow
       </div>
     </Link>
-  );
-}
-
-function ThemeToggle() {
-  const { theme, toggleTheme } = useTheme();
-  const nextThemeLabel = theme === "dark" ? "浅色主题" : "暗色主题";
-  const Icon = theme === "dark" ? SunIcon : MoonIcon;
-
-  return (
-    <button
-      type="button"
-      aria-label={`切换至${nextThemeLabel}`}
-      title={`切换至${nextThemeLabel}`}
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-[var(--app-border-soft)] bg-[var(--app-sidebar-bg)] text-[var(--app-text-strong)] transition-colors hover:bg-[var(--app-panel-strong)]"
-      onClick={toggleTheme}
-    >
-      <Icon className="h-[18px] w-[18px]" />
-    </button>
   );
 }
 
@@ -421,7 +381,6 @@ function SidebarRail(props: {
             ) : null}
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <ThemeToggle />
             <button
               type="button"
               aria-label="切换侧边栏"
@@ -471,6 +430,18 @@ function SidebarRail(props: {
           onNavigate={onNavigate}
         />
       ) : null}
+
+      <div className={cn(shouldShowHistory ? "pt-1" : "mt-auto pt-1")}>
+        <SidebarLink
+          href="/settings"
+          label="设置"
+          icon={SettingsIcon}
+          iconKey="settings"
+          active={section === "settings"}
+          collapsed={collapsed}
+          onNavigate={onNavigate}
+        />
+      </div>
     </div>
   );
 }
@@ -638,9 +609,6 @@ export function WorkspaceShell(props: {
               <MenuIcon className="h-[18px] w-[18px]" />
             </button>
             <SidebarBrand />
-            <div className="ml-auto">
-              <ThemeToggle />
-            </div>
           </div>
         </div>
 

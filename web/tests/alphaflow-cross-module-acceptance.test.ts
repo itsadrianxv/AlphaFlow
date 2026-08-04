@@ -415,7 +415,6 @@ describe("F04 跨 module 验收场景", () => {
           query.where.scope === "PERSONALIZED" ? null : baselineProjection,
       },
       homepageGenerationTask: { findFirst: async () => null },
-      homepageSnapshot: { findMany: async () => marketBaselineSnapshots() },
     };
     const [withoutFocus, withFocus] = await Promise.all([
       getHomePageSnapshot(db as never, "user-without-focus"),
@@ -728,7 +727,6 @@ describe("F04 跨 module 验收场景", () => {
             query.where.scope === "PERSONALIZED" ? null : baselineProjection,
         },
         homepageGenerationTask: { findFirst: async () => ({ id: newClaim.task.id }) },
-        homepageSnapshot: { findMany: async () => marketBaselineSnapshots() },
       } as never,
       "user-1",
     );

@@ -2,12 +2,12 @@
 
 import { Database, ExternalLink, TriangleAlert } from "lucide-react";
 import React from "react";
-import { useHomePageSnapshot } from "~/app/_components/home-page-snapshot-provider";
 import type {
   HomepageMarketBaseline,
   HomepageMarketDomainId,
   HomepageMarketPhaseId,
 } from "~/contracts/homepage-market-baseline";
+import { api } from "~/trpc/react";
 
 function cutoffText(cutoff: { key: string; value: string }) {
   return `${cutoff.value} · ${cutoff.key}`;
@@ -356,20 +356,23 @@ export function MarketBaselineWorkspace({
 }
 
 export function HomepageMarketBaselineWorkspace() {
-  const snapshot = useHomePageSnapshot();
-  if (snapshot.isLoading) {
+  const baseline = api.homepage.getMarketBaseline.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+  if (baseline.isLoading) {
     return (
       <div className="px-6 py-8 text-sm text-[var(--app-text-muted)]">
         正在读取专业市场基线
       </div>
     );
   }
-  if (snapshot.isError || !snapshot.data) {
+  if (baseline.isError || !baseline.data) {
     return (
       <div className="px-6 py-8 text-sm text-[var(--app-danger-text)]">
         专业市场基线暂时无法读取
       </div>
     );
   }
-  return <MarketBaselineWorkspace baseline={snapshot.data.marketBaseline} />;
+  return <MarketBaselineWorkspace baseline={baseline.data} />;
 }

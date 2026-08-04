@@ -39,9 +39,16 @@ type BaselineDatasetDefinition = {
 export const HOMEPAGE_BASELINE_DATASETS = [
   {
     baselineDomain: "market",
-    datasetKey: "market_snapshot",
+    datasetKey: "market_heatmap",
     providerKey: "tushare",
     required: true,
+    emptyPolicy: "REQUIRE_NON_EMPTY",
+  },
+  {
+    baselineDomain: "market",
+    datasetKey: "market_snapshot",
+    providerKey: "tushare",
+    required: false,
     emptyPolicy: "REQUIRE_NON_EMPTY",
   },
   {
@@ -81,8 +88,8 @@ export const HOMEPAGE_BASELINE_DATASETS = [
   },
 ] as const satisfies readonly BaselineDatasetDefinition[];
 
-const DEFINITION_VERSION = "homepage-baseline-manifest.v1";
-const REQUIREMENT_VERSION = "homepage-baseline-requirement.v1";
+const DEFINITION_VERSION = "homepage-baseline-manifest.v3";
+const REQUIREMENT_VERSION = "homepage-baseline-requirement.v3";
 const PROVIDER_CONTRACT_VERSION = "1.0";
 const NORMALIZATION_RULES_VERSION = "homepage-normalization.v1";
 
@@ -130,11 +137,12 @@ export function buildHomepageBaselineManifestItems(
         ? `${targetTradeDate}T23:59:59+08:00`
         : targetTradeDate;
     const targetDataCutoffJson = {
-      key: definition.providerKey === "minishare" ? "published_at" : "trade_date",
+      key:
+        definition.providerKey === "minishare" ? "published_at" : "trade_date",
       value: targetDataCutoffValue,
     };
     return {
-      itemKey: `${REQUIREMENT_VERSION}:${definition.baselineDomain}`,
+      itemKey: `${REQUIREMENT_VERSION}:${definition.baselineDomain}:${definition.datasetKey}`,
       datasetKey: definition.datasetKey,
       factScopeKey: sha256(factScopeJson),
       factScopeJson,
@@ -203,7 +211,10 @@ export class HomepageBaselineBootstrap {
         targetTradeDate: input.targetTradeDate,
       },
       requestNonce: input.requestNonce,
-      items: buildHomepageBaselineManifestItems(input.phase, input.targetTradeDate),
+      items: buildHomepageBaselineManifestItems(
+        input.phase,
+        input.targetTradeDate,
+      ),
     });
     const attempts = manifest.items.flatMap((item) => item.attempts);
     const published =

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { homepageMarketBaselineSchema } from "~/contracts/homepage-market-baseline";
 import { marketHeatmapSnapshotSchema } from "~/contracts/market-heatmap";
 
 export const HOMEPAGE_PAYLOAD_SCHEMA_VERSION = "homepage-payload.v2";
@@ -182,7 +181,7 @@ const legacyHomePageSnapshotEnvelopeSchema = z.object({
   refreshInProgress: z.boolean(),
   personalizationPending: z.boolean(),
   payload: homePagePayloadSchema,
-  marketBaseline: homepageMarketBaselineSchema,
+  marketBaseline: z.unknown().optional(),
 });
 
 const versionedHomePageSnapshotEnvelopeSchema = z.object({
@@ -195,7 +194,6 @@ const versionedHomePageSnapshotEnvelopeSchema = z.object({
   refreshInProgress: z.boolean(),
   personalizationPending: z.boolean(),
   payload: versionedHomePagePayloadSchema,
-  marketBaseline: homepageMarketBaselineSchema,
   // 读取层迁移完成前只保留属性类型，不允许 v2 信封继续写入旧语义。
   dataAsOf: z.never().optional(),
   isStale: z.never().optional(),

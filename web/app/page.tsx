@@ -1,8 +1,7 @@
 import { Suspense } from "react";
 
-import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { HomePageSnapshotProvider } from "~/app/_components/home-page-snapshot-provider";
-import { HomepageMarketBaselineWorkspace } from "~/app/_components/market-baseline-workspace";
+import { OverviewWorkspace } from "~/app/_components/overview-workspace";
 import { WorkspaceShell } from "~/app/_components/ui";
 import { PiAgentComposer } from "~/app/agent-runtime/agent-runtime-client";
 import { requireAuth } from "~/server/auth/require-auth";
@@ -15,17 +14,13 @@ export default async function Home() {
   return (
     <HydrateClient>
       <WorkspaceShell section="home" showHistory={false}>
-        <HomePageSnapshotProvider>
-          <HighlightToNote floatingToolbar source={{ kind: "overview" }}>
-            <HomepageMarketBaselineWorkspace />
-          </HighlightToNote>
+        <HomePageSnapshotProvider showRefreshStatus={false}>
+          <OverviewWorkspace signedIn={signedIn} />
         </HomePageSnapshotProvider>
         {signedIn ? (
-          <div className="pb-[144px]">
-            <Suspense fallback={null}>
-              <PiAgentComposer showConversation={false} />
-            </Suspense>
-          </div>
+          <Suspense fallback={null}>
+            <PiAgentComposer showConversation={false} />
+          </Suspense>
         ) : null}
       </WorkspaceShell>
     </HydrateClient>

@@ -150,6 +150,38 @@ describe("评分规则构建器 Agent 变更集", () => {
       expect(source).toContain(label);
   });
 
+  it("构建器下拉框文案完整显示且桌面 Agent 栏固定在右侧视口", async () => {
+    const source = await readFile(
+      path.resolve(
+        import.meta.dirname,
+        "../app/scheduled-tasks/builder/scoring-task-builder.tsx",
+      ),
+      "utf8",
+    );
+
+    expect(source).toContain("h-10 w-full");
+    expect(source).toContain("!py-0");
+    expect(source).toContain("lg:sticky lg:top-0");
+    expect(source).toContain("lg:h-screen lg:overflow-hidden");
+  });
+
+  it("Agent 辅助复用投研智能体消息布局并把输入区固定在底部", async () => {
+    const source = await readFile(
+      path.resolve(
+        import.meta.dirname,
+        "../app/scheduled-tasks/builder/scoring-task-builder.tsx",
+      ),
+      "utf8",
+    );
+
+    expect(source).toContain("app-scroll min-h-0 flex-1 overflow-y-auto");
+    expect(source).toContain("flex justify-end");
+    expect(source).toContain("flex justify-start");
+    expect(source).toContain("shrink-0 border-t");
+    expect(source).toContain("h-[93px]");
+    expect(source).toContain('aria-label="发送消息"');
+  });
+
   it("评分构建器 Agent 技能不接收或修改投递凭证", async () => {
     const source = await readFile(
       path.resolve(

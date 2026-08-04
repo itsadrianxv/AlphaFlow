@@ -180,6 +180,7 @@ function buildMergedSkill(skills: Skill[]): Skill {
 
 export type HarnessEventState = {
   lastAssistantText: string;
+  lastToolError?: string;
   waitingForInput?: UserInputRequest;
   scheduledDraftBuilt: boolean;
   scheduleValidationStatus?: string;
@@ -280,6 +281,9 @@ export function mapHarnessEvent(
       outputSummary: payload.outputSummary,
       isError: event.isError,
     });
+    if (event.isError) {
+      state.lastToolError = payload.outputSummary.preview;
+    }
 
     store.appendEvent(
       request.runId,
@@ -382,6 +386,20 @@ export function isScheduledTaskFlowComplete(state: HarnessEventState) {
   return (
     state.scheduledDraftBuilt || state.scheduleValidationStatus === "UNSUPPORTED"
   );
+}
+
+export function resolveScheduledTaskFlowFailure(state: HarnessEventState) {
+  if (state.lastToolError) {
+    return {
+      errorCode: "SCHEDULED_TASK_TOOL_FAILED",
+      errorMessage: `定时任务工具执行失败：${state.lastToolError}`,
+    };
+  }
+
+  return {
+    errorCode: "SCHEDULED_TASK_FLOW_INCOMPLETE",
+    errorMessage: "定时任务未进入等待状态，也未生成可确认草稿",
+  };
 }
 
 export class PiAdapter {
@@ -538,7 +556,12 @@ export class PiAdapter {
     );
     const budgetController = new AgentBudgetController(boundary);
     const skills = skillIds
-      .map((skillId) => this.skillRegistry.get(skillId))
+      .map((skillId) =>
+        this.skillRegistry.getWithUserDefinitions(
+          skillId,
+          request.userSkillDefinitions,
+        ),
+      )
       .filter((skill): skill is Skill => Boolean(skill));
     const missingSkillId = skillIds.find(
       (skillId) => !skills.some((skill) => skill.name === skillId),
@@ -719,6 +742,7 @@ export class PiAdapter {
         scheduledTaskInteractive &&
         !isScheduledTaskFlowComplete(eventState)
       ) {
+        const failure = resolveScheduledTaskFlowFailure(eventState);
         this.recordAudit({
           boundary,
           state: eventState,
@@ -726,8 +750,8 @@ export class PiAdapter {
         });
         this.store.markFailed(
           request.runId,
-          "SCHEDULED_TASK_FLOW_INCOMPLETE",
-          "定时任务未进入等待状态，也未生成可确认草稿",
+          failure.errorCode,
+          failure.errorMessage,
         );
         return;
       }
@@ -757,6 +781,12 @@ export class PiAdapter {
         text,
         skillId: request.skillId,
         skillIds,
+        userSkillDefinitions: request.userSkillDefinitions?.map((skill) => ({
+          id: skill.id,
+          versionId: skill.versionId,
+          version: skill.version,
+          contentHash: skill.contentHash,
+        })),
         generatedAt: new Date().toISOString(),
         context: asJsonObject(request.context),
         researchOnly: {

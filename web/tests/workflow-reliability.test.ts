@@ -24,12 +24,16 @@ const commandSource = readFileSync(
 const schemaSource = readFileSync("prisma/schema.prisma", "utf8");
 
 describe("workflow reliability guards", () => {
-  it("does not let legacy recovery block the configured worker slots", () => {
+  it("只恢复超过节点超时且被原子领取的运行", () => {
     expect(workerSource).toContain("void recoverLegacyRuns();");
     expect(workerSource.indexOf("void recoverLegacyRuns();")).toBeLessThan(
       workerSource.indexOf("await Promise.all("),
     );
     expect(workerSource).toContain("Array.from({ length: concurrency }");
+    expect(executionSource).toContain("claimRecoverableRunningRun");
+    expect(executionSource).not.toContain("listRunningRuns(10)");
+    expect(repositorySource).toContain('"updatedAt" < ${params.staleBefore}');
+    expect(repositorySource).toContain("FOR UPDATE SKIP LOCKED");
   });
 
   it("claims pending runs with database row locking", () => {
@@ -50,5 +54,15 @@ describe("workflow reliability guards", () => {
     expect(conversationSource).toContain("AGENT_WORKFLOW_RUN_ALREADY_BOUND");
     expect(schemaSource).toContain("workflowRunId  String?                        @unique");
     expect(commandSource).toContain("pi-agent-message:${command.userId}:${command.assistantMessageId}");
+  });
+
+  it("串行分配事件序号并清理不可恢复的等待消息", () => {
+    expect(repositorySource).toContain("pg_advisory_xact_lock");
+    expect(conversationSource).toContain("pg_advisory_xact_lock");
+    expect(conversationSource).toContain(
+      "AgentConversationMessageStatus.WAITING_FOR_INPUT",
+    );
+    expect(conversationSource).toContain("AGENT_WAITING_RUN_NOT_RESUMABLE");
+    expect(executionSource).toContain("markAssistantFailedByRun");
   });
 });

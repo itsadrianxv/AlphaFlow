@@ -17,6 +17,7 @@
     "postinstall": "prisma generate",
     "preview": "next build && next start",
     "screening:reset-legacy-data": "tsx tooling/reset-legacy-screening-data.ts",
+    "seed:admin-demo-collections": "tsx tooling/seed-admin-demo-research-collections.ts",
     "start": "next start",
     "validate:runtime": "tsx tooling/validate-runtime-env.ts",
     "worker:workflow": "tsx tooling/workers/workflow-worker.ts",

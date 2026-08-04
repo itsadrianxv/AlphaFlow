@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadSkills, type Skill } from "@earendil-works/pi-agent-core";
 import { RestrictedExecutionEnv } from "./restricted-env";
-import type { SkillSummary } from "./types";
+import type { SkillSummary, UserSkillDefinition } from "./types";
 
 const runtimeDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -131,6 +131,29 @@ export class SkillRegistry {
 
   get(skillId: string) {
     return this.skillsById.get(skillId) ?? null;
+  }
+
+  getWithUserDefinitions(
+    skillId: string,
+    userSkillDefinitions: UserSkillDefinition[] = [],
+  ) {
+    const userSkill = userSkillDefinitions.find(
+      (definition) => definition.id === skillId,
+    );
+    if (userSkill) {
+      return {
+        name: userSkill.id,
+        description: userSkill.description,
+        content: userSkill.content,
+        filePath: path.join(
+          "virtual-user-skills",
+          userSkill.versionId,
+          "SKILL.md",
+        ),
+      } satisfies Skill;
+    }
+
+    return this.get(skillId);
   }
 
   list(): SkillSummary[] {

@@ -11,7 +11,14 @@ import {
   type WorkspaceHistoryItem,
   WorkspaceShell,
 } from "~/app/_components/ui";
-import { resolveAgentMessageText } from "~/app/agent-runtime/message-display";
+import {
+  type AgentInputOption,
+  formatAgentInputOptionPrompt,
+} from "~/app/agent-runtime/agent-input-option";
+import {
+  resolveAgentMessageText,
+  splitAgentReasoningSection,
+} from "~/app/agent-runtime/message-display";
 import {
   consumePiAgentSelectionDraft,
   PI_AGENT_SELECTION_DRAFT_QUERY,
@@ -59,6 +66,7 @@ const statusLabel = {
 } as const;
 
 const skillCategoryOrder = [
+  "我的 Skill",
   "市场与题材",
   "个股研究",
   "财报、公告与事件解读",
@@ -376,7 +384,7 @@ function ChatMessage(props: {
   liveText?: string;
   lastTargetRef?: ResearchTargetRef | null;
   onLastTargetRefChange?: (targetRef: ResearchTargetRef | null) => void;
-  onAskOption?: (value: string) => void;
+  onAskOption?: (option: AgentInputOption) => void;
   piAgentHref: string;
 }) {
   const { message, liveText } = props;
@@ -389,6 +397,7 @@ function ChatMessage(props: {
     }),
   );
   const content = parsed.text;
+  const sections = splitAgentReasoningSection(content);
 
   if (isUser) {
     return (
@@ -420,10 +429,23 @@ function ChatMessage(props: {
               workflowRunId: message.workflowRunId,
             }}
           >
-            <MarkdownContent
-              content={content}
-              className="max-w-none [&>*+*]:mt-4"
-            />
+            {sections.mainContent ? (
+              <MarkdownContent
+                content={sections.mainContent}
+                className="max-w-none [&>*+*]:mt-4"
+              />
+            ) : null}
+            {sections.reasoningContent ? (
+              <details className="mt-4 border-t border-[var(--app-border-soft)] pt-3 text-sm">
+                <summary className="cursor-pointer select-none font-medium text-[var(--app-text-muted)] transition-colors hover:text-[var(--app-text-strong)]">
+                  分析过程
+                </summary>
+                <MarkdownContent
+                  content={sections.reasoningContent}
+                  className="mt-3 max-w-none text-[var(--app-text-muted)] [&>*+*]:mt-3"
+                />
+              </details>
+            ) : null}
             <div className="mt-2">
               <EvidenceContextCitations citations={parsed.citations} />
             </div>
@@ -453,7 +475,7 @@ function ChatMessage(props: {
                 key={`${message.id}:${option.value}`}
                 type="button"
                 className="rounded-[8px] border border-[var(--app-border-soft)] px-3 py-2 text-sm text-[var(--app-text-strong)] transition-colors hover:border-[var(--app-primary-border)] hover:bg-[var(--app-hover-surface)]"
-                onClick={() => props.onAskOption?.(option.value)}
+                onClick={() => props.onAskOption?.(option)}
               >
                 {option.label}
               </button>
@@ -1008,10 +1030,8 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-1 border-t border-[var(--app-border-soft)] p-1 sm:grid-cols-4">
-                    {skillCategoryOrder.map((category) => {
-                      const group = groupedSkills.find(
-                        (item) => item.category === category,
-                      );
+                    {groupedSkills.map((group) => {
+                      const category = group.category;
                       const active = activeSkillGroup?.category === category;
 
                       return (
@@ -1104,9 +1124,10 @@ export function PiAgentComposer(props: { showConversation?: boolean } = {}) {
                   liveText={liveMessages[message.id]}
                   lastTargetRef={lastTargetRef}
                   onLastTargetRefChange={setLastTargetRef}
-                  onAskOption={(value) => {
-                    setPrompt(value);
-                    void handleSend(value);
+                  onAskOption={(option) => {
+                    const optionPrompt = formatAgentInputOptionPrompt(option);
+                    setPrompt(optionPrompt);
+                    void handleSend(optionPrompt);
                   }}
                   piAgentHref={`/agent-runtime?conversationId=${encodeURIComponent(
                     selectedConversationId,

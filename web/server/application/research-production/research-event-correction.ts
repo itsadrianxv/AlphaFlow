@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import { researchEventClaimTypeSchema } from "~/contracts/research-production";
 
 const citationSchema = z
   .object({
@@ -44,7 +45,7 @@ export const researchEventRevisionCommandSchema = z
       .array(
         z
           .object({
-            claimType: z.string().min(1),
+            claimType: researchEventClaimTypeSchema,
             text: z.string().min(1),
             isInference: z.boolean().default(false),
             citations: z.array(citationSchema).min(1),
