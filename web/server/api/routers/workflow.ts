@@ -1,7 +1,12 @@
 ﻿import { WorkflowRunStatus } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import {
+  getLatestWorkflowPauseReason,
+  WORKFLOW_NODE_TIMEOUT_PAUSE_REASON,
+} from "~/contracts/workflow-pause";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { readHomepageNewsRadar } from "~/server/application/homepage/homepage-news-radar";
 import { WorkflowCommandService } from "~/server/application/workflow/command-service";
 import { WorkflowQueryService } from "~/server/application/workflow/query-service";
 import { impactMappingInputSchema } from "~/server/domain/intelligence/impact-mapping";
@@ -203,6 +208,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function isPrismaUniqueConstraintError(error: unknown) {
+  if (!isRecord(error) || error.code !== "P2002" || !isRecord(error.meta)) {
+    return false;
+  }
+  const target = error.meta.target;
+  if (Array.isArray(target)) {
+    return target.includes("userId") && target.includes("idempotencyKey");
+  }
+  return (
+    typeof target === "string" &&
+    target.includes("WorkflowRun_active_user_idempotency_key")
+  );
+}
+
+const IMPACT_ANALYSIS_MAX_ATTEMPTS = 2;
+
+function impactAnalysisIdempotencyKey(stableKey: string, attempt: number) {
+  return attempt === 1 ? stableKey : `${stableKey}:attempt:${attempt}`;
+}
+
 function embeddedEventAnalysis(
   result: Record<string, unknown>,
   eventId: string,
@@ -277,19 +302,9 @@ export const workflowRouter = createTRPCRouter({
           baseResult = baseRun.result;
         }
       } else if (input.baseSnapshotId) {
-        const snapshot = await ctx.db.homepageSnapshot.findFirst({
-          where: {
-            id: input.baseSnapshotId,
-            OR: [{ scope: "BASELINE" }, { userId }],
-          },
-          select: { payloadJson: true },
-        });
-        const payload = isRecord(snapshot?.payloadJson)
-          ? snapshot.payloadJson
-          : undefined;
-        if (isRecord(payload?.impactMapping)) {
-          baseResult = payload.impactMapping;
-        }
+        baseResult = (
+          await readHomepageNewsRadar(ctx.db, input.baseSnapshotId, userId)
+        )?.result as unknown as Record<string, unknown> | undefined;
       }
       if (!baseResult) {
         throw new TRPCError({
@@ -333,12 +348,35 @@ export const workflowRouter = createTRPCRouter({
 
           const sourceId = input.baseRunId ?? input.baseSnapshotId;
           const sourceKind = input.baseRunId ? "run" : "snapshot";
-          const idempotencyKey = `impact-analysis:${sourceKind}:${sourceId}:${eventId}`;
+          const stableIdempotencyKey = `impact-analysis:${sourceKind}:${sourceId}:${eventId}`;
+          const attemptKeys = Array.from(
+            { length: IMPACT_ANALYSIS_MAX_ATTEMPTS },
+            (_, index) =>
+              impactAnalysisIdempotencyKey(stableIdempotencyKey, index + 1),
+          );
           const existing = await ctx.db.workflowRun.findFirst({
-            where: { userId, idempotencyKey },
+            where: {
+              userId,
+              idempotencyKey: { in: attemptKeys },
+            },
             orderBy: { createdAt: "desc" },
-            select: { id: true, status: true, result: true },
+            select: {
+              id: true,
+              idempotencyKey: true,
+              status: true,
+              result: true,
+              events: {
+                where: { eventType: "RUN_PAUSED" },
+                orderBy: { sequence: "desc" },
+                take: 1,
+                select: { eventType: true, payload: true },
+              },
+            },
           });
+          const existingAttempt = existing?.idempotencyKey
+            ? Math.max(1, attemptKeys.indexOf(existing.idempotencyKey) + 1)
+            : 1;
+          const pauseReason = getLatestWorkflowPauseReason(existing?.events);
           if (
             existing?.status === WorkflowRunStatus.SUCCEEDED &&
             isRecord(existing.result)
@@ -349,12 +387,12 @@ export const workflowRouter = createTRPCRouter({
               status: existing.status,
               source: "run" as const,
               result: existing.result,
+              attempt: existingAttempt,
             };
           }
           const activeStatuses = new Set<WorkflowRunStatus>([
             WorkflowRunStatus.PENDING,
             WorkflowRunStatus.RUNNING,
-            WorkflowRunStatus.PAUSED,
           ]);
           if (existing && activeStatuses.has(existing.status)) {
             return {
@@ -362,26 +400,75 @@ export const workflowRouter = createTRPCRouter({
               runId: existing.id,
               status: existing.status,
               source: "run" as const,
+              attempt: existingAttempt,
             };
           }
 
-          const started = await commandService.startImpactMapping({
-            userId,
-            input: impactMappingInputSchema.parse({
-              mode: "trace",
-              baseRunId: input.baseRunId,
-              baseSnapshotId: input.baseSnapshotId,
-              eventId,
-              traceMaxDays: 365,
-              traceMaxEvents: 30,
-            }),
-            idempotencyKey,
-          });
+          if (existing?.status === WorkflowRunStatus.PAUSED) {
+            const retryExhausted =
+              pauseReason === WORKFLOW_NODE_TIMEOUT_PAUSE_REASON &&
+              existingAttempt >= IMPACT_ANALYSIS_MAX_ATTEMPTS;
+            if (
+              pauseReason !== WORKFLOW_NODE_TIMEOUT_PAUSE_REASON ||
+              retryExhausted
+            ) {
+              return {
+                eventId,
+                runId: existing.id,
+                status: existing.status,
+                source: "run" as const,
+                pauseReason,
+                retryExhausted,
+                attempt: existingAttempt,
+              };
+            }
+          }
+
+          const nextAttempt =
+            existing?.status === WorkflowRunStatus.PAUSED
+              ? existingAttempt + 1
+              : existingAttempt;
+
+          const nextIdempotencyKey = impactAnalysisIdempotencyKey(
+            stableIdempotencyKey,
+            nextAttempt,
+          );
+          let started: {
+            runId: string;
+            status: WorkflowRunStatus;
+          };
+          try {
+            started = await commandService.startImpactMapping({
+              userId,
+              input: impactMappingInputSchema.parse({
+                mode: "trace",
+                baseRunId: input.baseRunId,
+                baseSnapshotId: input.baseSnapshotId,
+                eventId,
+                traceMaxDays: 365,
+                traceMaxEvents: 30,
+              }),
+              idempotencyKey: nextIdempotencyKey,
+            });
+          } catch (error) {
+            if (!isPrismaUniqueConstraintError(error)) throw error;
+            const concurrentRun = await ctx.db.workflowRun.findFirst({
+              where: { userId, idempotencyKey: nextIdempotencyKey },
+              orderBy: { createdAt: "desc" },
+              select: { id: true, status: true },
+            });
+            if (!concurrentRun) throw error;
+            started = {
+              runId: concurrentRun.id,
+              status: concurrentRun.status,
+            };
+          }
           return {
             eventId,
             runId: started.runId,
             status: started.status,
             source: "run" as const,
+            attempt: nextAttempt,
           };
         }),
       );
@@ -406,18 +493,41 @@ export const workflowRouter = createTRPCRouter({
         completedAt: true,
       },
     });
-    return (
-      runs.find((run) => {
-        const input = run.input;
-        return (
-          input !== null &&
-          typeof input === "object" &&
-          !Array.isArray(input) &&
-          input.mode === "overview" &&
-          hasNonEmptyImpactEvents(run.result)
-        );
-      }) ?? null
+    const latestRun = runs.find((run) => {
+      const input = run.input;
+      return (
+        input !== null &&
+        typeof input === "object" &&
+        !Array.isArray(input) &&
+        input.mode === "overview" &&
+        hasNonEmptyImpactEvents(run.result)
+      );
+    });
+    if (latestRun) return { ...latestRun, baseRunId: latestRun.id };
+    const projection = await ctx.db.homepageCurrentSnapshotProjection.findFirst(
+      {
+        where: { scope: "BASELINE", userId: null },
+        orderBy: { activationSequence: "desc" },
+        select: { snapshotId: true },
+      },
     );
+    if (!projection) return null;
+    const cached = await readHomepageNewsRadar(
+      ctx.db,
+      projection.snapshotId,
+      ctx.session.user.id,
+    );
+    if (!cached || cached.result.events.length === 0) return null;
+    return {
+      id: cached.snapshotId,
+      baseSnapshotId: cached.snapshotId,
+      status: WorkflowRunStatus.SUCCEEDED,
+      progressPercent: 100,
+      input: { mode: "overview", source: "homepage_snapshot" },
+      result: cached.result,
+      createdAt: cached.generatedAt,
+      completedAt: cached.generatedAt,
+    };
   }),
 
   startIndustryResearch: protectedProcedure

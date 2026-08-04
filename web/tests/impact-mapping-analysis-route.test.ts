@@ -72,6 +72,93 @@ function callerWithFindFirst(findFirst: ReturnType<typeof vi.fn>) {
   } as never);
 }
 
+function callerForPausedRun(params: {
+  pauseReason: string;
+  idempotencyKey: string;
+  createError?: unknown;
+  concurrentRun?: {
+    id: string;
+    status: WorkflowRunStatus;
+    createdAt: Date;
+  };
+}) {
+  const create = params.createError
+    ? vi.fn(async () => Promise.reject(params.createError))
+    : vi.fn(async () => ({
+        id: "run-retry-1",
+        status: WorkflowRunStatus.PENDING,
+        createdAt: new Date("2026-07-25T08:00:00.000Z"),
+      }));
+  const findFirst = vi
+    .fn()
+    .mockResolvedValueOnce({
+      input: { mode: "overview" },
+      result: baseResult(false),
+    })
+    .mockResolvedValueOnce({
+      id: "run-paused-1",
+      idempotencyKey: params.idempotencyKey,
+      status: WorkflowRunStatus.PAUSED,
+      result: null,
+      events: [
+        {
+          eventType: "RUN_PAUSED",
+          payload: { reason: params.pauseReason },
+        },
+      ],
+    })
+    .mockResolvedValueOnce(null)
+    .mockResolvedValueOnce(params.concurrentRun ?? null);
+  const db = {
+    user: {
+      findUnique: vi.fn(async () => ({
+        id: "user-1",
+        sessionVersion: 0,
+        status: "ACTIVE",
+      })),
+    },
+    workflowRun: {
+      findFirst,
+      create,
+      update: vi.fn(async () => undefined),
+    },
+    workflowTemplate: {
+      findFirst: vi.fn(async () => ({
+        id: "template-1",
+        version: 1,
+        graphConfig: {
+          nodes: [
+            "load_impact_context",
+            "collect_impact_evidence",
+            "persist_impact_observations",
+            "map_impact_layers",
+            "build_impact_timeline",
+            "forecast_impact_scenarios",
+            "persist_impact_analysis",
+          ],
+        },
+      })),
+    },
+    workflowNodeRun: { createMany: vi.fn(async () => undefined) },
+    workflowEvent: { create: vi.fn(async () => undefined) },
+    $transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+      callback(db),
+    ),
+  };
+
+  return {
+    caller: createCaller({
+      db,
+      session: {
+        user: { id: "user-1", sessionVersion: 0 },
+        expires: "2099-01-01T00:00:00.000Z",
+      },
+      headers: new Headers(),
+    } as never),
+    create,
+  };
+}
+
 function callerWithSnapshot(snapshot: unknown) {
   return createCaller({
     db: {
@@ -173,5 +260,102 @@ describe("ensureImpactMappingAnalyses", () => {
       code: "BAD_REQUEST",
       message: "基准快照中不存在新闻事件: event-missing",
     });
+  });
+
+  it("节点超时暂停后只创建一次新的分析尝试", async () => {
+    const stableKey = `impact-analysis:run:${baseRunId}:event-1`;
+    const { caller, create } = callerForPausedRun({
+      pauseReason: "node_timeout",
+      idempotencyKey: stableKey,
+    });
+
+    const result = await caller.ensureImpactMappingAnalyses({
+      baseRunId,
+      eventIds: ["event-1"],
+    });
+
+    expect(result[0]).toMatchObject({
+      eventId: "event-1",
+      runId: "run-retry-1",
+      status: WorkflowRunStatus.PENDING,
+      attempt: 2,
+    });
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it("并发创建第二次尝试冲突时复用已胜出的运行", async () => {
+    const stableKey = `impact-analysis:run:${baseRunId}:event-1`;
+    const { caller, create } = callerForPausedRun({
+      pauseReason: "node_timeout",
+      idempotencyKey: stableKey,
+      createError: {
+        code: "P2002",
+        meta: { target: ["userId", "idempotencyKey"] },
+      },
+      concurrentRun: {
+        id: "run-concurrent-winner",
+        status: WorkflowRunStatus.PENDING,
+        createdAt: new Date("2026-07-25T08:00:00.000Z"),
+      },
+    });
+
+    const result = await caller.ensureImpactMappingAnalyses({
+      baseRunId,
+      eventIds: ["event-1"],
+    });
+
+    expect(result[0]).toMatchObject({
+      eventId: "event-1",
+      runId: "run-concurrent-winner",
+      status: WorkflowRunStatus.PENDING,
+      attempt: 2,
+    });
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it("第二次节点超时后返回重试耗尽且不再创建运行", async () => {
+    const stableKey = `impact-analysis:run:${baseRunId}:event-1`;
+    const { caller, create } = callerForPausedRun({
+      pauseReason: "node_timeout",
+      idempotencyKey: `${stableKey}:attempt:2`,
+    });
+
+    const result = await caller.ensureImpactMappingAnalyses({
+      baseRunId,
+      eventIds: ["event-1"],
+    });
+
+    expect(result[0]).toMatchObject({
+      eventId: "event-1",
+      runId: "run-paused-1",
+      status: WorkflowRunStatus.PAUSED,
+      pauseReason: "node_timeout",
+      retryExhausted: true,
+      attempt: 2,
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("等待人工输入的暂停运行保持可恢复且不自动重试", async () => {
+    const stableKey = `impact-analysis:run:${baseRunId}:event-1`;
+    const { caller, create } = callerForPausedRun({
+      pauseReason: "waiting_for_input",
+      idempotencyKey: stableKey,
+    });
+
+    const result = await caller.ensureImpactMappingAnalyses({
+      baseRunId,
+      eventIds: ["event-1"],
+    });
+
+    expect(result[0]).toMatchObject({
+      eventId: "event-1",
+      runId: "run-paused-1",
+      status: WorkflowRunStatus.PAUSED,
+      pauseReason: "waiting_for_input",
+      retryExhausted: false,
+      attempt: 1,
+    });
+    expect(create).not.toHaveBeenCalled();
   });
 });

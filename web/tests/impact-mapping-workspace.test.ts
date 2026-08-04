@@ -91,8 +91,13 @@ vi.mock("~/app/_components/home-page-snapshot-provider", () => ({
 
 import {
   buildEvidenceOrdinals,
+  eventAnalysisStateFromEnsureRecord,
+  getImpactAnalysisRunDisposition,
+  handleImpactAnalysisRunUpdate,
   ImpactMappingWorkspace,
   isNewsSnapshotFresh,
+  nextImpactOverviewRetryAt,
+  shouldPollImpactAnalysisRun,
 } from "~/app/_components/impact-mapping-workspace";
 
 const radarResult: ImpactMappingResult = {
@@ -338,6 +343,76 @@ describe("ImpactMappingWorkspace", () => {
     expect(routerSource).toContain(
       "impact-analysis:${sourceKind}:${sourceId}:${eventId}",
     );
+  });
+
+  it("新闻雷达优先使用工作流快照，并支持首页缓存快照请求分析", () => {
+    expect(workspaceSource).toContain(
+      "api.workflow.getLatestImpactMapping.useQuery",
+    );
+    expect(workspaceSource).toContain("startOverviewMutation.mutate({");
+    expect(workspaceSource).toContain('mode: "overview"');
+    expect(workspaceSource).toContain("impact-news-overview:");
+    expect(workspaceSource).toContain(
+      "...(baseRunId ? { baseRunId } : { baseSnapshotId }),",
+    );
+    expect(workspaceSource).not.toContain("useHomePageSnapshot");
+  });
+
+  it("节点超时暂停会停止轮询并进入一次受控重试", () => {
+    const run = {
+      status: "PAUSED",
+      events: [
+        { eventType: "RUN_PAUSED", payload: { reason: "node_timeout" } },
+      ],
+    };
+
+    expect(shouldPollImpactAnalysisRun(run)).toBe(false);
+    expect(getImpactAnalysisRunDisposition(run)).toBe("retry");
+
+    const onTimedOut = vi.fn();
+    handleImpactAnalysisRunUpdate("event-1", run, {
+      onReady: vi.fn(),
+      onFailed: vi.fn(),
+      onTimedOut,
+    });
+    expect(onTimedOut).toHaveBeenCalledWith("event-1");
+  });
+
+  it("第二次节点超时后退出加载态并显示明确错误", () => {
+    expect(
+      eventAnalysisStateFromEnsureRecord({
+        status: "PAUSED",
+        pauseReason: "node_timeout",
+        retryExhausted: true,
+        runId: "run-paused-2",
+      }),
+    ).toEqual({
+      status: "error",
+      message: "新闻分析超时，请稍后重试",
+    });
+  });
+
+  it("等待人工输入的暂停运行继续轮询且不自动重试", () => {
+    const run = {
+      status: "PAUSED",
+      events: [
+        {
+          eventType: "RUN_PAUSED",
+          payload: { reason: "waiting_for_input" },
+        },
+      ],
+    };
+
+    expect(shouldPollImpactAnalysisRun(run)).toBe(true);
+    expect(getImpactAnalysisRunDisposition(run)).toBe("waiting");
+  });
+
+  it("overview 节点超时退避到下一个小时幂等窗口", () => {
+    expect(
+      nextImpactOverviewRetryAt(
+        new Date("2026-08-04T08:23:00.000Z").getTime(),
+      ),
+    ).toBe(new Date("2026-08-04T09:00:00.000Z").getTime());
   });
 
   it("按首次出现顺序为证据去重编号", () => {

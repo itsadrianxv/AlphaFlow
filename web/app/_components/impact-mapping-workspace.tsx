@@ -8,6 +8,10 @@ import React, {
   useState,
 } from "react";
 import { EvidenceContextCitations } from "~/app/_components/evidence-context-citations";
+import {
+  isNodeTimeoutPausedRun,
+  WORKFLOW_NODE_TIMEOUT_PAUSE_REASON,
+} from "~/contracts/workflow-pause";
 import type {
   ImpactEdge,
   ImpactMappingResult,
@@ -16,13 +20,13 @@ import type {
   ImpactTimelineItem,
 } from "~/server/domain/intelligence/impact-mapping";
 import { api } from "~/trpc/react";
-import { useHomePageSnapshot } from "~/app/_components/home-page-snapshot-provider";
 
 void React;
 
 const CACHE_TTL_MS = 60 * 60 * 1_000;
 const RETRY_DELAY_MS = 60 * 1_000;
 const PAGE_SIZE = 3;
+const NEWS_DAYS = 7;
 const MAX_TIMELINE_HISTORY = 5;
 
 type EventAnalysis = {
@@ -37,6 +41,52 @@ type EventAnalysisState =
   | { status: "loading"; runId?: string }
   | { status: "ready"; data: EventAnalysis }
   | { status: "error"; message: string };
+
+type ObservableWorkflowRun = {
+  status: string;
+  result?: unknown;
+  errorMessage?: string | null;
+  events?: ReadonlyArray<{ eventType: string; payload: unknown }> | null;
+};
+
+export function shouldPollImpactAnalysisRun(run?: ObservableWorkflowRun) {
+  if (!run) return false;
+  const disposition = getImpactAnalysisRunDisposition(run);
+  return disposition === "poll" || disposition === "waiting";
+}
+
+export function getImpactAnalysisRunDisposition(
+  run: ObservableWorkflowRun,
+): "poll" | "ready" | "failed" | "retry" | "waiting" {
+  if (run.status === "SUCCEEDED") return "ready";
+  if (run.status === "FAILED" || run.status === "CANCELLED") return "failed";
+  if (isNodeTimeoutPausedRun(run)) return "retry";
+  if (run.status === "PAUSED") return "waiting";
+  return "poll";
+}
+
+export function nextImpactOverviewRetryAt(now = Date.now()) {
+  return (Math.floor(now / CACHE_TTL_MS) + 1) * CACHE_TTL_MS;
+}
+
+export function handleImpactAnalysisRunUpdate(
+  eventId: string,
+  run: ObservableWorkflowRun,
+  callbacks: {
+    onReady: (eventId: string, result: unknown) => void;
+    onFailed: (eventId: string, message: string) => void;
+    onTimedOut: (eventId: string) => void;
+  },
+) {
+  const disposition = getImpactAnalysisRunDisposition(run);
+  if (disposition === "ready") {
+    callbacks.onReady(eventId, run.result);
+  } else if (disposition === "failed") {
+    callbacks.onFailed(eventId, run.errorMessage ?? "新闻分析加载失败");
+  } else if (disposition === "retry") {
+    callbacks.onTimedOut(eventId);
+  }
+}
 
 const sourceLabels: Record<string, string> = {
   fast: "快讯",
@@ -133,6 +183,26 @@ function analysisFromResult(value: unknown): EventAnalysis | null {
   };
 }
 
+export function eventAnalysisStateFromEnsureRecord(record: {
+  status: string;
+  result?: unknown;
+  runId?: string;
+  pauseReason?: string;
+  retryExhausted?: boolean;
+}): EventAnalysisState {
+  const data = analysisFromResult(record.result);
+  if (data) return { status: "ready", data };
+  if (
+    record.status === "PAUSED" &&
+    record.pauseReason === WORKFLOW_NODE_TIMEOUT_PAUSE_REASON &&
+    record.retryExhausted
+  ) {
+    return { status: "error", message: "新闻分析超时，请稍后重试" };
+  }
+  if (record.runId) return { status: "loading", runId: record.runId };
+  return { status: "error", message: "未能启动新闻分析" };
+}
+
 function embeddedAnalysis(item: ImpactRadarEvent): EventAnalysis | null {
   if (!item.analysis) return null;
   return {
@@ -198,22 +268,19 @@ function AnalysisRunTracker({
   runId,
   onReady,
   onFailed,
+  onTimedOut,
 }: {
   eventId: string;
   runId: string;
   onReady: (eventId: string, result: unknown) => void;
   onFailed: (eventId: string, message: string) => void;
+  onTimedOut: (eventId: string) => void;
 }) {
   const query = api.workflow.getRun.useQuery(
     { runId },
     {
       refetchInterval: (current) => {
-        const status = current.state.data?.status;
-        return status === "PENDING" ||
-          status === "RUNNING" ||
-          status === "PAUSED"
-          ? 3_000
-          : false;
+        return shouldPollImpactAnalysisRun(current.state.data) ? 3_000 : false;
       },
       refetchOnWindowFocus: false,
     },
@@ -222,12 +289,12 @@ function AnalysisRunTracker({
   useEffect(() => {
     const run = query.data;
     if (!run) return;
-    if (run.status === "SUCCEEDED") {
-      onReady(eventId, run.result);
-    } else if (run.status === "FAILED" || run.status === "CANCELLED") {
-      onFailed(eventId, run.errorMessage ?? "新闻分析加载失败");
-    }
-  }, [eventId, onFailed, onReady, query.data]);
+    handleImpactAnalysisRunUpdate(eventId, run, {
+      onReady,
+      onFailed,
+      onTimedOut,
+    });
+  }, [eventId, onFailed, onReady, onTimedOut, query.data]);
 
   return null;
 }
@@ -600,10 +667,10 @@ function NewsAnalysis({
 }
 
 export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
-  const snapshot = useHomePageSnapshot();
   const utils = api.useUtils();
   const [overviewRunId, setOverviewRunId] = useState<string>();
   const [baseRunId, setBaseRunId] = useState<string>();
+  const [baseSnapshotId, setBaseSnapshotId] = useState<string>();
   const [radarResult, setRadarResult] = useState<ImpactMappingResult>();
   const [carouselPage, setCarouselPage] = useState(0);
   const [selectedEventId, setSelectedEventId] = useState<string>();
@@ -616,25 +683,16 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
   const handledOverviewRunIdRef = useRef<string | undefined>(undefined);
   const requestedAnalysisKeysRef = useRef(new Set<string>());
 
-  const snapshotResult = asOverviewResult(snapshot.data?.payload.impactMapping);
-  const latestQuery = {
-    data: snapshotResult
-      ? { result: snapshotResult, completedAt: snapshot.data?.generatedAt, id: undefined }
-      : null,
-    isLoading: snapshot.isLoading,
-    refetch: async () => undefined,
-  };
+  const latestQuery = api.workflow.getLatestImpactMapping.useQuery(undefined, {
+    enabled: signedIn,
+    refetchOnWindowFocus: false,
+  });
   const overviewRunQuery = api.workflow.getRun.useQuery(
     { runId: overviewRunId ?? "" },
     {
       enabled: Boolean(overviewRunId),
       refetchInterval: (query) => {
-        const status = query.state.data?.status;
-        return status === "PENDING" ||
-          status === "RUNNING" ||
-          status === "PAUSED"
-          ? 3_000
-          : false;
+        return shouldPollImpactAnalysisRun(query.state.data) ? 3_000 : false;
       },
       refetchOnWindowFocus: false,
     },
@@ -670,13 +728,22 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
     const completedTime = completedAt ? new Date(completedAt).getTime() : 0;
     if (parsed && completedTime >= localSuccessAtRef.current) {
       setRadarResult(parsed);
-      if (latestQuery.data?.id && latestQuery.data.id !== baseRunId) {
-        setBaseRunId(latestQuery.data.id);
+      const nextRunId =
+        latestQuery.data && "baseRunId" in latestQuery.data
+          ? latestQuery.data.baseRunId
+          : undefined;
+      const nextSnapshotId =
+        latestQuery.data && "baseSnapshotId" in latestQuery.data
+          ? latestQuery.data.baseSnapshotId
+          : undefined;
+      if (nextRunId !== baseRunId || nextSnapshotId !== baseSnapshotId) {
+        setBaseRunId(nextRunId);
+        setBaseSnapshotId(nextSnapshotId);
         setAnalysisStates({});
         requestedAnalysisKeysRef.current.clear();
       }
     }
-  }, [baseRunId, latestQuery.data]);
+  }, [baseRunId, baseSnapshotId, latestQuery.data]);
 
   useEffect(() => {
     setCarouselPage((page) => Math.min(page, pageCount - 1));
@@ -711,7 +778,13 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
       return () => window.clearTimeout(timeout);
     }
     if (retryNotBeforeRef.current > Date.now()) return;
-    return;
+    startOverviewMutation.mutate({
+      mode: "overview",
+      days: NEWS_DAYS,
+      traceMaxDays: 365,
+      traceMaxEvents: 30,
+      idempotencyKey: `impact-news-overview:${Math.floor(Date.now() / CACHE_TTL_MS)}`,
+    });
   }, [
     checkRequestedAt,
     latestQuery.data,
@@ -724,11 +797,13 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     const run = overviewRunQuery.data;
     if (!run || handledOverviewRunIdRef.current === run.id) return;
-    if (run.status === "SUCCEEDED") {
+    const disposition = getImpactAnalysisRunDisposition(run);
+    if (disposition === "ready") {
       const parsed = asOverviewResult(run.result);
       if (parsed) {
         setRadarResult(parsed);
         setBaseRunId(run.id);
+        setBaseSnapshotId(undefined);
         setCarouselPage(0);
         setAnalysisStates({});
         requestedAnalysisKeysRef.current.clear();
@@ -740,9 +815,12 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
       handledOverviewRunIdRef.current = run.id;
       setOverviewRunId(undefined);
       void utils.workflow.getLatestImpactMapping.invalidate();
-    } else if (run.status === "FAILED" || run.status === "CANCELLED") {
+    } else if (disposition === "failed" || disposition === "retry") {
       handledOverviewRunIdRef.current = run.id;
-      retryNotBeforeRef.current = Date.now() + RETRY_DELAY_MS;
+      retryNotBeforeRef.current =
+        disposition === "retry"
+          ? nextImpactOverviewRetryAt()
+          : Date.now() + RETRY_DELAY_MS;
       setOverviewRunId(undefined);
       setCheckRequestedAt(Date.now());
     }
@@ -773,11 +851,10 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
 
   const requestAnalyses = useCallback(
     async (eventIds: string[], force = false) => {
-      const baseSnapshotId = baseRunId ? undefined : snapshot.data?.snapshotId;
-      const sourceId = baseRunId ?? baseSnapshotId;
-      if (!sourceId || eventIds.length === 0) return;
+      if ((!baseRunId && !baseSnapshotId) || eventIds.length === 0) return;
       const uniqueEventIds = [...new Set(eventIds)].slice(0, PAGE_SIZE);
-      const requestKey = `${sourceId}:${uniqueEventIds.join(",")}`;
+      const baseId = baseRunId ?? baseSnapshotId;
+      const requestKey = `${baseId}:${uniqueEventIds.join(",")}`;
       if (!force && requestedAnalysisKeysRef.current.has(requestKey)) return;
       requestedAnalysisKeysRef.current.add(requestKey);
       setAnalysisStates((current) => {
@@ -789,27 +866,13 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
       });
       try {
         const records = await ensureMutation.mutateAsync({
-          baseRunId,
-          baseSnapshotId,
+          ...(baseRunId ? { baseRunId } : { baseSnapshotId }),
           eventIds: uniqueEventIds,
         });
         setAnalysisStates((current) => {
           const next = { ...current };
           for (const record of records) {
-            const data = analysisFromResult(record.result);
-            if (data) {
-              next[record.eventId] = { status: "ready", data };
-            } else if (record.runId) {
-              next[record.eventId] = {
-                status: "loading",
-                runId: record.runId,
-              };
-            } else {
-              next[record.eventId] = {
-                status: "error",
-                message: "未能启动新闻分析",
-              };
-            }
+            next[record.eventId] = eventAnalysisStateFromEnsureRecord(record);
           }
           return next;
         });
@@ -826,7 +889,7 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
         });
       }
     },
-    [baseRunId, ensureMutation, snapshot.data?.snapshotId],
+    [baseRunId, baseSnapshotId, ensureMutation],
   );
 
   useEffect(() => {
@@ -838,6 +901,19 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
       .map((item) => item.event.id);
     void requestAnalyses(missing);
   }, [analysisStates, pageEvents, requestAnalyses]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    const checkWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void latestQuery.refetch();
+        setCheckRequestedAt(Date.now());
+      }
+    };
+    document.addEventListener("visibilitychange", checkWhenVisible);
+    return () =>
+      document.removeEventListener("visibilitychange", checkWhenVisible);
+  }, [latestQuery.refetch, signedIn]);
 
   if (!signedIn || events.length === 0) return null;
 
@@ -866,6 +942,9 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
             runId={state.runId}
             onReady={handleAnalysisReady}
             onFailed={handleAnalysisFailed}
+            onTimedOut={(timedOutEventId) =>
+              void requestAnalyses([timedOutEventId], true)
+            }
           />
         ) : null,
       )}
