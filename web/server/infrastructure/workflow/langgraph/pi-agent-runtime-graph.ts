@@ -77,6 +77,8 @@ function throwIfAborted(signal?: AbortSignal) {
   throw new Error("工作流执行已中止");
 }
 
+const ASSISTANT_DELTA_FLUSH_CHARS = 4096;
+
 export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
   readonly templateCode = PI_AGENT_RUN_TEMPLATE_CODE;
   readonly templateVersion = 1;
@@ -321,9 +323,32 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
     } else {
       signal?.addEventListener("abort", abortStream, { once: true });
     }
-    let runtimeEvents = [...state.runtimeEvents];
+    const runtimeEvents = [...state.runtimeEvents];
     let toolCallCount = state.toolCallCount;
     let waitingForInput = state.waitingForInput;
+    const pendingAssistantDeltas: string[] = [];
+    let pendingAssistantChars = 0;
+    const flushAssistantDeltas = async () => {
+      if (!task.assistantMessageId || pendingAssistantDeltas.length === 0) {
+        return;
+      }
+      const deltaCount = pendingAssistantDeltas.length;
+      const deltas = pendingAssistantDeltas.slice(0, deltaCount);
+      const repository = this.deps.agentConversationRepository;
+      if (repository?.appendAssistantDeltas) {
+        await repository.appendAssistantDeltas(task.assistantMessageId, deltas);
+      } else {
+        await repository?.appendAssistantDelta(
+          task.assistantMessageId,
+          deltas.join(""),
+        );
+      }
+      pendingAssistantDeltas.splice(0, deltaCount);
+      pendingAssistantChars -= deltas.reduce(
+        (total, delta) => total + delta.length,
+        0,
+      );
+    };
 
     try {
       for await (const event of this.deps.agentRuntimeClient.streamRunEvents({
@@ -331,11 +356,14 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
         afterSequence: runtimeEvents.at(-1)?.sequence ?? 0,
         signal: streamAbort.signal,
       })) {
-        runtimeEvents = [...runtimeEvents, event];
-        await this.deps.agentRuntimeRepository.recordRuntimeEvent(
-          state.runId,
-          event,
-        );
+        const isAssistantDelta = event.type === "agent.message.delta";
+        if (!isAssistantDelta) {
+          runtimeEvents.push(event);
+          await this.deps.agentRuntimeRepository.recordRuntimeEvent(
+            state.runId,
+            event,
+          );
+        }
 
         if (event.type === "tool.call.started") {
           toolCallCount += 1;
@@ -346,10 +374,17 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
             event.payload && typeof event.payload.delta === "string"
               ? event.payload.delta
               : "";
-          await this.deps.agentConversationRepository?.appendAssistantDelta(
-            task.assistantMessageId,
-            delta,
-          );
+          if (delta) {
+            pendingAssistantDeltas.push(delta);
+            pendingAssistantChars += delta.length;
+            if (pendingAssistantChars >= ASSISTANT_DELTA_FLUSH_CHARS) {
+              await flushAssistantDeltas();
+            }
+          }
+        }
+
+        if (!isAssistantDelta) {
+          await flushAssistantDeltas();
         }
 
         if (event.type === "agent.message.start" && task.assistantMessageId) {
@@ -368,17 +403,20 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
           }
         }
 
-        await hooks?.onNodeProgress?.("execute_agent_runtime", {
-          piEventType: event.type,
-          piSequence: event.sequence,
-          message: event.message,
-          payload: event.payload ?? {},
-        });
+        if (!isAssistantDelta) {
+          await hooks?.onNodeProgress?.("execute_agent_runtime", {
+            piEventType: event.type,
+            piSequence: event.sequence,
+            message: event.message,
+            payload: event.payload ?? {},
+          });
+        }
 
         if (event.type === "run.waiting_for_input") {
           const request =
             parseUserInputRequest(event.payload) ?? waitingForInput;
           if (request) {
+            await flushAssistantDeltas();
             throw new WorkflowPauseError(
               "Pi agent 正在等待用户补充信息",
               "user_input_required",
@@ -393,10 +431,12 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
         }
 
         if (isTerminalRuntimeEvent(event.type)) {
+          await flushAssistantDeltas();
           break;
         }
       }
     } finally {
+      await flushAssistantDeltas();
       streamAbort.abort();
       signal?.removeEventListener("abort", abortStream);
     }

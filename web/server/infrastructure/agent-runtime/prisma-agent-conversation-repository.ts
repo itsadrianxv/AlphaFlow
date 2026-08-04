@@ -466,33 +466,27 @@ export class PrismaAgentConversationRepository {
   }
 
   async appendAssistantDelta(messageId: string, delta: string) {
-    if (!delta) {
+    return this.appendAssistantDeltas(messageId, [delta]);
+  }
+
+  async appendAssistantDeltas(messageId: string, deltas: string[]) {
+    const content = deltas.join("");
+    if (!content) {
       return null;
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const message = await tx.agentConversationMessage.findUnique({
-        where: { id: messageId },
-      });
-      if (!message) {
-        return null;
-      }
-
-      if (
-        message.status !== AgentConversationMessageStatus.PENDING &&
-        message.status !== AgentConversationMessageStatus.STREAMING
-      ) {
-        return null;
-      }
-
-      return tx.agentConversationMessage.update({
-        where: { id: messageId },
-        data: {
-          status: AgentConversationMessageStatus.STREAMING,
-          content: `${message.content}${delta}`,
-        },
-      });
-    });
+    return this.prisma.$executeRaw(Prisma.sql`
+      UPDATE "AgentConversationMessage"
+      SET
+        "status" = 'STREAMING'::"AgentConversationMessageStatus",
+        "content" = "content" || ${content},
+        "updatedAt" = NOW()
+      WHERE "id" = ${messageId}
+        AND "status" IN (
+          'PENDING'::"AgentConversationMessageStatus",
+          'STREAMING'::"AgentConversationMessageStatus"
+        )
+    `);
   }
 
   async markAssistantSucceeded(params: {

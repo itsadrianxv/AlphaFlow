@@ -216,7 +216,6 @@ export function mapHarnessEvent(
           conversationId: request.conversationId,
           assistantMessageId: request.assistantMessageId,
           delta,
-          text,
         },
         delta,
       );

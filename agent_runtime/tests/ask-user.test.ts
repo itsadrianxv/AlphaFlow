@@ -137,4 +137,67 @@ describe("ask_user tool", () => {
       errorMessage: expect.stringContaining("TASK_NOT_EDITABLE"),
     });
   });
+
+  it("delta 事件只携带增量，不重复携带累计全文", () => {
+    const store = new AgentRuntimeRunStore(60_000);
+    const request = {
+      runId: "run_delta",
+      userId: "user_1",
+      skillId: "x",
+      prompt: "x",
+    };
+    const state: HarnessEventState = {
+      lastAssistantText: "",
+      scheduledDraftBuilt: false,
+    };
+    store.createOrGet(request);
+    mapHarnessEvent(
+      store,
+      request,
+      {
+        type: "message_update",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "你好" }],
+        },
+      } as never,
+      state,
+    );
+    mapHarnessEvent(
+      store,
+      request,
+      {
+        type: "message_update",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "你好世界" }],
+        },
+      } as never,
+      state,
+    );
+    mapHarnessEvent(
+      store,
+      request,
+      {
+        type: "message_end",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "你好世界" }],
+        },
+      } as never,
+      state,
+    );
+    const events = store.snapshot(request.runId)?.events ?? [];
+    const deltas = events.filter(
+      (event) => event.type === "agent.message.delta",
+    );
+    expect(deltas).toHaveLength(2);
+    expect(deltas[0]?.payload).not.toHaveProperty("text");
+    expect(deltas[1]?.payload).toMatchObject({ delta: "世界" });
+    const finalMessages = events.filter(
+      (event) => event.type === "agent.message",
+    );
+    expect(finalMessages).toHaveLength(1);
+    expect(finalMessages[0]?.payload).toMatchObject({ text: "你好世界" });
+  });
 });
