@@ -15,6 +15,7 @@ import {
   type ResearchPreferenceSnapshotInput,
   sortItems,
 } from "~/server/domain/research-preference/research-preference";
+import { buildResearchPreferenceImportCandidates } from "~/server/infrastructure/research-preference/research-preference-import-candidates";
 
 type TransactionClient = Prisma.TransactionClient;
 
@@ -54,62 +55,14 @@ export class PrismaResearchPreferenceRepository
       }),
       this.prisma.watchList.findMany({
         where: { userId },
-        select: { stocks: true },
+        select: { name: true, stocks: true },
         orderBy: { name: "asc" },
       }),
     ]);
-
-    const candidates = new Map<string, ResearchPreferenceImportCandidate>();
-    for (const company of companies) {
-      const candidate: ResearchPreferenceImportCandidate = {
-        targetType: "COMPANY",
-        targetKey: company.stockCode.trim(),
-        source: "SAVED_COMPANY",
-        label: company.companyName.trim() || company.stockCode.trim(),
-      };
-      candidates.set(
-        `${candidate.targetType}:${candidate.targetKey}`,
-        candidate,
-      );
-    }
-    for (const industry of industries) {
-      const targetKey = `${industry.source.trim()}:${industry.name.trim()}`;
-      const candidate: ResearchPreferenceImportCandidate = {
-        targetType: "INDUSTRY",
-        targetKey,
-        source: "SAVED_INDUSTRY",
-        label: industry.name.trim(),
-      };
-      candidates.set(
-        `${candidate.targetType}:${candidate.targetKey}`,
-        candidate,
-      );
-    }
-    for (const watchList of watchLists) {
-      if (!Array.isArray(watchList.stocks)) continue;
-      for (const stock of watchList.stocks) {
-        if (!isRecord(stock) || typeof stock.stockCode !== "string") continue;
-        const targetKey = stock.stockCode.trim();
-        if (!targetKey) continue;
-        const candidate: ResearchPreferenceImportCandidate = {
-          targetType: "COMPANY",
-          targetKey,
-          source: "WATCHLIST",
-          label:
-            typeof stock.stockName === "string" && stock.stockName.trim()
-              ? stock.stockName.trim()
-              : targetKey,
-        };
-        candidates.set(
-          `${candidate.targetType}:${candidate.targetKey}`,
-          candidate,
-        );
-      }
-    }
-    return [...candidates.values()].sort((left, right) => {
-      const typeOrder = left.targetType.localeCompare(right.targetType, "en");
-      if (typeOrder !== 0) return typeOrder;
-      return left.targetKey.localeCompare(right.targetKey, "en");
+    return buildResearchPreferenceImportCandidates({
+      companies,
+      industries,
+      watchLists,
     });
   }
 
@@ -584,8 +537,4 @@ function isSerializationError(error: unknown): boolean {
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === "P2034"
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

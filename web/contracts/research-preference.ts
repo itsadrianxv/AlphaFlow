@@ -74,9 +74,16 @@ export const researchPreferenceImportSourceSchema = z.enum([
   "WATCHLIST",
 ]);
 
+export const researchPreferenceImportCandidateSourceSchema = z.object({
+  source: researchPreferenceImportSourceSchema,
+  name: z.string().trim().min(1).optional(),
+});
+
 export const researchPreferenceImportCandidateSchema =
   researchPreferenceTargetSchema.extend({
+    // 兼容旧调用方的主来源；完整来源以 sources 为准。
     source: researchPreferenceImportSourceSchema,
+    sources: z.array(researchPreferenceImportCandidateSourceSchema).min(1),
     label: z.string().trim().min(1),
   });
 
@@ -112,6 +119,9 @@ export type ResearchPreferenceExplanation = z.infer<
 >;
 export type ResearchPreferenceImportSource = z.infer<
   typeof researchPreferenceImportSourceSchema
+>;
+export type ResearchPreferenceImportCandidateSource = z.infer<
+  typeof researchPreferenceImportCandidateSourceSchema
 >;
 export type ResearchPreferenceImportCandidate = z.infer<
   typeof researchPreferenceImportCandidateSchema
