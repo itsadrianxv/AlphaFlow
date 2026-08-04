@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+import pandas as pd
 import pytest
 
 from app.providers.homepage import (
@@ -20,15 +21,19 @@ from app.providers.homepage import (
     ScriptedHomepageProviderAdapter,
     TushareHomepageProviderAdapter,
 )
+from app.providers.tushare.client import TushareProviderClient
 
 
 def _request(dataset_key: str = "fixture", **kwargs) -> HomepageDataItemRequest:
+    params = {
+        "dataset_key": dataset_key,
+        "requested_scope": {"tradeDate": "2026-08-01"},
+        "target_data_cutoff": DataCutoff("trade_date", "2026-08-01"),
+        "request_params": {"fields": ["close", "volume"]},
+    }
+    params.update(kwargs)
     return HomepageDataItemRequest(
-        dataset_key=dataset_key,
-        requested_scope={"tradeDate": "2026-08-01"},
-        target_data_cutoff=DataCutoff("trade_date", "2026-08-01"),
-        request_params={"fields": ["close", "volume"]},
-        **kwargs,
+        **params,
     )
 
 
@@ -371,3 +376,135 @@ def test_tushare_baseline_datasets_use_explicit_production_client_methods(datase
 
     assert result.result_status == ResultStatus.SUCCESS
     assert client.calls == [(dataset_key, "2026-08-01")]
+
+
+class _MarketSnapshotProvider:
+    def get_market_snapshot(self, as_of_date=None):
+        return [
+            type(
+                "MarketRow",
+                (),
+                {
+                    "stockCode": "600000",
+                    "stockName": "浦发银行",
+                    "industry": "银行",
+                    "close": 10.5,
+                    "changePercent": 1.2,
+                    "turnoverRate": 0.8,
+                    "marketCap": 1000.0,
+                    "floatMarketCap": 900.0,
+                    "tradeDate": "2026-08-01",
+                },
+            )()
+        ]
+
+
+def test_tushare_provider_client_exposes_market_snapshot_for_homepage_adapter() -> None:
+    client = TushareProviderClient(provider=_MarketSnapshotProvider())
+    adapter = TushareHomepageProviderAdapter(client=client)
+
+    result = adapter.fetch(_request("market_snapshot"))
+
+    assert result.result_status == ResultStatus.SUCCESS
+    assert result.actual_data_cutoff == DataCutoff("trade_date", "2026-08-01")
+    assert result.observations[0].subject_key == "600000"
+
+
+class _CompanyActionsProvider:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict[str, str]]] = []
+
+    def get_raw_frame(self, dataset: str, **params: str) -> pd.DataFrame:
+        self.calls.append((dataset, params))
+        if dataset == "stock_basic":
+            return pd.DataFrame(
+                [
+                    {"ts_code": "600000.SH", "name": "浦发银行"},
+                    {"ts_code": "000001.SZ", "name": "平安银行"},
+                ]
+            )
+        if dataset == "repurchase":
+            return pd.DataFrame([{"ts_code": "600000.SH", "ann_date": "20260801", "amount": 1.2}])
+        if dataset == "express_vip":
+            assert params == {"ann_date": "20260801"}
+            raise RuntimeError("express_vip upstream failed")
+        if dataset == "express":
+            raise AssertionError("首页公司事项不应逐股调用 express")
+        return pd.DataFrame()
+
+
+def test_company_actions_uses_date_level_express_vip_and_keeps_partial_records() -> None:
+    provider = _CompanyActionsProvider()
+    client = TushareProviderClient(provider=provider)
+    adapter = TushareHomepageProviderAdapter(client=client)
+
+    result = adapter.fetch(_request("company_actions"))
+
+    express_vip_calls = [
+        params
+        for dataset, params in provider.calls
+        if dataset == "express_vip"
+    ]
+    assert express_vip_calls == [{"ann_date": "20260801"}]
+    assert all(dataset != "stock_basic" for dataset, _params in provider.calls)
+    assert all(dataset != "express" for dataset, _params in provider.calls)
+    assert result.result_status == ResultStatus.DEGRADED
+    assert len(result.observations) == 1
+    assert result.errors[0].error_class == "upstream_unavailable"
+
+
+def test_minishare_news_uses_published_at_cutoff_when_manifest_requests_publication_time() -> None:
+    class NewsClient:
+        def fetch_major_news(self, *_args):
+            return [
+                {
+                    "sourceItemId": "news-1",
+                    "title": "测试新闻",
+                    "content": "测试内容",
+                    "publishedAt": "2026-08-01T15:30:00+08:00",
+                }
+            ]
+
+    adapter = MinishareHomepageProviderAdapter(client=NewsClient())
+    request = _request(
+        "news.major",
+        requested_scope={
+            "startAt": "2026-08-01T00:00:00+08:00",
+            "endAt": "2026-08-01T23:59:59+08:00",
+        },
+        target_data_cutoff=DataCutoff("published_at", "2026-08-01T23:59:59+08:00"),
+    )
+
+    result = adapter.fetch(request)
+
+    assert result.result_status == ResultStatus.SUCCESS
+    assert result.actual_data_cutoff == DataCutoff("published_at", "2026-08-01T23:59:59+08:00")
+    assert result.missing_scope == {}
+
+
+def test_minishare_news_error_does_not_invent_window_cutoff_proof() -> None:
+    adapter = MinishareHomepageProviderAdapter(
+        datasets={
+            "news.major": lambda _request, _cursor: AdapterPage(
+                terminal_error=ProviderError(
+                    error_class="upstream_unavailable",
+                    retryability=Retryability.RETRYABLE,
+                    message="Minishare 请求失败",
+                )
+            )
+        }
+    )
+
+    result = adapter.fetch(
+        _request(
+            "news.major",
+            requested_scope={
+                "startAt": "2026-08-01T00:00:00+08:00",
+                "endAt": "2026-08-01T23:59:59+08:00",
+            },
+            target_data_cutoff=DataCutoff("published_at", "2026-08-01T23:59:59+08:00"),
+        )
+    )
+
+    assert result.result_status == ResultStatus.ERROR
+    assert result.actual_data_cutoff is None

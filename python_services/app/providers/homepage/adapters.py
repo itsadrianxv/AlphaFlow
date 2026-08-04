@@ -664,15 +664,15 @@ class MinishareHomepageProviderAdapter(HomepageProviderAdapter):
             records = client.fetch_fast_news(*window(request), limit=request.page_size, offset=offset)
             # Minishare 没有单独的 total 字段；返回满页时继续请求下一页，
             # 下一次空页即表示已正常终止，而不是静默截断。
-            return AdapterPage(items=tuple(records), next_cursor=str(offset + len(records)) if len(records) >= request.page_size else None)
+            return _news_page(request, records, next_cursor=str(offset + len(records)) if len(records) >= request.page_size else None)
 
         loaders: dict[str, PageLoader] = {
             "news.fast": fast_loader,
-            "news.major": lambda request, _cursor: client.fetch_major_news(*window(request)),
-            "news.cctv": lambda request, _cursor: client.fetch_cctv_news(request.requested_scope.get("date") or request.requested_scope.get("targetDate") or date.today()),
+            "news.major": lambda request, _cursor: _news_page(request, client.fetch_major_news(*window(request))),
+            "news.cctv": lambda request, _cursor: _news_page(request, client.fetch_cctv_news(request.requested_scope.get("date") or request.requested_scope.get("targetDate") or date.today())),
             "news_fast": fast_loader,
-            "news_major": lambda request, _cursor: client.fetch_major_news(*window(request)),
-            "news_cctv": lambda request, _cursor: client.fetch_cctv_news(request.requested_scope.get("date") or request.requested_scope.get("targetDate") or date.today()),
+            "news_major": lambda request, _cursor: _news_page(request, client.fetch_major_news(*window(request))),
+            "news_cctv": lambda request, _cursor: _news_page(request, client.fetch_cctv_news(request.requested_scope.get("date") or request.requested_scope.get("targetDate") or date.today())),
         }
         loaders.update(datasets or {})
         capabilities = {key: DatasetCapability(key, description=f"Minishare {key} 规范化数据集") for key in loaders}
@@ -790,10 +790,46 @@ def _bars_as_records(value: Any) -> Any:
 
 def _dated_page(request: HomepageDataItemRequest, value: Any) -> AdapterPage:
     target_date = _scope_date(request)
+    page = AdapterPage.from_value(value)
+    if page.prebuilt_result is not None:
+        return page
+    if page.actual_data_cutoff is not None:
+        return page
+    if page.covered_scope is not None or page.missing_scope is not None or page.terminal_error is not None:
+        return AdapterPage(
+            items=page.items,
+            next_cursor=page.next_cursor,
+            covered_scope=page.covered_scope or request.requested_scope,
+            missing_scope=page.missing_scope,
+            actual_data_cutoff=DataCutoff("trade_date", target_date) if target_date else None,
+            upstream_as_of=page.upstream_as_of,
+            source_published_at=page.source_published_at,
+            terminal_error=page.terminal_error,
+        )
     return AdapterPage(
-        items=tuple(value or ()),
+        items=page.items,
         covered_scope=request.requested_scope,
         actual_data_cutoff=DataCutoff("trade_date", target_date) if target_date else None,
+    )
+
+
+def _news_page(request: HomepageDataItemRequest, value: Any, *, next_cursor: str | None = None) -> AdapterPage:
+    page = AdapterPage.from_value(value)
+    if page.prebuilt_result is not None:
+        return page
+    end_at = request.requested_scope.get("endAt") or request.requested_scope.get("end_at")
+    actual_cutoff = page.actual_data_cutoff
+    if actual_cutoff is None and page.terminal_error is None:
+        actual_cutoff = DataCutoff("published_at", str(end_at)) if end_at else None
+    return AdapterPage(
+        items=page.items,
+        next_cursor=next_cursor or page.next_cursor,
+        covered_scope=page.covered_scope or request.requested_scope,
+        missing_scope=page.missing_scope,
+        actual_data_cutoff=actual_cutoff,
+        upstream_as_of=page.upstream_as_of,
+        source_published_at=page.source_published_at,
+        terminal_error=page.terminal_error,
     )
 
 

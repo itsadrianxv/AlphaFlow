@@ -101,6 +101,7 @@ RAW_DATASET_FIELDS: dict[str, str] = {
     "fina_audit": "ts_code,ann_date,end_date,audit_result,audit_fees,audit_agency,audit_sign",
     "forecast": "ts_code,ann_date,end_date,type,p_change_min,p_change_max,net_profit_min,net_profit_max,last_parent_net,first_ann_date,summary,change_reason",
     "express": "ts_code,ann_date,end_date,revenue,operate_profit,total_profit,n_income,total_assets,total_hldr_eqy_exc_min_int,diluted_eps,diluted_roe,yoy_net_profit,bps,yoy_sales,yoy_op,yoy_tp,yoy_dedu_np",
+    "express_vip": "ts_code,ann_date,end_date,revenue,operate_profit,total_profit,n_income,total_assets,total_hldr_eqy_exc_min_int,diluted_eps,diluted_roe,yoy_net_profit,bps,yoy_sales,yoy_op,yoy_tp,yoy_dedu_np",
     "disclosure_date": "ts_code,ann_date,end_date,pre_date,actual_date,modify_date",
     "dividend": "ts_code,end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date",
     "fund_basic": "ts_code,name,management,custodian,fund_type,found_date,due_date,list_date,issue_date,delist_date,issue_amount,m_fee,c_fee,duration_year,p_value,min_amount,exp_return,benchmark,status,invest_type,type,trustee,purc_startdate,redm_startdate,market",
@@ -887,16 +888,16 @@ class TushareProvider:
                 params["ts_code"] = ts_code
             return params
 
-        if dataset in {"daily", "weekly", "monthly", "daily_basic", "moneyflow", "margin", "margin_detail", "hk_hold", "top_list", "top_inst", "block_trade", "stk_limit", "stk_holdernumber", "stk_holdertrade", "pledge_detail", "pledge_stat", "share_float", "repurchase", "income", "balancesheet", "cashflow", "fina_indicator", "fina_mainbz", "fina_audit", "forecast", "express", "disclosure_date", "dividend"}:
+        if dataset in {"daily", "weekly", "monthly", "daily_basic", "moneyflow", "margin", "margin_detail", "hk_hold", "top_list", "top_inst", "block_trade", "stk_limit", "stk_holdernumber", "stk_holdertrade", "pledge_detail", "pledge_stat", "share_float", "repurchase", "income", "balancesheet", "cashflow", "fina_indicator", "fina_mainbz", "fina_audit", "forecast", "express", "express_vip", "disclosure_date", "dividend"}:
             if ts_code and dataset not in {"margin", "stk_limit"}:
                 params["ts_code"] = ts_code
-            if trade_date and dataset not in {"stk_holdernumber", "income", "balancesheet", "cashflow", "fina_indicator", "fina_mainbz", "fina_audit", "forecast", "express", "disclosure_date", "dividend"}:
+            if trade_date and dataset not in {"stk_holdernumber", "income", "balancesheet", "cashflow", "fina_indicator", "fina_mainbz", "fina_audit", "forecast", "express", "express_vip", "disclosure_date", "dividend"}:
                 params["trade_date"] = trade_date
             if start_date:
                 params["start_date"] = start_date
             if end_date:
                 params["end_date"] = end_date
-            if period and dataset in {"income", "balancesheet", "cashflow", "fina_indicator", "fina_mainbz", "fina_audit", "forecast", "express", "disclosure_date", "dividend"}:
+            if period and dataset in {"income", "balancesheet", "cashflow", "fina_indicator", "fina_mainbz", "fina_audit", "forecast", "express", "express_vip", "disclosure_date", "dividend"}:
                 params["period"] = period
             if request.get("reportType") and dataset in {"income", "balancesheet", "cashflow"}:
                 params["report_type"] = request.get("reportType")

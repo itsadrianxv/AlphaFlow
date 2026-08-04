@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, date, datetime, timedelta
 import hashlib
 import json
@@ -36,6 +36,12 @@ _SW_THEME_INDUSTRY_HINTS: dict[str, list[str]] = {
     "汽车": ["汽车", "乘用车", "汽车零部件", "汽车电子电气系统"],
     "低空经济": ["航空装备", "国防军工", "航天装备", "机械设备"],
 }
+
+
+@dataclass(frozen=True)
+class _HomepageRecordsResult:
+    records: list[dict[str, Any]]
+    errors: list[dict[str, Any]]
 
 
 class TushareProviderClient:
@@ -167,6 +173,10 @@ class TushareProviderClient:
             adjust=adjust,
         )
         return pd.DataFrame([asdict(bar) for bar in bars])
+
+    def get_market_snapshot(self, target_date: str | None = None) -> list[dict[str, Any]]:
+        rows = self._provider.get_market_snapshot(as_of_date=target_date)
+        return [self._market_row_to_dict(row) for row in rows]
 
     def get_theme_candidates(
         self,
@@ -314,15 +324,32 @@ class TushareProviderClient:
             target_date=target_date,
         )
 
-    def get_company_actions(self, target_date: str | None) -> list[dict[str, Any]]:
+    def get_company_actions(self, target_date: str | None) -> list[dict[str, Any]] | dict[str, Any]:
         compact = _compact_date(target_date)
-        return self._homepage_records(
+        seed_result = self._homepage_records_allowing_partial_failure(
+            [("repurchase", {"ann_date": compact})],
+            target_date=target_date,
+        )
+        express_result = self._homepage_records_allowing_partial_failure(
             [
-                ("repurchase", {"ann_date": compact}),
-                ("express", {"ann_date": compact}),
+                ("express_vip", {"ann_date": compact}),
             ],
             target_date=target_date,
         )
+        records = [*seed_result.records, *express_result.records]
+        errors = [*seed_result.errors, *express_result.errors]
+        if errors:
+            return {
+                "items": records,
+                "error": {
+                    "errorClass": "upstream_unavailable",
+                    "retryability": "retryable",
+                    "message": "TuShare 公司事项部分子数据集获取失败",
+                    "code": "TUSHARE_COMPANY_ACTIONS_PARTIAL_FAILURE",
+                    "details": {"errors": errors},
+                },
+            }
+        return records
 
     def get_expectation_changes(self, target_date: str | None) -> list[dict[str, Any]]:
         compact = _compact_date(target_date)
@@ -351,12 +378,36 @@ class TushareProviderClient:
         *,
         target_date: str | None,
     ) -> list[dict[str, Any]]:
+        return self._homepage_records_allowing_partial_failure(
+            requests,
+            target_date=target_date,
+            raise_on_error=True,
+        ).records
+
+    def _homepage_records_allowing_partial_failure(
+        self,
+        requests: list[tuple[str, dict[str, str]]],
+        *,
+        target_date: str | None,
+        raise_on_error: bool = False,
+    ) -> _HomepageRecordsResult:
         records: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
         for dataset, params in requests:
-            frame = self._raw_frame(
-                dataset,
-                **{key: value for key, value in params.items() if value},
-            )
+            effective_params = {key: value for key, value in params.items() if value}
+            try:
+                frame = self._raw_frame(dataset, **effective_params)
+            except Exception as exc:  # noqa: BLE001
+                if raise_on_error:
+                    raise
+                errors.append(
+                    {
+                        "dataset": dataset,
+                        "params": _redact_params(effective_params),
+                        "message": str(exc) or exc.__class__.__name__,
+                    }
+                )
+                continue
             for _, row in frame.iterrows():
                 raw = {
                     str(key): _json_safe(value)
@@ -381,7 +432,7 @@ class TushareProviderClient:
                         "observationPeriod": {"tradeDate": business_date},
                     }
                 )
-        return records
+        return _HomepageRecordsResult(records=records, errors=errors)
 
     def get_concept_catalog(self) -> list[dict]:
         frame = self._raw_frame("ths_index", exchange="A", type="N")
@@ -797,6 +848,8 @@ class TushareProviderClient:
             "marketCap": row.marketCap,
             "floatMarketCap": row.floatMarketCap,
             "dataDate": row.tradeDate,
+            "tradeDate": _format_ymd(row.tradeDate),
+            "observationPeriod": {"tradeDate": _format_ymd(row.tradeDate)},
         }
 
     def _safe_latest_metrics(
@@ -1074,6 +1127,14 @@ def _json_safe(value: Any) -> Any:
     if hasattr(value, "item") and callable(value.item):
         return value.item()
     return value
+
+
+def _redact_params(params: dict[str, str]) -> dict[str, str]:
+    return {
+        key: value
+        for key, value in params.items()
+        if "token" not in key.lower() and "secret" not in key.lower()
+    }
 
 
 def _infer_sw_level(index_code: Any) -> str:

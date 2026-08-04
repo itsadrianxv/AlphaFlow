@@ -119,12 +119,19 @@ function requestedScope(
   return { ...common, tradeDate: targetTradeDate };
 }
 
-function manifestItems(phase: HomepageBaselinePhase, targetTradeDate: string) {
+export function buildHomepageBaselineManifestItems(
+  phase: HomepageBaselinePhase,
+  targetTradeDate: string,
+) {
   return HOMEPAGE_BASELINE_DATASETS.map((definition) => {
     const factScopeJson = requestedScope(definition, phase, targetTradeDate);
+    const targetDataCutoffValue =
+      definition.providerKey === "minishare"
+        ? `${targetTradeDate}T23:59:59+08:00`
+        : targetTradeDate;
     const targetDataCutoffJson = {
-      key: "trade_date",
-      value: targetTradeDate,
+      key: definition.providerKey === "minishare" ? "published_at" : "trade_date",
+      value: targetDataCutoffValue,
     };
     return {
       itemKey: `${REQUIREMENT_VERSION}:${definition.baselineDomain}`,
@@ -134,7 +141,7 @@ function manifestItems(phase: HomepageBaselinePhase, targetTradeDate: string) {
       requirementVersion: REQUIREMENT_VERSION,
       required: definition.required,
       emptyPolicy: definition.emptyPolicy,
-      targetDataCutoffKey: targetTradeDate,
+      targetDataCutoffKey: targetDataCutoffValue,
       targetDataCutoffJson,
       providerKey: definition.providerKey,
       providerContractVersion: PROVIDER_CONTRACT_VERSION,
@@ -196,7 +203,7 @@ export class HomepageBaselineBootstrap {
         targetTradeDate: input.targetTradeDate,
       },
       requestNonce: input.requestNonce,
-      items: manifestItems(input.phase, input.targetTradeDate),
+      items: buildHomepageBaselineManifestItems(input.phase, input.targetTradeDate),
     });
     const attempts = manifest.items.flatMap((item) => item.attempts);
     const published =
