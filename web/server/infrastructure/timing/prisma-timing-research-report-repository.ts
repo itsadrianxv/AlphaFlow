@@ -21,6 +21,11 @@ function mapReport(record: any): TimingResearchReportRecord {
     observationConditions: record.observationConditions as TimingResearchReportRecord["observationConditions"],
     dataCompleteness: record.dataCompleteness as TimingResearchReportRecord["dataCompleteness"],
     modelOutlook: (record.modelOutlook as TimingResearchReportRecord["modelOutlook"]) ?? null,
+    modelEvidence: record.modelEvidence as TimingResearchReportRecord["modelEvidence"],
+    forecastSnapshots: record.forecastSnapshots?.map((link: any) => ({
+      snapshotId: link.snapshot.id,
+      forecast: link.snapshot.forecastJson,
+    })),
     riskFlags: record.riskFlags as TimingRiskFlag[],
     reasoning: record.reasoning as TimingResearchReportRecord["reasoning"],
     ruleAudit: record.ruleAudit as TimingResearchReportRecord["ruleAudit"],
@@ -67,11 +72,19 @@ export class PrismaTimingResearchReportRepository {
             observationConditions: toJson(item.observationConditions),
             dataCompleteness: toJson(item.dataCompleteness),
             modelOutlook: item.modelOutlook ? toJson(item.modelOutlook) : undefined,
+            modelEvidence: toJson(item.modelEvidence),
             riskFlags: item.riskFlags,
             reasoning: toJson(item.reasoning),
             ruleAudit: toJson(item.ruleAudit),
+            forecastSnapshots: item.forecastSnapshotIds
+              ? {
+                  create: Object.values(item.forecastSnapshotIds).map((snapshotId) => ({
+                    snapshot: { connect: { id: snapshotId } },
+                  })),
+                }
+              : undefined,
           },
-          include: { signalSnapshot: true },
+          include: { signalSnapshot: true, forecastSnapshots: { include: { snapshot: true } } },
         }),
       ),
     );
@@ -81,7 +94,7 @@ export class PrismaTimingResearchReportRepository {
   async getByIdForUser(userId: string, id: string) {
     const record = await this.prisma.timingResearchReport.findFirst({
       where: { id, userId },
-      include: { signalSnapshot: true },
+      include: { signalSnapshot: true, forecastSnapshots: { include: { snapshot: true } } },
     });
     return record ? mapReport(record) : null;
   }
@@ -102,7 +115,7 @@ export class PrismaTimingResearchReportRepository {
         watchListId: params.watchListId,
         workflowRunId: params.workflowRunId,
       },
-      include: { signalSnapshot: true },
+      include: { signalSnapshot: true, forecastSnapshots: { include: { snapshot: true } } },
       take: params.limit,
       orderBy: { createdAt: "desc" },
     });

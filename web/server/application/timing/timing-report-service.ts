@@ -6,10 +6,8 @@ import type {
   TimingReportEvidence,
   TimingReportPayload,
   TimingReportSeriesPayload,
-  TimingSignalEngineKey,
   TimingTimeframe,
 } from "~/server/domain/timing/types";
-import type { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
 import type { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
 import type { PrismaTimingResearchReportRepository } from "~/server/infrastructure/timing/prisma-timing-research-report-repository";
 import type { PrismaTimingSignalSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-signal-snapshot-repository";
@@ -81,7 +79,6 @@ export class TimingReportService {
     researchReportRepository: Pick<PrismaTimingResearchReportRepository, "getByIdForUser">;
     signalSnapshotRepository: Pick<PrismaTimingSignalSnapshotRepository, "updateFrozenBars">;
     marketContextSnapshotRepository: Pick<PrismaTimingMarketContextSnapshotRepository, "getByAsOfDate">;
-    kronosForecastSnapshotRepository?: Pick<PrismaTimingKronosForecastSnapshotRepository, "getLatestForStock">;
     timingDataClient: Pick<PythonTimingDataClient, "getBars">;
   }) {}
 
@@ -95,17 +92,14 @@ export class TimingReportService {
       bars = (await this.deps.timingDataClient.getBars({ stockCode: report.stockCode, end: asOfDate })).bars;
       if (report.signalSnapshotId) await this.deps.signalSnapshotRepository.updateFrozenBars({ signalSnapshotId: report.signalSnapshotId, bars });
     }
-    const [marketSnapshot, forecastSnapshot] = await Promise.all([
-      this.deps.marketContextSnapshotRepository.getByAsOfDate(asOfDate),
-      this.deps.kronosForecastSnapshotRepository?.getLatestForStock({ userId: params.userId, stockCode: report.stockCode, asOfDate, timeframe: "DAILY" }) ?? Promise.resolve(null),
-    ]);
+    const marketSnapshot = await this.deps.marketContextSnapshotRepository.getByAsOfDate(asOfDate);
     return {
       report,
       bars,
       chartLevels: computeTimingChartLevels(bars),
       evidence: buildEvidence(report.signalSnapshot?.signalContext.engines ?? []),
       marketContext: marketSnapshot?.analysis ?? fallbackMarketContext(asOfDate),
-      modelOutlook: forecastSnapshot?.forecast,
+      modelOutlook: report.modelOutlook ?? undefined,
     };
   }
 
@@ -117,7 +111,7 @@ export class TimingReportService {
     const frozen = report.signalSnapshot?.barsByTimeframe?.[params.timeframe];
     const response = frozen?.length ? null : await this.deps.timingDataClient.getBars({ stockCode: report.stockCode, end: asOfDate, timeframe: params.timeframe });
     const bars = frozen ?? response?.bars ?? [];
-    const forecast = await this.deps.kronosForecastSnapshotRepository?.getLatestForStock({ userId: params.userId, stockCode: report.stockCode, asOfDate, timeframe: params.timeframe });
+    const forecast = report.forecastSnapshots?.find((item) => item.forecast.timeframe === params.timeframe);
     return {
       stockCode: report.stockCode,
       stockName: report.stockName,
@@ -126,7 +120,7 @@ export class TimingReportService {
       bars,
       chartLevels: computeTimingChartLevels(bars),
       modelOutlook: forecast?.forecast,
-      warnings: forecast?.warnings ?? [],
+      warnings: forecast?.forecast.warnings ?? [`本报告未冻结 ${params.timeframe} 周期的模型预测。`],
     };
   }
 }

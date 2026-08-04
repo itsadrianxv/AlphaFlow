@@ -17,6 +17,7 @@ export type TimingKronosForecastSnapshotRecord = {
   id: string;
   userId: string;
   workflowRunId?: string | null;
+  researchRunId: string;
   stockCode: string;
   stockName: string;
   timeframe: TimingTimeframe;
@@ -38,6 +39,7 @@ function mapRecord(record: {
   id: string;
   userId: string;
   workflowRunId: string | null;
+  researchRunId: string;
   stockCode: string;
   stockName: string;
   timeframe: string;
@@ -58,6 +60,7 @@ function mapRecord(record: {
     id: record.id,
     userId: record.userId,
     workflowRunId: record.workflowRunId,
+    researchRunId: record.researchRunId,
     stockCode: record.stockCode,
     stockName: record.stockName,
     timeframe: record.timeframe as TimingTimeframe,
@@ -81,6 +84,7 @@ type KronosForecastDelegate = {
     id: string;
     userId: string;
     workflowRunId: string | null;
+    researchRunId: string;
     stockCode: string;
     stockName: string;
     timeframe: string;
@@ -124,6 +128,7 @@ type KronosForecastDelegate = {
       id: string;
       userId: string;
       workflowRunId: string | null;
+      researchRunId: string;
       stockCode: string;
       stockName: string;
       timeframe: string;
@@ -157,6 +162,7 @@ export class PrismaTimingKronosForecastSnapshotRepository {
   async upsert(params: {
     userId: string;
     workflowRunId?: string;
+    researchRunId: string;
     stockCode: string;
     stockName: string;
     timeframe?: TimingTimeframe;
@@ -168,9 +174,10 @@ export class PrismaTimingKronosForecastSnapshotRepository {
     const asOfDate = toDateOnly(params.forecast.asOfDate);
     const record = await this.snapshots.upsert({
       where: {
-        userId_stockCode_asOfDate_timeframe_modelName_predictionLength_inputBarsHash:
+        userId_researchRunId_stockCode_asOfDate_timeframe_modelName_predictionLength_inputBarsHash:
           {
             userId: params.userId,
+            researchRunId: params.researchRunId,
             stockCode: params.stockCode,
             asOfDate,
             timeframe: params.forecast.timeframe,
@@ -182,6 +189,7 @@ export class PrismaTimingKronosForecastSnapshotRepository {
       create: {
         userId: params.userId,
         workflowRunId: params.workflowRunId,
+        researchRunId: params.researchRunId,
         stockCode: params.stockCode,
         stockName: params.stockName,
         timeframe: params.forecast.timeframe,
@@ -201,7 +209,6 @@ export class PrismaTimingKronosForecastSnapshotRepository {
       update: {
         workflowRunId: params.workflowRunId,
         sourceType: params.sourceType,
-        sourceId: params.sourceId,
         stockName: params.stockName,
         timeframe: params.forecast.timeframe,
         modelVersion: params.forecast.modelVersion,

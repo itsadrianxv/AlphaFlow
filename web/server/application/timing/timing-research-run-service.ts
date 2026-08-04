@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { TimingResearchRunInput } from "~/contracts/timing-research";
 import { MarketRegimeService } from "~/server/application/timing/market-regime-service";
+import type { KronosResearchForecastModule } from "~/server/application/timing/kronos-research-forecast-module";
 import { PortfolioRiskDiagnosticService } from "~/server/application/timing/portfolio-risk-diagnostic-service";
 import { SystemTimingStrategyService } from "~/server/application/timing/system-timing-strategy-service";
 import { TimingAnalysisService } from "~/server/application/timing/timing-analysis-service";
 import { evaluateTimingResearchRules } from "~/server/domain/timing/services/timing-rule-engine";
+import { synthesizeTimingResearchWithModel } from "~/server/domain/timing/services/timing-model-synthesis";
 import type {
   PortfolioCompositionPosition,
   TimingResearchReportDraft,
@@ -36,6 +38,7 @@ export class TimingResearchRunService {
     diagnosticRepository: PrismaPortfolioRiskDiagnosticRepository;
     marketContextRepository: PrismaTimingMarketContextSnapshotRepository;
     timingDataClient: PythonTimingDataClient;
+    kronosResearchForecastModule: Pick<KronosResearchForecastModule, "generateForResearchRun">;
   }) {}
 
   private async resolveRevision(userId: string, input: TimingResearchRunInput) {
@@ -77,6 +80,7 @@ export class TimingResearchRunService {
     const revision = await this.resolveRevision(userId, input);
     const targets = this.targets(input);
     const sourceId = input.sourceWatchListId ?? randomUUID();
+    const researchRunId = randomUUID();
     const stockCodes = targets.map((item) => item.stockCode);
     const [signalsResult, evidenceResult, marketSnapshot] = await Promise.all([
       this.deps.timingDataClient.getSignalsBatch({ stockCodes, asOfDate: input.analysisDate.asOfDate, includeBars: true }),
@@ -98,12 +102,37 @@ export class TimingResearchRunService {
     const assessments = new TimingAnalysisService().buildTechnicalAssessments(signalsResult.items);
     const assessmentByCode = new Map(assessments.map((item) => [item.stockCode, item]));
     const signalByCode = new Map(signalsResult.items.map((item) => [item.stockCode, item]));
+    const forecastResult = await this.deps.kronosResearchForecastModule.generateForResearchRun({
+      userId,
+      sourceType: input.sourceWatchListId ? "watchlist" : "single",
+      sourceId,
+      researchRunId,
+      signalSnapshots: snapshots,
+      requestedTimeframes: ["DAILY", "WEEKLY", "MONTHLY"],
+    });
     const reports: TimingResearchReportDraft[] = evidenceResult.items.flatMap((evidence) => {
       const assessment = assessmentByCode.get(evidence.stockCode);
       const snapshot = snapshotByCode.get(evidence.stockCode);
       const signal = signalByCode.get(evidence.stockCode);
       if (!assessment || !snapshot || !signal) return [];
       const ruleAudit = evaluateTimingResearchRules({ config: revision.config, features: evidence.features, strategyRevisionId: revision.id, configHash: revision.configHash });
+      const forecastSet = forecastResult.forecastsByStock.get(evidence.stockCode) ?? {};
+      const synthesis = synthesizeTimingResearchWithModel({
+        technicalState: ruleAudit.researchState,
+        technicalConfidence: assessment.confidence,
+        technicalDirection: signal.signalContext.composite.direction,
+        forecasts: forecastSet,
+      });
+      const generatedEvidence = forecastResult.evidenceByStock.get(evidence.stockCode);
+      const modelEvidence = generatedEvidence?.status === "AVAILABLE"
+        ? {
+            ...generatedEvidence,
+            alignment: synthesis.evidence.alignment,
+            timeframeConsistency: synthesis.evidence.timeframeConsistency,
+            confidenceAdjustment: synthesis.evidence.confidenceAdjustment,
+            message: `${synthesis.evidence.message} ${generatedEvidence.message}`,
+          }
+        : generatedEvidence ?? synthesis.evidence;
       const available = evidence.features.filter((item) => item.status === "AVAILABLE").length;
       const missing = evidence.features.filter((item) => item.status !== "AVAILABLE").map((item) => `${item.indicatorId}:${item.timeframe}`);
       return [{
@@ -117,16 +146,18 @@ export class TimingResearchRunService {
         sourceType: input.sourceWatchListId ? "watchlist" : "single",
         sourceId,
         signalSnapshotId: snapshot.id,
-        researchState: ruleAudit.researchState,
+        researchState: synthesis.researchState,
         trendState: assessment.trendState,
-        confidence: assessment.confidence,
+        confidence: synthesis.confidence,
         marketState: marketContext.state,
         marketTransition: marketContext.transition,
-        summary: `${assessment.summary} 规则研究状态为 ${ruleAudit.researchState}。`,
-        dimensions: assessment.dimensions,
+        summary: `${assessment.summary} 规则研究状态为 ${ruleAudit.researchState}。${modelEvidence.message}`,
+        dimensions: [...assessment.dimensions, { ...synthesis.dimension, limitations: [modelEvidence.message] }],
         observationConditions: assessment.observationConditions,
         dataCompleteness: { status: missing.length ? (available ? "PARTIAL" : "INSUFFICIENT") : "COMPLETE", available, total: evidence.features.length, missing, warnings: evidence.warnings },
-        modelOutlook: null,
+        modelOutlook: forecastSet.DAILY?.forecast ?? null,
+        modelEvidence,
+        forecastSnapshotIds: Object.fromEntries(Object.entries(forecastSet).map(([timeframe, item]) => [timeframe, item?.snapshotId])),
         riskFlags: assessment.riskFlags,
         reasoning: { indicators: signal.indicators, engineBreakdown: assessment.engineBreakdown, dataManifest: evidence.dataManifest, featureEvidence: evidence.features, inputHash: evidence.inputHash },
         ruleAudit,
@@ -143,7 +174,7 @@ export class TimingResearchRunService {
       reports: persistedReports,
       portfolioDiagnostic,
       marketContext,
-      errors: [...signalsResult.errors, ...evidenceResult.errors],
+      errors: [...signalsResult.errors, ...evidenceResult.errors, ...forecastResult.warnings.map((message) => ({ stockCode: "KRONOS", code: "forecast_warning", message }))],
     };
   }
 

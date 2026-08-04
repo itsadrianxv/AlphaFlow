@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TimingAnalysisService } from "~/server/application/timing/timing-analysis-service";
+import { synthesizeTimingResearchWithModel } from "~/server/domain/timing/services/timing-model-synthesis";
 import { evaluateTimingResearchRules } from "~/server/domain/timing/services/timing-rule-engine";
 import type { TimingFeatureEvidence, TimingResearchRuleConfig, TimingSignalData } from "~/server/domain/timing/types";
 
@@ -32,11 +33,53 @@ function signal(): TimingSignalData {
 }
 
 describe("择时研究领域", () => {
-  it("相同技术证据不因持仓、市场状态或模型展望改变研究状态", () => {
-    const baseline = evaluateTimingResearchRules({ config, features });
-    const contextual = evaluateTimingResearchRules({ config, features, hasPosition: true, marketState: "RISK_OFF", modelOutlook: { direction: "bearish" } } as never);
-    expect(baseline.researchState).toBe("CONFIRMED");
-    expect(contextual.researchState).toBe(baseline.researchState);
+  it("模型偏多不能把技术证据不足的研究升级为已确认", () => {
+    const result = synthesizeTimingResearchWithModel({
+      technicalState: "FORMING",
+      technicalConfidence: 0.62,
+      technicalDirection: "bullish",
+      forecasts: { DAILY: { snapshotId: "forecast-1", forecast: { summary: { direction: "bullish", confidence: 0.9, expectedReturnPct: 8, maxDrawdownPct: -3 } } as never } },
+    });
+    expect(result.researchState).toBe("FORMING");
+    expect(result.confidence).toBe(0.7);
+    expect(result.evidence.alignment).toBe("CONFIRMING");
+  });
+
+  it("模型与已确认技术结构明显冲突时降级并降低置信度", () => {
+    const result = synthesizeTimingResearchWithModel({
+      technicalState: "CONFIRMED",
+      technicalConfidence: 0.8,
+      technicalDirection: "bullish",
+      forecasts: { DAILY: { snapshotId: "forecast-1", forecast: { summary: { direction: "bearish", confidence: 0.8, expectedReturnPct: -6, maxDrawdownPct: -12 } } as never } },
+    });
+    expect(result.researchState).toBe("FORMING");
+    expect(result.confidence).toBe(0.65);
+    expect(result.evidence.alignment).toBe("CONFLICTING");
+  });
+
+  it("日线与中期模型方向分歧时明确记录周期不一致", () => {
+    const result = synthesizeTimingResearchWithModel({
+      technicalState: "CONFIRMED",
+      technicalConfidence: 0.8,
+      technicalDirection: "bullish",
+      forecasts: {
+        DAILY: { snapshotId: "daily", forecast: { summary: { direction: "bullish", confidence: 0.8, expectedReturnPct: 6, maxDrawdownPct: -4 } } as never },
+        WEEKLY: { snapshotId: "weekly", forecast: { summary: { direction: "bearish" } } as never },
+      },
+    });
+    expect(result.evidence.timeframeConsistency).toBe("DIVERGENT");
+    expect(result.evidence.message).toContain("日线与中期模型方向存在分歧");
+  });
+
+  it("技术偏空而模型明显偏多时同样视为冲突", () => {
+    const result = synthesizeTimingResearchWithModel({
+      technicalState: "CONFIRMED",
+      technicalConfidence: 0.8,
+      technicalDirection: "bearish",
+      forecasts: { DAILY: { snapshotId: "daily", forecast: { summary: { direction: "bullish", confidence: 0.8, expectedReturnPct: 6, maxDrawdownPct: -2 } } as never } },
+    });
+    expect(result.researchState).toBe("FORMING");
+    expect(result.evidence.alignment).toBe("CONFLICTING");
   });
 
   it("缺失必选证据时降级为数据不完整", () => {

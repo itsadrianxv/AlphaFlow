@@ -980,6 +980,7 @@ model TimingResearchReport {
   dataCompleteness      Json
   modelOutlook          Json?
   riskFlags             String[]
+  modelEvidence         Json
   reasoning             Json
   ruleAudit             Json
   createdAt             DateTime @default(now())
@@ -992,6 +993,7 @@ model TimingResearchReport {
   presetRevision TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
   signalSnapshot TimingSignalSnapshot  @relation(fields: [signalSnapshotId], references: [id], onDelete: Cascade)
 
+  forecastSnapshots TimingResearchReportForecastSnapshot[]
   @@index([userId, createdAt])
   @@index([workflowRunId])
   @@index([watchListId, createdAt])
@@ -1247,6 +1249,7 @@ model TimingKronosForecastSnapshot {
   userId           String
   workflowRunId    String?
   stockCode        String
+  researchRunId    String
   stockName        String
   timeframe        String   @default("DAILY")
   asOfDate         DateTime
@@ -1264,11 +1267,23 @@ model TimingKronosForecastSnapshot {
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   workflowRun WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  researchReports TimingResearchReportForecastSnapshot[]
 
-  @@unique([userId, stockCode, asOfDate, timeframe, modelName, predictionLength, inputBarsHash], map: "TimingKronos_user_stock_date_model_input_key")
+  @@unique([userId, researchRunId, stockCode, asOfDate, timeframe, modelName, predictionLength, inputBarsHash], map: "TimingKronos_user_run_stock_date_model_input_key")
   @@index([userId, stockCode, asOfDate, timeframe], map: "TimingKronos_user_stock_date_timeframe_idx")
   @@index([workflowRunId])
   @@index([sourceType, sourceId])
+}
+
+model TimingResearchReportForecastSnapshot {
+  reportId   String
+  snapshotId String
+
+  report   TimingResearchReport         @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  snapshot TimingKronosForecastSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
+
+  @@id([reportId, snapshotId])
+  @@index([snapshotId])
 }
 
 model WorkflowNodeRun {

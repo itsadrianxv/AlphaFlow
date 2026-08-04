@@ -69,6 +69,7 @@ export const TIMING_DIMENSION_KEYS = [
   "relativeStrength",
   "volatility",
   "liquidity",
+  "modelForecast",
 ] as const;
 export const TIMING_RISK_FLAGS = [
   "HIGH_VOLATILITY",
@@ -387,6 +388,38 @@ export type TimingKronosForecast = {
   warnings: string[];
 };
 
+export type TimingModelEvidenceStatus =
+  | "AVAILABLE"
+  | "INSUFFICIENT_HISTORY"
+  | "MODEL_DISABLED"
+  | "SERVICE_UNAVAILABLE"
+  | "PREDICTION_FAILED";
+
+export type TimingModelEvidence = {
+  status: TimingModelEvidenceStatus;
+  inputBars: number;
+  requestedTimeframes: TimingTimeframe[];
+  availableTimeframes: TimingTimeframe[];
+  message: string;
+  retryable: boolean;
+  alignment: "CONFIRMING" | "CONFLICTING" | "NEUTRAL" | "UNAVAILABLE";
+  timeframeConsistency: "CONSISTENT" | "DIVERGENT" | "SINGLE_TIMEFRAME" | "UNAVAILABLE";
+  confidenceAdjustment: number;
+  timeframeResults: Partial<Record<TimingTimeframe, {
+    status: TimingModelEvidenceStatus;
+    inputBars: number;
+    message: string;
+    retryable: boolean;
+  }>>;
+};
+
+export type TimingFrozenForecast = {
+  snapshotId: string;
+  forecast: TimingKronosForecast;
+};
+
+export type TimingForecastSet = Partial<Record<TimingTimeframe, TimingFrozenForecast>>;
+
 export type TimingSignalSnapshotRecord = {
   id: string;
   userId: string;
@@ -448,6 +481,8 @@ export type TimingResearchReportRecord = {
   observationConditions: TimingObservationCondition[];
   dataCompleteness: TimingDataCompleteness;
   modelOutlook?: TimingKronosForecast | null;
+  modelEvidence: TimingModelEvidence;
+  forecastSnapshots?: TimingFrozenForecast[];
   riskFlags: TimingRiskFlag[];
   reasoning: TimingResearchReasoning;
   ruleAudit: TimingRuleAudit;
@@ -457,8 +492,8 @@ export type TimingResearchReportRecord = {
 };
 export type TimingResearchReportDraft = Omit<
   TimingResearchReportRecord,
-  "id" | "createdAt" | "updatedAt" | "signalSnapshot"
->;
+  "id" | "createdAt" | "updatedAt" | "signalSnapshot" | "forecastSnapshots"
+> & { forecastSnapshotIds?: Partial<Record<TimingTimeframe, string>> };
 
 export type PortfolioCompositionPosition = {
   stockCode: string;

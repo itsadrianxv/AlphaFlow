@@ -9,6 +9,7 @@ import {
 } from "~/contracts/timing-research";
 import { TimingReportService } from "~/server/application/timing/timing-report-service";
 import { TimingResearchRunService } from "~/server/application/timing/timing-research-run-service";
+import { KronosResearchForecastModule } from "~/server/application/timing/kronos-research-forecast-module";
 import {
   createTimingResearchRuleConfig,
   validateTimingResearchRuleConfig,
@@ -22,6 +23,7 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { PrismaPortfolioCompositionRepository } from "~/server/infrastructure/timing/prisma-portfolio-composition-repository";
 import { PrismaPortfolioRiskDiagnosticRepository } from "~/server/infrastructure/timing/prisma-portfolio-risk-diagnostic-repository";
 import { PrismaTimingKronosForecastSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-kronos-forecast-snapshot-repository";
+import { KronosForecastClient } from "~/server/infrastructure/timing/kronos-forecast-client";
 import { PrismaTimingMarketContextSnapshotRepository } from "~/server/infrastructure/timing/prisma-timing-market-context-snapshot-repository";
 import {
   hashTimingPresetConfig,
@@ -46,6 +48,7 @@ const reportListInput = z.object({
 
 function researchService(ctx: { db: PrismaClient }) {
   const db = ctx.db;
+  const forecastSnapshotRepository = new PrismaTimingKronosForecastSnapshotRepository(db);
   return new TimingResearchRunService({
     revisionRepository: new PrismaTimingPresetRevisionRepository(db),
     signalSnapshotRepository: new PrismaTimingSignalSnapshotRepository(db),
@@ -54,6 +57,10 @@ function researchService(ctx: { db: PrismaClient }) {
     diagnosticRepository: new PrismaPortfolioRiskDiagnosticRepository(db),
     marketContextRepository: new PrismaTimingMarketContextSnapshotRepository(db),
     timingDataClient: new PythonTimingDataClient(),
+    kronosResearchForecastModule: new KronosResearchForecastModule({
+      client: new KronosForecastClient(),
+      snapshotRepository: forecastSnapshotRepository,
+    }),
   });
 }
 
@@ -84,7 +91,6 @@ export const timingRouter = createTRPCRouter({
         researchReportRepository: new PrismaTimingResearchReportRepository(ctx.db),
         signalSnapshotRepository: new PrismaTimingSignalSnapshotRepository(ctx.db),
         marketContextSnapshotRepository: new PrismaTimingMarketContextSnapshotRepository(ctx.db),
-        kronosForecastSnapshotRepository: new PrismaTimingKronosForecastSnapshotRepository(ctx.db),
         timingDataClient: new PythonTimingDataClient(),
       });
       const report = await service.getTimingReport({ userId: ctx.session.user.id, reportId: input.reportId });
@@ -99,7 +105,6 @@ export const timingRouter = createTRPCRouter({
         researchReportRepository: new PrismaTimingResearchReportRepository(ctx.db),
         signalSnapshotRepository: new PrismaTimingSignalSnapshotRepository(ctx.db),
         marketContextSnapshotRepository: new PrismaTimingMarketContextSnapshotRepository(ctx.db),
-        kronosForecastSnapshotRepository: new PrismaTimingKronosForecastSnapshotRepository(ctx.db),
         timingDataClient: new PythonTimingDataClient(),
       });
       const series = await service.getTimingSeries({ userId: ctx.session.user.id, ...input });

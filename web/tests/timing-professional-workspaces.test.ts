@@ -19,7 +19,6 @@ describe("择时研究工作台", () => {
       expect(reportSource).toContain(label);
     }
     expect(reportSource).toContain("不参与个股研究状态判定");
-    expect(reportSource).toContain("不参与综合分数或研究状态");
   });
 
   it("规则编辑器使用校验发布且历史页仅展示研究档案", () => {
