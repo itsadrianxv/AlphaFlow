@@ -190,4 +190,67 @@ describe("首页固定输入与确定性生成", () => {
 
     expect(result.payload.heatmap).toEqual(heatmap);
   });
+
+  it("把固定输入中的新闻雷达历史结果写入首次首页 payload", () => {
+    const current = {
+      id: "current-event",
+      title: "当前事件",
+      summary: "当前事件摘要",
+      source: "测试新闻源",
+      publishedAt: "2026-08-01T10:00:00.000Z",
+      sentiment: "neutral" as const,
+      relevanceScore: 0.9,
+      relatedStocks: [],
+      scopeTags: ["macro" as const],
+      eventType: "政策",
+      matchReason: "测试",
+    };
+    const history = {
+      mode: "overview",
+      analysisStatus: "complete",
+      asOf: "2026-08-01T12:00:00.000Z",
+      context: { watchLists: [], companies: [], industries: [], hypotheses: [] },
+      events: [
+        {
+          event: current,
+          impactEdges: [],
+          portfolioHits: [],
+          importanceScore: 0.9,
+          analysis: {
+            timeline: [
+              {
+                id: "timeline-current",
+                occurredAt: current.publishedAt,
+                title: current.title,
+                summary: current.summary,
+                eventId: current.id,
+                evidenceItemIds: [],
+                kind: "observed" as const,
+              },
+            ],
+            scenarios: [],
+            warnings: [],
+          },
+        },
+      ],
+      impactEdges: [],
+      timeline: [],
+      scenarios: [],
+      evidenceCitations: [],
+      warnings: [],
+      featuredEventIds: [current.id],
+    };
+    const result = generateHomepageDraft(
+      input([
+        item({
+          itemKey: "a:history",
+          datasetKey: "news.radar_history",
+          required: false,
+          revisionValue: history,
+        }),
+      ]),
+    );
+
+    expect((result.payload as Record<string, unknown>).newsRadar).toEqual(history);
+  });
 });

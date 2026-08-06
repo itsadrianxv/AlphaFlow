@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env";
@@ -227,7 +228,9 @@ export const scheduledTaskRouter = createTRPCRouter({
             version: input.expectedVersion,
           },
         },
-        data: { executionPlan: parsed.normalizedPlan },
+        data: {
+          executionPlan: parsed.normalizedPlan as Prisma.InputJsonObject,
+        },
       });
       return { valid: true as const, normalizedPlan: parsed.normalizedPlan };
     }),

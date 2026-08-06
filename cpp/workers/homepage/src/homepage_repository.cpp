@@ -68,7 +68,7 @@ void HomePageRepository::settle(const HomePageTask& task, HomePageSettlement set
     }
     const auto inserted = transaction.exec_params(
         R"SQL(INSERT INTO "HomepageSnapshot"(id,"manifestId","generationTaskId",scope,"userId","activationSequence","generationInputContractVersion","generatorDefinitionVersion","payloadSchemaVersion","inputHash","payloadHash","dataCoverageJson","payloadJson","generatedAt")
-              SELECT $1,"HomepageGenerationTask"."manifestId","HomepageGenerationTask".id,manifest.scope,manifest."userId","HomepageGenerationTask"."activationSequence","generationInputContractVersion","generatorDefinitionVersion","payloadSchemaVersion",$3,$4,$5::jsonb,$6::jsonb,NOW()
+              SELECT $1,"HomepageGenerationTask"."manifestId","HomepageGenerationTask".id,manifest.scope,manifest."userId","HomepageGenerationTask"."activationSequence","generationInputContractVersion","generatorDefinitionVersion","payloadSchemaVersion",$3::text,$4::text,$5::jsonb,$6::jsonb,NOW()
               FROM "HomepageGenerationTask" JOIN "HomepageDataManifest" manifest ON manifest.id="HomepageGenerationTask"."manifestId"
               WHERE "HomepageGenerationTask".id=$1 AND "fencingToken"=$2 AND status='RUNNING'
               ON CONFLICT("generationTaskId") DO NOTHING)SQL",

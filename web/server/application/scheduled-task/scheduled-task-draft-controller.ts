@@ -8,17 +8,36 @@ import {
 import { validateScheduleSpec } from "~/server/domain/scheduled-task/schedule";
 
 const timeframeSchema = z.enum(["daily", "weekly", "monthly"]);
-const operatorSchema = z.enum([
-  "gt",
-  "gte",
-  "lt",
-  "lte",
-  "eq",
-  "ne",
-  "between",
+const allowedOperators = new Set([
+  "var",
+  "==",
+  "===",
+  "!=",
+  "!==",
+  "<",
+  "<=",
+  ">",
+  ">=",
+  "and",
+  "or",
+  "!",
+  "in",
   "cross_above",
   "cross_below",
 ]);
+const builtinMetrics = new Set([
+  "open",
+  "high",
+  "low",
+  "close",
+  "volume",
+  "amount",
+  "candle.direction",
+]);
+const indicatorOutputs = {
+  macd: new Set(["dif", "dea", "histogram"]),
+  kdj: new Set(["k", "d", "j"]),
+} as const;
 
 const scoringBuilderDeliverySchema = z.union([
   z.object({ type: z.literal("SAVE_ONLY") }).strict(),
@@ -66,14 +85,14 @@ const scoringBuilderDraftSchema = z.object({
       z.object({
         id: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
         name: z.string().trim().min(1).max(120),
-        points: z.number().finite().nonnegative(),
+        scoreDelta: z.number().finite(),
         condition: z.unknown(),
       }),
     )
     .min(1)
     .max(50),
   selection: z.object({
-    minScore: z.number().finite().nonnegative(),
+    minScore: z.number().finite(),
     limit: z.number().int().min(1).max(5000),
   }),
   output: scheduledTaskOutputSpecSchema,
@@ -94,22 +113,6 @@ export type ValidatedScoringDraft = ScoringBuilderDraft & {
 type ValidationResult =
   | { valid: true; draft: ValidatedScoringDraft; issues: [] }
   | { valid: false; draft: null; issues: DraftValidationIssue[] };
-
-const numericMetrics = new Set([
-  "open",
-  "high",
-  "low",
-  "close",
-  "volume",
-  "amount",
-  "macd.dif",
-  "macd.dea",
-  "macd.histogram",
-  "kdj.k",
-  "kdj.d",
-  "kdj.j",
-]);
-const directionValues = new Set(["bullish", "bearish", "doji"]);
 
 function issue(path: string, message: string): DraftValidationIssue {
   return { path, message };
@@ -141,13 +144,6 @@ function normalizeStockInputs(values: string[]) {
   return { stockCodes, issues };
 }
 
-type AtomicCondition = {
-  timeframe: z.infer<typeof timeframeSchema>;
-  metric: string;
-  operator: z.infer<typeof operatorSchema>;
-  value: unknown;
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -160,98 +156,105 @@ function inspectCondition(
     nodes: number;
     issues: DraftValidationIssue[];
     metrics: Map<"macd" | "kdj", Set<z.infer<typeof timeframeSchema>>>;
+    indicatorTypes: Map<string, "macd" | "kdj">;
+    references: Map<string, Set<z.infer<typeof timeframeSchema>>>;
   },
 ): unknown {
   state.nodes += 1;
   if (depth > 8) state.issues.push(issue(path, "条件树最多 8 层"));
   if (state.nodes > 200 && state.nodes === 201)
     state.issues.push(issue(path, "评分草稿的条件节点最多 200 个"));
-  if (!isRecord(value)) {
-    state.issues.push(issue(path, "条件必须是比较条件或 all、any、not 条件组"));
+  if (!isRecord(value) || Object.keys(value).length !== 1) {
+    state.issues.push(
+      issue(path, "条件必须是只包含一个操作符的 JSONLogic 对象"),
+    );
     return value;
   }
-
-  const groupKeys = ["all", "any", "not"].filter((key) => key in value);
-  if (groupKeys.length) {
-    if (groupKeys.length !== 1 || Object.keys(value).length !== 1) {
-      state.issues.push(issue(path, "条件组只能包含 all、any 或 not 中的一种"));
-      return value;
-    }
-    const key = groupKeys[0] as "all" | "any" | "not";
-    if (key === "not")
-      return {
-        not: inspectCondition(value.not, `${path}.not`, depth + 1, state),
-      };
-    const children = value[key];
-    if (
-      !Array.isArray(children) ||
-      children.length === 0 ||
-      children.length > 20
-    ) {
-      state.issues.push(
-        issue(`${path}.${key}`, "条件组需要包含 1 至 20 个条件"),
-      );
-      return value;
-    }
-    return {
-      [key]: children.map((child, index) =>
-        inspectCondition(child, `${path}.${key}.${index}`, depth + 1, state),
-      ),
-    };
+  const entry = Object.entries(value)[0];
+  if (!entry) return value;
+  const [operator, args] = entry;
+  if (!allowedOperators.has(operator)) {
+    state.issues.push(issue(path, `不支持的 JSONLogic 操作符: ${operator}`));
+    return value;
   }
-
-  const timeframe = timeframeSchema.safeParse(value.timeframe);
-  const operator = operatorSchema.safeParse(value.operator);
-  const metric = typeof value.metric === "string" ? value.metric : "";
-  if (!timeframe.success)
-    state.issues.push(issue(`${path}.timeframe`, "不支持的行情周期"));
-  if (!operator.success)
-    state.issues.push(issue(`${path}.operator`, "不支持的操作符"));
-  if (!numericMetrics.has(metric) && metric !== "candle.direction")
-    state.issues.push(issue(`${path}.metric`, "不支持的指标"));
-
-  if (metric === "candle.direction") {
-    if (!operator.success || !["eq", "ne"].includes(operator.data))
+  const inspectChild = (child: unknown, childPath: string) => {
+    if (isRecord(child)) inspectCondition(child, childPath, depth + 1, state);
+  };
+  if (operator === "var") {
+    if (typeof args !== "string" || !args.includes(".")) {
+      state.issues.push(issue(`${path}.var`, "var 必须是快照路径字符串"));
+      return value;
+    }
+    const parts = args.split(".");
+    const timeframe = timeframeSchema.safeParse(parts[0]);
+    if (!timeframe.success) {
       state.issues.push(
-        issue(`${path}.operator`, "K 线方向只支持等于或不等于"),
+        issue(`${path}.var`, "快照路径必须以 daily、weekly 或 monthly 开头"),
       );
-    if (typeof value.value !== "string" || !directionValues.has(value.value))
+      return value;
+    }
+    const metric = parts
+      .slice(1)
+      .join(".")
+      .replace(/\.(current|previous)$/, "");
+    if (builtinMetrics.has(metric)) return value;
+    const [indicatorId, output, ...rest] = metric.split(".");
+    const indicatorType = state.indicatorTypes.get(indicatorId ?? "");
+    if (rest.length || !indicatorType) {
+      state.issues.push(issue(`${path}.var`, `未知指标字段: ${metric}`));
+      return value;
+    }
+    if (!indicatorOutputs[indicatorType].has(output ?? "")) {
+      state.issues.push(issue(`${path}.var`, `指标输出不存在: ${metric}`));
+      return value;
+    }
+    state.metrics.get(indicatorType)?.add(timeframe.data);
+    const referencedTimeframes =
+      state.references.get(indicatorId ?? "") ?? new Set();
+    referencedTimeframes.add(timeframe.data);
+    state.references.set(indicatorId ?? "", referencedTimeframes);
+    return value;
+  }
+  if (operator === "and" || operator === "or") {
+    if (!Array.isArray(args) || args.length < 1 || args.length > 20)
       state.issues.push(
-        issue(`${path}.value`, "K 线方向必须是 bullish、bearish 或 doji"),
+        issue(`${path}.${operator}`, "必须包含 1 至 20 个条件"),
       );
-  } else if (numericMetrics.has(metric) && operator.success) {
-    const validValue =
-      operator.data === "between"
-        ? Array.isArray(value.value) &&
-          value.value.length === 2 &&
-          value.value.every(
-            (item) => typeof item === "number" && Number.isFinite(item),
-          )
-        : typeof value.value === "number" && Number.isFinite(value.value);
-    if (!validValue)
+    else
+      args.forEach((child, index) => {
+        inspectChild(child, `${path}.${operator}.${index}`);
+      });
+    return value;
+  }
+  if (operator === "!") {
+    if (!Array.isArray(args) || args.length !== 1)
+      state.issues.push(issue(`${path}.!`, "必须包含一个条件"));
+    else inspectChild(args[0], `${path}.!.0`);
+    return value;
+  }
+  if (!Array.isArray(args) || args.length !== 2) {
+    state.issues.push(issue(`${path}.${operator}`, "必须包含两个操作数"));
+    return value;
+  }
+  if (operator === "cross_above" || operator === "cross_below") {
+    const leftPath = isRecord(args[0]) ? args[0].var : undefined;
+    const rightPath = isRecord(args[1]) ? args[1].var : undefined;
+    if (
+      typeof leftPath === "string" &&
+      typeof rightPath === "string" &&
+      leftPath.split(".")[0] !== rightPath.split(".")[0]
+    )
       state.issues.push(
         issue(
-          `${path}.value`,
-          operator.data === "between"
-            ? "between 需要两个有限数值"
-            : "该指标需要有限数值",
+          `${path}.${operator}`,
+          "cross_above/cross_below 只支持同周期序列",
         ),
       );
   }
-
-  if (
-    timeframe.success &&
-    (metric.startsWith("macd.") || metric.startsWith("kdj."))
-  ) {
-    const kind = metric.startsWith("macd.") ? "macd" : "kdj";
-    state.metrics.get(kind)?.add(timeframe.data);
-  }
-  return {
-    timeframe: timeframe.success ? timeframe.data : "daily",
-    metric,
-    operator: operator.success ? operator.data : "eq",
-    value: value.value,
-  } satisfies AtomicCondition;
+  args.forEach((child, index) => {
+    inspectChild(child, `${path}.${operator}.${index}`);
+  });
+  return value;
 }
 
 export class ScheduledTaskDraftController {
@@ -273,20 +276,30 @@ export class ScheduledTaskDraftController {
       ["macd", new Set()],
       ["kdj", new Set()],
     ]);
-    const state = { nodes: 0, issues, metrics };
+    const state = {
+      nodes: 0,
+      issues,
+      metrics,
+      indicatorTypes: new Map<string, "macd" | "kdj">([
+        ["macd", "macd"],
+        ["kdj", "kdj"],
+        ...parsed.data.indicators.map((item) => [item.id, item.type] as const),
+      ]),
+      references: new Map(),
+    };
     parsed.data.rules.forEach((rule, index) => {
       inspectCondition(rule.condition, `rules.${index}.condition`, 1, state);
     });
-    for (const type of ["macd", "kdj"] as const) {
+    for (const [indicatorId, timeframes] of state.references) {
       const declaration = parsed.data.indicators.find(
-        (item) => item.type === type,
+        (item) => item.id === indicatorId,
       );
-      for (const timeframe of metrics.get(type) ?? []) {
+      for (const timeframe of timeframes) {
         if (!declaration?.timeframes.includes(timeframe))
           issues.push(
             issue(
               "indicators",
-              `${type.toUpperCase()} 缺少 ${timeframe} 周期声明`,
+              `${indicatorId.toUpperCase()} 缺少 ${timeframe} 周期声明`,
             ),
           );
       }
@@ -341,7 +354,16 @@ export class ScheduledTaskDraftController {
       ["macd", new Set()],
       ["kdj", new Set()],
     ]);
-    const conditionState = { nodes: 0, issues, metrics };
+    const conditionState = {
+      nodes: 0,
+      issues,
+      metrics,
+      indicatorTypes: new Map<string, "macd" | "kdj">([
+        ["macd", "macd"],
+        ["kdj", "kdj"],
+      ]),
+      references: new Map(),
+    };
     const conditions = draft.rules.map((rule, index) =>
       inspectCondition(
         rule.condition,
@@ -360,7 +382,7 @@ export class ScheduledTaskDraftController {
       issues.push(issue("rules", "指标声明最多 20 个"));
 
     const planCandidate = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       type: "deterministic_scoring",
       universe,
       data: draft.data,

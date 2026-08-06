@@ -227,7 +227,16 @@ def execute_cached(
 
 def is_valid_stock_code(stock_code: str) -> bool:
     normalized = str(stock_code).strip()
-    return normalized.isdigit() and len(normalized) == 6
+    if normalized.isdigit():
+        return len(normalized) == 6
+    if len(normalized) != 9 or normalized[6] != ".":
+        return False
+    return normalized[:6].isdigit() and normalized[7:].upper() in {"SH", "SZ", "BJ"}
+
+
+def normalize_stock_code(stock_code: str) -> str:
+    normalized = str(stock_code).strip().upper()
+    return normalized.split(".", 1)[0] if "." in normalized else normalized
 
 
 def is_empty_payload(value: Any) -> bool:

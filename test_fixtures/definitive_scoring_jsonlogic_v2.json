@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "cases": [
+    {
+      "name": "阴线枚举匹配",
+      "condition": { "==": [{ "var": "daily.candle.direction.current" }, "bearish"] },
+      "snapshot": { "daily": { "candle": { "direction": { "current": "bearish", "previous": "bullish" } } } },
+      "status": "MATCHED"
+    },
+    {
+      "name": "KDJ 金叉",
+      "condition": { "cross_above": [{ "var": "daily.kdj.k" }, { "var": "daily.kdj.d" }] },
+      "snapshot": { "daily": { "kdj": { "k": { "current": 40, "previous": 20 }, "d": { "current": 35, "previous": 30 } } } },
+      "status": "MATCHED"
+    },
+    {
+      "name": "缺失周线值",
+      "condition": { ">": [{ "var": "weekly.kdj.j.current" }, 50] },
+      "snapshot": {},
+      "status": "NOT_EVALUATED"
+    }
+  ]
+}

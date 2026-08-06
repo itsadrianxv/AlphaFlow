@@ -73,6 +73,13 @@ export const HOMEPAGE_BASELINE_DATASETS = [
     emptyPolicy: "ALLOW_EMPTY",
   },
   {
+    baselineDomain: "news",
+    datasetKey: "news.radar_history",
+    providerKey: "minishare",
+    required: true,
+    emptyPolicy: "ALLOW_EMPTY",
+  },
+  {
     baselineDomain: "expectation",
     datasetKey: "expectation_changes",
     providerKey: "tushare",
@@ -88,8 +95,8 @@ export const HOMEPAGE_BASELINE_DATASETS = [
   },
 ] as const satisfies readonly BaselineDatasetDefinition[];
 
-const DEFINITION_VERSION = "homepage-baseline-manifest.v3";
-const REQUIREMENT_VERSION = "homepage-baseline-requirement.v3";
+const DEFINITION_VERSION = "homepage-baseline-manifest.v4";
+const REQUIREMENT_VERSION = "homepage-baseline-requirement.v4";
 const PROVIDER_CONTRACT_VERSION = "1.0";
 const NORMALIZATION_RULES_VERSION = "homepage-normalization.v1";
 
@@ -117,6 +124,17 @@ function requestedScope(
     targetTradeDate,
   };
   if (definition.providerKey === "minishare") {
+    if (definition.datasetKey === "news.radar_history") {
+      return {
+        ...common,
+        startAt: `${targetTradeDate}T00:00:00+08:00`,
+        endAt: `${targetTradeDate}T23:59:59+08:00`,
+        currentDays: 7,
+        traceDays: 365,
+        maxEvents: 30,
+        featuredEvents: 3,
+      };
+    }
     return {
       ...common,
       startAt: `${targetTradeDate}T00:00:00+08:00`,

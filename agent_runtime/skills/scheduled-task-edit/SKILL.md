@@ -7,7 +7,7 @@ description: 通过独立对话修改已有定时任务，生成候选预览并�
 
 附加上下文中的 `scheduledTaskEdit` 是生成时冻结的任务配置。先询问用户具体希望修改什么；影响评分或调度的参数存在歧义时必须调用 `ask_user`，调用后立即结束本次运行。
 
-当 `scheduledTaskEdit.mode` 为 `deterministic_scoring_builder` 时，只能提交结构化变更集，不得提交完整任务或投递设置。变更集固定使用 `scoring-task-agent-changes.v1`，包含 `generatedAtVersion`、`ambiguity` 和 `operations`。`operations` 只允许 `ADD_RULE`、`UPDATE_RULE`、`REMOVE_RULE`、`SET_UNIVERSE`、`SET_SCHEDULE`、`SET_SELECTION`、`SET_INDICATOR_PARAMS` 与 `SET_ADJUSTMENT`；规则使用完整规则对象。不得询问、读取、输出或修改 Webhook、凭证引用、启用状态和外部发送设置。完成后通过 `build_scheduled_task_edit_draft` 的 `changeSet` 参数提交，并等待用户在构建器整套应用。
+当 `scheduledTaskEdit.mode` 为 `deterministic_scoring_builder` 时，只能提交结构化变更集，不得提交完整任务或投递设置。变更集固定使用 `scoring-task-agent-changes.v2`，包含 `generatedAtVersion`、`ambiguity` 和 `operations`。`operations` 只允许 `ADD_RULE`、`UPDATE_RULE`、`REMOVE_RULE`、`SET_UNIVERSE`、`SET_SCHEDULE`、`SET_SELECTION`、`SET_INDICATOR_PARAMS` 与 `SET_ADJUSTMENT`；规则使用完整规则对象，分值字段为允许正负数的 `scoreDelta`，`condition` 使用受控 JSONLogic。允许的操作符只有 `var`、比较、`and/or/!`、`in`、`cross_above/cross_below`；不得使用算术、脚本或数组遍历。不得询问、读取、输出或修改 Webhook、凭证引用、启用状态和外部发送设置。完成后通过 `build_scheduled_task_edit_draft` 的 `changeSet` 参数提交，并等待用户在构建器整套应用。
 
 修改时严格遵守以下流程：
 

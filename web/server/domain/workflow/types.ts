@@ -441,6 +441,7 @@ export type CompanyResearchVerdict = {
 };
 
 export type CompanyResearchResultDto = {
+  fullReportMarkdown?: string;
   brief: CompanyResearchBrief;
   conceptInsights: CompanyConceptInsight[];
   deepQuestions: CompanyResearchQuestion[];

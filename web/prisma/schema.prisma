@@ -415,7 +415,8 @@ model ScheduledTaskScoreResult {
   selected         Boolean                @default(false)
   evaluationStatus String
   score            Float
-  maxScore         Float
+  minimumPossibleScore Float
+  maximumPossibleScore Float
   ruleResults      Json
   createdAt        DateTime               @default(now())
   execution        ScheduledTaskExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)

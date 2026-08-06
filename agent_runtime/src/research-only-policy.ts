@@ -118,6 +118,130 @@ function hashSeed(value: unknown) {
   return `candidate-seed:${(hash >>> 0).toString(16).padStart(8, "0")}`;
 }
 
+export type ResearchCandidateSeedPayload = {
+  contractVersion: "research-candidate-seed.v1";
+  idempotencyKey: string;
+  triggerSource: "IMMEDIATE_RESEARCH" | "CONTROLLER_FOLLOW_UP";
+  runId: string;
+  scope: string;
+  subject: { type: string; key: string };
+  question: string;
+  outputMode: "research_only";
+  sourceReferences: Array<{
+    sourceType: "SOURCE_ASSERTION" | "OBSERVATION_REVISION" | "PUBLIC_WEB";
+    sourceKey: string;
+    summary: string;
+    href?: string;
+  }>;
+};
+
+function summaryText(value: unknown, maxLength: number) {
+  const previewValue =
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    typeof (value as { preview?: unknown }).preview === "string"
+      ? (value as { preview: string }).preview
+      : value;
+  const preview = summarizeValue(previewValue, maxLength).preview.trim();
+  if (!preview) {
+    throw new Error("candidate seed 摘要不能为空");
+  }
+  return preview;
+}
+
+function requiredSeedString(seed: Record<string, unknown>, key: string) {
+  const value = seed[key];
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`candidate seed 字段无效: ${key}`);
+  }
+  return value.trim();
+}
+
+/** 将运行时内部审计对象裁剪并规范化为 Web 严格 schema。 */
+export function toResearchCandidateSeedPayload(
+  seed: Record<string, unknown>,
+): ResearchCandidateSeedPayload {
+  const rawSubject = seed.subject;
+  if (
+    !rawSubject ||
+    typeof rawSubject !== "object" ||
+    Array.isArray(rawSubject)
+  ) {
+    throw new Error("candidate seed subject 无效");
+  }
+  const subject = rawSubject as Record<string, unknown>;
+  const subjectType = requiredSeedString(subject, "type");
+  const subjectKey = requiredSeedString(subject, "key");
+
+  const rawReferences = seed.sourceReferences;
+  if (
+    !Array.isArray(rawReferences) ||
+    rawReferences.length === 0 ||
+    rawReferences.length > 50
+  ) {
+    throw new Error("candidate seed sourceReferences 数量无效");
+  }
+
+  const sourceReferences = rawReferences.map((rawReference, index) => {
+    if (
+      !rawReference ||
+      typeof rawReference !== "object" ||
+      Array.isArray(rawReference)
+    ) {
+      throw new Error(`candidate seed sourceReferences[${index}] 无效`);
+    }
+    const reference = rawReference as Record<string, unknown>;
+    const sourceType = reference.sourceType;
+    if (
+      sourceType !== "SOURCE_ASSERTION" &&
+      sourceType !== "OBSERVATION_REVISION" &&
+      sourceType !== "PUBLIC_WEB"
+    ) {
+      throw new Error(`candidate seed sourceReferences[${index}] sourceType 无效`);
+    }
+    const normalized: ResearchCandidateSeedPayload["sourceReferences"][number] = {
+      sourceType,
+      sourceKey: summaryText(reference.sourceKey, 500),
+      summary: summaryText(reference.summary, 1200),
+    };
+    if (typeof reference.href === "string" && reference.href.trim()) {
+      try {
+        new URL(reference.href);
+        normalized.href = reference.href.trim();
+      } catch {
+        // 严格 schema 不接受非法 URL；保留证据摘要即可。
+      }
+    }
+    return normalized;
+  });
+
+  if (seed.contractVersion !== "research-candidate-seed.v1") {
+    throw new Error("candidate seed contractVersion 无效");
+  }
+  if (
+    seed.triggerSource !== "IMMEDIATE_RESEARCH" &&
+    seed.triggerSource !== "CONTROLLER_FOLLOW_UP"
+  ) {
+    throw new Error("candidate seed triggerSource 无效");
+  }
+  if (seed.outputMode !== undefined && seed.outputMode !== "research_only") {
+    throw new Error("candidate seed outputMode 无效");
+  }
+
+  return {
+    contractVersion: "research-candidate-seed.v1",
+    idempotencyKey: requiredSeedString(seed, "idempotencyKey"),
+    triggerSource: seed.triggerSource,
+    runId: requiredSeedString(seed, "runId"),
+    scope: requiredSeedString(seed, "scope"),
+    subject: { type: subjectType, key: subjectKey },
+    question: requiredSeedString(seed, "question"),
+    outputMode: "research_only",
+    sourceReferences,
+  };
+}
+
 export function buildImmediateResearchCandidateSeeds(params: {
   runId: string;
   prompt: string;
@@ -129,12 +253,13 @@ export function buildImmediateResearchCandidateSeeds(params: {
   });
 
   return webEvidence.map((summary) => {
+    const outputSummary = summarizeValue(summary.outputSummary, 1200).preview;
     const seedInput = {
       runId: params.runId,
       prompt: params.prompt,
       toolName: summary.toolName,
       inputSummary: summary.inputSummary,
-      outputSummary: summarizeValue(summary.outputSummary, 1200),
+      outputSummary,
     };
     return {
       kind: "immediate_research_candidate_seed",
@@ -155,11 +280,11 @@ export function buildImmediateResearchCandidateSeeds(params: {
       sourceReferences: [
         {
           sourceType: "PUBLIC_WEB",
-          sourceKey: summarizeValue(summary.inputSummary, 500),
-          summary: seedInput.outputSummary,
+          sourceKey: summarizeValue(summary.inputSummary, 500).preview,
+          summary: outputSummary,
         },
       ],
-      materialSummary: seedInput.outputSummary,
+      materialSummary: outputSummary,
       writesSynchronously: false,
       targetStores: ["candidate_seed_queue"],
     };

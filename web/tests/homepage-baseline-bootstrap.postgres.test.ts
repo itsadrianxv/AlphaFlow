@@ -47,16 +47,16 @@ describePostgres("首页专业市场基线自举 PostgreSQL 契约", () => {
     });
 
     expect(second.manifestId).toBe(first.manifestId);
-    expect(first.attemptCount).toBe(6);
-    expect(first.publishedAttemptCount).toBe(6);
+    expect(first.attemptCount).toBe(7);
+    expect(first.publishedAttemptCount).toBe(7);
     expect(second.publishedAttemptCount).toBe(0);
-    expect(xadd).toHaveBeenCalledTimes(6);
+    expect(xadd).toHaveBeenCalledTimes(7);
 
     const manifest = await db.homepageDataManifest.findUniqueOrThrow({
       where: { id: first.manifestId },
       include: { items: { include: { attempts: true } } },
     });
-    expect(manifest.definitionVersion).toBe("homepage-baseline-manifest.v1");
+    expect(manifest.definitionVersion).toBe("homepage-baseline-manifest.v4");
     expect(manifest.targetContextJson).toEqual({
       phase: "POST_MARKET",
       targetTradeDate,

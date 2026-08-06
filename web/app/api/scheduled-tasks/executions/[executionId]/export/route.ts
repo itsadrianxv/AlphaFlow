@@ -36,7 +36,7 @@ export async function GET(_request: Request, context: RouteContext) {
         return {
           id: String(item.id ?? ""),
           name: String(item.name ?? item.id ?? ""),
-          points: Number(item.points ?? 0),
+          scoreDelta: Number(item.scoreDelta ?? 0),
           condition: item.condition,
         };
       })

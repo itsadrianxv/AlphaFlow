@@ -49,6 +49,12 @@ describe("workflow reliability guards", () => {
     expect(executionSource).toContain("markAssistantFailedByRun");
   });
 
+  it("把会话仓储注入顶层 workflow 执行服务", () => {
+    expect(workerSource).toMatch(
+      /new WorkflowExecutionService\(\{[\s\S]*agentConversationRepository,\s*\}\);/,
+    );
+  });
+
   it("uses one binding per workflow run and per assistant message", () => {
     expect(conversationSource).toContain("FOR UPDATE");
     expect(conversationSource).toContain("AGENT_WORKFLOW_RUN_ALREADY_BOUND");

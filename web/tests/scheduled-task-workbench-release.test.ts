@@ -40,13 +40,8 @@ describe("定时评分发布门禁", () => {
         {
           id: "momentum",
           name: "MACD 动量",
-          points: 10,
-          condition: {
-            timeframe: "daily" as const,
-            metric: "macd.histogram",
-            operator: "gt" as const,
-            value: 0,
-          },
+          scoreDelta: 10,
+          condition: { ">": [{ var: "daily.macd.histogram.current" }, 0] },
         },
       ],
       selection: { minScore: 10, limit: 50 },

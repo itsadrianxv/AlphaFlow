@@ -184,6 +184,7 @@ export function createWorkflowExecutionService(
     companyResearchService,
     researchToolRegistry,
     evidenceContextWriter,
+    evidenceAwareLlmClient,
   });
   const agentRuntimeRepository = new PrismaAgentRuntimeRepository(prisma);
   const agentConversationRepository = new PrismaAgentConversationRepository(

@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { FavoriteStockPicker } from "~/app/_components/favorite-stock-picker";
 import { HighlightToNote } from "~/app/_components/highlight-to-note";
 import { InlineNotice, Panel, WorkspaceShell } from "~/app/_components/ui";
 import { WorkflowStageSwitcher } from "~/app/_components/workflow-stage-switcher";
@@ -165,6 +166,14 @@ export function CompanyResearchClient() {
     <>
       <Panel className={targetCanvasClassName} title="研究目标">
         <div className="grid gap-4">
+          <FavoriteStockPicker
+            selectedStockCodes={/^\d{6}$/.test(stockCode) ? [stockCode] : []}
+            maxSelection={1}
+            onToggleStock={(stock) => {
+              setCompanyName(stock.stockName);
+              setStockCode(stock.stockCode);
+            }}
+          />
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px]">
             <input
               value={companyName}

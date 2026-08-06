@@ -2,9 +2,9 @@ import { createHash } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import type { HomePagePayload } from "~/contracts/homepage";
 
-export const HOMEPAGE_GENERATION_INPUT_CONTRACT_VERSION = "1.0";
-export const HOMEPAGE_GENERATOR_DEFINITION_VERSION = "1.0";
-export const HOMEPAGE_PAYLOAD_SCHEMA_VERSION = "1.0";
+export const HOMEPAGE_GENERATION_INPUT_CONTRACT_VERSION = "1.1";
+export const HOMEPAGE_GENERATOR_DEFINITION_VERSION = "1.1";
+export const HOMEPAGE_PAYLOAD_SCHEMA_VERSION = "1.1";
 
 type HomePageDb = PrismaClient;
 
@@ -382,6 +382,20 @@ function revisionsFor(input: HomepageGenerationInput, datasetKey: string) {
     .sort((a, b) => a.ordinal - b.ordinal || a.id.localeCompare(b.id));
 }
 
+function buildNewsRadar(input: HomepageGenerationInput) {
+  const revision = revisionsFor(input, "news.radar_history").find(
+    (candidate) =>
+      candidate.valueJson &&
+      typeof candidate.valueJson === "object" &&
+      !Array.isArray(candidate.valueJson),
+  );
+  if (!revision) return null;
+  const value = revision.valueJson as Record<string, unknown>;
+  return value.mode === "overview" && Array.isArray(value.events)
+    ? value
+    : null;
+}
+
 function buildHeatmap(input: HomepageGenerationInput) {
   const revisions = revisionsFor(input, "market_heatmap");
   const snapshot = revisions
@@ -461,7 +475,11 @@ export function generateHomepageDraft(
       manifestId: input.manifest.id,
       inputHash: input.inputHash,
       items: input.items
-        .filter((item) => item.datasetKey !== "market_heatmap")
+        .filter(
+          (item) =>
+            item.datasetKey !== "market_heatmap" &&
+            item.datasetKey !== "news.radar_history",
+        )
         .map((item) => ({
           itemKey: item.itemKey,
           datasetKey: item.datasetKey,
@@ -475,6 +493,7 @@ export function generateHomepageDraft(
     moneyFlow: {
       coverage: dataCoverage.filter((item) => item.datasetKey.includes("flow")),
     },
+    newsRadar: buildNewsRadar(input),
     impactMapping: null,
   };
   return {

@@ -2,17 +2,45 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+import time
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.contracts.timing import TimingSignalBatchRequest
 from app.data_providers.contracts import DailyBar, MarketSnapshotRow, StockProfile
 from app.data_providers.errors import DataUnavailableError
 from app.gateway.timing_gateway import TimingGateway
 from app.main import app
+from app.routers import timing_v1
 
 client = TestClient(app)
+
+
+def test_timing_batch_route_does_not_block_event_loop(monkeypatch) -> None:
+    class SlowGateway:
+        def get_signal_batch(self, **_params):
+            time.sleep(0.15)
+            return {"status": "ok"}
+
+    monkeypatch.setattr(timing_v1, "timing_gateway", SlowGateway())
+    request = SimpleNamespace(state=SimpleNamespace(request_id="request-slow"))
+    body = TimingSignalBatchRequest(stockCodes=["601138"])
+
+    async def run_scenario() -> float:
+        started_at = time.perf_counter()
+        request_task = asyncio.create_task(
+            timing_v1.get_stock_signal_batch(request, body),
+        )
+        await asyncio.sleep(0.02)
+        event_loop_delay = time.perf_counter() - started_at
+        await request_task
+        return event_loop_delay
+
+    assert asyncio.run(run_scenario()) < 0.08
 
 
 def _sample_bars(stock_code: str = "600519") -> list[DailyBar]:
@@ -106,6 +134,15 @@ def test_get_timing_bars_success(install_gateway) -> None:
     assert payload["data"]["stockName"] == "Moutai"
     assert payload["data"]["timeframe"] == "DAILY"
     assert len(payload["data"]["bars"]) == 280
+
+
+def test_get_timing_bars_accepts_tushare_stock_code(install_gateway) -> None:
+    install_gateway(FakeDataProvider())
+
+    response = client.get("/api/v1/timing/stocks/600519.SH/bars")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["stockCode"] == "600519"
 
 
 @pytest.mark.parametrize(

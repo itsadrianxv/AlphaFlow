@@ -3,6 +3,7 @@ import {
   type EvidenceContextWriter,
   writeEvidenceContext,
 } from "~/server/application/evidence-context/evidence-context-writer";
+import type { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
 import {
   type CompanyResearchAgentService,
   normalizeCompanyResearchQuestions,
@@ -48,6 +49,7 @@ type CompanyResearchWorkflowServiceDependencies = {
   companyResearchService: CompanyResearchAgentService;
   researchToolRegistry: ResearchToolRegistry;
   evidenceContextWriter?: EvidenceContextWriter;
+  evidenceAwareLlmClient?: EvidenceAwareLlmClient;
 };
 
 type CompanyExecutionSnapshot = {
@@ -77,6 +79,28 @@ function uniqueStrings(items: string[], limit = 8) {
     0,
     limit,
   );
+}
+
+function buildFallbackCompanyReport(params: {
+  brief: CompanyResearchBrief;
+  conceptInsights: CompanyResearchResultDto["conceptInsights"];
+  findings: CompanyResearchResultDto["findings"];
+  evidence: CompanyResearchResultDto["evidence"];
+  references: CompanyResearchResultDto["references"];
+  verdict: CompanyResearchResultDto["verdict"];
+}) {
+  const list = (items: string[]) => items.length ? items.map((item) => `- ${item}`).join("\n") : "- 暂无";
+  return [
+    `## 公司结论\n${params.verdict.summary}\n\n立场：${params.verdict.stance}`,
+    `## 研究范围与公司概况\n- 公司：${params.brief.companyName}\n- 股票代码：${params.brief.stockCode ?? "未提供"}\n- 研究目标：${params.brief.researchGoal}`,
+    `## 业务、概念与变现路径\n${params.conceptInsights.length ? params.conceptInsights.map((item) => `- **${item.concept}**：${item.whyItMatters}；${item.monetizationPath}`).join("\n") : "- 暂无概念洞察"}`,
+    `## 核心投资逻辑\n${list(params.verdict.bullPoints)}`,
+    `## 关键问题及证据回答\n${params.findings.length ? params.findings.map((item) => `### ${item.question}\n${item.answer}\n${item.gaps.length ? `待补充：${item.gaps.join("；")}` : ""}`).join("\n\n") : "- 暂无"}`,
+    `## 经营与财务观察\n${params.evidence.length ? params.evidence.slice(0, 8).map((item) => `- ${item.title}：${item.extractedFact}`).join("\n") : "- 暂无已采集证据"}`,
+    `## 风险与待验证问题\n${list(params.verdict.bearPoints)}`,
+    `## 后续跟踪清单\n${list(params.verdict.nextChecks)}`,
+    `## 引用与来源\n${params.references.length ? params.references.map((item) => `- [${item.title}](${item.url ?? ""})：${item.sourceName}`).join("\n") : "- 暂无来源"}`,
+  ].join("\n\n");
 }
 
 function normalizeUrl(url?: string) {
@@ -312,25 +336,55 @@ export class CompanyResearchWorkflowService {
   private readonly companyResearchService: CompanyResearchAgentService;
   private readonly researchToolRegistry: ResearchToolRegistry;
   private readonly evidenceContextWriter?: EvidenceContextWriter;
+  private readonly evidenceAwareLlmClient?: EvidenceAwareLlmClient;
 
   constructor(dependencies: CompanyResearchWorkflowServiceDependencies) {
     this.client = dependencies.client;
     this.companyResearchService = dependencies.companyResearchService;
     this.researchToolRegistry = dependencies.researchToolRegistry;
     this.evidenceContextWriter = dependencies.evidenceContextWriter;
+    this.evidenceAwareLlmClient = dependencies.evidenceAwareLlmClient;
+  }
+
+  private async writeFullReportMarkdown(params: {
+    state: CompanyResearchGraphState;
+    runtimeConfig: ResearchRuntimeConfig;
+    brief: CompanyResearchBrief;
+    conceptInsights: CompanyResearchResultDto["conceptInsights"];
+    deepQuestions: CompanyResearchResultDto["deepQuestions"];
+    findings: CompanyResearchResultDto["findings"];
+    evidence: CompanyResearchResultDto["evidence"];
+    references: CompanyResearchResultDto["references"];
+    verdict: CompanyResearchResultDto["verdict"];
+    evidenceItemIds?: string[];
+  }) {
+    const fallback = buildFallbackCompanyReport(params);
+    const messages = [
+      { role: "system" as const, content: "你是A股公司研究员，请输出完整的中文 Markdown 研究正文。只使用输入证据，不得编造股票、财务数字或来源。必须包含：公司结论、研究范围与公司概况、业务、概念与变现路径、核心投资逻辑、关键问题及证据回答、经营与财务观察、风险与待验证问题、后续跟踪清单、引用与来源。" },
+      { role: "user" as const, content: JSON.stringify({ brief: params.brief, conceptInsights: params.conceptInsights, deepQuestions: params.deepQuestions, findings: params.findings, evidence: params.evidence, references: params.references, verdict: params.verdict }) },
+    ];
+    const options = { model: params.runtimeConfig.models.report, maxOutputTokens: 2600, budgetPolicy: { maxRetries: 1, prioritySections: ["公司结论", "风险与待验证问题", "引用与来源"] } };
+    if (this.evidenceAwareLlmClient && params.evidenceItemIds?.length) {
+      return this.evidenceAwareLlmClient.complete({ userId: params.state.userId, workflowRunId: params.state.runId, purpose: "company_final_report", policy: "evidence_required", messages, evidenceItemIds: params.evidenceItemIds, fallbackText: fallback, options }).then((result) => result.output).catch(() => fallback);
+    }
+    return this.client.complete(messages, fallback, options).catch(() => fallback);
   }
 
   async buildTaskContract(
     input: CompanyResearchInput,
     runtimeConfig: ResearchRuntimeConfig,
   ) {
-    return writeTaskContract({
+    const contract = await writeTaskContract({
       client: this.client,
       subject: "company",
       preferences: input.researchPreferences,
       taskContract: input.taskContract,
       runtimeConfig,
     });
+    return {
+      ...contract,
+      requiredSections: uniqueStrings([...contract.requiredSections, "full_report"], 12),
+    };
   }
 
   async clarifyScope(
@@ -1149,13 +1203,26 @@ export class CompanyResearchWorkflowService {
           ],
         })
       : undefined;
+    const fullReportMarkdown = await this.writeFullReportMarkdown({
+      state: params.state,
+      runtimeConfig: params.runtimeConfig,
+      brief,
+      conceptInsights: params.state.conceptInsights ?? [],
+      deepQuestions,
+      findings,
+      evidence: params.state.evidence ?? [],
+      references: params.state.references ?? [],
+      verdict,
+      evidenceItemIds: evidenceContext?.citations?.map((item) => item.evidenceItemId),
+    });
     const reflection = reflectCompanyResearch({
       taskContract,
-      result: report,
+      result: { ...report, fullReportMarkdown },
     });
 
     return {
       ...report,
+      fullReportMarkdown,
       reflection,
       contractScore: reflection.contractScore,
       qualityFlags: reflection.qualityFlags,

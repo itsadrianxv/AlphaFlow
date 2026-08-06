@@ -420,6 +420,7 @@ function buildTaskContractFallback(params: {
         "findings",
         "verdict",
         "risks",
+        "full_report",
       ],
       citationRequired: true,
       analysisDepth: "deep" as const,

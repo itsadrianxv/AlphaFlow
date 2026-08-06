@@ -64,7 +64,7 @@ def resolve_news_radar(request: Request, body: NewsRadarResolveRequest):
     )
 
 
-@router.get("/themes/{theme}/news", response_model=ThemeNewsResponse)
+@router.get("/themes/{theme:path}/news", response_model=ThemeNewsResponse)
 async def get_theme_news(
     request: Request,
     theme: str,

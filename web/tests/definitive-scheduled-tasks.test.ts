@@ -1,11 +1,13 @@
 import ExcelJS from "exceljs";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { publishDefinitiveTaskRun } from "~/server/application/scheduled-task/definitive-task-run-stream";
 import { buildScoringWorkbook } from "~/server/application/scheduled-task/scoring-excel-service";
 import { deterministicExecutionPlanSchema } from "~/server/domain/scheduled-task/contracts";
 
 const plan = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   type: "deterministic_scoring",
   universe: { type: "stocks", stockCodes: ["600519"] },
   data: { adjustment: "qfq" },
@@ -21,13 +23,8 @@ const plan = {
     {
       id: "macd_positive",
       name: "MACD 柱为正",
-      condition: {
-        timeframe: "daily",
-        metric: "macd_default.histogram",
-        operator: "gt",
-        value: 0,
-      },
-      points: 15,
+      condition: { ">": [{ var: "daily.macd_default.histogram.current" }, 0] },
+      scoreDelta: 15,
     },
   ],
   selection: { minScore: 10, limit: 20 },
@@ -44,6 +41,43 @@ describe("确定性定时评分任务", () => {
         universe: { type: "stocks", stockCodes: ["600519.SH"] },
       }).success,
     ).toBe(false);
+    expect(
+      deterministicExecutionPlanSchema.safeParse({
+        ...plan,
+        rules: [{ id: "bad", name: "非法算术", condition: { "+": [1, 2] }, scoreDelta: 1 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      deterministicExecutionPlanSchema.safeParse({
+        ...plan,
+        rules: [{ id: "bad", name: "非法默认值", condition: { var: ["daily.close.current", 0] }, scoreDelta: 1 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("Web 与 Python 共用 JSONLogic v2 契约样例", async () => {
+    const fixture = JSON.parse(
+      await readFile(
+        path.resolve(import.meta.dirname, "../../test_fixtures/definitive_scoring_jsonlogic_v2.json"),
+        "utf8",
+      ),
+    ) as { cases: Array<{ condition: unknown }> };
+    for (const [index, item] of fixture.cases.entries()) {
+      const parsed = deterministicExecutionPlanSchema.safeParse({
+        ...plan,
+        indicators: [
+          ...plan.indicators,
+          {
+            id: "kdj",
+            type: "kdj",
+            timeframes: ["daily", "weekly"],
+            params: { period: 9, kSmoothing: 3, dSmoothing: 3 },
+          },
+        ],
+        rules: [{ id: `fixture_${index}`, name: `fixture ${index}`, condition: item.condition, scoreDelta: 1 }],
+      });
+      expect(parsed.success).toBe(true);
+    }
   });
 
   it("Redis 消息只包含执行标识", async () => {
@@ -69,7 +103,7 @@ describe("确定性定时评分任务", () => {
       scheduledAt: new Date("2026-07-29T10:00:00Z"),
       summary: { type: "SCORING_REPORT", asOfDate: "2026-07-29" },
       rules: [
-        { id: "macd_positive", name: "MACD 柱为正", points: 15 },
+        { id: "macd_positive", name: "MACD 柱为正", scoreDelta: 15 },
       ],
       rows: [
         {
@@ -79,11 +113,12 @@ describe("确定性定时评分任务", () => {
           selected: true,
           evaluationStatus: "FULL",
           score: 15,
-          maxScore: 15,
+          minimumPossibleScore: 0,
+          maximumPossibleScore: 15,
           ruleResults: {
             macd_positive: {
               status: "MATCHED",
-              awardedPoints: 15,
+              awardedDelta: 15,
               observations: {
                 "daily.macd_default.histogram": { current: 0.42 },
               },

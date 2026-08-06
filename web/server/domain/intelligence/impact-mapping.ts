@@ -134,6 +134,8 @@ export type ImpactRadarEvent = {
   analysis?: {
     timeline: ImpactTimelineItem[];
     scenarios: ImpactScenario[];
+    historyReady?: boolean;
+    historyVersion?: string;
     traceState?: ImpactMappingResult["traceState"];
     warnings: string[];
   };

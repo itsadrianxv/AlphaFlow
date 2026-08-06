@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 type RuleMetadata = {
   id: string;
   name: string;
-  points: number;
+  scoreDelta: number;
   condition?: unknown;
 };
 
@@ -14,7 +14,8 @@ type ScoreRow = {
   selected: boolean;
   evaluationStatus: string;
   score: number;
-  maxScore: number;
+  minimumPossibleScore: number;
+  maximumPossibleScore: number;
   ruleResults: unknown;
 };
 
@@ -39,7 +40,10 @@ function observationText(value: unknown) {
   return Object.entries(observations)
     .map(([metric, observation]) => {
       const values = record(observation);
-      const previous = values.previous === undefined ? "" : `, previous=${String(values.previous)}`;
+      const previous =
+        values.previous === undefined
+          ? ""
+          : `, previous=${String(values.previous)}`;
       return `${metric}: current=${String(values.current ?? "-")}${previous}`;
     })
     .join("; ");
@@ -67,15 +71,23 @@ export async function buildScoringWorkbook(params: {
     { header: "股票名称", key: "stockName", width: 18 },
     { header: "评估状态", key: "evaluationStatus", width: 16 },
     { header: "总分", key: "score", width: 12 },
-    { header: "最高分", key: "maxScore", width: 12 },
+    { header: "理论最低分", key: "minimumPossibleScore", width: 14 },
+    { header: "理论最高分", key: "maximumPossibleScore", width: 14 },
     ...params.rules.flatMap((rule) => [
       { header: `${rule.name}-状态`, key: `${rule.id}:status`, width: 18 },
       { header: `${rule.name}-得分`, key: `${rule.id}:score`, width: 16 },
-      { header: `${rule.name}-观测值`, key: `${rule.id}:observations`, width: 42 },
+      {
+        header: `${rule.name}-观测值`,
+        key: `${rule.id}:observations`,
+        width: 42,
+      },
     ]),
   ];
   overview.getRow(1).font = { bold: true };
-  overview.autoFilter = { from: "A1", to: overview.getRow(1).getCell(overview.columnCount).address };
+  overview.autoFilter = {
+    from: "A1",
+    to: overview.getRow(1).getCell(overview.columnCount).address,
+  };
   for (const item of params.rows) {
     const ruleResults = record(item.ruleResults);
     const row: Record<string, unknown> = {
@@ -85,12 +97,13 @@ export async function buildScoringWorkbook(params: {
       stockName: safeCell(item.stockName),
       evaluationStatus: item.evaluationStatus,
       score: item.score,
-      maxScore: item.maxScore,
+      minimumPossibleScore: item.minimumPossibleScore,
+      maximumPossibleScore: item.maximumPossibleScore,
     };
     for (const rule of params.rules) {
       const result = record(ruleResults[rule.id]);
       row[`${rule.id}:status`] = result.status ?? "NOT_EVALUATED";
-      row[`${rule.id}:score`] = result.awardedPoints ?? 0;
+      row[`${rule.id}:score`] = result.awardedDelta ?? 0;
       row[`${rule.id}:observations`] = safeCell(observationText(result));
     }
     overview.addRow(row);
@@ -101,13 +114,17 @@ export async function buildScoringWorkbook(params: {
     { header: "顺序", key: "order", width: 10 },
     { header: "规则ID", key: "id", width: 28 },
     { header: "规则名称", key: "name", width: 30 },
-    { header: "分值", key: "points", width: 12 },
+    { header: "分值变化", key: "scoreDelta", width: 12 },
     { header: "条件", key: "condition", width: 80 },
   ];
   rules.getRow(1).font = { bold: true };
-  params.rules.forEach((rule, index) =>
-    rules.addRow({ ...rule, order: index + 1, condition: safeCell(rule.condition) }),
-  );
+  params.rules.forEach((rule, index) => {
+    rules.addRow({
+      ...rule,
+      order: index + 1,
+      condition: safeCell(rule.condition),
+    });
+  });
 
   const info = workbook.addWorksheet("执行信息");
   info.columns = [

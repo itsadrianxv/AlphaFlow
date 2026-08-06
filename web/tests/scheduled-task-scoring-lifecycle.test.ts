@@ -40,8 +40,8 @@ describe("确定性评分预览启用门控", () => {
       summarizePreviewGate({
         minScore: 10,
         results: [
-          { evaluationStatus: "NONE", score: 0, maxScore: 20 },
-          { evaluationStatus: "NONE", score: 0, maxScore: 20 },
+          { evaluationStatus: "NONE", score: 0, minimumPossibleScore: 0, maximumPossibleScore: 20 },
+          { evaluationStatus: "NONE", score: 0, minimumPossibleScore: 0, maximumPossibleScore: 20 },
         ],
         warnings: [],
       }),
@@ -53,8 +53,8 @@ describe("确定性评分预览启用门控", () => {
       summarizePreviewGate({
         minScore: 30,
         results: [
-          { evaluationStatus: "FULL", score: 20, maxScore: 20 },
-          { evaluationStatus: "NONE", score: 0, maxScore: 20 },
+          { evaluationStatus: "FULL", score: 20, minimumPossibleScore: 0, maximumPossibleScore: 20 },
+          { evaluationStatus: "NONE", score: 0, minimumPossibleScore: 0, maximumPossibleScore: 20 },
         ],
         warnings: [],
       }),
@@ -74,7 +74,7 @@ describe("确定性评分预览执行", () => {
         universe: { type: "stocks", stockCodes: ["000001"] },
         data: { adjustment: "qfq" },
         indicators: [{ type: "macd", params: { fast: 12 } }],
-        rules: [{ id: "rule_1", points: 10 }],
+        rules: [{ id: "rule_1", scoreDelta: 10 }],
       },
       scheduleSpec: { type: "DAILY", time: "18:00" },
     };

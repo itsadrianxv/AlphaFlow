@@ -22,6 +22,8 @@ class ScreeningRunExecutor:
     def execute(self, run_id: str, config: dict[str, Any]) -> dict[str, Any]:
         universe_records = self._resolve_universe(dict(config.get("universe") or {}))
         stock_codes = tuple(item["stockCode"] for item in universe_records)
+        ts_codes = tuple(self._to_tushare_ts_code(item) for item in universe_records)
+        stock_code_by_ts_code = dict(zip(ts_codes, stock_codes, strict=True))
         metric_ids = list(dict.fromkeys(str(value) for value in config.get("indicatorIds", [])))
         formulas = list(config.get("formulas", []))
         for formula in formulas:
@@ -32,12 +34,13 @@ class ScreeningRunExecutor:
         time_config = dict(config.get("timeConfig") or {})
         periods = tuple(resolve_periods(time_config))
         series = self._financial.get_series(SeriesQuery(
-            stock_codes=stock_codes, metric_ids=tuple(metric_ids), periods=periods,
+            stock_codes=ts_codes, metric_ids=tuple(metric_ids), periods=periods,
             period_type=time_config["periodType"], use_case="SCREENING",
         ))
         frame = series.frame.copy()
         if frame.empty:
             return self._response(run_id, len(stock_codes), [], series, "PARTIAL")
+        frame["stock_code"] = frame["stock_code"].astype(str).map(lambda code: stock_code_by_ts_code.get(code, code.split(".", 1)[0]))
         pivot = frame.pivot_table(index=["stock_code", "period"], columns="metric_id", values="value", aggfunc="first").reset_index()
         for formula in formulas:
             targets = [str(value) for value in formula.get("targetIndicators", [])]
@@ -78,6 +81,12 @@ class ScreeningRunExecutor:
             codes = {str(value) for value in universe.get("stockCodes", [])}
             return [record for record in records if record["stockCode"] in codes]
         raise ValueError("无效的筛选股票池")
+
+    @staticmethod
+    def _to_tushare_ts_code(record: dict[str, str]) -> str:
+        stock_code = str(record["stockCode"]).strip().upper()
+        market = str(record.get("market") or "").strip().upper()
+        return f"{stock_code}.{market}" if market else stock_code
 
     @staticmethod
     def _nullable(value: Any) -> float | None:

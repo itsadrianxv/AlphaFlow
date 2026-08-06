@@ -51,7 +51,7 @@ cpp/workers/definitive_task/
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "type": "deterministic_scoring",
   "universe": { "type": "stocks", "stockCodes": ["600519"] },
   "data": { "adjustment": "qfq" },
@@ -73,7 +73,7 @@ cpp/workers/definitive_task/
 - 指标 MVP 包含 OHLCV、`candle.direction`、MACD 与 KDJ。
 - MACD 默认 12/26/9，柱值为 `2 * (DIF - DEA)`；KDJ 默认 9/3/3，初始 K/D 为 50。
 - 历史长度由解析器推导，每个使用周期至少预热 120 bars；交叉操作额外读取前一 bar。
-- 原子操作符为 `gt/gte/lt/lte/eq/ne/between/cross_above/cross_below`，右侧仅接受常量。
+- 条件使用受控 JSONLogic，标准操作符为 `var`、比较、`and/or/!` 和 `in`；只额外提供 `cross_above/cross_below`，其参数为两个标准化序列快照或序列与数字常量。
 - 条件树最多 8 层、200 个节点；规则最多 50 条，指标声明最多 20 个。
 
 ## 多周期与缺失语义
@@ -104,15 +104,16 @@ cpp/workers/definitive_task/
 
 可以这样描述：
 
-> 每条评分规则由条件和分值组成。条件既可以是针对某个周期、指标和目标值的单项比较，也可以通过“全部满足”“任一满足”和“取反”组合成复合条件。条件成立时获得该规则指定的分数，否则不得分。
+> 每条评分规则由 JSONLogic 条件和有符号分值变化组成。条件只组合标准化指标快照；条件成立时应用 `scoreDelta`，否则贡献 0。
 
 对应关系是：
 
-- 单项比较：`timeframe + metric + operator + value`
-- 全部满足：`all`
-- 任一满足：`any`
-- 条件取反：`not`
-- 得分：`points`
+- 指标值：`{"var":"daily.macd.histogram.current"}`
+- 全部满足：`and`
+- 任一满足：`or`
+- 条件取反：`!`
+- 金叉/死叉：`cross_above/cross_below`
+- 得分变化：`scoreDelta`
 
 ## json 规则示例
 
@@ -121,13 +122,8 @@ cpp/workers/definitive_task/
 {
   "id": "daily_macd_positive",
   "name": "日线 MACD 柱为正",
-  "condition": {
-    "timeframe": "daily",
-    "metric": "macd.histogram",
-    "operator": "gt",
-    "value": 0
-  },
-  "points": 15
+  "condition": { ">": [{ "var": "daily.macd.histogram.current" }, 0] },
+  "scoreDelta": 15
 }
 
 语义是 日线 MACD histogram > 0 时加 15 分，否则加 0 分。
@@ -138,38 +134,16 @@ cpp/workers/definitive_task/
   "id": "multi_timeframe_bullish",
   "name": "多周期趋势一致向上",
   "condition": {
-    "all": [
-      {
-        "timeframe": "daily",
-        "metric": "candle.direction",
-        "operator": "eq",
-        "value": "bullish"
-      },
-      {
-        "timeframe": "weekly",
-        "metric": "candle.direction",
-        "operator": "eq",
-        "value": "bullish"
-      },
-      {
-        "any": [
-          {
-            "timeframe": "monthly",
-            "metric": "macd.histogram",
-            "operator": "gt",
-            "value": 0
-          },
-          {
-            "timeframe": "monthly",
-            "metric": "kdj.j",
-            "operator": "gt",
-            "value": 50
-          }
-        ]
-      }
+    "and": [
+      { "==": [{ "var": "daily.candle.direction.current" }, "bullish"] },
+      { "==": [{ "var": "weekly.candle.direction.current" }, "bullish"] },
+      { "or": [
+        { ">": [{ "var": "monthly.macd.histogram.current" }, 0] },
+        { ">": [{ "var": "monthly.kdj.j.current" }, 50] }
+      ] }
     ]
   },
-  "points": 25
+  "scoreDelta": 25
 }
 
 语义是：日线阳线、周线阳线，并且月线 MACD 或 KDJ 至少一个满足条件时，加 25 分。

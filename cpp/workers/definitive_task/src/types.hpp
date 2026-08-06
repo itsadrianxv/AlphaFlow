@@ -19,7 +19,8 @@ struct DefinitiveTaskResultRow {
   bool selected{};
   std::string evaluation_status;
   double score{};
-  double max_score{};
+  double minimum_possible_score{};
+  double maximum_possible_score{};
   nlohmann::json rule_results = nlohmann::json::object();
 };
 

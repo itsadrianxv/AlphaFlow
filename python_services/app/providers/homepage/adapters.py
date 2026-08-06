@@ -33,6 +33,8 @@ from .contracts import (
     normalize_decimal,
     sha256_hash,
 )
+from .radar_history import build_radar_history
+from app.providers.minishare.news import MinishareNewsProvider
 
 
 class ProviderAdapterException(RuntimeError):
@@ -652,11 +654,13 @@ class MinishareHomepageProviderAdapter(HomepageProviderAdapter):
 
     provider_key = "minishare"
 
-    def __init__(self, client: Any | None = None, *, datasets: Mapping[str, PageLoader] | None = None, authority_config: Mapping[str, Mapping[str, Any]] | None = None) -> None:
+    def __init__(self, client: Any | None = None, *, datasets: Mapping[str, PageLoader] | None = None, authority_config: Mapping[str, Mapping[str, Any]] | None = None, radar_provider: Any | None = None) -> None:
         if client is None:
             from app.providers.minishare.client import MinishareNewsClient
 
             client = MinishareNewsClient()
+        radar_provider = radar_provider or MinishareNewsProvider(client=client)
+        history_cache: dict[str, dict[str, Any]] = {}
 
         def window(request: HomepageDataItemRequest) -> tuple[datetime, datetime]:
             start = _parse_datetime(request.requested_scope.get("startAt") or request.requested_scope.get("start_at"))
@@ -674,10 +678,65 @@ class MinishareHomepageProviderAdapter(HomepageProviderAdapter):
             # 下一次空页即表示已正常终止，而不是静默截断。
             return _news_page(request, records, next_cursor=str(offset + len(records)) if len(records) >= request.page_size else None)
 
+        def history_loader(request: HomepageDataItemRequest, _cursor: str | None) -> AdapterPage:
+            end_at = _parse_datetime(
+                request.requested_scope.get("endAt")
+                or request.requested_scope.get("end_at")
+            ) or datetime.now(UTC)
+            scope = request.requested_scope
+            current_days = int(scope.get("currentDays") or 7)
+            trace_days = int(scope.get("traceDays") or 365)
+            max_events = int(scope.get("maxEvents") or 30)
+            featured_events = int(scope.get("featuredEvents") or 3)
+            cache_key = ":".join(
+                [
+                    str(scope.get("targetTradeDate") or end_at.date()),
+                    end_at.isoformat(),
+                    str(current_days),
+                    str(trace_days),
+                    str(max_events),
+                    str(featured_events),
+                ]
+            )
+            history = history_cache.get(cache_key)
+            if history is None:
+                history = build_radar_history(
+                    radar_provider,
+                    end_at=end_at,
+                    current_days=current_days,
+                    trace_days=trace_days,
+                    max_events=max_events,
+                    featured_events=featured_events,
+                )
+                history_cache[cache_key] = history
+                if len(history_cache) > 8:
+                    del history_cache[next(iter(history_cache))]
+            record = {
+                "sourceRecordKey": request.request_fingerprint,
+                "subjectType": "news_radar",
+                "subjectKey": "homepage",
+                "metricCatalogId": request.dataset_key,
+                "valueType": "json",
+                "valueJson": history,
+                "observationPeriod": {
+                    "targetTradeDate": scope.get("targetTradeDate"),
+                    "phase": scope.get("phase"),
+                },
+                "publishedAt": end_at.isoformat(),
+            }
+            return AdapterPage(
+                items=(record,),
+                covered_scope=request.requested_scope,
+                actual_data_cutoff=request.target_data_cutoff
+                or DataCutoff("published_at", end_at.isoformat()),
+                source_published_at=end_at,
+            )
+
         loaders: dict[str, PageLoader] = {
             "news.fast": fast_loader,
             "news.major": lambda request, _cursor: _news_page(request, client.fetch_major_news(*window(request))),
             "news.cctv": lambda request, _cursor: _news_page(request, client.fetch_cctv_news(request.requested_scope.get("date") or request.requested_scope.get("targetDate") or date.today())),
+            "news.radar_history": history_loader,
             "news_fast": fast_loader,
             "news_major": lambda request, _cursor: _news_page(request, client.fetch_major_news(*window(request))),
             "news_cctv": lambda request, _cursor: _news_page(request, client.fetch_cctv_news(request.requested_scope.get("date") or request.requested_scope.get("targetDate") or date.today())),

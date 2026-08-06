@@ -27,6 +27,8 @@ import {
   buildImmediateResearchCandidateSeeds,
   buildResearchOnlySystemInstruction,
   enforceResearchOnlyFinalText,
+  toResearchCandidateSeedPayload,
+  type ResearchCandidateSeedPayload,
 } from "./research-only-policy";
 import type { SkillRegistry } from "./skill-registry";
 import { createInternalTools, STANDARD_INTERNAL_TOOL_NAMES } from "./tool-policy";
@@ -401,6 +403,30 @@ export function resolveScheduledTaskFlowFailure(state: HarnessEventState) {
   };
 }
 
+export async function recoverCandidateSeedOutboxFiles(params: {
+  root: string;
+  enqueue: (payload: ResearchCandidateSeedPayload) => Promise<unknown>;
+  onError?: (file: string, error: unknown) => void;
+}) {
+  const files = await fs.readdir(params.root).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  });
+
+  for (const file of files.filter((item) => item.endsWith(".json")).sort()) {
+    const filePath = path.join(params.root, file);
+    try {
+      const seed = JSON.parse(
+        await fs.readFile(filePath, { encoding: "utf8" }),
+      ) as Record<string, unknown>;
+      await params.enqueue(toResearchCandidateSeedPayload(seed));
+      await fs.unlink(filePath);
+    } catch (error) {
+      params.onError?.(file, error);
+    }
+  }
+}
+
 export class PiAdapter {
   private readonly pythonGatewayClient: PythonGatewayClient;
   private readonly webInternalClient: WebInternalClient;
@@ -547,7 +573,12 @@ export class PiAdapter {
   }
 
   private async runTurn(request: StartRunRequest, turnGeneration: number) {
-    await this.recoverCandidateSeedOutbox();
+    try {
+      await this.recoverCandidateSeedOutbox();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[agent-runtime] candidate seed recovery skipped: ${message}`);
+    }
     const skillIds = resolveSkillIds(request);
     const boundary = createExecutionBoundary(
       { ...request, skillIds },
@@ -815,8 +846,10 @@ export class PiAdapter {
           idempotent: true,
           count: candidateSeeds.length,
           seedKeys: candidateSeeds.map((seed) => seed.seedKey),
-          accepted: enqueueResults.length,
-          pendingRecovery: 0,
+          accepted: enqueueResults.filter((result) => result.accepted).length,
+          pendingRecovery: enqueueResults.filter(
+            (result) => result.pendingRecovery,
+          ).length,
         });
       }
       this.recordAudit({
@@ -866,34 +899,49 @@ export class PiAdapter {
 
   private async enqueueCandidateSeed(seed: Record<string, unknown>) {
     const seedKey = String(seed.seedKey ?? "");
-    if (!seedKey) throw new Error("candidate seed 缺少稳定 seedKey");
-    await fs.mkdir(this.candidateSeedOutboxRoot, { recursive: true });
+    if (!seedKey) {
+      console.error("[agent-runtime] candidate seed 缺少稳定 seedKey");
+      return { accepted: false, pendingRecovery: false };
+    }
+
     const filePath = path.join(
       this.candidateSeedOutboxRoot,
       `${Buffer.from(seedKey, "utf8").toString("base64url")}.json`,
     );
-    await fs.writeFile(filePath, JSON.stringify(seed), { encoding: "utf8" });
-    await this.webInternalClient.enqueueResearchCandidateSeed(seed);
-    await fs.unlink(filePath).catch((error: NodeJS.ErrnoException) => {
-      if (error.code !== "ENOENT") throw error;
-    });
+
+    try {
+      await fs.mkdir(this.candidateSeedOutboxRoot, { recursive: true });
+      await fs.writeFile(filePath, JSON.stringify(seed), { encoding: "utf8" });
+      await this.webInternalClient.enqueueResearchCandidateSeed(
+        toResearchCandidateSeedPayload(seed),
+      );
+      await fs.unlink(filePath).catch((error: NodeJS.ErrnoException) => {
+        if (error.code !== "ENOENT") throw error;
+      });
+      return { accepted: true, pendingRecovery: false };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[agent-runtime] candidate seed delivery deferred (${seedKey}): ${message}`,
+      );
+      // 保留 outbox 文件，主回答仍可成功，下一次运行时再幂等重放。
+      return { accepted: false, pendingRecovery: true };
+    }
   }
 
   private async recoverCandidateSeedOutbox() {
-    const files = await fs
-      .readdir(this.candidateSeedOutboxRoot)
-      .catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return [];
-        throw error;
-      });
-    for (const file of files.filter((item) => item.endsWith(".json")).sort()) {
-      const filePath = path.join(this.candidateSeedOutboxRoot, file);
-      const seed = JSON.parse(
-        await fs.readFile(filePath, { encoding: "utf8" }),
-      ) as Record<string, unknown>;
-      await this.webInternalClient.enqueueResearchCandidateSeed(seed);
-      await fs.unlink(filePath);
-    }
+    await recoverCandidateSeedOutboxFiles({
+      root: this.candidateSeedOutboxRoot,
+      enqueue: (payload) =>
+        this.webInternalClient.enqueueResearchCandidateSeed(payload),
+      onError: (file, error) => {
+        const message = error instanceof Error ? error.message : String(error);
+        // 单个坏文件或暂时不可达不能阻断 runtime 的 HTTP 服务。
+        console.error(
+          `[agent-runtime] candidate seed recovery deferred (${file}): ${message}`,
+        );
+      },
+    });
   }
 
   private recordAudit(params: {

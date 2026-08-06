@@ -99,4 +99,12 @@ describe("CompanyResearchDetail layout", () => {
     expect(companyPageSource).toContain("COMPANY_RESEARCH_TEMPLATE_CODE");
     expect(companyPageSource).toContain("initialTemplateCode");
   });
+
+  it("exposes a standalone full research report tab with an empty state", () => {
+    expect(detailSource).toContain('id: "report"');
+    expect(detailSource).toContain('label: "研究正文"');
+    expect(detailSource).toContain("fullReportMarkdown: result.fullReportMarkdown");
+    expect(detailSource).toContain("暂无研究正文");
+    expect(detailSource).toContain("<MarkdownContent content={props.model.fullReportMarkdown} />");
+  });
 });

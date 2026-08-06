@@ -47,6 +47,11 @@ const companyResearchDetailTabs: WorkflowStageTab[] = [
     summary: "",
   },
   {
+    id: "report",
+    label: "研究正文",
+    summary: "",
+  },
+  {
     id: "concepts",
     label: "业务与概念",
     summary: "",
@@ -125,6 +130,7 @@ type CompanyResearchDetailModel = {
   referenceFilters: CompanyResearchReferenceFilter[];
   collectors: CompanyResearchResultDto["collectionSummary"]["collectors"];
   references: CompanyResearchReferenceItem[];
+  fullReportMarkdown?: string;
   referenceStats: Array<{
     label: string;
     value: string;
@@ -472,6 +478,7 @@ export function buildCompanyResearchDetailModel(params: {
       referenceFilters: buildReferenceFilters(result.references),
       collectors: result.collectionSummary.collectors,
       references: result.references,
+      fullReportMarkdown: result.fullReportMarkdown,
       referenceStats: [
         {
           label: "原始证据",
@@ -528,6 +535,21 @@ export function buildCompanyResearchDetailModel(params: {
       "回到公司研究页调整输入范围",
     ]),
   };
+}
+
+function ReportTab(props: { model: CompanyResearchDetailModel }) {
+  return (
+    <Panel title="研究正文">
+      {props.model.fullReportMarkdown?.trim() ? (
+        <MarkdownContent content={props.model.fullReportMarkdown} />
+      ) : (
+        <EmptyState
+          title="暂无研究正文"
+          description="该结果可能来自旧版研究流程，或正文尚未生成。"
+        />
+      )}
+    </Panel>
+  );
 }
 
 function SummaryMetricRow(props: {
@@ -1021,6 +1043,7 @@ export function CompanyResearchDetailPanels(props: {
           />
         ),
         summary: <SummaryTab model={props.model} />,
+        report: <ReportTab model={props.model} />,
         concepts: <ConceptsTab model={props.model} />,
         questions: (
           <QuestionsTab

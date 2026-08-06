@@ -10,6 +10,7 @@ from functools import lru_cache
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
+from starlette.concurrency import run_in_threadpool
 
 from app.providers.homepage import (
     DataCutoff,
@@ -62,4 +63,5 @@ async def fetch_homepage_provider_item(
         request_params=request_payload.get("requestParams") or {},
     )
     provider_key = str(request_payload.get("providerKey") or payload.get("providerKey") or "")
-    return _adapter_for(provider_key).fetch(request).to_dict()
+    result = await run_in_threadpool(_adapter_for(provider_key).fetch, request)
+    return result.to_dict()

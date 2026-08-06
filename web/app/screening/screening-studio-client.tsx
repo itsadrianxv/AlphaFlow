@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FavoriteStockPicker } from "~/app/_components/favorite-stock-picker";
 import { ResearchTargetPicker } from "~/app/_components/research-target-picker";
 import { StockSearchPicker } from "~/app/_components/stock-search-picker";
 import {
@@ -1140,24 +1141,42 @@ export function ScreeningStudioClient() {
               : "hidden"
           }
         >
-          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="股票池范围">
-            {([
-              ["ALL_A_SHARES", "全部 A 股"],
-              ["INDUSTRY", "按行业"],
-              ["STOCKS", "自选股票"],
-            ] as const).map(([type, label]) => (
+          <div
+            className="mb-4 flex flex-wrap gap-2"
+            role="group"
+            aria-label="股票池范围"
+          >
+            {(
+              [
+                ["ALL_A_SHARES", "全部 A 股"],
+                ["INDUSTRY", "按行业"],
+                ["STOCKS", "自选股票"],
+              ] as const
+            ).map(([type, label]) => (
               <button
                 key={type}
                 type="button"
-                className={universe.type === type ? "app-button app-button-primary" : "app-button"}
+                className={
+                  universe.type === type
+                    ? "app-button app-button-primary"
+                    : "app-button"
+                }
                 onClick={() => {
                   if (type === "ALL_A_SHARES") setUniverse({ type });
                   if (type === "INDUSTRY") {
-                    const industryNames = industryNamesInput.split(/[、,，]/).map((item) => item.trim()).filter(Boolean);
+                    const industryNames = industryNamesInput
+                      .split(/[、,，]/)
+                      .map((item) => item.trim())
+                      .filter(Boolean);
                     setUniverse({ type, industryNames });
                   }
                   if (type === "STOCKS") {
-                    setUniverse({ type, stockCodes: selectedStocks.map((stock) => stock.stockCode) });
+                    setUniverse({
+                      type,
+                      stockCodes: selectedStocks.map(
+                        (stock) => stock.stockCode,
+                      ),
+                    });
                   }
                 }}
               >
@@ -1173,25 +1192,41 @@ export function ScreeningStudioClient() {
                 setIndustryNamesInput(value);
                 setUniverse({
                   type: "INDUSTRY",
-                  industryNames: value.split(/[、,，]/).map((item) => item.trim()).filter(Boolean),
+                  industryNames: value
+                    .split(/[、,，]/)
+                    .map((item) => item.trim())
+                    .filter(Boolean),
                 });
               }}
               className="app-input"
               placeholder="输入行业名称，多个行业用逗号分隔"
             />
           ) : universe.type === "STOCKS" ? (
-            <StockSearchPicker
-            label="搜索股票"
-            keyword={stockSearchKeyword}
-            onKeywordChange={setStockSearchKeyword}
-            selectedStocks={selectedStocks}
-            onToggleStock={toggleStock}
-            maxSelection={20}
-            className="mt-1"
-            emptyHint="输入关键词后从本地股票列表搜索，最多选择 20 只。"
-            />
+            <div className="grid gap-5 lg:grid-cols-2">
+              <FavoriteStockPicker
+                selectedStockCodes={selectedStocks.map(
+                  (stock) => stock.stockCode,
+                )}
+                onToggleStock={toggleStock}
+                maxSelection={20}
+                className="mt-1"
+              />
+              <StockSearchPicker
+                label="搜索全部股票"
+                keyword={stockSearchKeyword}
+                onKeywordChange={setStockSearchKeyword}
+                selectedStocks={selectedStocks}
+                onToggleStock={toggleStock}
+                maxSelection={20}
+                className="mt-1"
+                emptyHint="输入关键词后从本地股票列表搜索，最多选择 20 只。"
+              />
+            </div>
           ) : (
-            <InlineNotice tone="info" description="将对当前股票池快照中的全部 A 股执行筛选。" />
+            <InlineNotice
+              tone="info"
+              description="将对当前股票池快照中的全部 A 股执行筛选。"
+            />
           )}
         </SectionCard>
 
@@ -1491,8 +1526,18 @@ export function ScreeningStudioClient() {
                   : "开始筛选"}
               </button>
               <StatusPill
-                label={universe.type === "ALL_A_SHARES" ? "全部 A 股" : universe.type === "INDUSTRY" ? `行业 ${universe.industryNames.length}` : `股票 ${selectedStocks.length}/20`}
-                tone={universe.type !== "STOCKS" || selectedStocks.length > 0 ? "success" : "neutral"}
+                label={
+                  universe.type === "ALL_A_SHARES"
+                    ? "全部 A 股"
+                    : universe.type === "INDUSTRY"
+                      ? `行业 ${universe.industryNames.length}`
+                      : `股票 ${selectedStocks.length}/20`
+                }
+                tone={
+                  universe.type !== "STOCKS" || selectedStocks.length > 0
+                    ? "success"
+                    : "neutral"
+                }
               />
               <StatusPill
                 label={`指标 ${selectedIndicatorIds.length + selectedFormulaIds.length}`}
@@ -1655,33 +1700,69 @@ export function ScreeningStudioClient() {
           {activeRunId ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <StatusPill label={`运行 ${runQuery.data?.status ?? "PENDING"}`} tone={runQuery.data?.status === "FAILED" ? "danger" : runIsTerminal ? "success" : "info"} />
-                <StatusPill label={`命中 ${runQuery.data?.totalCount ?? 0}`} tone="neutral" />
-                <StatusPill label={`股票池 ${runQuery.data?.universeCount ?? 0}`} tone="neutral" />
+                <StatusPill
+                  label={`运行 ${runQuery.data?.status ?? "PENDING"}`}
+                  tone={
+                    runQuery.data?.status === "FAILED"
+                      ? "danger"
+                      : runIsTerminal
+                        ? "success"
+                        : "info"
+                  }
+                />
+                <StatusPill
+                  label={`命中 ${runQuery.data?.totalCount ?? 0}`}
+                  tone="neutral"
+                />
+                <StatusPill
+                  label={`股票池 ${runQuery.data?.universeCount ?? 0}`}
+                  tone="neutral"
+                />
               </div>
               {runQuery.data?.status === "FAILED" ? (
-                <InlineNotice tone="danger" description={runQuery.data.errorMessage ?? runQuery.data.errorCode ?? "筛选执行失败"} />
+                <InlineNotice
+                  tone="danger"
+                  description={
+                    runQuery.data.errorMessage ??
+                    runQuery.data.errorCode ??
+                    "筛选执行失败"
+                  }
+                />
               ) : null}
               {runResultItems.length ? (
                 <div className="overflow-x-auto border border-[var(--app-border-soft)]">
                   <table className="min-w-full text-sm">
                     <thead className="bg-[var(--app-neutral-surface)] text-left text-[var(--app-text-muted)]">
-                      <tr><th className="px-3 py-2">排名</th><th className="px-3 py-2">股票代码</th></tr>
+                      <tr>
+                        <th className="px-3 py-2">排名</th>
+                        <th className="px-3 py-2">股票代码</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {runResultItems.map((item) => (
-                        <tr key={item.stockCode} className="border-t border-[var(--app-border-soft)]">
+                        <tr
+                          key={item.stockCode}
+                          className="border-t border-[var(--app-border-soft)]"
+                        >
                           <td className="px-3 py-2 font-mono">{item.rank}</td>
-                          <td className="px-3 py-2 font-mono">{item.stockCode}</td>
+                          <td className="px-3 py-2 font-mono">
+                            {item.stockCode}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : runIsTerminal && runQuery.data?.status !== "FAILED" ? (
-                <EmptyState title="没有命中股票" description="当前股票池中没有股票满足全部筛选条件。" />
+                <EmptyState
+                  title="没有命中股票"
+                  description="当前股票池中没有股票满足全部筛选条件。"
+                />
               ) : (
-                <InlineNotice tone="info" description="worker 正在获取财报并执行筛选。" />
+                <InlineNotice
+                  tone="info"
+                  description="worker 正在获取财报并执行筛选。"
+                />
               )}
               {runResultsQuery.hasNextPage ? (
                 <button
@@ -1690,7 +1771,9 @@ export function ScreeningStudioClient() {
                   disabled={runResultsQuery.isFetchingNextPage}
                   onClick={() => void runResultsQuery.fetchNextPage()}
                 >
-                  {runResultsQuery.isFetchingNextPage ? "加载中..." : "加载更多"}
+                  {runResultsQuery.isFetchingNextPage
+                    ? "加载中..."
+                    : "加载更多"}
                 </button>
               ) : null}
             </div>

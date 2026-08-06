@@ -80,6 +80,8 @@ const companyResearchWorkflowService = new CompanyResearchWorkflowService({
   client: deepSeekClient,
   companyResearchService,
   researchToolRegistry,
+  evidenceContextWriter: evidenceContextRepository,
+  evidenceAwareLlmClient: new EvidenceAwareLlmClient(deepSeekClient, evidenceContextRepository),
 });
 const executionService = new WorkflowExecutionService({
   repository: workflowRepository,
@@ -97,6 +99,7 @@ const executionService = new WorkflowExecutionService({
       agentConversationRepository,
     }),
   ],
+  agentConversationRepository,
 });
 
 const workerId =

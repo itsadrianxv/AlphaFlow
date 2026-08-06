@@ -47,8 +47,8 @@ class Handler(BaseHTTPRequestHandler):
         rule_results = {
             "macd_positive": {
                 "status": "MATCHED",
-                "awardedPoints": 15,
-                "possiblePoints": 15,
+                "awardedDelta": 15,
+                "configuredDelta": 15,
                 "observations": {"daily.macd.histogram": {"current": 1.2}},
             }
         }
@@ -59,10 +59,10 @@ class Handler(BaseHTTPRequestHandler):
             "universeCount": 2,
             "evaluatedCount": 2,
             "selectedCount": 2,
-            "rules": [{"id": "macd_positive", "name": "MACD 柱为正", "points": 15}],
+            "rules": [{"id": "macd_positive", "name": "MACD 柱为正", "scoreDelta": 15}],
             "results": [
-                {"stockCode": "600519", "stockName": "贵州茅台", "rank": 1, "selected": True, "evaluationStatus": "FULL", "score": 15, "maxScore": 15, "ruleResults": rule_results},
-                {"stockCode": "000001", "stockName": "平安银行", "rank": 2, "selected": True, "evaluationStatus": "FULL", "score": 15, "maxScore": 15, "ruleResults": rule_results},
+                {"stockCode": "600519", "stockName": "贵州茅台", "rank": 1, "selected": True, "evaluationStatus": "FULL", "score": 15, "minimumPossibleScore": 0, "maximumPossibleScore": 15, "ruleResults": rule_results},
+                {"stockCode": "000001", "stockName": "平安银行", "rank": 2, "selected": True, "evaluationStatus": "FULL", "score": 15, "minimumPossibleScore": 0, "maximumPossibleScore": 15, "ruleResults": rule_results},
             ],
             "warnings": [],
             "diagnostics": {"provider": "fixture"},

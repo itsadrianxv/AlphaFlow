@@ -48,7 +48,8 @@ CREATE TABLE "ScheduledTaskScoreResult" (
   selected BOOLEAN NOT NULL,
   "evaluationStatus" TEXT NOT NULL,
   score DOUBLE PRECISION NOT NULL,
-  "maxScore" DOUBLE PRECISION NOT NULL,
+  "minimumPossibleScore" DOUBLE PRECISION NOT NULL,
+  "maximumPossibleScore" DOUBLE PRECISION NOT NULL,
   "ruleResults" JSONB NOT NULL,
   UNIQUE ("executionId", "stockCode"),
   UNIQUE ("executionId", rank)

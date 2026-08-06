@@ -132,6 +132,7 @@ export function reflectCompanyResearch(params: {
     params.result.findings.length > 0 ? "findings" : undefined,
     params.result.verdict.summary ? "verdict" : undefined,
     params.result.verdict.bearPoints.length > 0 ? "risks" : undefined,
+    params.result.fullReportMarkdown?.trim() ? "full_report" : undefined,
   ].filter((item): item is string => Boolean(item));
   const sectionResult = sectionCoverage(
     params.taskContract.requiredSections,
@@ -159,6 +160,7 @@ export function reflectCompanyResearch(params: {
     sectionResult.missing.length > 0 ? "missing_required_sections" : undefined,
     citationCoverage < 0.6 ? "citation_coverage_low" : undefined,
     firstPartyRatio < 0.25 ? "first_party_ratio_low" : undefined,
+    !params.result.fullReportMarkdown?.trim() ? "full_report_missing" : undefined,
     unansweredQuestions.length > 0 ? "open_questions_remaining" : undefined,
   ]);
   const contractScore = Math.round(
@@ -171,6 +173,7 @@ export function reflectCompanyResearch(params: {
     ...sectionResult.missing.map((section) => `missing_section:${section}`),
     citationCoverage < 0.6 ? "citation_coverage_below_target" : undefined,
     firstPartyRatio < 0.25 ? "first_party_ratio_below_target" : undefined,
+    !params.result.fullReportMarkdown?.trim() ? "missing_full_report" : undefined,
   ]);
 
   return {

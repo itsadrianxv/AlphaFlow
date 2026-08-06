@@ -4,6 +4,7 @@ import { Copy, MessageSquare, Plus, Save, Trash2, Undo2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { FavoriteStockPicker } from "~/app/_components/favorite-stock-picker";
 import { MarkdownContent } from "~/app/_components/markdown-content";
 import { InlineNotice, WorkspaceShell } from "~/app/_components/ui";
 import { splitAgentReasoningSection } from "~/app/agent-runtime/message-display";
@@ -26,14 +27,19 @@ type AtomicCondition = {
   timeframe: Timeframe;
   metric: string;
   operator: Operator;
-  value: string | number | [number, number];
+  value: string | number | [number, number] | { metric: string };
 };
 type Condition =
   | AtomicCondition
   | { all: Condition[] }
   | { any: Condition[] }
   | { not: Condition };
-type Rule = { id: string; name: string; points: number; condition: Condition };
+type Rule = {
+  id: string;
+  name: string;
+  scoreDelta: number;
+  condition: Condition;
+};
 
 type Draft = {
   name: string;
@@ -119,6 +125,128 @@ function atomicCondition(): AtomicCondition {
   return { timeframe: "daily", metric: "close", operator: "gt", value: 0 };
 }
 
+function defaultCrossTarget(metric: string) {
+  if (metric === "kdj.k") return "kdj.d";
+  if (metric === "macd.dif") return "macd.dea";
+  return "close";
+}
+
+const jsonLogicOperator: Record<
+  Exclude<Operator, "between" | "cross_above" | "cross_below">,
+  string
+> = {
+  gt: ">",
+  gte: ">=",
+  lt: "<",
+  lte: "<=",
+  eq: "==",
+  ne: "!=",
+};
+
+function metricPath(condition: AtomicCondition, current = true) {
+  return `${condition.timeframe}.${condition.metric}${current ? ".current" : ""}`;
+}
+
+function conditionToJsonLogic(condition: Condition): unknown {
+  if ("all" in condition)
+    return { and: condition.all.map(conditionToJsonLogic) };
+  if ("any" in condition)
+    return { or: condition.any.map(conditionToJsonLogic) };
+  if ("not" in condition) return { "!": [conditionToJsonLogic(condition.not)] };
+  if (condition.operator === "between") {
+    const range = Array.isArray(condition.value) ? condition.value : [0, 0];
+    return {
+      and: [
+        { ">=": [{ var: metricPath(condition) }, range[0]] },
+        { "<=": [{ var: metricPath(condition) }, range[1]] },
+      ],
+    };
+  }
+  if (
+    condition.operator === "cross_above" ||
+    condition.operator === "cross_below"
+  ) {
+    const right =
+      typeof condition.value === "object" && !Array.isArray(condition.value)
+        ? { var: `${condition.timeframe}.${condition.value.metric}` }
+        : condition.value;
+    return {
+      [condition.operator]: [{ var: metricPath(condition, false) }, right],
+    };
+  }
+  return {
+    [jsonLogicOperator[condition.operator] ?? "=="]: [
+      { var: metricPath(condition) },
+      condition.value,
+    ],
+  };
+}
+
+function jsonLogicToCondition(value: unknown): Condition {
+  const node = asRecord(value);
+  if (Array.isArray(node.and)) {
+    const [lowerNode, upperNode] = node.and.map(asRecord);
+    const lowerArgs = Array.isArray(lowerNode?.[">="]) ? lowerNode[">="] : [];
+    const upperArgs = Array.isArray(upperNode?.["<="]) ? upperNode["<="] : [];
+    const lowerPath = String(asRecord(lowerArgs[0]).var ?? "");
+    const upperPath = String(asRecord(upperArgs[0]).var ?? "");
+    if (
+      node.and.length === 2 &&
+      lowerPath &&
+      lowerPath === upperPath &&
+      typeof lowerArgs[1] === "number" &&
+      typeof upperArgs[1] === "number"
+    ) {
+      const parts = lowerPath.split(".");
+      const timeframe = (parts.shift() ?? "daily") as Timeframe;
+      return {
+        timeframe,
+        metric: parts.join(".").replace(/\.(current|previous)$/, ""),
+        operator: "between",
+        value: [lowerArgs[1], upperArgs[1]],
+      };
+    }
+    return { all: node.and.map(jsonLogicToCondition) };
+  }
+  if (Array.isArray(node.or)) return { any: node.or.map(jsonLogicToCondition) };
+  if (Array.isArray(node["!"]) && node["!"].length === 1)
+    return { not: jsonLogicToCondition(node["!"][0]) };
+  const [operator, rawArgs] = Object.entries(node)[0] ?? [];
+  const args = Array.isArray(rawArgs) ? rawArgs : [];
+  const leftPath = String(asRecord(args[0]).var ?? "daily.close.current");
+  const parts = leftPath.split(".");
+  const timeframe = (parts.shift() ?? "daily") as Timeframe;
+  const metric = parts.join(".").replace(/\.(current|previous)$/, "");
+  const map: Record<string, Operator> = {
+    ">": "gt",
+    ">=": "gte",
+    "<": "lt",
+    "<=": "lte",
+    "==": "eq",
+    "===": "eq",
+    "!=": "ne",
+    "!==": "ne",
+    cross_above: "cross_above",
+    cross_below: "cross_below",
+  };
+  const rightVar = asRecord(args[1]).var;
+  return {
+    timeframe,
+    metric,
+    operator: map[operator ?? ""] ?? "eq",
+    value:
+      typeof rightVar === "string"
+        ? {
+            metric: rightVar
+              .split(".")
+              .slice(1)
+              .join(".")
+              .replace(/\.(current|previous)$/, ""),
+          }
+        : ((args[1] as AtomicCondition["value"]) ?? 0),
+  };
+}
+
 function ruleId() {
   return `rule_${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`;
 }
@@ -137,7 +265,9 @@ const initialDraft: Draft = {
     macd: { fast: 12, slow: 26, signal: 9 },
     kdj: { period: 9, kSmoothing: 3, dSmoothing: 3 },
   },
-  rules: [{ id: "rule_1", name: "", points: 10, condition: atomicCondition() }],
+  rules: [
+    { id: "rule_1", name: "", scoreDelta: 10, condition: atomicCondition() },
+  ],
   selection: { minScore: 0, limit: 100 },
   output: { type: "SCORING_REPORT", feishuSummaryLimit: 20, sendOnEmpty: true },
   delivery: { type: "SAVE_ONLY" },
@@ -151,10 +281,8 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function leafStatuses(value: unknown): string[] {
   const node = asRecord(value);
-  if (node.kind === "LEAF")
-    return [
-      `${String(node.timeframe)}.${String(node.metric)}: ${String(node.status)}`,
-    ];
+  if (!Array.isArray(node.children))
+    return [`${String(node.op ?? "condition")}: ${String(node.status)}`];
   return Array.isArray(node.children)
     ? node.children.flatMap(leafStatuses)
     : [];
@@ -293,6 +421,9 @@ function ConditionEditor(props: {
           const atomic = value as AtomicCondition;
           const direction = atomic.metric === "candle.direction";
           const between = atomic.operator === "between";
+          const cross =
+            atomic.operator === "cross_above" ||
+            atomic.operator === "cross_below";
           return (
             <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
               <select
@@ -342,7 +473,13 @@ function ConditionEditor(props: {
                   props.onChange({
                     ...atomic,
                     operator,
-                    value: operator === "between" ? [0, 100] : atomic.value,
+                    value:
+                      operator === "between"
+                        ? [0, 100]
+                        : operator === "cross_above" ||
+                            operator === "cross_below"
+                          ? { metric: defaultCrossTarget(atomic.metric) }
+                          : atomic.value,
                   });
                 }}
               >
@@ -367,6 +504,68 @@ function ConditionEditor(props: {
                   <option value="bearish">阴线</option>
                   <option value="doji">十字线</option>
                 </select>
+              ) : cross ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    aria-label="穿越目标类型"
+                    className={inputClass()}
+                    value={
+                      typeof atomic.value === "object" &&
+                      !Array.isArray(atomic.value)
+                        ? "metric"
+                        : "constant"
+                    }
+                    onChange={(event) =>
+                      props.onChange({
+                        ...atomic,
+                        value:
+                          event.target.value === "metric"
+                            ? { metric: defaultCrossTarget(atomic.metric) }
+                            : 0,
+                      })
+                    }
+                  >
+                    <option value="metric">另一指标</option>
+                    <option value="constant">常量</option>
+                  </select>
+                  {typeof atomic.value === "object" &&
+                  !Array.isArray(atomic.value) ? (
+                    <select
+                      aria-label="穿越目标指标"
+                      className={inputClass()}
+                      value={atomic.value.metric}
+                      onChange={(event) =>
+                        props.onChange({
+                          ...atomic,
+                          value: { metric: event.target.value },
+                        })
+                      }
+                    >
+                      {metricOptions
+                        .filter(([key]) => key !== "candle.direction")
+                        .map(([key, label]) => (
+                          <option key={key} value={key}>
+                            {label}
+                          </option>
+                        ))}
+                    </select>
+                  ) : (
+                    <input
+                      aria-label="穿越目标常量"
+                      className={inputClass()}
+                      type="number"
+                      value={
+                        typeof atomic.value === "number" ? atomic.value : 0
+                      }
+                      onChange={(event) =>
+                        props.onChange({
+                          ...atomic,
+                          value: Number(event.target.value),
+                        })
+                      }
+                    />
+                  )}
+                </div>
               ) : between ? (
                 <div className="grid grid-cols-2 gap-2">
                   <input
@@ -522,7 +721,15 @@ function draftFromConfig(payload: {
       kdj: { ...initialDraft.indicatorParams.kdj, ...asRecord(kdj?.params) },
     } as Draft["indicatorParams"],
     rules: Array.isArray(plan.rules)
-      ? (plan.rules as Rule[])
+      ? plan.rules.map((item) => {
+          const rule = asRecord(item);
+          return {
+            id: String(rule.id ?? ""),
+            name: String(rule.name ?? ""),
+            scoreDelta: Number(rule.scoreDelta ?? 0),
+            condition: jsonLogicToCondition(rule.condition),
+          } satisfies Rule;
+        })
       : initialDraft.rules,
     selection: {
       ...initialDraft.selection,
@@ -638,7 +845,13 @@ export function ScoringTaskBuilder() {
       taskId,
       expectedVersion: version,
       idempotencyKey: `builder-${crypto.randomUUID()}`,
-      value: draft,
+      value: {
+        ...draft,
+        rules: draft.rules.map((rule) => ({
+          ...rule,
+          condition: conditionToJsonLogic(rule.condition),
+        })),
+      },
     });
     if (!result.saved) {
       if (!automatic) setIssues(result.issues);
@@ -1089,6 +1302,40 @@ export function ScoringTaskBuilder() {
             </div>
             {draft.universe.type === "stocks" ? (
               <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                <FavoriteStockPicker
+                  selectedStockCodes={draft.universe.stockInputs.flatMap(
+                    (input) => input.match(/\d{6}/)?.[0] ?? [],
+                  )}
+                  maxSelection={500}
+                  className="lg:col-span-2"
+                  onToggleStock={(stock) =>
+                    change((current) => {
+                      const inputs =
+                        current.universe.type === "stocks"
+                          ? current.universe.stockInputs
+                          : [];
+                      const exists = inputs.some(
+                        (input) =>
+                          input.match(/\d{6}/)?.[0] === stock.stockCode,
+                      );
+                      return {
+                        ...current,
+                        universe: {
+                          type: "stocks",
+                          stockInputs: exists
+                            ? inputs.filter(
+                                (input) =>
+                                  input.match(/\d{6}/)?.[0] !== stock.stockCode,
+                              )
+                            : [
+                                ...inputs,
+                                `${stock.stockName} ${stock.stockCode}`,
+                              ],
+                        },
+                      };
+                    })
+                  }
+                />
                 <div className="grid content-start gap-1 text-sm text-[var(--app-text-muted)]">
                   <label htmlFor="stock-search">按名称或代码搜索</label>
                   <input
@@ -1189,7 +1436,7 @@ export function ScoringTaskBuilder() {
                         {
                           id: ruleId(),
                           name: "",
-                          points: 10,
+                          scoreDelta: 10,
                           condition: atomicCondition(),
                         },
                       ],
@@ -1232,13 +1479,14 @@ export function ScoringTaskBuilder() {
                     </label>
                     <NumberField
                       label="分值"
-                      min={0}
-                      value={rule.points}
-                      onChange={(points) =>
+                      value={rule.scoreDelta}
+                      onChange={(scoreDelta) =>
                         change((current) => ({
                           ...current,
                           rules: current.rules.map((item, ruleIndex) =>
-                            ruleIndex === index ? { ...item, points } : item,
+                            ruleIndex === index
+                              ? { ...item, scoreDelta }
+                              : item,
                           ),
                         }))
                       }
@@ -1595,13 +1843,13 @@ export function ScoringTaskBuilder() {
                                 {result.stockName}（{result.stockCode}）
                               </td>
                               <td className="py-2 pr-4">
-                                {result.score} / {result.maxScore}
+                                {result.score} / {result.maximumPossibleScore}
                               </td>
                               <td className="py-2 pr-4">
                                 {Object.entries(ruleResults)
                                   .map(([ruleId, value]) => {
                                     const detail = asRecord(value);
-                                    return `${ruleId}: ${String(detail.awardedPoints ?? 0)}`;
+                                    return `${ruleId}: ${String(detail.awardedDelta ?? 0)}`;
                                   })
                                   .join("；") || "-"}
                               </td>
@@ -1632,7 +1880,6 @@ export function ScoringTaskBuilder() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <NumberField
                 label="最低分"
-                min={0}
                 value={draft.selection.minScore}
                 onChange={(minScore) =>
                   change((current) => ({

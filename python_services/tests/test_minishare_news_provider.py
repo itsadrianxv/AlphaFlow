@@ -44,6 +44,17 @@ def _provider(client: Mock | None = None, api_key: str = "deepseek-token"):
     )
 
 
+def test_deepseek_timeout_honors_configured_value() -> None:
+    provider = MinishareNewsProvider(
+        token="minishare-token",
+        deepseek_api_key="deepseek-token",
+        deepseek_timeout_ms=60_000,
+        client=Mock(),
+    )
+
+    assert provider.deepseek_timeout_ms == 60_000
+
+
 def test_requires_minishare_token() -> None:
     provider = MinishareNewsProvider(token="", deepseek_api_key="deepseek-token")
     with pytest.raises(GatewayError, match="MINISHARE_TOKEN"):
@@ -199,7 +210,9 @@ def test_trace_radar_requires_core_subject_relation_and_score() -> None:
         }
 
     with (
-        patch.object(provider, "_attribute", side_effect=fake_attribute),
+        patch.object(
+            provider, "_attribute", side_effect=fake_attribute
+        ) as attribute,
         patch.object(provider, "_rerank", side_effect=fake_rerank),
     ):
         result = provider.resolve_radar(
@@ -218,8 +231,34 @@ def test_trace_radar_requires_core_subject_relation_and_score() -> None:
             },
         )
 
+    attribute.assert_not_called()
     assert [item["title"] for item in result.items] == ["香港楼市成交持续升温"]
     assert result.items[0]["eventRelation"] == "prior_signal"
+
+
+def test_trace_radar_does_not_fetch_cctv_daily_source() -> None:
+    client = Mock()
+    client.fetch_fast_news.return_value = []
+    client.fetch_major_news.return_value = []
+    client.fetch_cctv_news.return_value = []
+    provider = _provider(client=client, api_key="")
+
+    provider.get_radar(
+        companies=(),
+        industries=(),
+        days=1,
+        limit=10,
+        include_macro=False,
+        trace_anchor={
+            "title": "内地买家涌入香港楼市",
+            "summary": "",
+            "eventType": "房地产",
+            "relatedStocks": [],
+            "scopeTags": ["industry"],
+        },
+    )
+
+    client.fetch_cctv_news.assert_not_called()
 
 
 def test_trace_radar_returns_empty_when_model_cannot_confirm_relation() -> None:

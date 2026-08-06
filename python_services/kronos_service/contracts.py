@@ -108,6 +108,9 @@ class KronosHealthResponse(BaseModel):
     device: str
     maxContext: int
     defaultPredictionLength: int
+    temperature: float
+    topP: float
+    sampleCount: int
 
 
 class KronosErrorBody(BaseModel):

@@ -4,6 +4,7 @@ import {
   buildResearchOnlySystemInstruction,
   detectResearchOnlyViolation,
   enforceResearchOnlyFinalText,
+  toResearchCandidateSeedPayload,
 } from "../src/research-only-policy";
 import { assertPublicHttpUrl } from "../src/tool-policy";
 
@@ -68,6 +69,41 @@ describe("research_only 策略", () => {
     });
     expect(seeds[0]?.seedKey).toMatch(/^candidate-seed:/);
     expect(seeds[0]?.idempotencyKey).toMatch(/^candidate-seed:/);
+  });
+
+  it("把内部 seed 适配为 Web 候选种子严格契约", () => {
+    const seed = buildImmediateResearchCandidateSeeds({
+      runId: "run_1",
+      prompt: "研究公司公告影响",
+      toolSummaries: [
+        {
+          toolName: "internal_web_fetch",
+          inputSummary: { url: "https://example.com/a" },
+          outputSummary: { text: "公告内容" },
+        },
+      ],
+    })[0];
+
+    expect(seed).toBeDefined();
+    const payload = toResearchCandidateSeedPayload(seed as Record<string, unknown>);
+    expect(Object.keys(payload).sort()).toEqual([
+      "contractVersion",
+      "idempotencyKey",
+      "outputMode",
+      "question",
+      "runId",
+      "scope",
+      "sourceReferences",
+      "subject",
+      "triggerSource",
+    ]);
+    expect(payload.sourceReferences).toEqual([
+      {
+        sourceType: "PUBLIC_WEB",
+        sourceKey: expect.any(String),
+        summary: expect.any(String),
+      },
+    ]);
   });
 
   it("公开网页读取拒绝非 HTTP、凭据、本机和内网地址", () => {

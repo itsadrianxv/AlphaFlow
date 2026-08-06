@@ -36,8 +36,23 @@ function baseResult(withAnalysis: boolean) {
         ...(withAnalysis
           ? {
               analysis: {
-                timeline: [],
+                timeline: [
+                  {
+                    id: "timeline-1",
+                    occurredAt: "2026-07-25T07:00:00.000Z",
+                    title: "测试新闻",
+                    summary: "测试摘要",
+                    eventId: "event-1",
+                    evidenceItemIds: [],
+                    kind: "observed",
+                  },
+                ],
                 scenarios: [],
+                traceState: {
+                  tracedDays: 30,
+                  eventCount: 1,
+                  canContinue: true,
+                },
                 warnings: [],
               },
             }
@@ -186,9 +201,9 @@ describe("ensureImpactMappingAnalyses", () => {
       input: { mode: "overview" },
       result: baseResult(true),
     }));
-    const result = await callerWithFindFirst(findFirst).ensureImpactMappingAnalyses(
-      { baseRunId, eventIds: ["event-1"] },
-    );
+    const result = await callerWithFindFirst(
+      findFirst,
+    ).ensureImpactMappingAnalyses({ baseRunId, eventIds: ["event-1"] });
 
     expect(result[0]).toMatchObject({
       eventId: "event-1",
@@ -233,9 +248,9 @@ describe("ensureImpactMappingAnalyses", () => {
         status: WorkflowRunStatus.SUCCEEDED,
         result: traceResult,
       });
-    const result = await callerWithFindFirst(findFirst).ensureImpactMappingAnalyses(
-      { baseRunId, eventIds: ["event-1"] },
-    );
+    const result = await callerWithFindFirst(
+      findFirst,
+    ).ensureImpactMappingAnalyses({ baseRunId, eventIds: ["event-1"] });
 
     expect(result[0]).toMatchObject({
       eventId: "event-1",
@@ -357,5 +372,81 @@ describe("ensureImpactMappingAnalyses", () => {
       attempt: 1,
     });
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe("getLatestImpactMapping", () => {
+  it("首页历史回溯快照优先于旧的 current-only overview run", async () => {
+    const currentOnlyRun = {
+      id: "run-current-only",
+      status: WorkflowRunStatus.SUCCEEDED,
+      progressPercent: 100,
+      input: { mode: "overview" },
+      result: baseResult(false),
+      createdAt: new Date("2026-08-04T09:00:00.000Z"),
+      completedAt: new Date("2026-08-04T09:00:00.000Z"),
+    };
+    const historyResult = {
+      ...baseResult(false),
+      events: baseResult(false).events.map((item) => ({
+        ...item,
+        analysis: {
+          timeline: [
+            {
+              id: "timeline-current",
+              occurredAt: item.event.publishedAt,
+              title: item.event.title,
+              summary: item.event.summary,
+              eventId: item.event.id,
+              evidenceItemIds: [],
+              kind: "observed" as const,
+            },
+          ],
+          scenarios: [],
+          historyReady: true,
+          historyVersion: "homepage-news-radar.v1",
+          warnings: [],
+        },
+      })),
+      historyVersion: "homepage-news-radar.v1",
+    };
+    const caller = createCaller({
+      db: {
+        user: {
+          findUnique: vi.fn(async () => ({
+            id: "user-1",
+            sessionVersion: 0,
+            status: "ACTIVE",
+          })),
+        },
+        workflowRun: {
+          findMany: vi.fn(async () => [currentOnlyRun]),
+        },
+        homepageCurrentSnapshotProjection: {
+          findFirst: vi.fn(async () => ({ snapshotId: "snapshot-history" })),
+        },
+        homepageSnapshot: {
+          findFirst: vi.fn(async () => ({
+            id: "snapshot-history",
+            generatedAt: new Date("2026-08-04T10:00:00.000Z"),
+            payloadJson: { newsRadar: historyResult },
+            manifest: null,
+          })),
+        },
+      },
+      session: {
+        user: { id: "user-1", sessionVersion: 0 },
+        expires: "2099-01-01T00:00:00.000Z",
+      },
+      headers: new Headers(),
+    } as never);
+
+    const result = await caller.getLatestImpactMapping();
+
+    expect(result).toMatchObject({
+      id: "snapshot-history",
+      baseSnapshotId: "snapshot-history",
+      result: { historyVersion: "homepage-news-radar.v1" },
+    });
   });
 });

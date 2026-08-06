@@ -116,6 +116,19 @@ def test_intelligence_gateway_uses_minishare_news_provider():
     assert payload["meta"]["warnings"] == []
 
 
+def test_intelligence_gateway_accepts_theme_with_slash():
+    with patch(
+        "app.gateway.intelligence_gateway.MinishareNewsProvider.get_news_result",
+        return_value=__import__(
+            "app.providers.minishare.news", fromlist=["NewsRetrievalResult"]
+        ).NewsRetrievalResult(items=[]),
+    ):
+        response = client.get("/api/v1/intelligence/themes/GPU%2FASIC/news")
+
+    assert response.status_code == 200
+    assert response.json()["data"]["theme"] == "GPU/ASIC"
+
+
 def test_v1_news_radar_returns_standardized_items():
     result_type = __import__(
         "app.providers.minishare.news", fromlist=["NewsRetrievalResult"]

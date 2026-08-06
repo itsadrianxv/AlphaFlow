@@ -26,6 +26,33 @@ describe("DeepSeek 结构化输出契约", () => {
     expect(request.response_format).toBeUndefined();
   });
 
+  it("message.content 为空时使用 reasoning_content 作为正文", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: "",
+                reasoning_content: "推理字段中的可展示正文",
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new DeepSeekClient({
+      apiKey: "test-key",
+      baseUrl: "https://deepseek.invalid",
+    });
+
+    await expect(
+      client.complete([{ role: "user", content: "返回正文" }], "fallback"),
+    ).resolves.toBe("推理字段中的可展示正文");
+  });
+
   it("从带尾注的响应提取完整 JSON 对象并请求 JSON mode", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

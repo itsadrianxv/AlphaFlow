@@ -73,9 +73,9 @@ class DefinitiveScoringService:
             rows.append(score_stock(stock_code=record["stockCode"], stock_name=record["stockName"], frames=frames, plan=request.executionPlan))
 
         rank_and_select(rows, request.executionPlan)
-        rules = [{"id": rule.id, "name": rule.name, "points": rule.points, "condition": rule.condition.model_dump(by_alias=True)} for rule in request.executionPlan.rules]
+        rules = [{"id": rule.id, "name": rule.name, "scoreDelta": rule.scoreDelta, "condition": rule.condition} for rule in request.executionPlan.rules]
         return {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "executionId": request.executionId,
             "status": "SUCCEEDED",
             "asOfDate": cutoff.date().isoformat(),

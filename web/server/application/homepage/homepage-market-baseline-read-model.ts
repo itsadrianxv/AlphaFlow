@@ -173,6 +173,7 @@ export async function readHomepageMarketBaseline(
             "homepage-baseline-manifest.v1",
             "homepage-baseline-manifest.v2",
             "homepage-baseline-manifest.v3",
+            "homepage-baseline-manifest.v4",
           ],
         },
       },

@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import type { EvidenceAwareLlmClient } from "~/server/application/evidence-context/evidence-aware-llm-client";
+import { readHomepageNewsRadar } from "~/server/application/homepage/homepage-news-radar";
 import type { SharedNewsLibraryService } from "~/server/application/intelligence/shared-news-library-service";
 import type { EvidenceCitation } from "~/server/domain/evidence-context/types";
 import {
@@ -16,7 +17,6 @@ import {
   impactScenarioSchema,
 } from "~/server/domain/intelligence/impact-mapping";
 import type { ThemeNewsItem } from "~/server/domain/intelligence/types";
-import { readHomepageNewsRadar } from "~/server/application/homepage/homepage-news-radar";
 import type { PythonCapabilityGatewayClient } from "~/server/infrastructure/capabilities/python-capability-gateway-client";
 import type { PrismaEvidenceContextRepository } from "~/server/infrastructure/evidence-context/prisma-evidence-context-repository";
 import type { PythonIntelligenceDataClient } from "~/server/infrastructure/intelligence/python-intelligence-data-client";
@@ -538,16 +538,20 @@ export class ImpactMappingService {
         index += 1
       ) {
         try {
-          const batch = await this.deps.dataClient.getNewsRadar({
-            days: TRACE_WINDOW_DAYS,
-            limit: Math.min(30, maxHistoricalEvents - (news.length - 1)),
-            endAt: cursor.toISOString(),
-            companies: context.companies,
-            industries: context.industries,
-            includeMacro: false,
-            traceAnchor: traceAnchor(selectedEvent),
-          });
-          for (const item of batch) {
+          const traced = await this.collectNewsRadar(
+            {
+              days: TRACE_WINDOW_DAYS,
+              limit: Math.min(30, maxHistoricalEvents - (news.length - 1)),
+              endAt: cursor.toISOString(),
+              companies: context.companies,
+              industries: context.industries,
+              includeMacro: false,
+              traceAnchor: traceAnchor(selectedEvent),
+            },
+            "trace_window",
+          );
+          warnings.push(...traced.warnings);
+          for (const item of traced.news) {
             if (
               news.length - 1 >= maxHistoricalEvents ||
               seen.has(item.id) ||
@@ -1025,11 +1029,7 @@ export class ImpactMappingService {
       value = run?.result;
     } else if (source.snapshotId) {
       value = (
-        await readHomepageNewsRadar(
-          this.deps.prisma,
-          source.snapshotId,
-          userId,
-        )
+        await readHomepageNewsRadar(this.deps.prisma, source.snapshotId, userId)
       )?.result;
     }
     const result = asObject(value) as Partial<ImpactMappingResult>;

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 import time
 
@@ -53,6 +54,7 @@ MARKET_INDEX_CODES = [
     ("399006.SZ", "创业板指", "159915"),
     ("000688.SH", "科创50", "588000"),
 ]
+TIMING_BATCH_MAX_WORKERS = 4
 
 
 class TimingGateway:
@@ -170,30 +172,42 @@ class TimingGateway:
             as_of_date=as_of_date,
             lookback_days=lookback_days,
         )
-        for stock_code in stock_codes:
-            try:
-                result = self._get_signal_result(
-                    stock_code=stock_code,
-                    as_of_date=as_of_date,
-                    lookback_days=lookback_days,
-                    include_bars=include_bars,
-                    force_refresh=force_refresh,
-                    stock=stock_snapshots.get(stock_code),
-                    benchmark_histories=benchmark_histories,
-                )
-                items.append(result.data)
-                cache_hits.append(result.cache_hit)
-                stale_hits.append(result.is_stale)
-                as_of_values.append(result.as_of)
-                warnings.extend(result.warnings)
-            except Exception as exc:  # noqa: BLE001
-                errors.append(
-                    BatchItemError(
-                        stockCode=stock_code,
-                        code=str(getattr(exc, "code", "signal_fetch_failed")),
-                        message=str(exc),
+        with ThreadPoolExecutor(
+            max_workers=min(TIMING_BATCH_MAX_WORKERS, max(len(stock_codes), 1)),
+            thread_name_prefix="timing-signal",
+        ) as executor:
+            futures = [
+                (
+                    stock_code,
+                    executor.submit(
+                        self._get_signal_result,
+                        stock_code=stock_code,
+                        as_of_date=as_of_date,
+                        lookback_days=lookback_days,
+                        include_bars=include_bars,
+                        force_refresh=force_refresh,
+                        stock=stock_snapshots.get(stock_code),
+                        benchmark_histories=benchmark_histories,
                     ),
                 )
+                for stock_code in stock_codes
+            ]
+            for stock_code, future in futures:
+                try:
+                    result = future.result()
+                    items.append(result.data)
+                    cache_hits.append(result.cache_hit)
+                    stale_hits.append(result.is_stale)
+                    as_of_values.append(result.as_of)
+                    warnings.extend(result.warnings)
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(
+                        BatchItemError(
+                            stockCode=stock_code,
+                            code=str(getattr(exc, "code", "signal_fetch_failed")),
+                            message=str(exc),
+                        ),
+                    )
 
         if errors:
             warnings.append(
@@ -238,22 +252,34 @@ class TimingGateway:
             lookback_days=lookback_days,
         )
 
-        for stock_code in stock_codes:
-            try:
-                items.append(self._build_evidence_data(
-                    stock_code=stock_code,
-                    as_of_date=resolved_request_date,
-                    timeframes=timeframes,
-                    indicator_ids=indicator_ids,
-                    lookback_days=lookback_days,
-                    benchmark_history=benchmark_histories.get("510300"),
-                ))
-            except Exception as exc:  # noqa: BLE001
-                errors.append(BatchItemError(
-                    stockCode=stock_code,
-                    code=str(getattr(exc, "code", "evidence_fetch_failed")),
-                    message=str(exc),
-                ))
+        with ThreadPoolExecutor(
+            max_workers=min(TIMING_BATCH_MAX_WORKERS, max(len(stock_codes), 1)),
+            thread_name_prefix="timing-evidence",
+        ) as executor:
+            futures = [
+                (
+                    stock_code,
+                    executor.submit(
+                        self._build_evidence_data,
+                        stock_code=stock_code,
+                        as_of_date=resolved_request_date,
+                        timeframes=timeframes,
+                        indicator_ids=indicator_ids,
+                        lookback_days=lookback_days,
+                        benchmark_history=benchmark_histories.get("510300"),
+                    ),
+                )
+                for stock_code in stock_codes
+            ]
+            for stock_code, future in futures:
+                try:
+                    items.append(future.result())
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(BatchItemError(
+                        stockCode=stock_code,
+                        code=str(getattr(exc, "code", "evidence_fetch_failed")),
+                        message=str(exc),
+                    ))
 
         if errors:
             warnings.append(GatewayWarning(

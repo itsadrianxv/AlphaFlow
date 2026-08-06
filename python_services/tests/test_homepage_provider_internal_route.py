@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import time
+from types import SimpleNamespace
+
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.routers import homepage_provider_v1
 from app.routers.homepage_provider_v1 import _adapter_for
 
 
@@ -47,3 +52,39 @@ def test_homepage_provider_internal_route_enforces_contract_and_returns_envelope
     assert body["contractVersion"] == "1.0"
     assert body["resultStatus"] == "error"
     assert body["errors"][0]["errorClass"] == "unsupported_dataset"
+
+
+def test_homepage_provider_fetch_does_not_block_event_loop(monkeypatch) -> None:
+    class SlowAdapter:
+        def fetch(self, _request):
+            time.sleep(0.15)
+            return SimpleNamespace(to_dict=lambda: {"resultStatus": "success"})
+
+    monkeypatch.setattr(
+        homepage_provider_v1,
+        "_adapter_for",
+        lambda _provider_key: SlowAdapter(),
+    )
+
+    payload = {
+        "contractVersion": "1.0",
+        "providerKey": "minishare",
+        "attemptId": "attempt-slow",
+        "request": {
+            "datasetKey": "news.radar_history",
+            "requestedScope": {},
+            "targetDataCutoff": None,
+        },
+    }
+
+    async def run_scenario() -> float:
+        started_at = time.perf_counter()
+        request_task = asyncio.create_task(
+            homepage_provider_v1.fetch_homepage_provider_item(payload),
+        )
+        await asyncio.sleep(0.02)
+        event_loop_delay = time.perf_counter() - started_at
+        await request_task
+        return event_loop_delay
+
+    assert asyncio.run(run_scenario()) < 0.08

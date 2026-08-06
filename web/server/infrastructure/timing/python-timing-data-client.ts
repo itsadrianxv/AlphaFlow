@@ -11,6 +11,7 @@ import {
   WORKFLOW_ERROR_CODES,
   WorkflowDomainError,
 } from "~/server/domain/workflow/errors";
+import { toTimingStockCode } from "~/server/infrastructure/timing/stock-code";
 
 type GatewayResponse<T> = {
   data: T;
@@ -84,6 +85,7 @@ export class PythonTimingDataClient {
     timeframe?: TimingTimeframe;
     adjust?: string;
   }) {
+    const stockCode = toTimingStockCode(params.stockCode);
     const search = new URLSearchParams();
     if (params.start) {
       search.set("start", params.start);
@@ -95,7 +97,7 @@ export class PythonTimingDataClient {
     search.set("adjust", params.adjust ?? "qfq");
 
     return this.request<TimingBarsData>(
-      this.timingPath(`/stocks/${params.stockCode}/bars?${search.toString()}`),
+      this.timingPath(`/stocks/${stockCode}/bars?${search.toString()}`),
     );
   }
 

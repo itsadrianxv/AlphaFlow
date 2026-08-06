@@ -416,7 +416,12 @@ describe("Impact Mapping", () => {
       title: `历史事件 ${index}`,
       publishedAt: `2026-0${Math.max(1, 6 - index)}-01T10:00:00+08:00`,
     }));
-    const getNewsRadar = vi.fn(async (_request: unknown) => historical);
+    const collectRadar = vi.fn(async (request: { traceAnchor?: unknown }) =>
+      request.traceAnchor
+        ? { news: historical, warnings: [] }
+        : { news: [event], warnings: [] },
+    );
+    const getNewsRadar = vi.fn();
     const service = new ImpactMappingService({
       prisma: {
         workflowRun: {
@@ -435,6 +440,7 @@ describe("Impact Mapping", () => {
         },
       },
       dataClient: { getNewsRadar },
+      sharedNewsLibraryService: { collectRadar },
       capabilityClient: { search: vi.fn(async () => []) },
     } as never);
 
@@ -450,8 +456,9 @@ describe("Impact Mapping", () => {
       }),
     });
 
-    expect(getNewsRadar).toHaveBeenCalledTimes(1);
-    expect(getNewsRadar.mock.calls[0]?.[0]).toMatchObject({
+    expect(collectRadar).toHaveBeenCalledTimes(1);
+    expect(getNewsRadar).not.toHaveBeenCalled();
+    expect(collectRadar.mock.calls[0]?.[0]).toMatchObject({
       days: 30,
       endAt: "2026-07-24T02:00:00.000Z",
       includeMacro: false,

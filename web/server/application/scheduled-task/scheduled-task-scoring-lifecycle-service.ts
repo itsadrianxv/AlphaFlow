@@ -61,7 +61,8 @@ export function summarizePreviewGate(params: {
   results: Array<{
     evaluationStatus: string;
     score: number;
-    maxScore: number;
+    minimumPossibleScore: number;
+    maximumPossibleScore: number;
   }>;
   warnings: unknown[];
 }) {

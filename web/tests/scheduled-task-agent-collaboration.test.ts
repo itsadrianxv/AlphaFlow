@@ -16,8 +16,8 @@ const draft = {
     {
       id: "quality",
       name: "质量",
-      points: 10,
-      condition: { timeframe: "daily", metric: "close", operator: "gt", value: 10 },
+      scoreDelta: 10,
+      condition: { ">": [{ var: "daily.close.current" }, 10] },
     },
   ],
   selection: { minScore: 10, limit: 100 },
@@ -26,7 +26,7 @@ const draft = {
 };
 
 const changeSet = {
-  schemaVersion: "scoring-task-agent-changes.v1",
+  schemaVersion: "scoring-task-agent-changes.v2",
   generatedAtVersion: 3,
   ambiguity: { status: "CLEAR" },
   operations: [
@@ -35,8 +35,8 @@ const changeSet = {
       rule: {
         id: "momentum",
         name: "动量",
-        points: 5,
-        condition: { timeframe: "daily", metric: "macd.histogram", operator: "gt", value: 0 },
+        scoreDelta: 5,
+        condition: { ">": [{ var: "daily.macd.histogram.current" }, 0] },
       },
     },
     { type: "REMOVE_RULE", ruleId: "quality" },
@@ -56,7 +56,7 @@ describe("评分规则构建器 Agent 变更集", () => {
     expect(result).toMatchObject({
       status: "APPLIED",
       draft: {
-        rules: [{ id: "momentum", name: "动量", points: 5 }],
+        rules: [{ id: "momentum", name: "动量", scoreDelta: 5 }],
         selection: { minScore: 5, limit: 50 },
       },
       markers: [
@@ -207,7 +207,7 @@ describe("评分规则构建器 Agent 变更集", () => {
       ),
       "utf8",
     );
-    expect(source).toContain("scoring-task-agent-changes.v1");
+    expect(source).toContain("scoring-task-agent-changes.v2");
     expect(source).toContain("不得询问、读取、输出或修改 Webhook");
     expect(source).not.toContain("SET_DELIVERY");
   });

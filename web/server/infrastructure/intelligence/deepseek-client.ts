@@ -37,6 +37,7 @@ type DeepSeekResponse = {
   choices?: Array<{
     message?: {
       content?: string;
+      reasoning_content?: string;
     };
   }>;
   error?: {
@@ -316,7 +317,9 @@ export class DeepSeekClient {
         }
 
         const data = (await response.json()) as DeepSeekResponse;
-        const content = data.choices?.[0]?.message?.content?.trim();
+        const message = data.choices?.[0]?.message;
+        const content =
+          message?.content?.trim() || message?.reasoning_content?.trim();
 
         if (!content) {
           throw new WorkflowDomainError(

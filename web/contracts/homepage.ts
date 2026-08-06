@@ -162,6 +162,7 @@ const legacyHomePagePayloadSchema = z.object({
   heatmap: marketHeatmapSnapshotSchema,
   overviewInsights: z.unknown(),
   moneyFlow: z.unknown(),
+  newsRadar: z.unknown().nullable().optional(),
   impactMapping: z.unknown().nullable(),
 });
 

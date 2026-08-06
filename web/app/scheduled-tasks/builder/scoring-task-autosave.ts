@@ -21,7 +21,7 @@ export type ScoringDraftAutosaveInput = {
   name: unknown;
   rules: ReadonlyArray<{
     name: unknown;
-    points?: unknown;
+    scoreDelta?: unknown;
     condition?: unknown;
   }>;
   universe: AutosaveUniverse;
@@ -69,8 +69,7 @@ export function isScoringDraftReadyForAutosave(
       (rule) =>
         typeof rule.name !== "string" ||
         !rule.name.trim() ||
-        (rule.points !== undefined &&
-          (!isFiniteNumber(rule.points) || rule.points < 0)),
+        (rule.scoreDelta !== undefined && !isFiniteNumber(rule.scoreDelta)),
     )
   )
     return false;
@@ -123,7 +122,6 @@ export function isScoringDraftReadyForAutosave(
   if (
     draft.selection &&
     (!isFiniteNumber(draft.selection.minScore) ||
-      draft.selection.minScore < 0 ||
       !isIntegerInRange(draft.selection.limit, 1, 5000))
   )
     return false;

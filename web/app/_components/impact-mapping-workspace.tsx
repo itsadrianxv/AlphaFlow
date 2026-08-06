@@ -204,7 +204,9 @@ export function eventAnalysisStateFromEnsureRecord(record: {
 }
 
 function embeddedAnalysis(item: ImpactRadarEvent): EventAnalysis | null {
-  if (!item.analysis) return null;
+  if (!item.analysis || item.analysis.timeline.length === 0) {
+    return null;
+  }
   return {
     impactEdges: item.impactEdges,
     timeline: item.analysis.timeline,
@@ -896,7 +898,8 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
     const missing = pageEvents
       .filter(
         (item) =>
-          !item.analysis && analysisStates[item.event.id]?.status !== "ready",
+          (!item.analysis || item.analysis.timeline.length === 0) &&
+          analysisStates[item.event.id]?.status !== "ready",
       )
       .map((item) => item.event.id);
     void requestAnalyses(missing);
@@ -960,7 +963,10 @@ export function ImpactMappingWorkspace({ signedIn }: { signedIn: boolean }) {
             analysisState={analysisStates[item.event.id]}
             onSelect={() => {
               setSelectedEventId(item.event.id);
-              if (!item.analysis && !analysisStates[item.event.id]) {
+              if (
+                (!item.analysis || item.analysis.timeline.length === 0) &&
+                !analysisStates[item.event.id]
+              ) {
                 void requestAnalyses([item.event.id]);
               }
             }}

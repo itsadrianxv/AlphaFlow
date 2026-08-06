@@ -3,9 +3,11 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 import pytest
+import pandas as pd
 from fastapi.testclient import TestClient
 
 from kronos_service.app import create_app
+from kronos_service.contracts import KronosBar
 from kronos_service.service import (
     KronosForecastError,
     format_forecast_trade_date,
@@ -35,6 +37,9 @@ class FakeForecaster:
     model_version = "fake-local"
     max_context = 512
     default_prediction_length = 60
+    temperature = 0.8
+    top_p = 0.9
+    sample_count = 3
     device = "cpu"
     is_loaded = True
 
@@ -51,6 +56,9 @@ class FakeForecaster:
             "device": self.device,
             "maxContext": self.max_context,
             "defaultPredictionLength": self.default_prediction_length,
+            "temperature": self.temperature,
+            "topP": self.top_p,
+            "sampleCount": self.sample_count,
         }
 
     def forecast(self, *, stock_code, timeframe="DAILY", bars, prediction_length):
@@ -118,6 +126,79 @@ def test_health_exposes_model_device_and_defaults(client_and_forecaster):
     assert payload["device"] == "cpu"
     assert payload["maxContext"] == 512
     assert payload["defaultPredictionLength"] == 60
+    assert payload["temperature"] == 0.8
+    assert payload["topP"] == 0.9
+    assert payload["sampleCount"] == 3
+
+
+def test_forecaster_uses_configured_sampling_parameters():
+    class CapturePredictor:
+        def __init__(self):
+            self.predict_kwargs = None
+            self.batch_kwargs = None
+
+        def predict(self, **kwargs):
+            self.predict_kwargs = kwargs
+            return pd.DataFrame(
+                [
+                    {
+                        "open": 10.0,
+                        "high": 10.5,
+                        "low": 9.5,
+                        "close": 10.2,
+                        "volume": 100.0,
+                        "amount": 1000.0,
+                    }
+                ]
+            )
+
+        def predict_batch(self, **kwargs):
+            self.batch_kwargs = kwargs
+            return [
+                pd.DataFrame(
+                    [
+                        {
+                            "open": 10.0,
+                            "high": 10.5,
+                            "low": 9.5,
+                            "close": 10.2,
+                            "volume": 100.0,
+                            "amount": 1000.0,
+                        }
+                    ]
+                )
+            ]
+
+    from kronos_service.service import KronosModelForecaster, KronosSettings
+
+    predictor = CapturePredictor()
+    forecaster = KronosModelForecaster(
+        KronosSettings(
+            device="cpu",
+            temperature=0.8,
+            top_p=0.9,
+            sample_count=3,
+        )
+    )
+    forecaster._predictor = predictor
+    bars = [KronosBar(**bar) for bar in build_bars(120)]
+
+    forecaster.forecast(
+        stock_code="600519",
+        bars=bars,
+        prediction_length=1,
+    )
+    forecaster.forecast_batch(
+        items=[("600519", "DAILY", bars)],
+        prediction_length=1,
+    )
+
+    assert predictor.predict_kwargs["T"] == 0.8
+    assert predictor.predict_kwargs["top_p"] == 0.9
+    assert predictor.predict_kwargs["sample_count"] == 3
+    assert predictor.batch_kwargs["T"] == 0.8
+    assert predictor.batch_kwargs["top_p"] == 0.9
+    assert predictor.batch_kwargs["sample_count"] == 3
 
 
 def test_forecast_rejects_short_history(client_and_forecaster):

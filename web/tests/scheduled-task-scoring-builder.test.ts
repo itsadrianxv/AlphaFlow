@@ -24,13 +24,8 @@ const baseDraft = {
     {
       id: "macd_positive",
       name: "日线 MACD 为正",
-      points: 15,
-      condition: {
-        timeframe: "daily" as const,
-        metric: "macd.histogram",
-        operator: "gt" as const,
-        value: 0,
-      },
+      scoreDelta: 15,
+      condition: { ">": [{ var: "daily.macd.histogram.current" }, 0] },
     },
   ],
   selection: { minScore: 10, limit: 100 },
@@ -62,12 +57,7 @@ describe("确定性评分草稿 Controller", () => {
       rules: [
         {
           ...baseDraft.rules[0],
-          condition: {
-            timeframe: "daily",
-            metric: "candle.direction",
-            operator: "gt",
-            value: 1,
-          },
+          condition: { "*": [{ var: "daily.candle.direction.current" }, 1] },
         },
       ],
     });
@@ -75,20 +65,30 @@ describe("确定性评分草稿 Controller", () => {
     expect(result.valid).toBe(false);
     expect(result.valid ? [] : result.issues).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ path: "rules.0.condition.operator" }),
-        expect.objectContaining({ path: "rules.0.condition.value" }),
+        expect.objectContaining({ path: "rules.0.condition" }),
       ]),
+    );
+  });
+
+  it("拒绝未登记的 JSONLogic 快照路径", () => {
+    const result = new ScheduledTaskDraftController().validate({
+      ...baseDraft,
+      rules: [{
+        ...baseDraft.rules[0],
+        condition: { ">": [{ var: "daily.unknown.signal.current" }, 0] },
+      }],
+    });
+    expect(result.valid).toBe(false);
+    expect(result.valid ? [] : result.issues).toContainEqual(
+      expect.objectContaining({ path: "rules.0.condition.>.0.var" }),
     );
   });
 
   it("限制条件树深度和节点数量并定位到规则", () => {
     let condition: unknown = {
-      timeframe: "daily",
-      metric: "close",
-      operator: "gt",
-      value: 1,
+      ">": [{ var: "daily.close.current" }, 1],
     };
-    for (let index = 0; index < 9; index += 1) condition = { not: condition };
+    for (let index = 0; index < 9; index += 1) condition = { "!": [condition] };
 
     const result = new ScheduledTaskDraftController().validate({
       ...baseDraft,
@@ -117,8 +117,8 @@ describe("确定性评分草稿 Controller", () => {
 
     expect(result.valid).toBe(false);
     expect(result.issues).toContainEqual({
-      path: "indicators",
-      message: "MACD 缺少 daily 周期声明",
+      path: "rules.0.condition",
+      message: "未知指标字段: daily.macd.histogram.current",
     });
   });
 });

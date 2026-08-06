@@ -35,7 +35,7 @@ DefinitiveTaskClaimResult DefinitiveTaskRepository::claim(const task_lifecycle::
               (execution."leaseExpiresAt" IS NULL OR execution."leaseExpiresAt" <= NOW()))
         )
         RETURNING jsonb_build_object(
-          'schemaVersion', 1,
+          'schemaVersion', 2,
           'executionId', execution.id,
           'taskVersionId', execution."taskVersionId",
           'scheduledAt', to_char(execution."scheduledAt", 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
@@ -106,16 +106,19 @@ void DefinitiveTaskRepository::settle(const DefinitiveTask& task, DefinitiveTask
   transaction.exec(R"SQL(CREATE TEMP TABLE definitive_result_stage (
     stock_code TEXT NOT NULL, stock_name TEXT NOT NULL, rank INTEGER NOT NULL,
     selected BOOLEAN NOT NULL, evaluation_status TEXT NOT NULL,
-    score DOUBLE PRECISION NOT NULL, max_score DOUBLE PRECISION NOT NULL,
+    score DOUBLE PRECISION NOT NULL, minimum_possible_score DOUBLE PRECISION NOT NULL,
+    maximum_possible_score DOUBLE PRECISION NOT NULL,
     rule_results JSONB NOT NULL
   ) ON COMMIT DROP)SQL");
   {
     const std::vector<std::string> columns{
-        "stock_code", "stock_name", "rank", "selected", "evaluation_status", "score", "max_score", "rule_results"};
+        "stock_code", "stock_name", "rank", "selected", "evaluation_status", "score",
+        "minimum_possible_score", "maximum_possible_score", "rule_results"};
     pqxx::stream_to stream(transaction, "definitive_result_stage", columns);
     for (const auto& row : result.results)
       stream << std::make_tuple(row.stock_code, row.stock_name, row.rank, row.selected,
-                                row.evaluation_status, row.score, row.max_score, row.rule_results.dump());
+                                row.evaluation_status, row.score, row.minimum_possible_score,
+                                row.maximum_possible_score, row.rule_results.dump());
     stream.complete();
   }
   const auto validation = transaction.exec(
@@ -131,13 +134,14 @@ void DefinitiveTaskRepository::settle(const DefinitiveTask& task, DefinitiveTask
   transaction.exec_params(R"SQL(DELETE FROM "ScheduledTaskScoreResult" WHERE "executionId"=$1)SQL", task.message.run_id);
   transaction.exec_params(
       R"SQL(INSERT INTO "ScheduledTaskScoreResult"
-             (id, "executionId", "stockCode", "stockName", rank, selected, "evaluationStatus", score, "maxScore", "ruleResults")
+             (id, "executionId", "stockCode", "stockName", rank, selected, "evaluationStatus", score,
+              "minimumPossibleScore", "maximumPossibleScore", "ruleResults")
              SELECT $1 || ':' || stock_code, $1, stock_code, stock_name, rank, selected,
-                    evaluation_status, score, max_score, rule_results
+                    evaluation_status, score, minimum_possible_score, maximum_possible_score, rule_results
              FROM definitive_result_stage ORDER BY rank)SQL",
       task.message.run_id);
   const nlohmann::json summary = {
-      {"type", "SCORING_REPORT"}, {"schemaVersion", 1}, {"asOfDate", result.as_of_date},
+      {"type", "SCORING_REPORT"}, {"schemaVersion", 2}, {"asOfDate", result.as_of_date},
       {"universeCount", result.universe_count}, {"evaluatedCount", result.evaluated_count},
       {"selectedCount", result.selected_count}, {"rules", result.rules},
       {"warnings", result.warnings}, {"diagnostics", result.diagnostics}};

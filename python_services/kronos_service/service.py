@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 import importlib
+import math
 import os
 from pathlib import Path
 import sys
@@ -34,6 +35,27 @@ def _read_int_env(name: str, fallback: int) -> int:
     return parsed if parsed > 0 else fallback
 
 
+def _read_float_env(
+    name: str,
+    fallback: float,
+    *,
+    minimum: float,
+    maximum: float | None = None,
+) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return fallback
+    try:
+        parsed = float(raw)
+    except ValueError:
+        return fallback
+    if not math.isfinite(parsed) or parsed < minimum:
+        return fallback
+    if maximum is not None and parsed > maximum:
+        return fallback
+    return parsed
+
+
 @dataclass(frozen=True)
 class KronosSettings:
     model_name: str = os.getenv("KRONOS_MODEL_NAME", "NeoQuasar/Kronos-base")
@@ -47,6 +69,18 @@ class KronosSettings:
         "KRONOS_DEFAULT_PREDICTION_LENGTH",
         60,
     )
+    temperature: float = _read_float_env(
+        "KRONOS_TEMPERATURE",
+        0.8,
+        minimum=0.01,
+    )
+    top_p: float = _read_float_env(
+        "KRONOS_TOP_P",
+        0.9,
+        minimum=0.01,
+        maximum=1.0,
+    )
+    sample_count: int = _read_int_env("KRONOS_SAMPLE_COUNT", 3)
     kronos_repo_path: str | None = os.getenv("KRONOS_REPO_PATH")
 
 
@@ -211,6 +245,9 @@ class KronosModelForecaster:
         self.model_version = self.settings.model_name
         self.max_context = self.settings.max_context
         self.default_prediction_length = self.settings.default_prediction_length
+        self.temperature = self.settings.temperature
+        self.top_p = self.settings.top_p
+        self.sample_count = self.settings.sample_count
         self.device = resolve_device(self.settings.device)
         self._predictor: Any | None = None
         self._load_error: str | None = None
@@ -235,6 +272,9 @@ class KronosModelForecaster:
             "device": self.device,
             "maxContext": self.max_context,
             "defaultPredictionLength": self.default_prediction_length,
+            "temperature": self.temperature,
+            "topP": self.top_p,
+            "sampleCount": self.sample_count,
         }
 
     def forecast(
@@ -262,9 +302,9 @@ class KronosModelForecaster:
             x_timestamp=x_timestamp,
             y_timestamp=y_timestamp,
             pred_len=effective_prediction_length,
-            T=1.0,
-            top_p=0.9,
-            sample_count=1,
+            T=self.temperature,
+            top_p=self.top_p,
+            sample_count=self.sample_count,
         )
         pred_df = pred_df.reset_index(drop=True)
         pred_df["tradeDate"] = y_dates
@@ -320,9 +360,9 @@ class KronosModelForecaster:
             x_timestamp_list=x_timestamp_list,
             y_timestamp_list=y_timestamp_list,
             pred_len=effective_prediction_length,
-            T=1.0,
-            top_p=0.9,
-            sample_count=1,
+            T=self.temperature,
+            top_p=self.top_p,
+            sample_count=self.sample_count,
             verbose=False,
         )
 

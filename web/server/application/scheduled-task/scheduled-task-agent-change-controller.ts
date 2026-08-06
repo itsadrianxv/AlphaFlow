@@ -5,7 +5,7 @@ const ruleSchema = z
   .object({
     id: z.string().regex(/^[a-z][a-z0-9_]{0,63}$/),
     name: z.string().trim().min(1).max(120),
-    points: z.number().finite().nonnegative(),
+    scoreDelta: z.number().finite(),
     condition: z.unknown(),
   })
   .strict();
@@ -37,7 +37,7 @@ const operationSchema = z.discriminatedUnion("type", [
     .object({
       type: z.literal("SET_SELECTION"),
       selection: z.object({
-        minScore: z.number().finite().nonnegative(),
+        minScore: z.number().finite(),
         limit: z.number().int().min(1).max(5000),
       }),
     })
@@ -58,7 +58,7 @@ const operationSchema = z.discriminatedUnion("type", [
 
 export const scoringTaskAgentChangeSetSchema = z
   .object({
-    schemaVersion: z.literal("scoring-task-agent-changes.v1"),
+    schemaVersion: z.literal("scoring-task-agent-changes.v2"),
     generatedAtVersion: z.number().int().positive(),
     ambiguity: z.discriminatedUnion("status", [
       z.object({ status: z.literal("CLEAR") }).strict(),

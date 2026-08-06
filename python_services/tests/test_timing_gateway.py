@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import threading
+import time
+
 import pytest
 
 from app.data_providers.contracts import DailyBar, StockProfile
@@ -116,6 +119,80 @@ def test_get_signal_batch_reuses_benchmark_histories() -> None:
         },
     ]
     assert signal_provider.benchmark_codes == list(SIGNAL_BENCHMARK_CODES)
+
+
+def test_get_signal_batch_fetches_stocks_concurrently(monkeypatch) -> None:
+    signal_provider = FakeSignalProvider()
+    gateway = TimingGateway(
+        signal_data_provider=signal_provider,
+        market_context_provider=FakeMarketContextProvider(),
+    )
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+    original = gateway._get_signal_result
+
+    def slow_get_signal_result(**kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        try:
+            time.sleep(0.05)
+            return original(**kwargs)
+        finally:
+            with lock:
+                active -= 1
+
+    monkeypatch.setattr(gateway, "_get_signal_result", slow_get_signal_result)
+
+    response = gateway.get_signal_batch(
+        request_id="req-concurrent",
+        stock_codes=["600519", "000001"],
+        as_of_date="2025-12-31",
+        lookback_days=None,
+    )
+
+    assert [item.stockCode for item in response.data.items] == ["600519", "000001"]
+    assert max_active == 2
+
+
+def test_get_evidence_batch_fetches_stocks_concurrently(monkeypatch) -> None:
+    signal_provider = FakeSignalProvider()
+    gateway = TimingGateway(
+        signal_data_provider=signal_provider,
+        market_context_provider=FakeMarketContextProvider(),
+    )
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+    original = gateway._build_evidence_data
+
+    def slow_build_evidence_data(**kwargs):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        try:
+            time.sleep(0.05)
+            return original(**kwargs)
+        finally:
+            with lock:
+                active -= 1
+
+    monkeypatch.setattr(gateway, "_build_evidence_data", slow_build_evidence_data)
+
+    response = gateway.get_evidence_batch(
+        request_id="req-concurrent-evidence",
+        stock_codes=["600519", "000001"],
+        as_of_date="2025-12-31",
+        timeframes=["DAILY"],
+        indicator_ids=["trend.close_above_ema20"],
+        lookback_days=120,
+    )
+
+    assert [item.stockCode for item in response.data.items] == ["600519", "000001"]
+    assert max_active == 2
 
 
 def test_evidence_history_never_returns_future_evidence() -> None:

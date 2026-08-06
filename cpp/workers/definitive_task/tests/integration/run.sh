@@ -51,7 +51,7 @@ wait_status() {
   return 1
 }
 
-base_plan='{"schemaVersion":1,"type":"deterministic_scoring"}'
+base_plan='{"schemaVersion":2,"type":"deterministic_scoring"}'
 $compose up --build --detach --wait
 
 # 三字段消息完成结果事务；重复消息只能得到一份结果。
@@ -70,14 +70,14 @@ sleep 2
 [ "$($compose exec -T redis-test redis-cli XPENDING definitive-task:runs definitive-task-worker | head -n 1)" = "0" ]
 
 # 500 写入数据库到期时间，原 PEL 消息到期后恢复，不发布替代消息或回写 SUBMITTED。
-insert_execution execution-retry '{"schemaVersion":1,"type":"deterministic_scoring","mockStatusSequence":[500,200]}'
+insert_execution execution-retry '{"schemaVersion":2,"type":"deterministic_scoring","mockStatusSequence":[500,200]}'
 publish execution-retry
 wait_status execution-retry SUCCEEDED 25
 [ "$($compose exec -T postgres-test psql -U postgres -d definitive_task_worker_test -Atc \
   "SELECT attempts FROM \"ScheduledTaskExecution\" WHERE id='execution-retry'")" = "2" ]
 
 # kill -9 后由 PEL 与过期 lease 接管，fencing token 必须递增。
-insert_execution execution-recovery '{"schemaVersion":1,"type":"deterministic_scoring","mockDelaySequenceMs":[5000,0]}'
+insert_execution execution-recovery '{"schemaVersion":2,"type":"deterministic_scoring","mockDelaySequenceMs":[5000,0]}'
 publish execution-recovery
 wait_status execution-recovery RUNNING 10
 $compose kill --signal SIGKILL worker-test

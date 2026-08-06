@@ -16,6 +16,16 @@ describe("首页专业市场基线清单项构造", () => {
         key: "published_at",
         value: "2026-08-01T23:59:59+08:00",
       });
+      const historyItem = items.find(
+        (item) => item.datasetKey === "news.radar_history",
+      );
+      expect(historyItem?.factScopeJson).toMatchObject({
+        currentDays: 7,
+        traceDays: 365,
+        maxEvents: 30,
+        featuredEvents: 3,
+      });
+      expect(historyItem?.required).toBe(true);
 
       const marketItem = items.find((item) => item.datasetKey === "market_snapshot");
       expect(marketItem?.required).toBe(false);

@@ -204,6 +204,21 @@ function hasNonEmptyImpactEvents(value: unknown) {
   return Array.isArray(events) && events.length > 0;
 }
 
+function hasHistoryReadyImpactEvents(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const events = (value as Record<string, unknown>).events;
+  if (!Array.isArray(events)) return false;
+  return events.some((candidate) => {
+    if (!isRecord(candidate) || !isRecord(candidate.analysis)) return false;
+    const timeline = candidate.analysis.timeline;
+    return (
+      candidate.analysis.historyReady === true &&
+      Array.isArray(timeline) &&
+      timeline.length > 0
+    );
+  });
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -240,23 +255,29 @@ function embeddedEventAnalysis(
   if (!isRecord(item) || !isRecord(item.event) || !isRecord(item.analysis)) {
     return undefined;
   }
+  const timeline = Array.isArray(item.analysis.timeline)
+    ? item.analysis.timeline
+    : undefined;
+  const scenarios = Array.isArray(item.analysis.scenarios)
+    ? item.analysis.scenarios
+    : undefined;
+  const traceState = isRecord(item.analysis.traceState)
+    ? item.analysis.traceState
+    : undefined;
+  if (!timeline || !scenarios || timeline.length === 0) {
+    return undefined;
+  }
   return {
     ...result,
     mode: "trace",
     selectedEvent: item.event,
     impactEdges: Array.isArray(item.impactEdges) ? item.impactEdges : [],
-    timeline: Array.isArray(item.analysis.timeline)
-      ? item.analysis.timeline
-      : [],
-    scenarios: Array.isArray(item.analysis.scenarios)
-      ? item.analysis.scenarios
-      : [],
+    timeline,
+    scenarios,
     warnings: Array.isArray(item.analysis.warnings)
       ? item.analysis.warnings
       : [],
-    traceState: isRecord(item.analysis.traceState)
-      ? item.analysis.traceState
-      : undefined,
+    traceState,
   };
 }
 
@@ -503,7 +524,18 @@ export const workflowRouter = createTRPCRouter({
         hasNonEmptyImpactEvents(run.result)
       );
     });
-    if (latestRun) return { ...latestRun, baseRunId: latestRun.id };
+    const historyReadyRun = runs.find((run) => {
+      const input = run.input;
+      return (
+        input !== null &&
+        typeof input === "object" &&
+        !Array.isArray(input) &&
+        input.mode === "overview" &&
+        hasHistoryReadyImpactEvents(run.result)
+      );
+    });
+    if (historyReadyRun)
+      return { ...historyReadyRun, baseRunId: historyReadyRun.id };
     const projection = await ctx.db.homepageCurrentSnapshotProjection.findFirst(
       {
         where: { scope: "BASELINE", userId: null },
@@ -511,12 +543,30 @@ export const workflowRouter = createTRPCRouter({
         select: { snapshotId: true },
       },
     );
-    if (!projection) return null;
-    const cached = await readHomepageNewsRadar(
-      ctx.db,
-      projection.snapshotId,
-      ctx.session.user.id,
-    );
+    const cached = projection
+      ? await readHomepageNewsRadar(
+          ctx.db,
+          projection.snapshotId,
+          ctx.session.user.id,
+        )
+      : null;
+    if (
+      cached &&
+      cached.result.events.length > 0 &&
+      hasHistoryReadyImpactEvents(cached.result)
+    ) {
+      return {
+        id: cached.snapshotId,
+        baseSnapshotId: cached.snapshotId,
+        status: WorkflowRunStatus.SUCCEEDED,
+        progressPercent: 100,
+        input: { mode: "overview", source: "homepage_snapshot" },
+        result: cached.result,
+        createdAt: cached.generatedAt,
+        completedAt: cached.generatedAt,
+      };
+    }
+    if (latestRun) return { ...latestRun, baseRunId: latestRun.id };
     if (!cached || cached.result.events.length === 0) return null;
     return {
       id: cached.snapshotId,

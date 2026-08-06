@@ -183,7 +183,7 @@ class MinishareNewsProvider:
             "DEEPSEEK_TIMEOUT_MS", "15000"
         )
         try:
-            self.deepseek_timeout_ms = min(15_000, max(1_000, int(raw_timeout)))
+            self.deepseek_timeout_ms = max(1_000, int(raw_timeout))
         except (TypeError, ValueError):
             self.deepseek_timeout_ms = 15_000
         self.client = self.client or MinishareNewsClient(self.token)
@@ -256,7 +256,9 @@ class MinishareNewsProvider:
         raw_items, warnings = self._fetch_sources(
             start_at=end_at - timedelta(days=days),
             end_at=end_at,
-            kinds=("fast", "major", "cctv"),
+            kinds=("fast", "major")
+            if trace_anchor
+            else ("fast", "major", "cctv"),
             fast_limit=min(1500, max(limit * 15, 300)),
         )
         deduped = self._radar_candidates(
@@ -723,15 +725,16 @@ class MinishareNewsProvider:
                 )
             )
         else:
-            try:
-                attributed = self._attribute(candidates, query, targets=targets)
-            except Exception as exc:  # noqa: BLE001
-                analysis_warnings.append(
-                    GatewayWarning(
-                        code="news_attribution_failed",
-                        message=f"新闻归属判断失败: {exc}",
+            if not trace_anchor:
+                try:
+                    attributed = self._attribute(candidates, query, targets=targets)
+                except Exception as exc:  # noqa: BLE001
+                    analysis_warnings.append(
+                        GatewayWarning(
+                            code="news_attribution_failed",
+                            message=f"新闻归属判断失败: {exc}",
+                        )
                     )
-                )
             try:
                 ranked = self._rerank(
                     candidates, query, attributed, trace_anchor=trace_anchor
@@ -744,7 +747,7 @@ class MinishareNewsProvider:
                     )
                 )
 
-        complete = bool(attributed) and bool(ranked)
+        complete = bool(ranked) and (bool(attributed) or trace_anchor is not None)
         standardized = [
             self._standardize(
                 source,

@@ -662,7 +662,7 @@ export function ScheduledTaskDetailClient(props: { taskId: string }) {
                                                 ）
                                               </td>
                                               <td>
-                                                {row.score} / {row.maxScore}
+                                                {row.score} / {row.maximumPossibleScore}
                                               </td>
                                               <td>
                                                 {Object.entries(
@@ -670,7 +670,7 @@ export function ScheduledTaskDetailClient(props: { taskId: string }) {
                                                 )
                                                   .map(
                                                     ([ruleId, value]) =>
-                                                      `${ruleId}: ${String(asRecord(value).status ?? "NOT_EVALUATED")} / ${String(asRecord(value).awardedPoints ?? 0)} 分`,
+                                                      `${ruleId}: ${String(asRecord(value).status ?? "NOT_EVALUATED")} / ${String(asRecord(value).awardedDelta ?? 0)} 分`,
                                                   )
                                                   .join("；") || "—"}
                                               </td>

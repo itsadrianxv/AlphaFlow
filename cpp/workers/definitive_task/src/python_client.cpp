@@ -66,7 +66,8 @@ DefinitiveTaskExecutionResult PythonClient::parse_response(const std::string& bo
       value.selected = row.at("selected").get<bool>();
       value.evaluation_status = row.at("evaluationStatus").get<std::string>();
       value.score = row.at("score").get<double>();
-      value.max_score = row.at("maxScore").get<double>();
+      value.minimum_possible_score = row.at("minimumPossibleScore").get<double>();
+      value.maximum_possible_score = row.at("maximumPossibleScore").get<double>();
       value.rule_results = row.at("ruleResults");
       if (!std::regex_match(value.stock_code, stock_pattern)) throw std::runtime_error("股票代码不合法");
       if (!stocks.insert(value.stock_code).second || !ranks.insert(value.rank).second) throw std::runtime_error("股票代码或 rank 重复");

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Query, Request
+from starlette.concurrency import run_in_threadpool
 
 from app.contracts.timing import (
     MarketContextSnapshotResponse,
@@ -15,7 +16,7 @@ from app.contracts.timing import (
     TimingSignalBatchResponse,
     TimingSignalResponse,
 )
-from app.gateway.common import GatewayError, is_valid_stock_code
+from app.gateway.common import GatewayError, is_valid_stock_code, normalize_stock_code
 from app.gateway.timing_gateway import timing_gateway
 
 router = APIRouter(prefix="/api/v1/timing")
@@ -70,9 +71,10 @@ async def get_stock_bars(
             provider="gateway",
         )
 
-    return timing_gateway.get_bars(
+    return await run_in_threadpool(
+        timing_gateway.get_bars,
         request_id=request.state.request_id,
-        stock_code=stock_code,
+        stock_code=normalize_stock_code(stock_code),
         start=start,
         end=end,
         timeframe=_validate_timeframe(timeframe),
@@ -101,7 +103,8 @@ async def get_stock_signal(
             provider="gateway",
         )
 
-    return timing_gateway.get_signal(
+    return await run_in_threadpool(
+        timing_gateway.get_signal,
         request_id=request.state.request_id,
         stock_code=stock_code,
         as_of_date=as_of_date,
@@ -124,7 +127,8 @@ async def get_stock_signal_batch(
             provider="gateway",
         )
 
-    return timing_gateway.get_signal_batch(
+    return await run_in_threadpool(
+        timing_gateway.get_signal_batch,
         request_id=request.state.request_id,
         stock_codes=body.stockCodes,
         as_of_date=body.asOfDate,
@@ -146,7 +150,8 @@ async def get_stock_evidence_batch(
             status_code=400,
             provider="gateway",
         )
-    return timing_gateway.get_evidence_batch(
+    return await run_in_threadpool(
+        timing_gateway.get_evidence_batch,
         request_id=request.state.request_id,
         stock_codes=body.stockCodes,
         as_of_date=body.asOfDate,
@@ -169,7 +174,8 @@ async def get_stock_evidence_history(
             status_code=400,
             provider="gateway",
         )
-    return timing_gateway.get_evidence_history(
+    return await run_in_threadpool(
+        timing_gateway.get_evidence_history,
         request_id=request.state.request_id,
         stock_codes=body.stockCodes,
         start_date=body.startDate,
@@ -189,7 +195,8 @@ async def get_market_context(
     request: Request,
     as_of_date: str | None = Query(default=None, alias="asOfDate"),
 ):
-    return timing_gateway.get_market_context(
+    return await run_in_threadpool(
+        timing_gateway.get_market_context,
         request_id=request.state.request_id,
         as_of_date=as_of_date,
     )
