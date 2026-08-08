@@ -22,22 +22,16 @@ type CopyRow = {
   nextAttemptAt: Date | null;
   sentAt: Date | null;
   lastErrorCode: string | null;
+  failureClass: string | null;
   claimToken: string | null;
   claimExpiresAt: Date | null;
   fencingToken: bigint;
 };
 
-type CircuitRow = {
-  state: string;
-  consecutiveFailures: number;
-  openCount: number;
-  retryAfter: Date | null;
-};
-
 const copyColumns = Prisma.sql`
   "id", "entryId", "idempotencyKey", "payloadJson", "status", "attempts",
   "firstAttemptAt", "retryDeadline", "nextAttemptAt", "sentAt", "lastErrorCode"
-  , "claimToken", "claimExpiresAt", "fencingToken"
+  , "claimToken", "claimExpiresAt", "fencingToken", "failureClass"
 `;
 
 export class PrismaResearchDistributionStore
@@ -90,7 +84,7 @@ export class PrismaResearchDistributionStore
              "retryDeadline" = ${new Date(copy.retryDeadline)},
              "nextAttemptAt" = ${asDate(copy.nextAttemptAt)},
              "sentAt" = ${asDate(copy.sentAt)},
-             "lastErrorCode" = ${copy.lastErrorCode}, "updatedAt" = CURRENT_TIMESTAMP
+             "lastErrorCode" = ${copy.lastErrorCode}, "failureClass" = ${copy.failureClass ?? null}, "updatedAt" = CURRENT_TIMESTAMP
        WHERE "id" = ${copy.id}
       RETURNING ${copyColumns}
     `);
@@ -113,7 +107,7 @@ export class PrismaResearchDistributionStore
        WHERE "id" = ${id}
          AND (
            (
-             "status" IN ('PENDING', 'RETRY_WAIT', 'DEFERRED_CIRCUIT', 'CONFIG_BLOCKED')
+             "status" IN ('PENDING', 'RETRY_WAIT')
              AND ("nextAttemptAt" IS NULL OR "nextAttemptAt" <= ${now})
            ) OR (
              "status" = 'SENDING'
@@ -135,7 +129,7 @@ export class PrismaResearchDistributionStore
              "retryDeadline" = ${new Date(copy.retryDeadline)},
              "nextAttemptAt" = ${asDate(copy.nextAttemptAt)},
              "sentAt" = ${asDate(copy.sentAt)},
-             "lastErrorCode" = ${copy.lastErrorCode},
+             "lastErrorCode" = ${copy.lastErrorCode}, "failureClass" = ${copy.failureClass ?? null},
              "claimToken" = NULL,
              "claimExpiresAt" = NULL,
              "updatedAt" = CURRENT_TIMESTAMP
@@ -149,39 +143,19 @@ export class PrismaResearchDistributionStore
     return mapCopy(rows[0]);
   }
 
-  async getCircuit() {
-    await this.ensureCircuit();
-    const rows = await this.db.$queryRaw<CircuitRow[]>(Prisma.sql`
-      SELECT "state", "consecutiveFailures", "openCount", "retryAfter"
-        FROM "ResearchDeliveryCircuit" WHERE "channel" = 'FEISHU'
-    `);
-    if (!rows[0]) throw new Error("Feishu 熔断状态不存在");
-    return mapCircuit(rows[0]);
+  /** @deprecated 共享熔断权威已迁移到 ResearchCircuitBreaker。 */
+  async getCircuit(): Promise<FeishuCircuit> {
+    return {
+      state: "CLOSED",
+      consecutiveFailures: 0,
+      openCount: 0,
+      retryAfter: null,
+    };
   }
 
-  async saveCircuit(circuit: FeishuCircuit) {
-    await this.ensureCircuit();
-    const rows = await this.db.$queryRaw<CircuitRow[]>(Prisma.sql`
-      UPDATE "ResearchDeliveryCircuit"
-         SET "state" = ${circuit.state},
-             "consecutiveFailures" = ${circuit.consecutiveFailures},
-             "openCount" = ${circuit.openCount},
-             "retryAfter" = ${asDate(circuit.retryAfter)},
-             "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "channel" = 'FEISHU'
-      RETURNING "state", "consecutiveFailures", "openCount", "retryAfter"
-    `);
-    if (!rows[0]) throw new Error("Feishu 熔断状态不存在");
-    return mapCircuit(rows[0]);
-  }
-
-  private async ensureCircuit() {
-    await this.db.$executeRaw(Prisma.sql`
-      INSERT INTO "ResearchDeliveryCircuit" (
-        "id", "channel", "state", "consecutiveFailures", "openCount", "updatedAt"
-      ) VALUES ('research-delivery-circuit-feishu', 'FEISHU', 'CLOSED', 0, 0, CURRENT_TIMESTAMP)
-      ON CONFLICT ("channel") DO NOTHING
-    `);
+  /** @deprecated 共享熔断权威已迁移到 ResearchCircuitBreaker。 */
+  async saveCircuit(circuit: FeishuCircuit): Promise<FeishuCircuit> {
+    return circuit;
   }
 }
 
@@ -198,18 +172,10 @@ function mapCopy(row: CopyRow): FeishuCopy {
     nextAttemptAt: row.nextAttemptAt?.toISOString() ?? null,
     sentAt: row.sentAt?.toISOString() ?? null,
     lastErrorCode: row.lastErrorCode,
+    failureClass: row.failureClass,
     claimToken: row.claimToken,
     claimExpiresAt: row.claimExpiresAt?.toISOString() ?? null,
     fencingToken: row.fencingToken.toString(),
-  };
-}
-
-function mapCircuit(row: CircuitRow): FeishuCircuit {
-  return {
-    state: row.state as FeishuCircuit["state"],
-    consecutiveFailures: row.consecutiveFailures,
-    openCount: row.openCount,
-    retryAfter: row.retryAfter?.toISOString() ?? null,
   };
 }
 

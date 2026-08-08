@@ -2,70 +2,57 @@ import {
   FeishuDeliveryError,
   type FeishuDeliveryGuard,
 } from "~/server/application/research-distribution/research-distribution-service";
-import type { PostgresResearchScheduler } from "~/server/application/scheduling/postgres-research-scheduler";
-import { ResourcePermitUnavailableError } from "~/server/domain/scheduling/types";
 
-export type FeishuDeliveryTaskContext = {
-  taskId: string;
-  resourcePoolId: string;
-  holderId: string;
-  fencingToken: bigint;
-  permitKey: string;
-};
-
+/** @deprecated 仅保留旧测试/调用方兼容；正式 worker 不再使用 nested permit。 */
 export class PostgresFeishuDeliveryGuard implements FeishuDeliveryGuard {
   constructor(
-    private readonly scheduler: PostgresResearchScheduler,
-    private readonly context: FeishuDeliveryTaskContext,
+    private readonly scheduler: {
+      acquireNestedPermit(
+        input: Record<string, unknown>,
+      ): Promise<{ id: string }>;
+      releasePermit(
+        id: string,
+        holderId: string,
+        fencingToken: bigint,
+        reason: string,
+      ): Promise<void>;
+    },
+    private readonly control: {
+      getCircuit?: (
+        poolId: string,
+      ) => Promise<{ state: string; retryAfter?: Date | null }>;
+      recordOutcome(
+        poolId: string,
+        outcome: { kind: "SUCCESS" },
+      ): Promise<unknown>;
+    },
+    private readonly context: {
+      taskId: string;
+      resourcePoolId: string;
+      holderId: string;
+      fencingToken: bigint;
+      permitKey: string;
+    },
   ) {}
 
   async run(_copyId: string, operation: () => Promise<void>) {
-    let permitId: string;
-    try {
-      const permit = await this.scheduler.acquireNestedPermit({
-        taskId: this.context.taskId,
-        resourcePoolId: this.context.resourcePoolId,
-        holderId: this.context.holderId,
-        fencingToken: this.context.fencingToken,
-        permitKey: this.context.permitKey,
-      });
-      permitId = permit.id;
-    } catch (error) {
-      if (!(error instanceof ResourcePermitUnavailableError)) throw error;
-      const circuit = await this.scheduler.getCircuit(
-        this.context.resourcePoolId,
-      );
-      throw new FeishuDeliveryError(
-        circuit?.state === "CONFIG_BLOCKED"
-          ? "FEISHU_RESOURCE_CONFIG_BLOCKED"
-          : "FEISHU_RESOURCE_UNAVAILABLE",
-        circuit?.state !== "CONFIG_BLOCKED",
-        circuit?.retryAfter
-          ? Math.max(0, circuit.retryAfter.getTime() - Date.now())
-          : undefined,
-      );
+    const circuit = this.control.getCircuit
+      ? await this.control.getCircuit(this.context.resourcePoolId)
+      : null;
+    if (circuit?.state === "OPEN") {
+      throw new FeishuDeliveryError("FEISHU_RESOURCE_UNAVAILABLE", true);
     }
-
+    const permit = await this.scheduler.acquireNestedPermit({
+      ...this.context,
+    });
     try {
       await operation();
-      await this.scheduler.recordOutcome(this.context.resourcePoolId, {
+      await this.control.recordOutcome(this.context.resourcePoolId, {
         kind: "SUCCESS",
       });
-    } catch (error) {
-      const deliveryError = error instanceof FeishuDeliveryError ? error : null;
-      await this.scheduler.recordOutcome(
-        this.context.resourcePoolId,
-        deliveryError?.code === "FEISHU_HTTP_429"
-          ? {
-              kind: "RATE_LIMITED",
-              retryAfterMs: deliveryError.retryAfterMs,
-            }
-          : { kind: "FAILURE" },
-      );
-      throw error;
     } finally {
       await this.scheduler.releasePermit(
-        permitId,
+        permit.id,
         this.context.holderId,
         this.context.fencingToken,
         "feishu_delivery_finished",

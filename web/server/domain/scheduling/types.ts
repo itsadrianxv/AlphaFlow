@@ -63,6 +63,7 @@ export interface ResearchTask {
   fairnessKey: string;
   userId: string | null;
   parentTaskId: string | null;
+  externalCopyId: string | null;
   targetCompletionAt: Date | null;
   status: ResearchTaskStatus;
   attempts: number;
@@ -123,6 +124,7 @@ export interface EnqueueTaskInput {
   fairnessKey: string;
   userId?: string | null;
   parentTaskId?: string | null;
+  externalCopyId?: string | null;
   targetCompletionAt?: Date | null;
   maxAttempts?: number;
   retryDeadline?: Date;

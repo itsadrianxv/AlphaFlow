@@ -407,19 +407,19 @@ model ScheduledTaskExecution {
 }
 
 model ScheduledTaskScoreResult {
-  id               String                 @id @default(cuid())
-  executionId      String
-  stockCode        String
-  stockName        String
-  rank             Int
-  selected         Boolean                @default(false)
-  evaluationStatus String
-  score            Float
+  id                   String                 @id @default(cuid())
+  executionId          String
+  stockCode            String
+  stockName            String
+  rank                 Int
+  selected             Boolean                @default(false)
+  evaluationStatus     String
+  score                Float
   minimumPossibleScore Float
   maximumPossibleScore Float
-  ruleResults      Json
-  createdAt        DateTime               @default(now())
-  execution        ScheduledTaskExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  ruleResults          Json
+  createdAt            DateTime               @default(now())
+  execution            ScheduledTaskExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
   @@unique([executionId, stockCode])
   @@unique([executionId, rank])
@@ -988,12 +988,12 @@ model TimingResearchReport {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workflowRun    WorkflowRun?          @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
-  watchList      WatchList?            @relation(fields: [watchListId], references: [id], onDelete: SetNull)
-  preset         TimingPreset?         @relation(fields: [presetId], references: [id], onDelete: SetNull)
-  presetRevision TimingPresetRevision? @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
-  signalSnapshot TimingSignalSnapshot  @relation(fields: [signalSnapshotId], references: [id], onDelete: Cascade)
+  user              User                                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowRun       WorkflowRun?                           @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  watchList         WatchList?                             @relation(fields: [watchListId], references: [id], onDelete: SetNull)
+  preset            TimingPreset?                          @relation(fields: [presetId], references: [id], onDelete: SetNull)
+  presetRevision    TimingPresetRevision?                  @relation(fields: [presetRevisionId], references: [id], onDelete: SetNull)
+  signalSnapshot    TimingSignalSnapshot                   @relation(fields: [signalSnapshotId], references: [id], onDelete: Cascade)
   forecastSnapshots TimingResearchReportForecastSnapshot[]
 
   @@index([userId, createdAt])
@@ -1267,8 +1267,8 @@ model TimingKronosForecastSnapshot {
   warnings         String[]
   createdAt        DateTime @default(now())
 
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workflowRun WorkflowRun? @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
+  user            User                                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowRun     WorkflowRun?                           @relation(fields: [workflowRunId], references: [id], onDelete: SetNull)
   researchReports TimingResearchReportForecastSnapshot[]
 
   @@unique([userId, researchRunId, stockCode, asOfDate, timeframe, modelName, predictionLength, inputBarsHash], map: "TimingKronos_user_run_stock_date_model_input_key")
@@ -1281,7 +1281,7 @@ model TimingResearchReportForecastSnapshot {
   reportId   String
   snapshotId String
 
-  report   TimingResearchReport        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report   TimingResearchReport         @relation(fields: [reportId], references: [id], onDelete: Cascade)
   snapshot TimingKronosForecastSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Restrict)
 
   @@id([reportId, snapshotId])
@@ -1428,29 +1428,29 @@ model AgentConversationMessage {
 }
 
 model UserSkill {
-  id            String              @id @default(cuid())
-  userId        String
+  id             String             @id @default(cuid())
+  userId         String
   currentVersion Int                @default(1)
-  enabled       Boolean             @default(true)
-  archivedAt    DateTime?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  versions      UserSkillVersion[]
+  enabled        Boolean            @default(true)
+  archivedAt     DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions       UserSkillVersion[]
 
   @@index([userId, enabled, updatedAt])
   @@index([userId, archivedAt, updatedAt])
 }
 
 model UserSkillVersion {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   skillId     String
   version     Int
   name        String
   description String
   content     String
   contentHash String
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   skill       UserSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@unique([skillId, version])
@@ -2112,25 +2112,17 @@ model ResearchExternalCopy {
   nextAttemptAt  DateTime?          @db.Timestamptz(3)
   sentAt         DateTime?          @db.Timestamptz(3)
   lastErrorCode  String?
+  failureClass   String?
   claimToken     String?            @unique
   claimExpiresAt DateTime?          @db.Timestamptz(3)
   fencingToken   BigInt             @default(0)
   createdAt      DateTime           @default(now()) @db.Timestamptz(3)
   updatedAt      DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
   entry          ResearchInboxEntry @relation(fields: [entryId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  tasks          ResearchTask[]
 
   @@index([channel, status, nextAttemptAt], map: "ResearchExternalCopy_delivery_idx")
   @@index([status, claimExpiresAt], map: "ResearchExternalCopy_claim_idx")
-}
-
-model ResearchDeliveryCircuit {
-  id                  String    @id @default(cuid())
-  channel             String    @unique
-  state               String    @default("CLOSED")
-  consecutiveFailures Int       @default(0)
-  openCount           Int       @default(0)
-  retryAfter          DateTime? @db.Timestamptz(3)
-  updatedAt           DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
 }
 
 model ResearchInboxEntryHistory {
@@ -2193,6 +2185,7 @@ model ResearchTask {
   eventCandidateId      String?
   eventRevisionId       String?
   preferenceSnapshotId  String?
+  externalCopyId        String?
   parentTaskId          String?
   targetCompletionAt    DateTime?                   @db.Timestamptz(3)
   status                String                      @default("PENDING")
@@ -2226,12 +2219,15 @@ model ResearchTask {
   auditRecords          ResearchAuditRecord[]
   briefingEntries       ResearchInboxEntry[]
   briefingScope         ResearchBriefingScope?
+  externalCopy          ResearchExternalCopy?       @relation(fields: [externalCopyId], references: [id], onDelete: Restrict)
 
+  @@unique([externalCopyId, attempts], map: "ResearchTask_external_copy_attempt_unique")
   @@index([resourcePoolId, status, schedulingTier, targetCompletionAt, nextAttemptAt, createdAt], map: "ResearchTask_claim_idx")
   @@index([resourcePoolId, schedulingTier, fairnessKey, createdAt], map: "ResearchTask_fairness_idx")
   @@index([resourcePoolId, status, createdAt], map: "ResearchTask_pool_status_created_idx")
   @@index([resourcePoolId, status, targetCompletionAt, fairnessKey, createdAt], map: "ResearchTask_pool_status_target_idx")
   @@index([status, leaseExpiresAt], map: "ResearchTask_lease_idx")
+  @@index([externalCopyId, createdAt], map: "ResearchTask_external_copy_idx")
 }
 
 model ResearchBriefingScope {

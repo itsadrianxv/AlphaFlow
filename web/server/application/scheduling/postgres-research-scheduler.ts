@@ -2,8 +2,6 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { Prisma, type PrismaClient } from "@prisma/client";
 import {
-  backlogLimit,
-  CIRCUIT_RETRY_DELAYS_MS,
   DEFAULT_RETRY_DELAYS_MS,
   defaultMaxAttempts,
   defaultRetryDeadline,
@@ -13,20 +11,26 @@ import {
 } from "~/server/domain/scheduling/policies";
 import {
   type AdmissionResult,
-  type BacklogSnapshot,
-  type CircuitBreaker,
   type ClaimedTask,
   type EnqueueTaskInput,
   LeaseLostError,
   type ResearchTask,
-  type ResourceOutcome,
   type ResourcePermit,
   ResourcePermitUnavailableError,
-  type ResourcePool,
   SchedulingInvariantError,
-  type SchedulingTier,
   type TaskSettlement,
 } from "~/server/domain/scheduling/types";
+import {
+  backlogInTransaction,
+  ensureCircuit,
+  oldestBacklogAge,
+  type PermitRow,
+  type PoolRow,
+  permitFromRow,
+  queryTask,
+  type TaskRow,
+  taskFromRow,
+} from "./postgres-scheduling-storage";
 
 export {
   LeaseLostError,
@@ -42,163 +46,14 @@ interface PostgresSchedulerOptions {
   retryDelaysMs?: readonly number[];
 }
 
-interface TaskRow {
-  id: string;
-  taskType: string;
-  idempotencyKey: string;
-  inputHash: string;
-  inputContractVersion: string;
-  inputJson: unknown;
-  schedulingTier: SchedulingTier;
-  resourcePoolId: string;
-  fairnessKey: string;
-  userId: string | null;
-  parentTaskId: string | null;
-  targetCompletionAt: Date | null;
-  status: ResearchTask["status"];
-  attempts: number;
-  maxAttempts: number;
-  retryDeadline: Date;
-  nextAttemptAt: Date | null;
-  workerId: string | null;
-  fencingToken: bigint;
-  leaseExpiresAt: Date | null;
-  heartbeatAt: Date | null;
-  resultContractVersion: string | null;
-  resultHash: string | null;
-  resultJson: unknown | null;
-  errorClass: string | null;
-  retryability: ResearchTask["retryability"];
-  terminalReason: string | null;
-  oldestBacklogAgeMs: bigint | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface PermitRow {
-  id: string;
-  resourcePoolId: string;
-  taskId: string;
-  permitKey: string;
-  holderId: string;
-  fencingToken: bigint;
-  status: ResourcePermit["status"];
-  acquiredAt: Date;
-  leaseExpiresAt: Date;
-  releasedAt: Date | null;
-  releaseReason: string | null;
-}
-
-interface PoolRow {
-  id: string;
-  poolKey: string;
-  resourceKind: string;
-  hardConcurrency: number;
-  currentConcurrency: number;
-  controlVersion: bigint;
-  lastHealthyAt: Date | null;
-  healthySince: Date | null;
-  successStreak: number;
-  latencyBaselineMs: number | null;
-  cooldownUntil: Date | null;
-}
-
-interface CircuitRow {
-  resourcePoolId: string;
-  state: CircuitBreaker["state"];
-  version: bigint;
-  consecutiveFailures: number;
-  windowAttempts: number;
-  windowFailures: number;
-  openCount: number;
-  retryAfter: Date | null;
-  halfOpenProbeTaskId: string | null;
-  blockedReason: string | null;
-  updatedAt: Date;
-}
-
-function taskFromRow(row: TaskRow): ResearchTask {
-  return {
-    id: row.id,
-    taskType: row.taskType,
-    idempotencyKey: row.idempotencyKey,
-    inputHash: row.inputHash,
-    inputContractVersion: row.inputContractVersion,
-    input: row.inputJson,
-    schedulingTier: row.schedulingTier,
-    resourcePoolId: row.resourcePoolId,
-    fairnessKey: row.fairnessKey,
-    userId: row.userId,
-    parentTaskId: row.parentTaskId,
-    targetCompletionAt: row.targetCompletionAt,
-    status: row.status,
-    attempts: row.attempts,
-    maxAttempts: row.maxAttempts,
-    retryDeadline: row.retryDeadline,
-    nextAttemptAt: row.nextAttemptAt,
-    workerId: row.workerId,
-    fencingToken: BigInt(row.fencingToken),
-    leaseExpiresAt: row.leaseExpiresAt,
-    heartbeatAt: row.heartbeatAt,
-    resultContractVersion: row.resultContractVersion,
-    resultHash: row.resultHash,
-    result: row.resultJson,
-    errorClass: row.errorClass,
-    retryability: row.retryability,
-    terminalReason: row.terminalReason,
-    oldestBacklogAgeMs:
-      row.oldestBacklogAgeMs === null ? null : BigInt(row.oldestBacklogAgeMs),
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
-function permitFromRow(row: PermitRow): ResourcePermit {
-  return {
-    ...row,
-    fencingToken: BigInt(row.fencingToken),
-  };
-}
-
-function poolFromRow(row: PoolRow): ResourcePool {
-  return {
-    ...row,
-    controlVersion: BigInt(row.controlVersion),
-  };
-}
-
-function circuitFromRow(row: CircuitRow): CircuitBreaker {
-  return {
-    ...row,
-    version: BigInt(row.version),
-  };
-}
-
 function resultHash(result: unknown): string {
   return `sha256:${createHash("sha256")
     .update(JSON.stringify(result) ?? "null", "utf8")
     .digest("hex")}`;
 }
 
-function queryTask(
-  tx: Prisma.TransactionClient,
-  taskId: string,
-  forUpdate = false,
-): Promise<TaskRow[]> {
-  const lockClause = forUpdate ? Prisma.sql` FOR UPDATE` : Prisma.empty;
-  return tx.$queryRaw<TaskRow[]>(Prisma.sql`
-    SELECT "id", "taskType", "idempotencyKey", "inputHash", "inputContractVersion",
-           "inputJson", "schedulingTier", "resourcePoolId", "fairnessKey", "userId",
-           "parentTaskId", "targetCompletionAt", "status", "attempts", "maxAttempts",
-           "retryDeadline", "nextAttemptAt", "workerId", "fencingToken", "leaseExpiresAt",
-           "heartbeatAt", "resultContractVersion", "resultHash", "resultJson", "errorClass",
-           "retryability", "terminalReason", "oldestBacklogAgeMs", "createdAt", "updatedAt"
-      FROM "ResearchTask" WHERE "id" = ${taskId}${lockClause}
-  `);
-}
-
 /**
- * 调度模块的 PostgreSQL adapter。每个变更操作使用单个事务，并以 PostgreSQL
+ * 任务生命周期 module。每个变更操作使用单个事务，并以 PostgreSQL
  * 作为任务和资源许可事实的权威来源。
  */
 export class PostgresResearchScheduler {
@@ -232,7 +87,7 @@ export class PostgresResearchScheduler {
       const duplicate = await tx.$queryRaw<TaskRow[]>(Prisma.sql`
         SELECT "id", "taskType", "idempotencyKey", "inputHash", "inputContractVersion",
                "inputJson", "schedulingTier", "resourcePoolId", "fairnessKey", "userId",
-               "parentTaskId", "targetCompletionAt", "status", "attempts", "maxAttempts",
+               "parentTaskId", "externalCopyId", "targetCompletionAt", "status", "attempts", "maxAttempts",
                "retryDeadline", "nextAttemptAt", "workerId", "fencingToken", "leaseExpiresAt",
                "heartbeatAt", "resultContractVersion", "resultHash", "resultJson", "errorClass",
                "retryability", "terminalReason", "oldestBacklogAgeMs", "createdAt", "updatedAt"
@@ -244,7 +99,7 @@ export class PostgresResearchScheduler {
           decision: "DEDUPLICATED",
           reason: "IDEMPOTENCY_KEY_REUSED",
           task: taskFromRow(duplicate[0]),
-          oldestBacklogAgeMs: await this.oldestBacklogAge(
+          oldestBacklogAgeMs: await oldestBacklogAge(
             tx,
             input.resourcePoolId,
             now,
@@ -258,29 +113,10 @@ export class PostgresResearchScheduler {
       `);
       const pool = pools[0];
       if (!pool) throw new SchedulingInvariantError("资源池不存在");
-      const circuits = await this.ensureCircuit(tx, pool.id, now);
+      const circuits = await ensureCircuit(tx, pool.id, now);
       const circuit = circuits[0];
       if (!circuit) throw new SchedulingInvariantError("资源池熔断器不存在");
-      if (circuit.state === "CONFIG_BLOCKED") {
-        return {
-          decision: "REJECTED",
-          reason: circuit.blockedReason ?? "RESOURCE_CONFIG_BLOCKED",
-          task: null,
-          oldestBacklogAgeMs: await this.oldestBacklogAge(tx, pool.id, now),
-        };
-      }
-      if (
-        circuit.state === "OPEN" &&
-        (!circuit.retryAfter || circuit.retryAfter > now)
-      ) {
-        return {
-          decision: "REJECTED",
-          reason: "RESOURCE_CIRCUIT_OPEN",
-          task: null,
-          oldestBacklogAgeMs: await this.oldestBacklogAge(tx, pool.id, now),
-        };
-      }
-      const backlog = await this.backlogInTransaction(tx, pool, now);
+      const backlog = await backlogInTransaction(tx, pool, now);
       const tierCount = backlog.counts[input.schedulingTier];
       const limit = backlog.limits[input.schedulingTier];
       if (tierCount >= limit) {
@@ -304,12 +140,12 @@ export class PostgresResearchScheduler {
       await tx.$executeRaw(Prisma.sql`
         INSERT INTO "ResearchTask" (
           "id", "taskType", "idempotencyKey", "inputHash", "inputContractVersion", "inputJson",
-          "schedulingTier", "resourcePoolId", "fairnessKey", "userId", "parentTaskId",
+          "schedulingTier", "resourcePoolId", "fairnessKey", "userId", "parentTaskId", "externalCopyId",
           "targetCompletionAt", "status", "maxAttempts", "retryDeadline", "oldestBacklogAgeMs"
         ) VALUES (
           ${id}, ${input.taskType}, ${input.idempotencyKey}, ${input.inputHash}, ${input.inputContractVersion},
           ${JSON.stringify(input.input)}::jsonb, ${input.schedulingTier}, ${input.resourcePoolId},
-          ${input.fairnessKey}, ${input.userId ?? null}, ${input.parentTaskId ?? null},
+          ${input.fairnessKey}, ${input.userId ?? null}, ${input.parentTaskId ?? null}, ${input.externalCopyId ?? null},
           ${input.targetCompletionAt ?? null}, 'PENDING',
           ${input.maxAttempts ?? defaultMaxAttempts(input.schedulingTier)},
           ${input.retryDeadline ?? defaultRetryDeadline(input.schedulingTier, now)}, 0
@@ -362,7 +198,7 @@ export class PostgresResearchScheduler {
            SET "status" = 'EXPIRED', "releasedAt" = ${now}, "releaseReason" = 'task_lease_expired'
          WHERE "taskId" IN (SELECT "id" FROM expired_tasks) AND "status" = 'ACTIVE'
       `);
-      const circuits = await this.ensureCircuit(tx, poolId, now);
+      const circuits = await ensureCircuit(tx, poolId, now);
       const circuit = circuits[0];
       if (!circuit || circuit.state === "CONFIG_BLOCKED") return null;
       if (circuit.state === "OPEN") {
@@ -602,7 +438,7 @@ export class PostgresResearchScheduler {
       `);
       const pool = pools[0];
       if (!pool) throw new SchedulingInvariantError("资源池不存在");
-      const circuits = await this.ensureCircuit(tx, pool.id, now);
+      const circuits = await ensureCircuit(tx, pool.id, now);
       if (
         !circuits[0] ||
         circuits[0].state === "OPEN" ||
@@ -778,319 +614,5 @@ export class PostgresResearchScheduler {
       errorClass: "TASK_CANCELLED",
       terminalReason: reason,
     });
-  }
-
-  async getBacklog(poolId: string): Promise<BacklogSnapshot> {
-    return this.db.$transaction((tx) =>
-      this.backlogInTransactionById(tx, poolId, this.now()),
-    );
-  }
-
-  async getPool(poolId: string): Promise<ResourcePool | null> {
-    const rows = await this.db.$queryRaw<PoolRow[]>(Prisma.sql`
-      SELECT "id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency",
-             "controlVersion", "lastHealthyAt", "healthySince", "successStreak", "latencyBaselineMs", "cooldownUntil"
-        FROM "ResearchResourcePool" WHERE "id" = ${poolId}
-    `);
-    return rows[0] ? poolFromRow(rows[0]) : null;
-  }
-
-  async restartPool(poolId: string): Promise<ResourcePool> {
-    const now = this.now();
-    const rows = await this.db.$queryRaw<PoolRow[]>(Prisma.sql`
-      UPDATE "ResearchResourcePool"
-         SET "currentConcurrency" = 1, "successStreak" = 0,
-             "healthySince" = NULL, "cooldownUntil" = NULL,
-             "controlVersion" = "controlVersion" + 1, "updatedAt" = ${now}
-       WHERE "id" = ${poolId}
-      RETURNING "id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency",
-        "controlVersion", "lastHealthyAt", "healthySince", "successStreak", "latencyBaselineMs", "cooldownUntil"
-    `);
-    if (!rows[0]) throw new SchedulingInvariantError("资源池不存在");
-    return poolFromRow(rows[0]);
-  }
-
-  async getCircuit(poolId: string): Promise<CircuitBreaker | null> {
-    const rows = await this.db.$queryRaw<CircuitRow[]>(Prisma.sql`
-      SELECT "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
-             "windowFailures", "openCount", "retryAfter", "halfOpenProbeTaskId", "blockedReason", "updatedAt"
-        FROM "ResearchCircuitBreaker" WHERE "resourcePoolId" = ${poolId}
-    `);
-    return rows[0] ? circuitFromRow(rows[0]) : null;
-  }
-
-  async recordOutcome(
-    poolId: string,
-    outcome: ResourceOutcome,
-  ): Promise<CircuitBreaker> {
-    const now = outcome.at ?? this.now();
-    return this.db.$transaction(async (tx) => {
-      const circuits = await this.ensureCircuit(tx, poolId, now);
-      const current = circuits[0];
-      if (!current) throw new SchedulingInvariantError("资源池熔断器不存在");
-      if (current.state === "CONFIG_BLOCKED") return circuitFromRow(current);
-      const failed = outcome.kind !== "SUCCESS";
-      const nextConsecutive = failed ? current.consecutiveFailures + 1 : 0;
-      const windowReset = current.windowAttempts >= 20;
-      const nextAttempts = windowReset ? 1 : current.windowAttempts + 1;
-      const nextFailures = windowReset
-        ? failed
-          ? 1
-          : 0
-        : current.windowFailures + (failed ? 1 : 0);
-      const shouldOpen =
-        current.state === "HALF_OPEN"
-          ? failed
-          : outcome.kind === "RATE_LIMITED" ||
-            nextConsecutive >= 5 ||
-            (nextAttempts >= 20 && nextFailures / nextAttempts >= 0.5);
-      const delay =
-        outcome.kind === "RATE_LIMITED"
-          ? Math.max(
-              outcome.retryAfterMs ?? 0,
-              CIRCUIT_RETRY_DELAYS_MS[Math.min(current.openCount, 4)] ?? 60_000,
-            )
-          : (CIRCUIT_RETRY_DELAYS_MS[Math.min(current.openCount, 4)] ?? 60_000);
-      const rows = await tx.$queryRaw<CircuitRow[]>(Prisma.sql`
-        UPDATE "ResearchCircuitBreaker"
-           SET "state" = CASE WHEN ${shouldOpen} THEN 'OPEN'
-                              WHEN "state" = 'HALF_OPEN' AND ${!failed} THEN 'CLOSED'
-                              ELSE "state" END,
-               "consecutiveFailures" = ${nextConsecutive}, "windowAttempts" = ${nextAttempts},
-               "windowFailures" = ${nextFailures},
-               "openCount" = CASE WHEN ${shouldOpen} THEN "openCount" + 1 ELSE "openCount" END,
-               "retryAfter" = CASE WHEN ${shouldOpen} THEN ${new Date(now.getTime() + delay)}
-                                    WHEN "state" = 'OPEN' THEN "retryAfter"
-                                    ELSE NULL END,
-               "halfOpenProbeTaskId" = NULL,
-               "version" = "version" + 1, "updatedAt" = ${now}
-         WHERE "resourcePoolId" = ${poolId}
-        RETURNING "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
-          "windowFailures", "openCount", "retryAfter", "halfOpenProbeTaskId", "blockedReason", "updatedAt"
-      `);
-      if (!rows[0]) throw new SchedulingInvariantError("资源池熔断器更新失败");
-      return circuitFromRow(rows[0]);
-    });
-  }
-
-  async blockConfiguration(
-    poolId: string,
-    reason: string,
-  ): Promise<CircuitBreaker> {
-    const now = this.now();
-    return this.db.$transaction(async (tx) => {
-      const circuits = await this.ensureCircuit(tx, poolId, now);
-      if (!circuits[0])
-        throw new SchedulingInvariantError("资源池熔断器不存在");
-      const rows = await tx.$queryRaw<CircuitRow[]>(Prisma.sql`
-        UPDATE "ResearchCircuitBreaker" SET "state" = 'CONFIG_BLOCKED', "blockedReason" = ${reason},
-               "retryAfter" = NULL, "halfOpenProbeTaskId" = NULL, "version" = "version" + 1,
-               "updatedAt" = ${now}
-         WHERE "resourcePoolId" = ${poolId}
-        RETURNING "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
-          "windowFailures", "openCount", "retryAfter", "halfOpenProbeTaskId", "blockedReason", "updatedAt"
-      `);
-      if (!rows[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
-      return circuitFromRow(rows[0]);
-    });
-  }
-
-  async allowConfiguration(poolId: string): Promise<CircuitBreaker> {
-    const now = this.now();
-    return this.db.$transaction(async (tx) => {
-      const circuits = await this.ensureCircuit(tx, poolId, now);
-      if (!circuits[0])
-        throw new SchedulingInvariantError("资源池熔断器不存在");
-      const rows = await tx.$queryRaw<CircuitRow[]>(Prisma.sql`
-        UPDATE "ResearchCircuitBreaker"
-           SET "state" = 'CLOSED', "blockedReason" = NULL, "retryAfter" = NULL,
-               "halfOpenProbeTaskId" = NULL, "consecutiveFailures" = 0,
-               "windowAttempts" = 0, "windowFailures" = 0, "version" = "version" + 1,
-               "updatedAt" = ${now}
-         WHERE "resourcePoolId" = ${poolId}
-        RETURNING "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
-          "windowFailures", "openCount", "retryAfter", "halfOpenProbeTaskId", "blockedReason", "updatedAt"
-      `);
-      if (!rows[0]) throw new SchedulingInvariantError("资源池熔断器不存在");
-      return circuitFromRow(rows[0]);
-    });
-  }
-
-  async recordAdaptiveOutcome(
-    poolId: string,
-    outcome: ResourceOutcome,
-  ): Promise<{
-    previous: number;
-    current: number;
-    changed: boolean;
-    reason: string;
-    cooldownUntil: Date | null;
-  }> {
-    const now = outcome.at ?? this.now();
-    return this.db.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<PoolRow[]>(Prisma.sql`
-        SELECT "id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency",
-               "controlVersion", "lastHealthyAt", "healthySince", "successStreak", "latencyBaselineMs", "cooldownUntil"
-          FROM "ResearchResourcePool" WHERE "id" = ${poolId} FOR UPDATE
-      `);
-      const pool = rows[0];
-      if (!pool) throw new SchedulingInvariantError("资源池不存在");
-      const previous = pool.currentConcurrency;
-      let current = previous;
-      let successStreak = pool.successStreak;
-      let healthySince = pool.healthySince;
-      let latencyBaselineMs = pool.latencyBaselineMs;
-      let cooldownUntil = pool.cooldownUntil;
-      let reason = "NO_CHANGE";
-      if (outcome.kind === "RATE_LIMITED") {
-        current = Math.max(1, Math.floor(previous / 2));
-        successStreak = 0;
-        healthySince = null;
-        cooldownUntil = new Date(now.getTime() + 5 * 60_000);
-        reason = "RATE_LIMITED_HALVED";
-      } else if (
-        outcome.kind === "TIMEOUT" ||
-        outcome.kind === "LATENCY_HIGH"
-      ) {
-        current = Math.max(1, previous - 1);
-        successStreak = 0;
-        healthySince = null;
-        cooldownUntil = new Date(now.getTime() + 5 * 60_000);
-        reason = `${outcome.kind}_DECREASED`;
-      } else if (outcome.kind === "SUCCESS") {
-        successStreak += 1;
-        healthySince ??= now;
-        if (outcome.latencyMs !== undefined) {
-          latencyBaselineMs =
-            latencyBaselineMs === null
-              ? outcome.latencyMs
-              : Math.min(latencyBaselineMs, outcome.latencyMs);
-        }
-        const healthyLongEnough =
-          now.getTime() - healthySince.getTime() >= 5 * 60_000;
-        const latencyHealthy =
-          outcome.latencyMs === undefined ||
-          latencyBaselineMs === null ||
-          outcome.latencyMs <= latencyBaselineMs * 2;
-        if (
-          successStreak >= 20 &&
-          healthyLongEnough &&
-          (!cooldownUntil || cooldownUntil <= now) &&
-          current < pool.hardConcurrency &&
-          latencyHealthy
-        ) {
-          current += 1;
-          successStreak = 0;
-          reason = "HEALTHY_STREAK_INCREASED";
-        }
-      }
-      const updated = await tx.$queryRaw<PoolRow[]>(Prisma.sql`
-        UPDATE "ResearchResourcePool"
-           SET "currentConcurrency" = ${Math.min(pool.hardConcurrency, current)},
-               "cooldownUntil" = ${cooldownUntil}, "healthySince" = ${healthySince},
-               "successStreak" = ${successStreak}, "latencyBaselineMs" = ${latencyBaselineMs},
-               "lastHealthyAt" = CASE WHEN ${outcome.kind === "SUCCESS"} THEN ${now} ELSE "lastHealthyAt" END,
-               "controlVersion" = "controlVersion" + 1, "updatedAt" = ${now}
-         WHERE "id" = ${poolId}
-        RETURNING "id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency",
-          "controlVersion", "lastHealthyAt", "healthySince", "successStreak", "latencyBaselineMs", "cooldownUntil"
-      `);
-      const result = updated[0];
-      if (!result) throw new SchedulingInvariantError("资源池更新失败");
-      return {
-        previous,
-        current: result.currentConcurrency,
-        changed: previous !== result.currentConcurrency,
-        reason,
-        cooldownUntil: result.cooldownUntil,
-      };
-    });
-  }
-
-  private async ensureCircuit(
-    tx: Prisma.TransactionClient,
-    poolId: string,
-    now: Date,
-  ): Promise<CircuitRow[]> {
-    await tx.$executeRaw(Prisma.sql`
-      INSERT INTO "ResearchCircuitBreaker" ("id", "resourcePoolId", "updatedAt")
-      VALUES (${randomUUID()}, ${poolId}, ${now}) ON CONFLICT ("resourcePoolId") DO NOTHING
-    `);
-    return tx.$queryRaw<CircuitRow[]>(Prisma.sql`
-      SELECT "resourcePoolId", "state", "version", "consecutiveFailures", "windowAttempts",
-             "windowFailures", "openCount", "retryAfter", "halfOpenProbeTaskId", "blockedReason", "updatedAt"
-        FROM "ResearchCircuitBreaker" WHERE "resourcePoolId" = ${poolId} FOR UPDATE
-    `);
-  }
-
-  private async oldestBacklogAge(
-    tx: Prisma.TransactionClient,
-    poolId: string,
-    now: Date,
-  ): Promise<bigint | null> {
-    const rows = await tx.$queryRaw<Array<{ oldest: Date | null }>>(Prisma.sql`
-      SELECT MIN("createdAt") AS oldest FROM "ResearchTask"
-       WHERE "resourcePoolId" = ${poolId} AND "status" IN ('PENDING', 'RETRY_WAIT')
-    `);
-    return rows[0]?.oldest
-      ? BigInt(Math.max(0, now.getTime() - rows[0].oldest.getTime()))
-      : null;
-  }
-
-  private async backlogInTransactionById(
-    tx: Prisma.TransactionClient,
-    poolId: string,
-    now: Date,
-  ): Promise<BacklogSnapshot> {
-    const pools = await tx.$queryRaw<PoolRow[]>(Prisma.sql`
-      SELECT "id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency",
-             "controlVersion", "lastHealthyAt", "healthySince", "successStreak", "latencyBaselineMs", "cooldownUntil"
-        FROM "ResearchResourcePool" WHERE "id" = ${poolId}
-    `);
-    const pool = pools[0];
-    if (!pool) throw new SchedulingInvariantError("资源池不存在");
-    return this.backlogInTransaction(tx, pool, now);
-  }
-
-  private async backlogInTransaction(
-    tx: Prisma.TransactionClient,
-    pool: PoolRow,
-    now: Date,
-  ): Promise<BacklogSnapshot> {
-    const rows = await tx.$queryRaw<
-      Array<{
-        schedulingTier: SchedulingTier;
-        count: bigint;
-        oldest: Date | null;
-      }>
-    >(Prisma.sql`
-      SELECT "schedulingTier", COUNT(*)::bigint AS count, MIN("createdAt") AS oldest
-        FROM "ResearchTask"
-       WHERE "resourcePoolId" = ${pool.id} AND "status" IN ('PENDING', 'RETRY_WAIT')
-       GROUP BY "schedulingTier"
-    `);
-    const counts: Record<SchedulingTier, number> = {
-      INTERACTIVE: 0,
-      TIME_CRITICAL: 0,
-      BACKGROUND: 0,
-    };
-    let oldest: Date | null = null;
-    for (const row of rows) {
-      counts[row.schedulingTier] = Number(row.count);
-      if (row.oldest && (!oldest || row.oldest < oldest)) oldest = row.oldest;
-    }
-    return {
-      resourcePoolId: pool.id,
-      limits: {
-        INTERACTIVE: backlogLimit("INTERACTIVE", pool.hardConcurrency),
-        TIME_CRITICAL: backlogLimit("TIME_CRITICAL", pool.hardConcurrency),
-        BACKGROUND: backlogLimit("BACKGROUND", pool.hardConcurrency),
-      },
-      counts,
-      oldestAgeMs: oldest
-        ? BigInt(Math.max(0, now.getTime() - oldest.getTime()))
-        : null,
-      total: counts.INTERACTIVE + counts.TIME_CRITICAL + counts.BACKGROUND,
-    };
   }
 }

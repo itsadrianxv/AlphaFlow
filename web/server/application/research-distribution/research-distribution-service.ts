@@ -5,12 +5,7 @@ import type {
   ResearchInboxChannel,
   ResearchInboxEntryKind,
 } from "~/server/domain/research-inbox/types";
-import {
-  CIRCUIT_RETRY_DELAYS_MS,
-  DELIVERY_MAX_ATTEMPTS,
-  DELIVERY_RETRY_BUDGET_MS,
-  retryDelayMs,
-} from "~/server/domain/scheduling/policies";
+import { DELIVERY_RETRY_BUDGET_MS } from "~/server/domain/scheduling/policies";
 import { LeaseLostError } from "~/server/domain/scheduling/types";
 
 export type DistributionScore = 0 | 1 | 2 | 3 | 4 | null;
@@ -85,6 +80,7 @@ export interface FeishuDeliveryPort {
   send(payload: FeishuDeliveryPayload): Promise<void>;
 }
 
+/** @deprecated 发送准入已收敛到调度器 claim；仅为旧调用方的编译过渡保留类型。 */
 export interface FeishuDeliveryGuard {
   run(copyId: string, operation: () => Promise<void>): Promise<void>;
 }
@@ -105,10 +101,8 @@ export type FeishuCopyStatus =
   | "PENDING"
   | "SENDING"
   | "RETRY_WAIT"
-  | "DEFERRED_CIRCUIT"
   | "SENT"
-  | "FAILED"
-  | "CONFIG_BLOCKED";
+  | "FAILED";
 
 export type FeishuCopy = {
   id: string;
@@ -122,6 +116,7 @@ export type FeishuCopy = {
   nextAttemptAt: string | null;
   sentAt: string | null;
   lastErrorCode: string | null;
+  failureClass?: string | null;
   claimToken: string | null;
   claimExpiresAt: string | null;
   fencingToken: string;
@@ -145,8 +140,8 @@ export interface ResearchDistributionStore {
   claimCopy(id: string, now: Date, leaseMs: number): Promise<FeishuCopy | null>;
   settleCopy(copy: FeishuCopy): Promise<FeishuCopy>;
   saveCopy(copy: FeishuCopy): Promise<FeishuCopy>;
-  getCircuit(): Promise<FeishuCircuit>;
-  saveCircuit(circuit: FeishuCircuit): Promise<FeishuCircuit>;
+  getCircuit?(): Promise<FeishuCircuit>;
+  saveCircuit?(circuit: FeishuCircuit): Promise<FeishuCircuit>;
 }
 
 export class InMemoryResearchDistributionStore
@@ -154,13 +149,13 @@ export class InMemoryResearchDistributionStore
 {
   private readonly copies = new Map<string, FeishuCopy>();
   private readonly copyIdByKey = new Map<string, string>();
+  private sequence = 0;
   private circuit: FeishuCircuit = {
     state: "CLOSED",
     consecutiveFailures: 0,
     openCount: 0,
     retryAfter: null,
   };
-  private sequence = 0;
 
   async createCopy(input: {
     entryId: string;
@@ -262,7 +257,6 @@ export class InMemoryResearchDistributionStore
   async getCircuit() {
     return structuredClone(this.circuit);
   }
-
   async saveCircuit(circuit: FeishuCircuit) {
     this.circuit = structuredClone(circuit);
     return this.getCircuit();
@@ -278,7 +272,6 @@ export class ResearchDistributionService {
       feishu?: FeishuDeliveryPort;
       feishuGuard?: FeishuDeliveryGuard;
       inboxLink?: (entryId: string) => string;
-      deliveryLeaseMs?: number;
     } = {
       clock: () => new Date(),
     },
@@ -313,9 +306,7 @@ export class ResearchDistributionService {
   }
 
   async retryFeishuCopy(copyId: string) {
-    const copy = await this.store.getCopy(copyId);
-    if (!copy) throw new Error("Feishu 副本不存在");
-    return this.attemptFeishuCopy(copy);
+    return this.store.getCopy(copyId);
   }
 
   freezeBriefingScope(input: {
@@ -444,122 +435,7 @@ export class ResearchDistributionService {
           `/research/inbox/${result.entry.id}`,
       },
     });
-    return this.attemptFeishuCopy(queued.copy);
-  }
-
-  private async attemptFeishuCopy(copy: FeishuCopy): Promise<FeishuCopy> {
-    const now = this.dependencies.clock();
-    if (copy.status === "SENT" || copy.status === "FAILED") return copy;
-    if (copy.nextAttemptAt && new Date(copy.nextAttemptAt) > now) return copy;
-    if (
-      copy.attempts >= DELIVERY_MAX_ATTEMPTS ||
-      new Date(copy.retryDeadline) <= now
-    ) {
-      return this.store.saveCopy({
-        ...copy,
-        status: "FAILED",
-        nextAttemptAt: null,
-        lastErrorCode: copy.lastErrorCode ?? "DELIVERY_BUDGET_EXHAUSTED",
-      });
-    }
-    const attempted = await this.store.claimCopy(
-      copy.id,
-      now,
-      this.dependencies.deliveryLeaseMs ?? 60_000,
-    );
-    if (!attempted) return (await this.store.getCopy(copy.id)) ?? copy;
-    const feishu = this.dependencies.feishu;
-    const feishuGuard = this.dependencies.feishuGuard;
-    if (!feishu || !feishuGuard) {
-      return this.store.settleCopy({
-        ...attempted,
-        status: "CONFIG_BLOCKED",
-        lastErrorCode: !feishu
-          ? "FEISHU_PORT_NOT_CONFIGURED"
-          : "FEISHU_PERMIT_GUARD_NOT_CONFIGURED",
-      });
-    }
-    const circuit = await this.store.getCircuit();
-    if (circuit.state === "OPEN") {
-      if (!circuit.retryAfter || new Date(circuit.retryAfter) > now) {
-        return this.store.settleCopy({
-          ...attempted,
-          status: "DEFERRED_CIRCUIT",
-          nextAttemptAt: circuit.retryAfter,
-        });
-      }
-      circuit.state = "HALF_OPEN";
-      circuit.retryAfter = null;
-      await this.store.saveCircuit(circuit);
-    }
-    try {
-      await feishuGuard.run(attempted.id, () => feishu.send(attempted.payload));
-      await this.store.saveCircuit({
-        state: "CLOSED",
-        consecutiveFailures: 0,
-        openCount: circuit.openCount,
-        retryAfter: null,
-      });
-      return this.store.settleCopy({
-        ...attempted,
-        status: "SENT",
-        sentAt: now.toISOString(),
-        lastErrorCode: null,
-      });
-    } catch (error) {
-      if (error instanceof LeaseLostError) {
-        await this.store
-          .settleCopy({
-            ...attempted,
-            status: "RETRY_WAIT",
-            nextAttemptAt: now.toISOString(),
-            lastErrorCode: "FEISHU_PERMIT_LEASE_LOST",
-          })
-          .catch(() => undefined);
-        throw error;
-      }
-      const deliveryError =
-        error instanceof FeishuDeliveryError
-          ? error
-          : new FeishuDeliveryError("FEISHU_UNKNOWN_ERROR", false);
-      const failures = deliveryError.retryable
-        ? circuit.consecutiveFailures + 1
-        : 0;
-      const nextCircuit = { ...circuit, consecutiveFailures: failures };
-      if (deliveryError.retryable && failures >= 5) {
-        nextCircuit.state = "OPEN";
-        nextCircuit.openCount += 1;
-        nextCircuit.retryAfter = new Date(
-          now.getTime() + circuitDelayMs(nextCircuit.openCount),
-        ).toISOString();
-      }
-      await this.store.saveCircuit(nextCircuit);
-      const exhausted =
-        !deliveryError.retryable || attempted.attempts >= DELIVERY_MAX_ATTEMPTS;
-      const terminalStatus: FeishuCopyStatus =
-        !deliveryError.retryable &&
-        deliveryError.code.startsWith("FEISHU_BUSINESS_")
-          ? "CONFIG_BLOCKED"
-          : "FAILED";
-      return this.store.settleCopy({
-        ...attempted,
-        status: exhausted ? terminalStatus : "RETRY_WAIT",
-        nextAttemptAt: exhausted
-          ? null
-          : new Date(
-              Math.max(
-                now.getTime() + retryDelayMs(attempted.attempts),
-                deliveryError.retryAfterMs
-                  ? now.getTime() + deliveryError.retryAfterMs
-                  : 0,
-                nextCircuit.retryAfter
-                  ? new Date(nextCircuit.retryAfter).getTime()
-                  : 0,
-              ),
-            ).toISOString(),
-        lastErrorCode: deliveryError.code,
-      });
-    }
+    return queued.copy;
   }
 }
 
@@ -700,14 +576,6 @@ function briefingPriority(candidate: BriefingCandidate) {
     (candidate.informationNovelty ?? -1) * 10 +
     (candidate.confidence ?? -1)
   );
-}
-
-function circuitDelayMs(openCount: number) {
-  const index = Math.min(
-    CIRCUIT_RETRY_DELAYS_MS.length - 1,
-    Math.max(0, openCount - 1),
-  );
-  return CIRCUIT_RETRY_DELAYS_MS[index] ?? 60_000;
 }
 
 function toEntryKind(
