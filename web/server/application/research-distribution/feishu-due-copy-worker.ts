@@ -2,13 +2,15 @@ import { createHash } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import {
+  type FeishuCopy,
   FeishuDeliveryError,
   type FeishuDeliveryPort,
 } from "~/server/application/research-distribution/research-distribution-service";
 import { ProductionRuntimeObserver } from "~/server/application/runtime-observability/production-runtime-observer";
+import { PostgresExternalCopyAttemptRepository } from "~/server/application/scheduling/postgres-external-copy-attempt-repository";
 import type { PostgresResearchScheduler } from "~/server/application/scheduling/postgres-research-scheduler";
-import { PostgresSchedulingControl } from "~/server/application/scheduling/postgres-scheduling-control";
-import { PrismaResearchDistributionStore } from "~/server/infrastructure/research-distribution/prisma-research-distribution-store";
+import { FEISHU_DELIVERY_MAX_ATTEMPTS } from "~/server/domain/scheduling/policies";
+import { LeaseLostError } from "~/server/domain/scheduling/types";
 
 export const FEISHU_DELIVERY_TASK_TYPE = "research.feishu-delivery.v1";
 export const FEISHU_POOL_KEY = "feishu:research-delivery";
@@ -38,6 +40,8 @@ export class FeishuDueCopyScheduler {
     const copies = await this.db.researchExternalCopy.findMany({
       where: {
         channel: "FEISHU",
+        retryDeadline: { gt: now },
+        attempts: { lt: FEISHU_DELIVERY_MAX_ATTEMPTS },
         OR: [
           {
             status: {
@@ -94,16 +98,29 @@ export class FeishuDueCopyWorker {
       feishu?: FeishuDeliveryPort;
       clock?: () => Date;
       deliveryLeaseMs?: number;
+      observer?: Pick<ProductionRuntimeObserver, "record">;
     } = {},
   ) {}
 
   async runOnce(poolId: string, workerId: string) {
-    const claimed = await this.scheduler.claim(poolId, workerId);
-    if (!claimed) return null;
     const clock = this.dependencies.clock ?? (() => new Date());
     const startedAt = clock();
-    const observer = new ProductionRuntimeObserver(this.db);
+    const repository = new PostgresExternalCopyAttemptRepository(
+      this.db,
+      this.scheduler,
+    );
+    const claimed = await repository.claimNextExternalCopyAttempt({
+      poolId,
+      workerId,
+      claimedAt: startedAt,
+      leaseMs: this.dependencies.deliveryLeaseMs ?? 60_000,
+    });
+    if (!claimed) return null;
+    const observer =
+      this.dependencies.observer ?? new ProductionRuntimeObserver(this.db);
     let input: z.infer<typeof taskInputSchema> | null = null;
+    const claimedCopy: FeishuCopy | null = claimed.copy;
+    let httpSucceeded = false;
     try {
       if (claimed.task.taskType !== FEISHU_DELIVERY_TASK_TYPE) {
         throw new Error(
@@ -111,46 +128,20 @@ export class FeishuDueCopyWorker {
         );
       }
       input = taskInputSchema.parse(claimed.task.input);
-      const store = new PrismaResearchDistributionStore(this.db);
-      const copy = await store.claimCopy(
-        input.copyId,
-        startedAt,
-        this.dependencies.deliveryLeaseMs ?? 60_000,
-      );
-      if (!copy) {
-        await this.scheduler.settle(
-          claimed.task.id,
-          claimed.task.fencingToken,
-          {
-            disposition: "COMPLETED",
-            resultContractVersion: "feishu-delivery-result.v1",
-            result: {
-              copyId: input.copyId,
-              status: "SKIPPED",
-              attemptNo: input.attemptNo,
-            },
-          },
-        );
-        return {
-          copy: await store.getCopy(input.copyId),
-          taskId: claimed.task.id,
-        };
-      }
       if (!this.dependencies.feishu)
         throw new FeishuDeliveryError("FEISHU_PORT_NOT_CONFIGURED", false);
-      await this.dependencies.feishu.send(copy.payload);
-      const settledCopy = await store.settleCopy({
-        ...copy,
-        status: "SENT",
-        sentAt: clock().toISOString(),
-        lastErrorCode: null,
-        failureClass: null,
+      await this.dependencies.feishu.send(claimedCopy.payload);
+      httpSucceeded = true;
+      const settled = await repository.settleExternalCopyAttempt({
+        taskId: claimed.task.id,
+        taskFencingToken: claimed.task.fencingToken,
+        copyId: claimedCopy.id,
+        copyFencingToken: BigInt(claimedCopy.fencingToken),
+        outcome: { kind: "SUCCESS" },
+        completedAt: clock(),
       });
-      await new PostgresSchedulingControl(this.db, {
-        now: clock,
-      }).recordOutcome(poolId, { kind: "SUCCESS", at: clock() });
-      const finalCopy = settledCopy;
-      await observer.record({
+      const finalCopy = settled.copy;
+      await recordObservationSafely(observer, {
         idempotencyKey: `feishu-worker:${claimed.task.id}:${claimed.task.fencingToken.toString()}:SENT`,
         metricKind: "DELIVERY",
         stage: "external-delivery",
@@ -180,90 +171,42 @@ export class FeishuDueCopyWorker {
             : {}),
         },
       });
-      await this.scheduler.settle(claimed.task.id, claimed.task.fencingToken, {
-        disposition: "COMPLETED",
-        resultContractVersion: "feishu-delivery-result.v1",
-        result: {
-          copyId: finalCopy.id,
-          status: finalCopy.status,
-          attemptNo: input.attemptNo,
-        },
-      });
       return { copy: finalCopy, taskId: claimed.task.id };
     } catch (error) {
-      const store = new PrismaResearchDistributionStore(this.db);
+      if (error instanceof LeaseLostError || httpSucceeded) throw error;
       if (!input) {
-        await this.scheduler.settle(
-          claimed.task.id,
-          claimed.task.fencingToken,
-          {
-            disposition: "RETRY",
-            errorClass: "FEISHU_DELIVERY_TASK_INPUT_INVALID",
-            retryable: true,
+        await repository.settleExternalCopyAttempt({
+          taskId: claimed.task.id,
+          taskFencingToken: claimed.task.fencingToken,
+          copyId: claimed.copy.id,
+          copyFencingToken: BigInt(claimed.copy.fencingToken),
+          outcome: {
+            kind: "PERMANENT_FAILURE",
+            errorCode: "FEISHU_DELIVERY_TASK_INPUT_INVALID",
           },
-        );
+          completedAt: clock(),
+        });
         throw error;
       }
-      const current = await store.getCopy(input.copyId);
-      if (!current) {
-        await this.scheduler.settle(
-          claimed.task.id,
-          claimed.task.fencingToken,
-          {
-            disposition: "RETRY",
-            errorClass: "FEISHU_DELIVERY_COPY_UNAVAILABLE",
-            retryable: true,
-          },
-        );
-        throw error;
+      if (!claimedCopy) {
+        throw new LeaseLostError("飞书投递副本已失去 claim");
       }
-      if (current?.status === "SENDING" && current.claimToken) {
+      if (claimedCopy.status === "SENDING" && claimedCopy.claimToken) {
         const deliveryError =
           error instanceof FeishuDeliveryError
             ? error
             : new FeishuDeliveryError("FEISHU_UNKNOWN_ERROR", true);
         const now = clock();
-        const exhausted =
-          !deliveryError.retryable ||
-          current.attempts >= 5 ||
-          new Date(current.retryDeadline) <= now;
-        await store.settleCopy({
-          ...current,
-          status: exhausted ? "FAILED" : "RETRY_WAIT",
-          nextAttemptAt: exhausted
-            ? null
-            : new Date(
-                now.getTime() + (deliveryError.retryAfterMs ?? 60_000),
-              ).toISOString(),
-          lastErrorCode: deliveryError.code,
-          failureClass: deliveryError.retryable
-            ? exhausted
-              ? "RETRY_EXHAUSTED"
-              : deliveryError.code.includes("429")
-                ? "RATE_LIMITED"
-                : deliveryError.code.includes("TIMEOUT") ||
-                    deliveryError.code.includes("408")
-                  ? "TIMEOUT"
-                  : "UPSTREAM_FAILURE"
-            : deliveryError.code.startsWith("FEISHU_HTTP_4")
-              ? "TARGET_CONFIGURATION"
-              : "PERMANENT_FAILURE",
+        await repository.settleExternalCopyAttempt({
+          taskId: claimed.task.id,
+          taskFencingToken: claimed.task.fencingToken,
+          copyId: claimedCopy.id,
+          copyFencingToken: BigInt(claimedCopy.fencingToken),
+          outcome: deliveryOutcome(deliveryError),
+          completedAt: now,
         });
-        if (deliveryError.retryable)
-          await new PostgresSchedulingControl(this.db, {
-            now: clock,
-          }).recordOutcome(poolId, {
-            kind: deliveryError.code.includes("429")
-              ? "RATE_LIMITED"
-              : deliveryError.code.includes("TIMEOUT") ||
-                  deliveryError.code.includes("408")
-                ? "TIMEOUT"
-                : "FAILURE",
-            retryAfterMs: deliveryError.retryAfterMs,
-            at: now,
-          });
       }
-      await observer.record({
+      await recordObservationSafely(observer, {
         idempotencyKey: `feishu-worker:${claimed.task.id}:${claimed.task.fencingToken.toString()}:failure`,
         metricKind: "DELIVERY",
         stage: "external-delivery",
@@ -287,17 +230,47 @@ export class FeishuDueCopyWorker {
           fencingToken: claimed.task.fencingToken.toString(),
         },
       });
-      await this.scheduler.settle(claimed.task.id, claimed.task.fencingToken, {
-        disposition: "COMPLETED",
-        resultContractVersion: "feishu-delivery-result.v1",
-        result: {
-          copyId: input.copyId,
-          status: "FAILED",
-          attemptNo: input.attemptNo,
-        },
-      });
       throw error;
     }
+  }
+}
+
+function deliveryOutcome(error: FeishuDeliveryError) {
+  if (!error.retryable) {
+    const targetConfiguration =
+      error.code.startsWith("FEISHU_HTTP_4") ||
+      error.code.includes("TARGET_NOT_CONFIGURED") ||
+      error.code.includes("WEBHOOK_NOT_CONFIGURED") ||
+      error.code.includes("WEBHOOK_INVALID") ||
+      error.code === "FEISHU_PORT_NOT_CONFIGURED";
+    return {
+      kind: targetConfiguration
+        ? ("TARGET_CONFIGURATION" as const)
+        : ("PERMANENT_FAILURE" as const),
+      errorCode: error.code,
+    };
+  }
+  return {
+    kind:
+      error.resourceOutcome ??
+      (error.code.includes("429")
+        ? ("RATE_LIMITED" as const)
+        : error.code.includes("TIMEOUT") || error.code.includes("408")
+          ? ("TIMEOUT" as const)
+          : ("FAILURE" as const)),
+    errorCode: error.code,
+    retryAfterMs: error.retryAfterMs,
+  };
+}
+
+async function recordObservationSafely(
+  observer: Pick<ProductionRuntimeObserver, "record">,
+  input: Parameters<ProductionRuntimeObserver["record"]>[0],
+) {
+  try {
+    await observer.record(input);
+  } catch {
+    // 观测失败不能回滚已经完成的权威结算。
   }
 }
 

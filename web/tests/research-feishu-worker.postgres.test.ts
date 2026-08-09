@@ -96,4 +96,22 @@ describePostgres("Feishu due copy 正式 worker PostgreSQL 契约", () => {
     expect(sends).toBe(1);
     await expect(db.researchExternalCopy.findUnique({ where: { id: copy.id } })).resolves.toMatchObject({ status: "SENT", sentAt: expect.any(Date) });
   });
+
+  it("观测写入失败不影响权威结算", async () => {
+    const poolId = key("feishu-observer-pool");
+    await db.researchResourcePool.create({ data: { id: poolId, poolKey: key("feishu-observer-key"), resourceKind: "FEISHU", hardConcurrency: 1, currentConcurrency: 1 } });
+    const userId = key("feishu-observer-user");
+    await db.user.create({ data: { id: userId } });
+    const entry = await db.researchInboxEntry.create({ data: { distributionKey: key("distribution"), userId, highestChannel: "URGENT_ALERT", entryKind: "EVENT", title: "事件", summary: "摘要", bodyJson: {} } });
+    const copy = await db.researchExternalCopy.create({ data: { entryId: entry.id, idempotencyKey: key("copy"), payloadJson: { idempotencyKey: key("payload"), title: "事件", reason: "门控", status: "已核实", inboxLink: "/research-inbox" }, retryDeadline: new Date(Date.now() + 60_000) } });
+    const scheduler = new PostgresResearchScheduler(db);
+    await new FeishuDueCopyScheduler(db, scheduler).scheduleDueCopies({ poolId });
+    const worker = new FeishuDueCopyWorker(db, scheduler, {
+      feishu: { send: async () => undefined },
+      observer: { record: async () => { throw new Error("观测不可用"); } },
+    });
+
+    await expect(worker.runOnce(poolId, "feishu-observer-worker")).resolves.toMatchObject({ copy: { status: "SENT" } });
+    await expect(db.researchExternalCopy.findUniqueOrThrow({ where: { id: copy.id } })).resolves.toMatchObject({ status: "SENT" });
+  });
 });

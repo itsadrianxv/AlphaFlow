@@ -12,9 +12,21 @@ export class FeishuWebhookDeliveryAdapter implements FeishuDeliveryPort {
   ) {}
 
   async send(payload: FeishuDeliveryPayload): Promise<void> {
+    let webhookUrl: string;
+    try {
+      webhookUrl = resolveFeishuWebhook(this.targetRef);
+    } catch (error) {
+      throw new FeishuDeliveryError(
+        error instanceof Error
+          ? (error.message.split(":")[0] ??
+              "FEISHU_TARGET_CONFIGURATION_INVALID")
+          : "FEISHU_TARGET_CONFIGURATION_INVALID",
+        false,
+      );
+    }
     let response: Response;
     try {
-      response = await this.fetcher(resolveFeishuWebhook(this.targetRef), {
+      response = await this.fetcher(webhookUrl, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -31,16 +43,30 @@ export class FeishuWebhookDeliveryAdapter implements FeishuDeliveryPort {
       });
     } catch (error) {
       if (error instanceof FeishuDeliveryError) throw error;
-      throw new FeishuDeliveryError("FEISHU_NETWORK_ERROR", true);
+      throw new FeishuDeliveryError(
+        "FEISHU_NETWORK_ERROR",
+        true,
+        undefined,
+        "TIMEOUT",
+      );
     }
 
     if (!response.ok) {
       throw new FeishuDeliveryError(
         `FEISHU_HTTP_${response.status}`,
-        response.status === 429 || response.status >= 500,
+        response.status === 408 ||
+          response.status === 429 ||
+          response.status >= 500,
         response.status === 429
           ? retryAfterMs(response.headers.get("retry-after"))
           : undefined,
+        response.status === 429
+          ? "RATE_LIMITED"
+          : response.status === 408
+            ? "TIMEOUT"
+            : response.status >= 500
+              ? "FAILURE"
+              : undefined,
       );
     }
     const result = (await response.json().catch(() => null)) as {
@@ -49,7 +75,9 @@ export class FeishuWebhookDeliveryAdapter implements FeishuDeliveryPort {
     if (result?.code !== 0) {
       throw new FeishuDeliveryError(
         `FEISHU_BUSINESS_${String(result?.code ?? "INVALID_RESPONSE")}`,
-        false,
+        true,
+        undefined,
+        "FAILURE",
       );
     }
   }

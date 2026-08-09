@@ -80,11 +80,6 @@ export interface FeishuDeliveryPort {
   send(payload: FeishuDeliveryPayload): Promise<void>;
 }
 
-/** @deprecated 发送准入已收敛到调度器 claim；仅为旧调用方的编译过渡保留类型。 */
-export interface FeishuDeliveryGuard {
-  run(copyId: string, operation: () => Promise<void>): Promise<void>;
-}
-
 export class FeishuDeliveryError extends Error {
   override name = "FeishuDeliveryError";
 
@@ -92,6 +87,7 @@ export class FeishuDeliveryError extends Error {
     readonly code: string,
     readonly retryable: boolean,
     readonly retryAfterMs?: number,
+    readonly resourceOutcome?: "RATE_LIMITED" | "TIMEOUT" | "FAILURE",
   ) {
     super(code);
   }
@@ -122,13 +118,6 @@ export type FeishuCopy = {
   fencingToken: string;
 };
 
-export type FeishuCircuit = {
-  state: "CLOSED" | "OPEN" | "HALF_OPEN";
-  consecutiveFailures: number;
-  openCount: number;
-  retryAfter: string | null;
-};
-
 export interface ResearchDistributionStore {
   createCopy(input: {
     entryId: string;
@@ -140,8 +129,6 @@ export interface ResearchDistributionStore {
   claimCopy(id: string, now: Date, leaseMs: number): Promise<FeishuCopy | null>;
   settleCopy(copy: FeishuCopy): Promise<FeishuCopy>;
   saveCopy(copy: FeishuCopy): Promise<FeishuCopy>;
-  getCircuit?(): Promise<FeishuCircuit>;
-  saveCircuit?(circuit: FeishuCircuit): Promise<FeishuCircuit>;
 }
 
 export class InMemoryResearchDistributionStore
@@ -150,12 +137,6 @@ export class InMemoryResearchDistributionStore
   private readonly copies = new Map<string, FeishuCopy>();
   private readonly copyIdByKey = new Map<string, string>();
   private sequence = 0;
-  private circuit: FeishuCircuit = {
-    state: "CLOSED",
-    consecutiveFailures: 0,
-    openCount: 0,
-    retryAfter: null,
-  };
 
   async createCopy(input: {
     entryId: string;
@@ -253,14 +234,6 @@ export class InMemoryResearchDistributionStore
     this.copies.set(copy.id, structuredClone(settled));
     return structuredClone(settled);
   }
-
-  async getCircuit() {
-    return structuredClone(this.circuit);
-  }
-  async saveCircuit(circuit: FeishuCircuit) {
-    this.circuit = structuredClone(circuit);
-    return this.getCircuit();
-  }
 }
 
 export class ResearchDistributionService {
@@ -270,7 +243,6 @@ export class ResearchDistributionService {
     private readonly dependencies: {
       clock: () => Date;
       feishu?: FeishuDeliveryPort;
-      feishuGuard?: FeishuDeliveryGuard;
       inboxLink?: (entryId: string) => string;
     } = {
       clock: () => new Date(),

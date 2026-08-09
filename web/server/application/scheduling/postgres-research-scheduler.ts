@@ -164,20 +164,31 @@ export class PostgresResearchScheduler {
 
   async claim(poolId: string, workerId: string): Promise<ClaimedTask | null> {
     const now = this.now();
-    return this.db.$transaction(async (tx) => {
-      const pools = await tx.$queryRaw<PoolRow[]>(Prisma.sql`
+    return this.db.$transaction((tx) =>
+      this.claimInTransaction(tx, poolId, workerId, now),
+    );
+  }
+
+  /** @internal 供同一 PostgreSQL adapter 组合业务 claim，调用方必须持有外层事务。 */
+  async claimInTransaction(
+    tx: Prisma.TransactionClient,
+    poolId: string,
+    workerId: string,
+    now: Date,
+  ): Promise<ClaimedTask | null> {
+    const pools = await tx.$queryRaw<PoolRow[]>(Prisma.sql`
         SELECT "id", "poolKey", "resourceKind", "hardConcurrency", "currentConcurrency",
                "controlVersion", "lastHealthyAt", "healthySince", "successStreak", "latencyBaselineMs", "cooldownUntil"
           FROM "ResearchResourcePool" WHERE "id" = ${poolId} FOR UPDATE
       `);
-      const pool = pools[0];
-      if (!pool) throw new SchedulingInvariantError("资源池不存在");
-      await tx.$executeRaw(Prisma.sql`
+    const pool = pools[0];
+    if (!pool) throw new SchedulingInvariantError("资源池不存在");
+    await tx.$executeRaw(Prisma.sql`
         UPDATE "ResearchResourcePermit"
            SET "status" = 'EXPIRED', "releasedAt" = ${now}, "releaseReason" = 'permit_lease_expired'
          WHERE "resourcePoolId" = ${poolId} AND "status" = 'ACTIVE' AND "leaseExpiresAt" <= ${now}
       `);
-      await tx.$executeRaw(Prisma.sql`
+    await tx.$executeRaw(Prisma.sql`
         WITH expired_tasks AS (
           UPDATE "ResearchTask"
              SET "status" = CASE WHEN "attempts" < "maxAttempts" AND "retryDeadline" > ${now}
@@ -198,61 +209,60 @@ export class PostgresResearchScheduler {
            SET "status" = 'EXPIRED', "releasedAt" = ${now}, "releaseReason" = 'task_lease_expired'
          WHERE "taskId" IN (SELECT "id" FROM expired_tasks) AND "status" = 'ACTIVE'
       `);
-      const circuits = await ensureCircuit(tx, poolId, now);
-      const circuit = circuits[0];
-      if (!circuit || circuit.state === "CONFIG_BLOCKED") return null;
-      if (circuit.state === "OPEN") {
-        if (
-          !circuit.retryAfter ||
-          circuit.retryAfter > now ||
-          circuit.halfOpenProbeTaskId
-        )
-          return null;
-        const transitioned = await tx.$executeRaw(Prisma.sql`
+    const circuits = await ensureCircuit(tx, poolId, now);
+    const circuit = circuits[0];
+    if (!circuit || circuit.state === "CONFIG_BLOCKED") return null;
+    if (circuit.state === "OPEN") {
+      if (
+        !circuit.retryAfter ||
+        circuit.retryAfter > now ||
+        circuit.halfOpenProbeTaskId
+      )
+        return null;
+      const transitioned = await tx.$executeRaw(Prisma.sql`
           UPDATE "ResearchCircuitBreaker" SET "state" = 'HALF_OPEN', "version" = "version" + 1,
                  "updatedAt" = ${now} WHERE "resourcePoolId" = ${poolId} AND "state" = 'OPEN'
         `);
-        if (transitioned !== 1) return null;
-        circuit.state = "HALF_OPEN";
-        circuit.version += 1n;
-        circuit.updatedAt = now;
-      }
-      if (circuit.state === "HALF_OPEN" && circuit.halfOpenProbeTaskId) {
-        const probeRows = await tx.$queryRaw<
-          Array<{ status: ResearchTask["status"]; leaseExpiresAt: Date | null }>
-        >(Prisma.sql`
+      if (transitioned !== 1) return null;
+      circuit.state = "HALF_OPEN";
+      circuit.version += 1n;
+      circuit.updatedAt = now;
+    }
+    if (circuit.state === "HALF_OPEN" && circuit.halfOpenProbeTaskId) {
+      const probeRows = await tx.$queryRaw<
+        Array<{ status: ResearchTask["status"]; leaseExpiresAt: Date | null }>
+      >(Prisma.sql`
           SELECT "status", "leaseExpiresAt"
             FROM "ResearchTask" WHERE "id" = ${circuit.halfOpenProbeTaskId}
         `);
-        const probe = probeRows[0];
-        if (
-          !probe ||
-          probe.status !== "RUNNING" ||
-          !probe.leaseExpiresAt ||
-          probe.leaseExpiresAt <= now
-        ) {
-          await tx.$executeRaw(Prisma.sql`
+      const probe = probeRows[0];
+      if (
+        !probe ||
+        probe.status !== "RUNNING" ||
+        !probe.leaseExpiresAt ||
+        probe.leaseExpiresAt <= now
+      ) {
+        await tx.$executeRaw(Prisma.sql`
             UPDATE "ResearchCircuitBreaker"
                SET "halfOpenProbeTaskId" = NULL, "updatedAt" = ${now}
              WHERE "resourcePoolId" = ${poolId} AND "state" = 'HALF_OPEN'
                AND "halfOpenProbeTaskId" = ${circuit.halfOpenProbeTaskId}
           `);
-          circuit.halfOpenProbeTaskId = null;
-        }
+        circuit.halfOpenProbeTaskId = null;
       }
-      if (circuit.state === "HALF_OPEN" && circuit.halfOpenProbeTaskId)
-        return null;
-      const active = await tx.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+    }
+    if (circuit.state === "HALF_OPEN" && circuit.halfOpenProbeTaskId)
+      return null;
+    const active = await tx.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
         SELECT COUNT(*)::bigint AS count FROM "ResearchResourcePermit"
          WHERE "resourcePoolId" = ${poolId} AND "status" = 'ACTIVE' AND "leaseExpiresAt" > ${now}
       `);
-      if (Number(active[0]?.count ?? 0n) >= pool.currentConcurrency)
-        return null;
+    if (Number(active[0]?.count ?? 0n) >= pool.currentConcurrency) return null;
 
-      const rows = await tx.$queryRaw<TaskRow[]>(Prisma.sql`
+    const rows = await tx.$queryRaw<TaskRow[]>(Prisma.sql`
         SELECT "id", "taskType", "idempotencyKey", "inputHash", "inputContractVersion",
                "inputJson", "schedulingTier", "resourcePoolId", "fairnessKey", "userId",
-               "parentTaskId", "targetCompletionAt", "status", "attempts", "maxAttempts",
+               "parentTaskId", "externalCopyId", "targetCompletionAt", "status", "attempts", "maxAttempts",
                "retryDeadline", "nextAttemptAt", "workerId", "fencingToken", "leaseExpiresAt",
                "heartbeatAt", "resultContractVersion", "resultHash", "resultJson", "errorClass",
                "retryability", "terminalReason", "oldestBacklogAgeMs", "createdAt", "updatedAt"
@@ -269,58 +279,57 @@ export class PostgresResearchScheduler {
            "fairnessKey", "createdAt"
          FOR UPDATE SKIP LOCKED LIMIT 200
       `);
-      const activeUsers = await tx.$queryRaw<
-        Array<{ userId: string; count: bigint }>
-      >(Prisma.sql`
+    const activeUsers = await tx.$queryRaw<
+      Array<{ userId: string; count: bigint }>
+    >(Prisma.sql`
         SELECT "userId", COUNT(*)::bigint AS count
           FROM "ResearchTask"
          WHERE "resourcePoolId" = ${poolId} AND "status" = 'RUNNING' AND "userId" IS NOT NULL
          GROUP BY "userId"
       `);
-      const activeUserCounts = new Map(
-        activeUsers.map((row) => [row.userId, Number(row.count)]),
+    const activeUserCounts = new Map(
+      activeUsers.map((row) => [row.userId, Number(row.count)]),
+    );
+    const eligible = rows.filter((row) => {
+      if (!row.userId) return true;
+      return (
+        (activeUserCounts.get(row.userId) ?? 0) < this.maxUserConcurrencyPerPool
       );
-      const eligible = rows.filter((row) => {
-        if (!row.userId) return true;
-        return (
-          (activeUserCounts.get(row.userId) ?? 0) <
-          this.maxUserConcurrencyPerPool
-        );
-      });
-      const availableTiers = new Set(eligible.map((row) => row.schedulingTier));
-      const tier = weightedTierOrder(
-        availableTiers,
-        BigInt(pool.controlVersion),
-      )[0];
-      if (!tier) return null;
-      const candidates = eligible.filter((row) => row.schedulingTier === tier);
-      const urgency = Math.min(
-        ...candidates.map((row) => urgencyBucket(row.targetCompletionAt, now)),
-      );
-      const urgentCandidates = candidates.filter(
-        (row) => urgencyBucket(row.targetCompletionAt, now) === urgency,
-      );
-      const fairnessKeys = [
-        ...new Set(urgentCandidates.map((row) => row.fairnessKey)),
-      ].sort();
-      const fairnessStart = Number(
-        BigInt(pool.controlVersion) % BigInt(Math.max(1, fairnessKeys.length)),
-      );
-      const orderedFairnessKeys = fairnessKeys
-        .slice(fairnessStart)
-        .concat(fairnessKeys.slice(0, fairnessStart));
-      const candidate = orderedFairnessKeys.flatMap((fairnessKey) =>
-        urgentCandidates
-          .filter((row) => row.fairnessKey === fairnessKey)
-          .sort(
-            (left, right) =>
-              Number(left.attempts > 0) - Number(right.attempts > 0) ||
-              left.createdAt.getTime() - right.createdAt.getTime(),
-          ),
-      )[0];
-      if (!candidate) return null;
-      const nextToken = BigInt(candidate.fencingToken) + 1n;
-      const updated = await tx.$queryRaw<TaskRow[]>(Prisma.sql`
+    });
+    const availableTiers = new Set(eligible.map((row) => row.schedulingTier));
+    const tier = weightedTierOrder(
+      availableTiers,
+      BigInt(pool.controlVersion),
+    )[0];
+    if (!tier) return null;
+    const candidates = eligible.filter((row) => row.schedulingTier === tier);
+    const urgency = Math.min(
+      ...candidates.map((row) => urgencyBucket(row.targetCompletionAt, now)),
+    );
+    const urgentCandidates = candidates.filter(
+      (row) => urgencyBucket(row.targetCompletionAt, now) === urgency,
+    );
+    const fairnessKeys = [
+      ...new Set(urgentCandidates.map((row) => row.fairnessKey)),
+    ].sort();
+    const fairnessStart = Number(
+      BigInt(pool.controlVersion) % BigInt(Math.max(1, fairnessKeys.length)),
+    );
+    const orderedFairnessKeys = fairnessKeys
+      .slice(fairnessStart)
+      .concat(fairnessKeys.slice(0, fairnessStart));
+    const candidate = orderedFairnessKeys.flatMap((fairnessKey) =>
+      urgentCandidates
+        .filter((row) => row.fairnessKey === fairnessKey)
+        .sort(
+          (left, right) =>
+            Number(left.attempts > 0) - Number(right.attempts > 0) ||
+            left.createdAt.getTime() - right.createdAt.getTime(),
+        ),
+    )[0];
+    if (!candidate) return null;
+    const nextToken = BigInt(candidate.fencingToken) + 1n;
+    const updated = await tx.$queryRaw<TaskRow[]>(Prisma.sql`
         UPDATE "ResearchTask"
            SET "status" = 'RUNNING', "attempts" = "attempts" + 1, "workerId" = ${workerId},
                "fencingToken" = ${nextToken}, "leaseExpiresAt" = ${new Date(now.getTime() + this.leaseMs)},
@@ -330,16 +339,16 @@ export class PostgresResearchScheduler {
          WHERE "id" = ${candidate.id} AND "fencingToken" = ${candidate.fencingToken}
            AND "status" IN ('PENDING', 'RETRY_WAIT')
         RETURNING "id", "taskType", "idempotencyKey", "inputHash", "inputContractVersion",
-          "inputJson", "schedulingTier", "resourcePoolId", "fairnessKey", "userId", "parentTaskId",
+          "inputJson", "schedulingTier", "resourcePoolId", "fairnessKey", "userId", "parentTaskId", "externalCopyId",
           "targetCompletionAt", "status", "attempts", "maxAttempts", "retryDeadline", "nextAttemptAt",
           "workerId", "fencingToken", "leaseExpiresAt", "heartbeatAt", "resultContractVersion",
           "resultHash", "resultJson", "errorClass", "retryability", "terminalReason",
           "oldestBacklogAgeMs", "createdAt", "updatedAt"
       `);
-      const taskRow = updated[0];
-      if (!taskRow) return null;
-      const permitId = randomUUID();
-      const permitRows = await tx.$queryRaw<PermitRow[]>(Prisma.sql`
+    const taskRow = updated[0];
+    if (!taskRow) return null;
+    const permitId = randomUUID();
+    const permitRows = await tx.$queryRaw<PermitRow[]>(Prisma.sql`
         INSERT INTO "ResearchResourcePermit" (
           "id", "resourcePoolId", "taskId", "permitKey", "holderId", "fencingToken",
           "status", "acquiredAt", "leaseExpiresAt"
@@ -351,23 +360,22 @@ export class PostgresResearchScheduler {
         RETURNING "id", "resourcePoolId", "taskId", "permitKey", "holderId", "fencingToken",
           "status", "acquiredAt", "leaseExpiresAt", "releasedAt", "releaseReason"
       `);
-      await tx.$executeRaw(Prisma.sql`
+    await tx.$executeRaw(Prisma.sql`
         UPDATE "ResearchResourcePool" SET "controlVersion" = "controlVersion" + 1, "updatedAt" = ${now}
          WHERE "id" = ${poolId}
       `);
-      if (circuit.state === "HALF_OPEN") {
-        await tx.$executeRaw(Prisma.sql`
+    if (circuit.state === "HALF_OPEN") {
+      await tx.$executeRaw(Prisma.sql`
           UPDATE "ResearchCircuitBreaker" SET "halfOpenProbeTaskId" = ${candidate.id}, "updatedAt" = ${now}
            WHERE "resourcePoolId" = ${poolId} AND "state" = 'HALF_OPEN'
         `);
-      }
-      if (!permitRows[0])
-        throw new ResourcePermitUnavailableError("资源许可写入失败");
-      return {
-        task: taskFromRow(taskRow),
-        permit: permitFromRow(permitRows[0]),
-      };
-    });
+    }
+    if (!permitRows[0])
+      throw new ResourcePermitUnavailableError("资源许可写入失败");
+    return {
+      task: taskFromRow(taskRow),
+      permit: permitFromRow(permitRows[0]),
+    };
   }
 
   async renew(
@@ -384,7 +392,7 @@ export class PostgresResearchScheduler {
          WHERE "id" = ${taskId} AND "fencingToken" = ${fencingToken} AND "workerId" = ${holderId}
            AND "status" = 'RUNNING' AND "leaseExpiresAt" > ${now}
         RETURNING "id", "taskType", "idempotencyKey", "inputHash", "inputContractVersion",
-          "inputJson", "schedulingTier", "resourcePoolId", "fairnessKey", "userId", "parentTaskId",
+          "inputJson", "schedulingTier", "resourcePoolId", "fairnessKey", "userId", "parentTaskId", "externalCopyId",
           "targetCompletionAt", "status", "attempts", "maxAttempts", "retryDeadline", "nextAttemptAt",
           "workerId", "fencingToken", "leaseExpiresAt", "heartbeatAt", "resultContractVersion",
           "resultHash", "resultJson", "errorClass", "retryability", "terminalReason",
@@ -578,7 +586,7 @@ export class PostgresResearchScheduler {
          WHERE "id" = ${taskId} AND "fencingToken" = ${fencingToken} AND "status" = 'RUNNING'
            AND "leaseExpiresAt" > ${now}
         RETURNING "id", "taskType", "idempotencyKey", "inputHash", "inputContractVersion",
-          "inputJson", "schedulingTier", "resourcePoolId", "fairnessKey", "userId", "parentTaskId",
+          "inputJson", "schedulingTier", "resourcePoolId", "fairnessKey", "userId", "parentTaskId", "externalCopyId",
           "targetCompletionAt", "status", "attempts", "maxAttempts", "retryDeadline", "nextAttemptAt",
           "workerId", "fencingToken", "leaseExpiresAt", "heartbeatAt", "resultContractVersion",
           "resultHash", "resultJson", "errorClass", "retryability", "terminalReason",
@@ -590,16 +598,6 @@ export class PostgresResearchScheduler {
            SET "status" = 'RELEASED', "releasedAt" = ${now}, "releaseReason" = ${status}
          WHERE "taskId" = ${taskId} AND "status" = 'ACTIVE'
       `);
-      if (status === "SUCCEEDED") {
-        await tx.$executeRaw(Prisma.sql`
-          UPDATE "ResearchCircuitBreaker"
-             SET "state" = 'CLOSED', "halfOpenProbeTaskId" = NULL,
-                 "consecutiveFailures" = 0,
-                 "windowAttempts" = 0, "windowFailures" = 0, "retryAfter" = NULL,
-                 "version" = "version" + 1, "updatedAt" = ${now}
-           WHERE "resourcePoolId" = ${task.resourcePoolId} AND "state" = 'HALF_OPEN'
-        `);
-      }
       return taskFromRow(updated[0]);
     });
   }

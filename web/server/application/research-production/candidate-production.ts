@@ -7,10 +7,7 @@ import {
   researchProductionInputSchema,
 } from "~/contracts/research-production";
 import type { ResearchAssessmentLlmAdapter } from "~/server/application/research-assessment/research-assessment-service";
-import type {
-  FeishuDeliveryGuard,
-  FeishuDeliveryPort,
-} from "~/server/application/research-distribution/research-distribution-service";
+import type { FeishuDeliveryPort } from "~/server/application/research-distribution/research-distribution-service";
 import { ProductionRuntimeObserver } from "~/server/application/runtime-observability/production-runtime-observer";
 import type { PostgresResearchScheduler } from "~/server/application/scheduling/postgres-research-scheduler";
 import { runResearchProduction } from "./production";
@@ -186,7 +183,6 @@ type ProductionDependencies = {
   assessmentLlm?: ResearchAssessmentLlmAdapter;
   clock?: () => Date;
   feishu?: FeishuDeliveryPort;
-  feishuGuard?: FeishuDeliveryGuard;
 };
 
 function canonicalJson(value: unknown): string {

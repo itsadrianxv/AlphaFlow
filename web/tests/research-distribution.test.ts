@@ -2,17 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { ResearchPreferenceSnapshot } from "~/contracts/research-preference";
 import {
   briefingScheduleForTradingDay,
-  FeishuDeliveryError,
   InMemoryResearchDistributionStore,
   ResearchDistributionService,
   type DistributionCandidate,
   type FeishuDeliveryPayload,
   type FeishuDeliveryPort,
-  type ResearchDistributionStore,
 } from "~/server/application/research-distribution/research-distribution-service";
 import { InMemoryResearchInboxRepository } from "~/server/domain/research-inbox/repository";
 import { ResearchInboxService } from "~/server/application/research-inbox/research-inbox-service";
-import { LeaseLostError } from "~/server/domain/scheduling/types";
 
 const now = new Date("2026-08-03T00:00:00.000Z");
 
@@ -130,10 +127,6 @@ class ScriptedFeishu implements FeishuDeliveryPort {
     if (outcome instanceof Error) throw outcome;
   }
 }
-
-const directFeishuGuard = {
-  run: (_copyId: string, operation: () => Promise<void>) => operation(),
-};
 
 describe("确定性分发 application seam", () => {
   it.each([
@@ -327,7 +320,7 @@ describe("定时简报 application seam", () => {
     const distribution = new ResearchDistributionService(
       inbox,
       new InMemoryResearchDistributionStore(),
-      { clock: () => now, feishu, feishuGuard: directFeishuGuard },
+      { clock: () => now, feishu },
     );
     const ready = distribution.freezeBriefingScope({
       slot: "PRE_MARKET",
@@ -374,7 +367,7 @@ describe("定时简报 application seam", () => {
         highestChannel: "BRIEFING",
         references: { briefingTaskId: "briefing-task-ready" },
       },
-      externalCopy: { status: "SENT" },
+      externalCopy: { status: "PENDING" },
     });
     expect(silent).toEqual({
       status: "SKIPPED_NO_INCREMENT",
@@ -392,7 +385,7 @@ describe("定时简报 application seam", () => {
     const distribution = new ResearchDistributionService(
       inbox,
       new InMemoryResearchDistributionStore(),
-      { clock: () => now, feishu, feishuGuard: directFeishuGuard },
+      { clock: () => now, feishu },
     );
     const scope = distribution.freezeBriefingScope({
       slot: "CLOSE",
@@ -426,37 +419,22 @@ describe("定时简报 application seam", () => {
 });
 
 describe("Feishu 副本 application seam", () => {
-  it("默认预授权启用时先写站内，再只发送必要字段", async () => {
+  it("默认预授权启用时先写站内并创建待异步投递副本", async () => {
     const inbox = new ResearchInboxService(new InMemoryResearchInboxRepository(), {
       clock: () => now,
-    });
-    const feishu = new ScriptedFeishu(["SUCCESS"], async () => {
-      const authoritative = await inbox.list("user-1", "PENDING");
-      expect(authoritative.items).toHaveLength(1);
     });
     const distribution = new ResearchDistributionService(
       inbox,
       new InMemoryResearchDistributionStore(),
       {
         clock: () => now,
-        feishu,
-        feishuGuard: directFeishuGuard,
-        inboxLink: (entryId) => `/research/inbox/${entryId}`,
+         inboxLink: (entryId) => `/research/inbox/${entryId}`,
       },
     );
 
     const result = await distribution.distribute(candidate());
 
-    expect(result.externalCopy).toMatchObject({ status: "SENT", attempts: 1 });
-    expect(feishu.payloads).toEqual([
-      {
-        idempotencyKey: `feishu:${result.entry.id}`,
-        title: "公司公告重大订单",
-        reason: "满足紧急提醒的确定性门槛",
-        status: "已核实",
-        inboxLink: `/research/inbox/${result.entry.id}`,
-      },
-    ]);
+    expect(result.externalCopy).toMatchObject({ status: "PENDING", attempts: 0 });
   });
 
   it("用户关闭外部副本后不创建投递，重放也不重复发送", async () => {
@@ -467,7 +445,7 @@ describe("Feishu 副本 application seam", () => {
     const distribution = new ResearchDistributionService(
       inbox,
       new InMemoryResearchDistributionStore(),
-      { clock: () => now, feishu, feishuGuard: directFeishuGuard },
+      { clock: () => now, feishu },
     );
     const input = candidate({
       preferenceSnapshot: preference({ externalCopiesEnabled: false }),
@@ -481,153 +459,4 @@ describe("Feishu 副本 application seam", () => {
     expect(feishu.payloads).toHaveLength(0);
   });
 
-  it("Feishu 失败与熔断不回滚站内记录，恢复后按原幂等键补发", async () => {
-    let clock = new Date(now);
-    const inbox = new ResearchInboxService(new InMemoryResearchInboxRepository(), {
-      clock: () => clock,
-    });
-    const failure = () => new FeishuDeliveryError("FEISHU_HTTP_503", true);
-    const feishu = new ScriptedFeishu([
-      failure(),
-      failure(),
-      failure(),
-      failure(),
-      failure(),
-      "SUCCESS",
-    ]);
-    const store = new InMemoryResearchDistributionStore();
-    const distribution = new ResearchDistributionService(inbox, store, {
-      clock: () => clock,
-      feishu,
-      feishuGuard: directFeishuGuard,
-    });
-
-    const failed = [];
-    for (let index = 1; index <= 5; index += 1) {
-      failed.push(
-        await distribution.distribute(
-          candidate({
-            distributionKey: `gate:user-1:revision-${index}`,
-            subject: { kind: "EVENT_REVISION", id: `revision-${index}` },
-          }),
-        ),
-      );
-    }
-    const deferred = await distribution.distribute(
-      candidate({
-        distributionKey: "gate:user-1:revision-6",
-        subject: { kind: "EVENT_REVISION", id: "revision-6" },
-      }),
-    );
-
-    expect((await inbox.list("user-1", "PENDING")).items).toHaveLength(6);
-    expect(failed.every((item) => item.externalCopy?.status === "RETRY_WAIT")).toBe(true);
-    await expect(store.getCircuit()).resolves.toMatchObject({ state: "OPEN" });
-    expect(deferred.externalCopy).toMatchObject({ status: "DEFERRED_CIRCUIT", attempts: 1 });
-    expect(feishu.payloads).toHaveLength(5);
-
-    clock = new Date(clock.getTime() + 60_000);
-    const recovered = await distribution.retryFeishuCopy(
-      failed[0]!.externalCopy!.id,
-    );
-
-    expect(recovered).toMatchObject({ status: "SENT", attempts: 2 });
-    await expect(store.getCircuit()).resolves.toMatchObject({ state: "CLOSED", consecutiveFailures: 0 });
-    expect(feishu.payloads[5]?.idempotencyKey).toBe(
-      feishu.payloads[0]?.idempotencyKey,
-    );
-  });
-
-  it("站内提交后副本建档中断，重放会补建并发送原幂等副本", async () => {
-    const inbox = new ResearchInboxService(new InMemoryResearchInboxRepository(), {
-      clock: () => now,
-    });
-    const delegate = new InMemoryResearchDistributionStore();
-    let interrupted = true;
-    const store: ResearchDistributionStore = {
-      createCopy: async (input) => {
-        if (interrupted) {
-          interrupted = false;
-          throw new Error("模拟站内提交后的进程中断");
-        }
-        return delegate.createCopy(input);
-      },
-      getCopy: (id) => delegate.getCopy(id),
-      getCopyByKey: (key) => delegate.getCopyByKey(key),
-      claimCopy: (id, claimedAt, leaseMs) =>
-        delegate.claimCopy(id, claimedAt, leaseMs),
-      settleCopy: (copy) => delegate.settleCopy(copy),
-      saveCopy: (copy) => delegate.saveCopy(copy),
-      getCircuit: () => delegate.getCircuit(),
-      saveCircuit: (circuit) => delegate.saveCircuit(circuit),
-    };
-    const feishu = new ScriptedFeishu(["SUCCESS"]);
-    const distribution = new ResearchDistributionService(inbox, store, {
-      clock: () => now,
-      feishu,
-      feishuGuard: directFeishuGuard,
-    });
-
-    await expect(distribution.distribute(candidate())).rejects.toThrow(
-      "模拟站内提交后的进程中断",
-    );
-    expect((await inbox.list("user-1", "PENDING")).items).toHaveLength(1);
-
-    const recovered = await distribution.distribute(candidate());
-    expect(recovered.created).toBe(false);
-    expect(recovered.externalCopy).toMatchObject({ status: "SENT", attempts: 1 });
-    expect(feishu.payloads).toHaveLength(1);
-  });
-
-  it("不可重试错误进入配置阻断且不累计技术熔断", async () => {
-    const inbox = new ResearchInboxService(new InMemoryResearchInboxRepository(), {
-      clock: () => now,
-    });
-    const store = new InMemoryResearchDistributionStore();
-    const feishu = new ScriptedFeishu([
-      new FeishuDeliveryError("FEISHU_BUSINESS_19001", false),
-    ]);
-    const distribution = new ResearchDistributionService(inbox, store, {
-      clock: () => now,
-      feishu,
-      feishuGuard: directFeishuGuard,
-    });
-
-    const result = await distribution.distribute(candidate());
-
-    expect(result.externalCopy).toMatchObject({
-      status: "CONFIG_BLOCKED",
-      attempts: 1,
-    });
-    await expect(store.getCircuit()).resolves.toMatchObject({
-      state: "CLOSED",
-      consecutiveFailures: 0,
-    });
-  });
-
-  it("旧 fencing worker 不能结算 Feishu 副本状态", async () => {
-    const inbox = new ResearchInboxService(new InMemoryResearchInboxRepository(), {
-      clock: () => now,
-    });
-    const store = new InMemoryResearchDistributionStore();
-    const distribution = new ResearchDistributionService(inbox, store, {
-      clock: () => now,
-      feishu: new ScriptedFeishu(["SUCCESS"]),
-      feishuGuard: {
-        run: async () => {
-          throw new LeaseLostError();
-        },
-      },
-    });
-
-    await expect(distribution.distribute(candidate())).rejects.toBeInstanceOf(
-      LeaseLostError,
-    );
-    const entry = (await inbox.list("user-1", "PENDING")).items[0]!;
-    await expect(store.getCopyByKey(`feishu:${entry.id}`)).resolves.toMatchObject({
-      status: "RETRY_WAIT",
-      attempts: 1,
-      lastErrorCode: "FEISHU_PERMIT_LEASE_LOST",
-    });
-  });
 });

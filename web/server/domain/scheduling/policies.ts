@@ -26,6 +26,7 @@ export const MAX_ATTEMPTS: Record<SchedulingTier, number> = {
 
 export const DELIVERY_MAX_ATTEMPTS = 5;
 export const DELIVERY_RETRY_BUDGET_MS = 30 * 60_000;
+export const FEISHU_DELIVERY_MAX_ATTEMPTS = 5;
 
 export const CIRCUIT_RETRY_DELAYS_MS = [
   60_000,

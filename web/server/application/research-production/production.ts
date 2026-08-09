@@ -4,7 +4,6 @@ import { researchProductionInputSchema } from "~/contracts/research-production";
 import type { ResearchAssessmentLlmAdapter } from "~/server/application/research-assessment/research-assessment-service";
 import { ResearchAssessmentService } from "~/server/application/research-assessment/research-assessment-service";
 import {
-  type FeishuDeliveryGuard,
   type FeishuDeliveryPort,
   ResearchDistributionService,
 } from "~/server/application/research-distribution/research-distribution-service";
@@ -27,7 +26,6 @@ export type ResearchProductionDependencies = {
   assessmentLlm?: ResearchAssessmentLlmAdapter;
   clock?: () => Date;
   feishu?: FeishuDeliveryPort;
-  feishuGuard?: FeishuDeliveryGuard;
 };
 
 export function createProductionResearchInboxService(db: PrismaClient) {
@@ -58,8 +56,6 @@ export function createResearchProductionOrchestrator(
       new PrismaResearchDistributionStore(db),
       {
         clock,
-        feishu: dependencies.feishu,
-        feishuGuard: dependencies.feishuGuard,
         inboxLink: (entryId) => `/research-inbox?entry=${entryId}`,
       },
     ),

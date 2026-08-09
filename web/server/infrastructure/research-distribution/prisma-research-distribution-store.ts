@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import type {
-  FeishuCircuit,
   FeishuCopy,
   FeishuCopyStatus,
   FeishuDeliveryPayload,
@@ -141,21 +140,6 @@ export class PrismaResearchDistributionStore
     `);
     if (!rows[0]) throw new LeaseLostError();
     return mapCopy(rows[0]);
-  }
-
-  /** @deprecated 共享熔断权威已迁移到 ResearchCircuitBreaker。 */
-  async getCircuit(): Promise<FeishuCircuit> {
-    return {
-      state: "CLOSED",
-      consecutiveFailures: 0,
-      openCount: 0,
-      retryAfter: null,
-    };
-  }
-
-  /** @deprecated 共享熔断权威已迁移到 ResearchCircuitBreaker。 */
-  async saveCircuit(circuit: FeishuCircuit): Promise<FeishuCircuit> {
-    return circuit;
   }
 }
 
