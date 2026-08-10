@@ -9,24 +9,7 @@ type ToolFactoryOptions = {
   webInternalClient: WebInternalClient;
   runId: string;
   userId: string;
-  maxToolCalls: number;
   toolTimeoutMs: number;
-  networkPolicy?: AgentNetworkPolicy;
-  capabilityConstraints?: Record<string, unknown>;
-};
-
-export type AgentNetworkPolicy = {
-  allowPublicHttp?: boolean;
-  allowPrivateNetwork?: boolean;
-  allowCredentialedUrls?: boolean;
-  allowedSchemes?: string[];
-};
-
-const DEFAULT_NETWORK_POLICY: Required<AgentNetworkPolicy> = {
-  allowPublicHttp: true,
-  allowPrivateNetwork: false,
-  allowCredentialedUrls: false,
-  allowedSchemes: ["http:", "https:"],
 };
 
 export const STANDARD_INTERNAL_TOOL_NAMES = [
@@ -52,35 +35,6 @@ function asTextResult(details: Record<string, unknown>): AgentToolResult<Record<
   };
 }
 
-function createToolGuard(maxToolCalls: number) {
-  let toolCallCount = 0;
-
-  return (toolName: string) => {
-    toolCallCount += 1;
-    if (toolCallCount > maxToolCalls) {
-      throw new Error(`工具调用次数超过上限: ${toolName}`);
-    }
-  };
-}
-
-export function assertPublicHttpUrl(rawUrl: string) {
-  let parsed: URL;
-  try {
-    parsed = new URL(rawUrl);
-  } catch {
-    throw new Error("PUBLIC_WEB_URL_INVALID: 只能读取有效的公开 HTTP(S) URL");
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("PUBLIC_WEB_URL_SCHEME_FORBIDDEN: 只能读取 HTTP(S) URL");
-  }
-  if (parsed.username || parsed.password) {
-    throw new Error("PUBLIC_WEB_URL_CREDENTIALS_FORBIDDEN: 公开网页读取不能携带凭据");
-  }
-  if (isPrivateHostname(parsed.hostname)) {
-    throw new Error("PUBLIC_WEB_URL_PRIVATE_FORBIDDEN: 不允许访问本机、内网或链路本地地址");
-  }
-}
 
 function withTimeout(signal: AbortSignal | undefined, timeoutMs: number) {
   const controller = new AbortController();
@@ -97,81 +51,13 @@ function withTimeout(signal: AbortSignal | undefined, timeoutMs: number) {
   };
 }
 
-function normalizeNetworkPolicy(policy?: AgentNetworkPolicy): Required<AgentNetworkPolicy> {
-  return {
-    ...DEFAULT_NETWORK_POLICY,
-    ...policy,
-    allowedSchemes: policy?.allowedSchemes ?? DEFAULT_NETWORK_POLICY.allowedSchemes,
-  };
-}
-
-function isPrivateHostname(hostname: string) {
-  const normalized = hostname.toLowerCase();
-  if (normalized === "localhost" || normalized.endsWith(".localhost")) {
-    return true;
-  }
-  if (normalized === "0.0.0.0" || normalized === "::" || normalized === "::1") {
-    return true;
-  }
-
-  const ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4) {
-    const octets = ipv4.slice(1).map(Number);
-    if (octets.some((octet) => octet < 0 || octet > 255)) {
-      return true;
-    }
-    const a = octets[0] ?? -1;
-    const b = octets[1] ?? -1;
-    return (
-      a === 10 ||
-      a === 127 ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168)
-    );
-  }
-
-  return (
-    normalized.startsWith("[fc") ||
-    normalized.startsWith("[fd") ||
-    normalized.startsWith("[fe80") ||
-    normalized === "[::1]"
-  );
-}
-
-function assertNetworkAllowed(rawUrl: string, policy: AgentNetworkPolicy | undefined) {
-  const normalizedPolicy = normalizeNetworkPolicy(policy);
-  let url: URL;
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    throw new Error(`NETWORK_POLICY_BLOCKED: URL 无法解析: ${rawUrl}`);
-  }
-
-  if (!normalizedPolicy.allowedSchemes.includes(url.protocol)) {
-    throw new Error(`NETWORK_POLICY_BLOCKED: 不允许的 URL scheme: ${url.protocol}`);
-  }
-  if (!normalizedPolicy.allowPublicHttp) {
-    throw new Error("NETWORK_POLICY_BLOCKED: 当前执行边界未授权公开网页访问");
-  }
-  if (!normalizedPolicy.allowCredentialedUrls && (url.username || url.password)) {
-    throw new Error("NETWORK_POLICY_BLOCKED: URL 不得包含凭据");
-  }
-  if (!normalizedPolicy.allowPrivateNetwork && isPrivateHostname(url.hostname)) {
-    throw new Error("NETWORK_POLICY_BLOCKED: 不得访问本机或私网地址");
-  }
-}
-
 export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
-  const guard = createToolGuard(options.maxToolCalls);
-
   const callPython = async (
     toolName: string,
     path: string,
     body: Record<string, unknown>,
     signal?: AbortSignal,
   ) => {
-    guard(toolName);
     const timeout = withTimeout(signal, options.toolTimeoutMs);
 
     try {
@@ -196,7 +82,6 @@ export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
     params: Record<string, unknown>,
     signal?: AbortSignal,
   ) => {
-    guard(toolName);
     const timeout = withTimeout(signal, options.toolTimeoutMs);
 
     try {
@@ -282,34 +167,15 @@ export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
       }),
       execute: async (_toolCallId, params, signal) => {
         const input = params as { dataset: string; params?: Record<string, unknown>; maxRows?: number };
-        const raw = options.capabilityConstraints?.internal_tushare_dataset;
-        const constraints = raw && typeof raw === "object" && !Array.isArray(raw)
-          ? raw as Record<string, unknown>
-          : {};
-        const allowedDatasets = Array.isArray(constraints.allowedDatasets)
-          ? constraints.allowedDatasets.filter((item): item is string => typeof item === "string")
-          : [];
-        if (!allowedDatasets.includes(input.dataset)) {
-          throw new Error(`执行计划未授权 TuShare 数据集: ${input.dataset}`);
-        }
         const tsCode = input.params?.ts_code;
         if (tsCode !== undefined &&
           (typeof tsCode !== "string" || !/^\d{6}\.(SH|SZ|BJ)$/.test(tsCode))) {
           throw new Error("INVALID_TUSHARE_TS_CODE: ts_code 必须是完整 TuShare 代码，例如 601138.SH、000001.SZ 或 920001.BJ");
         }
-        const configuredMaxRows = typeof constraints.maxRows === "number" ? constraints.maxRows : 500;
-        const maxLookbackDays = typeof constraints.maxLookbackDays === "number" ? constraints.maxLookbackDays : 365;
-        const startText = typeof input.params?.start_date === "string" ? input.params.start_date.replaceAll("-", "") : "";
-        const endText = typeof input.params?.end_date === "string" ? input.params.end_date.replaceAll("-", "") : "";
-        if (/^\d{8}$/.test(startText) && /^\d{8}$/.test(endText)) {
-          const start = Date.UTC(Number(startText.slice(0, 4)), Number(startText.slice(4, 6)) - 1, Number(startText.slice(6, 8)));
-          const end = Date.UTC(Number(endText.slice(0, 4)), Number(endText.slice(4, 6)) - 1, Number(endText.slice(6, 8)));
-          if ((end - start) / 86_400_000 > maxLookbackDays) throw new Error("TuShare 查询超过执行计划允许的回看窗口");
-        }
         return callPython("internal_tushare_dataset", "/api/v1/capabilities/tushare/query-dataset", {
           dataset: input.dataset,
           params: input.params ?? {},
-          maxRows: Math.min(input.maxRows ?? configuredMaxRows, configuredMaxRows, 500),
+          maxRows: Math.min(input.maxRows ?? 500, 500),
         }, signal);
       },
     },
@@ -343,7 +209,6 @@ export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
       }),
       execute: async (_toolCallId, params, signal) => {
         const input = params as { url: string };
-        assertNetworkAllowed(input.url, options.networkPolicy);
         return callPython(
           "internal_web_fetch",
           "/api/v1/capabilities/web/fetch",

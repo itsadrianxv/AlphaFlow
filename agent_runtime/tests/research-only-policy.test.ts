@@ -6,7 +6,6 @@ import {
   enforceResearchOnlyFinalText,
   toResearchCandidateSeedPayload,
 } from "../src/research-only-policy";
-import { assertPublicHttpUrl } from "../src/tool-policy";
 
 describe("research_only 策略", () => {
   it("拒绝直接执行性投资请求，同时保留研究性内容", () => {
@@ -106,19 +105,4 @@ describe("research_only 策略", () => {
     ]);
   });
 
-  it("公开网页读取拒绝非 HTTP、凭据、本机和内网地址", () => {
-    expect(() => assertPublicHttpUrl("https://example.com/news")).not.toThrow();
-    expect(() => assertPublicHttpUrl("file:///etc/passwd")).toThrow(
-      "PUBLIC_WEB_URL_SCHEME_FORBIDDEN",
-    );
-    expect(() => assertPublicHttpUrl("https://user:pass@example.com")).toThrow(
-      "PUBLIC_WEB_URL_CREDENTIALS_FORBIDDEN",
-    );
-    expect(() => assertPublicHttpUrl("http://127.0.0.1:3000")).toThrow(
-      "PUBLIC_WEB_URL_PRIVATE_FORBIDDEN",
-    );
-    expect(() => assertPublicHttpUrl("http://192.168.1.10")).toThrow(
-      "PUBLIC_WEB_URL_PRIVATE_FORBIDDEN",
-    );
-  });
 });

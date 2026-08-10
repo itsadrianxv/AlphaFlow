@@ -6,6 +6,37 @@ export type AgentRunStatus =
   | "failed"
   | "cancelled";
 
+export type AgentRunKind = "immediate_research" | "scheduled_task";
+
+export type AgentInteractionMode =
+  | "research"
+  | "scheduled_task_setup"
+  | "scheduled_task_edit"
+  | "scheduled_task_execution";
+
+export type CapabilityConstraintRequest = {
+  internal_tushare_dataset?: {
+    allowedDatasets: string[];
+    maxRows: number;
+    maxLookbackDays: number;
+  };
+};
+
+export type NetworkPolicyNarrowing = {
+  allowPublicHttp?: boolean;
+  allowPrivateNetwork?: false;
+  allowCredentialedUrls?: false;
+  allowedSchemes?: Array<"http" | "https">;
+};
+
+export type AgentPolicyRequest = {
+  requestedCapabilities?: string[];
+  capabilityConstraints?: CapabilityConstraintRequest;
+  network?: NetworkPolicyNarrowing;
+  maxConcurrentSubtasks?: number;
+  costWarning?: { currency: "USD"; micros: number };
+};
+
 export type AgentRuntimeEventType =
   | "run.created"
   | "run.started"
@@ -56,6 +87,8 @@ export type UserSkillDefinition = {
 };
 
 export type StartRunRequest = {
+  runKind: AgentRunKind;
+  interactionMode: AgentInteractionMode;
   runId: string;
   userId: string;
   sessionId?: string;
@@ -69,15 +102,8 @@ export type StartRunRequest = {
   context?: Record<string, unknown>;
   sessionSeed?: AgentRuntimeSeedMessage[];
   userSkillDefinitions?: UserSkillDefinition[];
-  allowedCapabilities?: string[];
-  capabilityConstraints?: Record<string, unknown>;
-  executionBoundary?: Record<string, unknown>;
-  networkPolicy?: {
-    allowPublicHttp?: boolean;
-    allowPrivateNetwork?: boolean;
-    allowCredentialedUrls?: boolean;
-    allowedSchemes?: string[];
-  };
+  policy?: AgentPolicyRequest;
+  scheduledTask?: ScheduledTaskRunRequest;
 };
 
 export type ScheduledTaskRunRequest = {
@@ -118,11 +144,13 @@ export type AgentRunSnapshot = {
   skillIds?: string[];
   title: string;
   input: {
+    runKind: AgentRunKind;
+    interactionMode: AgentInteractionMode;
     prompt: string;
     skillIds?: string[];
     userSkillDefinitions?: UserSkillDefinition[];
     context?: Record<string, unknown>;
-    executionBoundary?: Record<string, unknown>;
+    executionSnapshot?: import("./agent-execution").AgentExecutionSnapshot;
   };
   finalOutput?: Record<string, unknown>;
   audit?: Record<string, unknown>;
@@ -155,7 +183,6 @@ export type AgentRuntimeConfig = {
   pythonServiceUrl: string;
   pythonServiceTimeoutMs: number;
   runTtlMs: number;
-  maxToolCallsPerRun: number;
   toolTimeoutMs: number;
   modelProvider: string;
   modelId: string;

@@ -1,15 +1,29 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import path from "node:path";
+import { AgentRunner } from "./agent-runner";
+import { RuntimeAgentExecutionFactory } from "./agent-capability-registry";
+import { AgentRuntimeService } from "./agent-runtime-service";
+import { CandidateSeedOutbox } from "./candidate-seed-outbox";
 import { readConfig } from "./config";
 import { isRecord } from "./json";
-import { PiAdapter } from "./pi-adapter";
+import { PiHarnessAdapter } from "./pi-harness-adapter";
+import { PiSessionAdapter } from "./pi-session-adapter";
+import { PythonGatewayClient } from "./python-gateway-client";
 import { AgentRuntimeRunStore } from "./run-store";
+import {
+  ImmediateResearchResultHandler,
+  ScheduledTaskResultHandler,
+} from "./run-result-handlers";
+import { ScheduledTaskEventPublisher } from "./scheduled-task-events";
 import { SkillRegistry } from "./skill-registry";
 import type {
   AgentRuntimeEvent,
   AgentRuntimeResumeRequest,
+  AgentPolicyRequest,
   ScheduledTaskRunRequest,
   StartRunRequest,
 } from "./types";
+import { WebInternalClient } from "./web-internal-client";
 
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
@@ -28,6 +42,8 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
   const runId = value.runId;
   const userId = value.userId;
   const skillId = value.skillId;
+  const runKind = value.runKind;
+  const interactionMode = value.interactionMode;
   const rawSkillIds = Array.isArray(value.skillIds) ? value.skillIds : [];
   const prompt = value.prompt;
   const skillIds = [
@@ -43,6 +59,12 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
     typeof runId !== "string" ||
     typeof userId !== "string" ||
     typeof skillId !== "string" ||
+    runKind !== "immediate_research" ||
+    ![
+      "research",
+      "scheduled_task_setup",
+      "scheduled_task_edit",
+    ].includes(String(interactionMode)) ||
     typeof prompt !== "string" ||
     !runId.trim() ||
     !userId.trim() ||
@@ -54,6 +76,8 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
   }
 
   return {
+    runKind,
+    interactionMode: interactionMode as StartRunRequest["interactionMode"],
     runId,
     userId,
     sessionId: typeof value.sessionId === "string" ? value.sessionId : undefined,
@@ -108,17 +132,8 @@ function parseRunRequest(value: unknown): StartRunRequest | null {
             contentHash: item.contentHash as string,
           }))
       : undefined,
-    allowedCapabilities: Array.isArray(value.allowedCapabilities)
-      ? value.allowedCapabilities.filter((item): item is string => typeof item === "string")
-      : undefined,
-    capabilityConstraints: isRecord(value.capabilityConstraints)
-      ? value.capabilityConstraints
-      : undefined,
-    executionBoundary: isRecord(value.executionBoundary)
-      ? value.executionBoundary
-      : undefined,
-    networkPolicy: isRecord(value.networkPolicy)
-      ? value.networkPolicy
+    policy: isRecord(value.policy)
+      ? (value.policy as AgentPolicyRequest)
       : undefined,
   };
 }
@@ -184,7 +199,47 @@ async function main() {
   const config = readConfig();
   const store = new AgentRuntimeRunStore(config.runTtlMs);
   const skillRegistry = await new SkillRegistry().load();
-  const adapter = new PiAdapter(config, skillRegistry, store);
+  const webInternalClient = new WebInternalClient(config);
+  const pythonGatewayClient = new PythonGatewayClient(config);
+  const agentExecutionFactory = new RuntimeAgentExecutionFactory({
+    config,
+    pythonGatewayClient,
+    webInternalClient,
+  });
+  const candidateSeedOutbox = new CandidateSeedOutbox(
+    path.resolve(config.sessionRoot, "candidate-seed-outbox"),
+    (payload) => webInternalClient.enqueueResearchCandidateSeed(payload),
+  );
+  const runtime = new AgentRuntimeService({
+    config,
+    skillRegistry,
+    store,
+    runner: new AgentRunner(
+      new PiHarnessAdapter(
+        config,
+        new PiSessionAdapter(
+          config.sessionRoot,
+          config.compactionTokenThreshold,
+        ),
+      ),
+    ),
+    agentExecutionFactory,
+    immediateResultHandler: new ImmediateResearchResultHandler(
+      candidateSeedOutbox,
+    ),
+    scheduledResultHandler: new ScheduledTaskResultHandler(
+      webInternalClient,
+      new ScheduledTaskEventPublisher(config),
+    ),
+    recoverCandidateSeeds: () =>
+      candidateSeedOutbox.recover((file, error) => {
+        console.error(
+          `[agent-runtime] candidate seed recovery deferred (${file}): ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }),
+  });
 
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
@@ -214,7 +269,7 @@ async function main() {
         const existing = store.snapshot(parsed.runId);
         store.createOrGet(parsed);
         if (!existing || existing.status === "queued" || existing.status === "running") {
-          void adapter.start(parsed);
+          void runtime.start(parsed);
         }
 
         const run = store.snapshot(parsed.runId);
@@ -230,9 +285,28 @@ async function main() {
         const capabilityConstraints = isRecord(parsed.executionPlan.capabilityConstraints)
           ? parsed.executionPlan.capabilityConstraints
           : undefined;
-        const run: StartRunRequest = { runId: parsed.runId, userId: parsed.userId, skillId: "scheduled-task-execution", skillIds: ["scheduled-task-execution"], prompt, allowedCapabilities: parsed.allowedCapabilities, capabilityConstraints, title: "定时任务执行", context: { executionId: parsed.executionId, taskId: parsed.taskId, taskVersionId: parsed.taskVersionId, executionPlan: parsed.executionPlan, allowedCapabilities: parsed.allowedCapabilities, scheduledAt: parsed.scheduledAt } };
+        const run: StartRunRequest = {
+          runKind: "scheduled_task",
+          interactionMode: "scheduled_task_execution",
+          runId: parsed.runId,
+          userId: parsed.userId,
+          skillId: "scheduled-task-execution",
+          skillIds: ["scheduled-task-execution"],
+          prompt,
+          policy: {
+            requestedCapabilities: parsed.allowedCapabilities,
+            capabilityConstraints: capabilityConstraints as AgentPolicyRequest["capabilityConstraints"],
+          },
+          title: "定时任务执行",
+          context: {
+            executionPlan: parsed.executionPlan,
+            allowedCapabilities: parsed.allowedCapabilities,
+            scheduledAt: parsed.scheduledAt,
+          },
+          scheduledTask: parsed,
+        };
         store.createOrGet(run);
-        if (!existing) void adapter.start(run);
+        if (!existing) void runtime.start(run);
         sendJson(response, existing ? 200 : 202, store.snapshot(parsed.runId));
         return;
       }
@@ -338,7 +412,7 @@ async function main() {
         }
 
         if (result.kind === "resumed") {
-          void adapter.resume(parts[1]);
+          void runtime.resume(parts[1]);
         }
         sendJson(response, 200, store.snapshot(parts[1]));
         return;

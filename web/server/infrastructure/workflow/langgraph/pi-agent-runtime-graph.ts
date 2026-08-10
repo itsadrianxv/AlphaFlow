@@ -249,7 +249,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
       conversationId: state.agentInput.conversationId,
       userMessageId: state.agentInput.userMessageId,
       assistantMessageId: state.agentInput.assistantMessageId,
-      executionBoundary: state.agentInput.executionBoundary,
+      policy: state.agentInput.policy,
       userSkillDefinitions: state.agentInput.userSkillDefinitions,
     };
     const nextState: PiAgentRunGraphState = {
@@ -282,6 +282,13 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
 
     const startedRuntimeRun = await this.deps.agentRuntimeClient.startRun(
       {
+        runKind: "immediate_research",
+        interactionMode:
+          task.skillId === "scheduled-task-setup"
+            ? "scheduled_task_setup"
+            : task.skillId === "scheduled-task-edit"
+              ? "scheduled_task_edit"
+              : "research",
         runId: state.runId,
         userId: state.userId,
         sessionId: task.conversationId,
@@ -293,7 +300,7 @@ export class PiAgentRuntimeLangGraph implements WorkflowGraphRunner {
         prompt: task.prompt,
         title: task.title,
         context: state.agentInput.context,
-        executionBoundary: task.executionBoundary,
+        policy: task.policy,
         userSkillDefinitions: task.userSkillDefinitions,
         sessionSeed: task.conversationId
           ? await this.deps.agentConversationRepository?.getSeedMessages(

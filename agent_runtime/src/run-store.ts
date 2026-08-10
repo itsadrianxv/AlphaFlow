@@ -7,6 +7,7 @@ import type {
   StartRunRequest,
   UserInputRequest,
 } from "./types";
+import type { AgentExecutionSnapshot } from "./agent-execution";
 
 type Subscriber = (event: AgentRuntimeEvent) => void;
 
@@ -38,11 +39,12 @@ export class AgentRuntimeRunStore {
       skillIds: request.skillIds,
       title: request.title?.trim() || request.prompt.trim().slice(0, 80),
       input: {
+        runKind: request.runKind,
+        interactionMode: request.interactionMode,
         prompt: request.prompt,
         skillIds: request.skillIds,
         userSkillDefinitions: request.userSkillDefinitions,
         context: request.context,
-        executionBoundary: request.executionBoundary,
       },
       createdAt: now,
       events: [],
@@ -91,6 +93,13 @@ export class AgentRuntimeRunStore {
 
   getTurnGeneration(runId: string) {
     return this.runs.get(runId)?.turnGeneration ?? null;
+  }
+
+  setExecutionSnapshot(runId: string, snapshot: AgentExecutionSnapshot) {
+    const run = this.runs.get(runId);
+    if (run) {
+      run.input.executionSnapshot = structuredClone(snapshot);
+    }
   }
 
   isCurrentTurn(runId: string, generation: number) {
@@ -208,8 +217,12 @@ export class AgentRuntimeRunStore {
     run.audit = audit;
     this.appendEvent(runId, "run.audit.recorded", {
       boundary: audit.boundary,
+      skills: audit.skills,
+      model: audit.model,
       stopReason: audit.stopReason,
       usage: audit.usage,
+      cost: audit.cost,
+      durationMs: audit.durationMs,
       toolSummaryCount: Array.isArray(audit.toolSummaries)
         ? audit.toolSummaries.length
         : 0,

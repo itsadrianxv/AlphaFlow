@@ -47,11 +47,18 @@ const agentRuntimeRunSchema = z.object({
   skillIds: z.array(z.string()).optional(),
   title: z.string(),
   input: z.object({
+    runKind: z.enum(["immediate_research", "scheduled_task"]),
+    interactionMode: z.enum([
+      "research",
+      "scheduled_task_setup",
+      "scheduled_task_edit",
+      "scheduled_task_execution",
+    ]),
     prompt: z.string(),
     skillIds: z.array(z.string()).optional(),
     userSkillDefinitions: z.array(userSkillDefinitionSchema).optional(),
     context: z.record(z.unknown()).optional(),
-    executionBoundary: z.record(z.unknown()).optional(),
+    executionSnapshot: z.record(z.unknown()).optional(),
   }),
   finalOutput: z.record(z.unknown()).optional(),
   audit: z.record(z.unknown()).optional(),
@@ -82,6 +89,8 @@ export type AgentRuntimeEvent = z.infer<typeof agentRuntimeEventSchema>;
 export type AgentRuntimeRun = z.infer<typeof agentRuntimeRunSchema>;
 
 export type StartAgentRuntimeRunInput = {
+  runKind: "immediate_research";
+  interactionMode: "research" | "scheduled_task_setup" | "scheduled_task_edit";
   runId: string;
   userId: string;
   sessionId?: string;
@@ -93,7 +102,7 @@ export type StartAgentRuntimeRunInput = {
   prompt: string;
   title?: string;
   context?: Record<string, unknown>;
-  executionBoundary?: Record<string, unknown>;
+  policy?: import("~/server/domain/workflow/types").AgentPolicyRequest;
   userSkillDefinitions?: Array<z.infer<typeof userSkillDefinitionSchema>>;
   sessionSeed?: Array<{
     role: "user" | "assistant";

@@ -27,7 +27,6 @@ export function readConfig(): AgentRuntimeConfig {
       process.env.PYTHON_SERVICE_URL ?? "http://python-service:8000",
     pythonServiceTimeoutMs: readNumber("PYTHON_SERVICE_TIMEOUT_MS", 60_000),
     runTtlMs: readNumber("AGENT_RUNTIME_RUN_TTL_MS", 30 * 60_000),
-    maxToolCallsPerRun: readNumber("AGENT_RUNTIME_MAX_TOOL_CALLS", 12),
     toolTimeoutMs: readNumber("AGENT_RUNTIME_TOOL_TIMEOUT_MS", 60_000),
     modelProvider: process.env.AGENT_RUNTIME_MODEL_PROVIDER ?? "deepseek",
     modelId: process.env.AGENT_RUNTIME_MODEL_ID ?? "deepseek-v4-flash",

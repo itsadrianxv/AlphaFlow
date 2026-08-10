@@ -18,6 +18,7 @@ import {
   SCREENING_INSIGHT_PIPELINE_TEMPLATE_CODE,
   type WorkflowEventStreamType,
   type WorkflowGraphState,
+  type AgentPolicyRequest,
 } from "~/server/domain/workflow/types";
 import type { PrismaWorkflowRunRepository } from "~/server/infrastructure/workflow/prisma/workflow-run-repository";
 import { RedisWorkflowRuntimeStore } from "~/server/infrastructure/workflow/redis/redis-workflow-runtime-store";
@@ -67,7 +68,7 @@ export type StartPiAgentRunCommand = {
   userMessageId?: string;
   assistantMessageId?: string;
   context?: Record<string, unknown>;
-  executionBoundary?: Record<string, unknown>;
+  policy?: AgentPolicyRequest;
   userSkillDefinitions?: UserSkillRuntimeDefinition[];
   templateVersion?: number;
   idempotencyKey?: string;
@@ -224,7 +225,7 @@ export class WorkflowCommandService {
         userMessageId: command.userMessageId,
         assistantMessageId: command.assistantMessageId,
         context: command.context,
-        executionBoundary: command.executionBoundary,
+        policy: command.policy,
         userSkillDefinitions: command.userSkillDefinitions,
       },
       idempotencyKey:

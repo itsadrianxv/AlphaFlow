@@ -5,6 +5,8 @@ describe("AgentRuntimeRunStore", () => {
   it("assigns increasing event sequences and replays after a sequence", () => {
     const store = new AgentRuntimeRunStore(60_000);
     store.createOrGet({
+      runKind: "immediate_research",
+      interactionMode: "research",
       runId: "run_1",
       userId: "user_1",
       skillId: "alphaflow-research-assistant",
@@ -36,6 +38,8 @@ describe("AgentRuntimeRunStore", () => {
   it("enters waiting state and resumes the same run idempotently", () => {
     const store = new AgentRuntimeRunStore(60_000);
     store.createOrGet({
+      runKind: "immediate_research",
+      interactionMode: "research",
       runId: "run_waiting",
       userId: "user_1",
       skillId: "skill_1",
@@ -74,6 +78,8 @@ describe("AgentRuntimeRunStore", () => {
   it("cancels a running run immediately and ignores late success", () => {
     const store = new AgentRuntimeRunStore(60_000);
     store.createOrGet({
+      runKind: "immediate_research",
+      interactionMode: "research",
       runId: "run_cancel",
       userId: "user_1",
       skillId: "skill_1",

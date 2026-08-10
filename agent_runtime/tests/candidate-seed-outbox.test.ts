@@ -2,7 +2,10 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { recoverCandidateSeedOutboxFiles } from "../src/pi-adapter";
+import {
+  CandidateSeedOutbox,
+  recoverCandidateSeedOutboxFiles,
+} from "../src/candidate-seed-outbox";
 
 const tempRoots: string[] = [];
 
@@ -42,6 +45,35 @@ const validInternalSeed = {
 };
 
 describe("candidate seed outbox", () => {
+  it("完成本地持久化后立即返回，不等待 Web 投递", async () => {
+    const root = await createOutbox();
+    let releaseDelivery: (() => void) | undefined;
+    let markDeliveryStarted: (() => void) | undefined;
+    const deliveryStarted = new Promise<void>((resolve) => {
+      markDeliveryStarted = resolve;
+    });
+    const deliveryGate = new Promise<void>((resolve) => {
+      releaseDelivery = resolve;
+    });
+    const outbox = new CandidateSeedOutbox(root, async () => {
+      markDeliveryStarted?.();
+      await deliveryGate;
+    });
+
+    const enqueue = outbox.enqueue(validInternalSeed);
+    await deliveryStarted;
+    const outcome = await Promise.race([
+      enqueue.then(() => "settled"),
+      new Promise<"timeout">((resolve) =>
+        setTimeout(() => resolve("timeout"), 50),
+      ),
+    ]);
+
+    expect(outcome).toBe("settled");
+    expect(await fs.readdir(root)).toHaveLength(1);
+    releaseDelivery?.();
+  });
+
   it("隔离单个坏文件并继续恢复其他文件", async () => {
     const root = await createOutbox();
     await fs.writeFile(path.join(root, "01-bad.json"), "{bad", "utf8");

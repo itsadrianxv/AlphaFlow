@@ -2,12 +2,12 @@ import type { AgentHarness } from "@earendil-works/pi-agent-core";
 import { describe, expect, it, vi } from "vitest";
 import {
   isScheduledTaskFlowComplete,
-  mapHarnessEvent,
-  registerHarnessEventHandlers,
+  mapPiHarnessEvent,
+  registerPiHarnessEventHandlers,
   resolveScheduledTaskFlowFailure,
-  type HarnessEventState,
-} from "../src/pi-adapter";
-import { AgentRuntimeRunStore } from "../src/run-store";
+  type PiHarnessEventState,
+} from "../src/pi-harness-events";
+import type { RunnerEvent } from "../src/agent-runner";
 import { createInternalTools } from "../src/tool-policy";
 
 describe("ask_user tool", () => {
@@ -17,7 +17,6 @@ describe("ask_user tool", () => {
       webInternalClient: {} as never,
       runId: "run_1",
       userId: "user_1",
-      maxToolCalls: 10,
       toolTimeoutMs: 1000,
     }).find((item) => item.name === "ask_user");
 
@@ -37,7 +36,7 @@ describe("ask_user tool", () => {
     });
   });
 
-  it("通过专用 hook 进入等待状态并立即中止当前回合", async () => {
+  it("通过专用 hook 返回等待请求并立即中止当前回合", async () => {
     const handlers = new Map<string, (event: never) => unknown>();
     const abort = vi.fn(async () => undefined);
     const harness = {
@@ -51,20 +50,17 @@ describe("ask_user tool", () => {
       }),
       abort,
     } as unknown as AgentHarness;
-    const store = new AgentRuntimeRunStore(60_000);
-    const request = {
-      runId: "run_waiting_hook",
-      userId: "user_1",
-      skillId: "scheduled-task-setup",
-      prompt: "创建定时任务",
-    };
-    const state: HarnessEventState = {
+    const state: PiHarnessEventState = {
       lastAssistantText: "",
       scheduledDraftBuilt: false,
+      toolSummaries: [],
     };
-    store.createOrGet(request);
-    store.markRunning(request.runId);
-    registerHarnessEventHandlers({ harness, store, request, state });
+    const events: RunnerEvent[] = [];
+    registerPiHarnessEventHandlers({
+      harness,
+      emit: (event) => events.push(event),
+      state,
+    });
 
     const patch = await handlers.get("tool_result")?.({
       type: "tool_result",
@@ -81,10 +77,11 @@ describe("ask_user tool", () => {
 
     expect(patch).toEqual({ terminate: true });
     expect(abort).toHaveBeenCalledOnce();
-    expect(store.snapshot(request.runId)?.status).toBe("waiting_for_input");
-    expect(store.snapshot(request.runId)?.events.map((event) => event.type)).toContain(
-      "run.waiting_for_input",
-    );
+    expect(state.waitingForInput).toEqual({
+      question: "请选择投递目标",
+      options: [{ label: "仅保存", value: "SAVE_ONLY" }],
+    });
+    expect(events.map((event) => event.type)).toContain("tool.completed");
   });
 
   it("不允许普通确认文本替代草稿或明确的不支持结果", () => {
@@ -92,34 +89,26 @@ describe("ask_user tool", () => {
       isScheduledTaskFlowComplete({
         lastAssistantText: "请确认后我再继续",
         scheduledDraftBuilt: false,
+        toolSummaries: [],
       }),
     ).toBe(false);
     expect(
       isScheduledTaskFlowComplete({
         lastAssistantText: "草稿已生成",
         scheduledDraftBuilt: true,
+        toolSummaries: [],
       }),
     ).toBe(true);
   });
 
   it("确定性工具错误会形成稳定的可见失败终态", () => {
-    const store = new AgentRuntimeRunStore(60_000);
-    const request = {
-      runId: "run_task_not_editable",
-      userId: "user_1",
-      skillId: "scheduled-task-edit",
-      prompt: "修改定时任务",
-    };
-    const state: HarnessEventState = {
+    const state: PiHarnessEventState = {
       lastAssistantText: "",
       scheduledDraftBuilt: false,
+      toolSummaries: [],
     };
-    store.createOrGet(request);
-    store.markRunning(request.runId);
 
-    mapHarnessEvent(
-      store,
-      request,
+    mapPiHarnessEvent(
       {
         type: "tool_result",
         toolCallId: "call_task_edit",
@@ -130,6 +119,7 @@ describe("ask_user tool", () => {
         isError: true,
       } as never,
       state,
+      () => undefined,
     );
 
     expect(resolveScheduledTaskFlowFailure(state)).toMatchObject({
@@ -139,21 +129,15 @@ describe("ask_user tool", () => {
   });
 
   it("delta 事件只携带增量，不重复携带累计全文", () => {
-    const store = new AgentRuntimeRunStore(60_000);
-    const request = {
-      runId: "run_delta",
-      userId: "user_1",
-      skillId: "x",
-      prompt: "x",
-    };
-    const state: HarnessEventState = {
+    const state: PiHarnessEventState = {
       lastAssistantText: "",
       scheduledDraftBuilt: false,
+      toolSummaries: [],
     };
-    store.createOrGet(request);
-    mapHarnessEvent(
-      store,
-      request,
+    const events: RunnerEvent[] = [];
+    const emit = (event: RunnerEvent) => events.push(event);
+
+    mapPiHarnessEvent(
       {
         type: "message_update",
         message: {
@@ -162,10 +146,9 @@ describe("ask_user tool", () => {
         },
       } as never,
       state,
+      emit,
     );
-    mapHarnessEvent(
-      store,
-      request,
+    mapPiHarnessEvent(
       {
         type: "message_update",
         message: {
@@ -174,10 +157,9 @@ describe("ask_user tool", () => {
         },
       } as never,
       state,
+      emit,
     );
-    mapHarnessEvent(
-      store,
-      request,
+    mapPiHarnessEvent(
       {
         type: "message_end",
         message: {
@@ -186,18 +168,15 @@ describe("ask_user tool", () => {
         },
       } as never,
       state,
+      emit,
     );
-    const events = store.snapshot(request.runId)?.events ?? [];
-    const deltas = events.filter(
-      (event) => event.type === "agent.message.delta",
-    );
+
+    const deltas = events.filter((event) => event.type === "message.delta");
     expect(deltas).toHaveLength(2);
-    expect(deltas[0]?.payload).not.toHaveProperty("text");
-    expect(deltas[1]?.payload).toMatchObject({ delta: "世界" });
-    const finalMessages = events.filter(
-      (event) => event.type === "agent.message",
-    );
-    expect(finalMessages).toHaveLength(1);
-    expect(finalMessages[0]?.payload).toMatchObject({ text: "你好世界" });
+    expect(deltas[0]).toEqual({ type: "message.delta", delta: "你好" });
+    expect(deltas[1]).toEqual({ type: "message.delta", delta: "世界" });
+    expect(events.filter((event) => event.type === "message.completed")).toEqual([
+      { type: "message.completed", text: "你好世界" },
+    ]);
   });
 });

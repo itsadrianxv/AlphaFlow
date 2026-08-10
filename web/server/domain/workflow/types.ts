@@ -509,6 +509,25 @@ export type ScreeningInsightPipelineInput = {
   maxInsightsPerSession?: number;
 };
 
+export type AgentPolicyRequest = {
+  requestedCapabilities?: string[];
+  capabilityConstraints?: {
+    internal_tushare_dataset?: {
+      allowedDatasets: string[];
+      maxRows: number;
+      maxLookbackDays: number;
+    };
+  };
+  network?: {
+    allowPublicHttp?: boolean;
+    allowPrivateNetwork?: false;
+    allowCredentialedUrls?: false;
+    allowedSchemes?: Array<"http" | "https">;
+  };
+  maxConcurrentSubtasks?: number;
+  costWarning?: { currency: "USD"; micros: number };
+};
+
 export type PiAgentRunInput = {
   skillId: string;
   skillIds?: string[];
@@ -518,7 +537,7 @@ export type PiAgentRunInput = {
   userMessageId?: string;
   assistantMessageId?: string;
   context?: Record<string, unknown>;
-  executionBoundary?: Record<string, unknown>;
+  policy?: AgentPolicyRequest;
   userSkillDefinitions?: Array<{
     id: string;
     versionId: string;
@@ -643,7 +662,7 @@ export type PiAgentRunGraphState = WorkflowGraphState & {
     conversationId?: string;
     userMessageId?: string;
     assistantMessageId?: string;
-    executionBoundary?: Record<string, unknown>;
+    policy?: AgentPolicyRequest;
     userSkillDefinitions?: PiAgentRunInput["userSkillDefinitions"];
   };
   waitingForInput?: {

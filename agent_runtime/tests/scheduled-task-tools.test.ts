@@ -18,22 +18,6 @@ describe("scheduled task tools", () => {
     for (const name of SCHEDULED_TASK_SETUP_TOOL_NAMES) expect(STANDARD_INTERNAL_TOOL_NAMES).not.toContain(name as never);
   });
 
-  it("拒绝执行计划外的 TuShare 数据集和超长窗口", async () => {
-    const tools = createInternalTools({
-      pythonGatewayClient: { postJson: async () => ({ ok: true }) } as never,
-      webInternalClient: {} as never,
-      runId: "run-1",
-      userId: "user-1",
-      maxToolCalls: 10,
-      toolTimeoutMs: 1000,
-      capabilityConstraints: { internal_tushare_dataset: { allowedDatasets: ["moneyflow"], maxRows: 10, maxLookbackDays: 5 } },
-    });
-    const tool = tools.find((item) => item.name === "internal_tushare_dataset");
-    expect(tool).toBeDefined();
-    await expect(tool?.execute("call-1", { dataset: "income", params: {} }, undefined)).rejects.toThrow("未授权");
-    await expect(tool?.execute("call-2", { dataset: "moneyflow", params: { start_date: "20260701", end_date: "20260720" } }, undefined)).rejects.toThrow("回看窗口");
-  });
-
   it("拒绝裸 TuShare 股票代码并允许规范代码", async () => {
     let calls = 0;
     const tools = createInternalTools({
@@ -41,9 +25,7 @@ describe("scheduled task tools", () => {
       webInternalClient: {} as never,
       runId: "run-code",
       userId: "user-code",
-      maxToolCalls: 10,
       toolTimeoutMs: 1000,
-      capabilityConstraints: { internal_tushare_dataset: { allowedDatasets: ["fina_mainbz"], maxRows: 10, maxLookbackDays: 365 } },
     });
     const tool = tools.find((item) => item.name === "internal_tushare_dataset");
     await expect(tool?.execute("call-bare", { dataset: "fina_mainbz", params: { ts_code: "601138" } }, undefined)).rejects.toThrow("INVALID_TUSHARE_TS_CODE");
