@@ -116,6 +116,7 @@ describe("AgentRunner", () => {
       "tool.started",
       "tool.completed",
     ]);
+    await expect(plan.execution.acquireSubtask()).rejects.toThrow("已暂停");
   });
 
   it("把等待用户输入作为显式停止结果返回", async () => {

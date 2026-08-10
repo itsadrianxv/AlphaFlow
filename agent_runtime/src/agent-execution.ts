@@ -1,4 +1,6 @@
 import type { AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import type {
   AgentInteractionMode,
   AgentPolicyRequest,
@@ -92,6 +94,8 @@ type CreateAgentExecutionInput = {
 type FactoryOptions = {
   modeCapabilities: Record<AgentInteractionMode, readonly string[]>;
   createAdapters: () => readonly AgentCapabilityAdapter[];
+  resolveHost?: (hostname: string) => Promise<readonly string[]>;
+  maxConcurrentSubtasks?: number;
 };
 
 const DEFAULT_NETWORK: Required<NetworkPolicyNarrowing> = {
@@ -143,6 +147,24 @@ function validatePolicy(policy: AgentPolicyRequest | undefined) {
       typeof policy.network.allowPublicHttp !== "boolean"
     ) {
       throw new Error("allowPublicHttp 非法");
+    }
+    if (
+      policy.network.allowPrivateNetwork !== undefined &&
+      policy.network.allowPrivateNetwork !== false
+    ) {
+      if (policy.network.allowPrivateNetwork === true) {
+        throw new Error("网络策略只能收窄，不能开放私网");
+      }
+      throw new Error("allowPrivateNetwork 非法");
+    }
+    if (
+      policy.network.allowCredentialedUrls !== undefined &&
+      policy.network.allowCredentialedUrls !== false
+    ) {
+      if (policy.network.allowCredentialedUrls === true) {
+        throw new Error("网络策略只能收窄，不能开放凭据 URL");
+      }
+      throw new Error("allowCredentialedUrls 非法");
     }
     if (
       policy.network.allowedSchemes !== undefined &&
@@ -227,7 +249,11 @@ function isPrivateHostname(hostname: string) {
   );
 }
 
-function assertNetwork(urlText: string, network: Required<NetworkPolicyNarrowing>) {
+async function assertNetwork(
+  urlText: string,
+  network: Required<NetworkPolicyNarrowing>,
+  resolveHost: (hostname: string) => Promise<readonly string[]>,
+) {
   let url: URL;
   try { url = new URL(urlText); } catch { throw new Error("网络策略拒绝: URL 无法解析"); }
   const scheme = url.protocol.slice(0, -1) as "http" | "https";
@@ -237,6 +263,21 @@ function assertNetwork(urlText: string, network: Required<NetworkPolicyNarrowing
     if (url.username || url.password) throw new Error("网络策略拒绝: URL 不得包含凭据");
   }
   if (!network.allowPrivateNetwork && isPrivateHostname(url.hostname)) throw new Error("网络策略拒绝: 不得访问私网");
+  const hostname = url.hostname.replace(/^\[|\]$/g, "");
+  if (!network.allowPrivateNetwork && isIP(hostname) === 0) {
+    let addresses: readonly string[];
+    try {
+      addresses = await resolveHost(hostname);
+    } catch {
+      throw new Error("网络策略拒绝: 主机名解析失败");
+    }
+    if (
+      addresses.length === 0 ||
+      addresses.some((address) => isPrivateHostname(address))
+    ) {
+      throw new Error("网络策略拒绝: 主机名解析到私网地址");
+    }
+  }
 }
 
 function validateConstraints(capabilities: readonly string[], constraints: CapabilityConstraintRequest | undefined) {
@@ -290,12 +331,25 @@ function assertTushareInput(
   const query = isRecord(params.params) ? params.params : {};
   const startText = typeof query.start_date === "string" ? query.start_date.replaceAll("-", "") : "";
   const endText = typeof query.end_date === "string" ? query.end_date.replaceAll("-", "") : "";
-  if (constraint.maxLookbackDays !== undefined && /^\d{8}$/.test(startText) && /^\d{8}$/.test(endText)) {
-    const start = Date.UTC(Number(startText.slice(0, 4)), Number(startText.slice(4, 6)) - 1, Number(startText.slice(6, 8)));
-    const end = Date.UTC(Number(endText.slice(0, 4)), Number(endText.slice(4, 6)) - 1, Number(endText.slice(6, 8)));
-    if ((end - start) / 86_400_000 > constraint.maxLookbackDays) {
-      throw new Error("TuShare 查询超过执行计划允许的回看窗口");
-    }
+  const parseDate = (text: string) => {
+    if (!/^\d{8}$/.test(text)) return undefined;
+    const year = Number(text.slice(0, 4));
+    const month = Number(text.slice(4, 6));
+    const day = Number(text.slice(6, 8));
+    const value = new Date(Date.UTC(year, month - 1, day));
+    return value.getUTCFullYear() === year &&
+      value.getUTCMonth() === month - 1 &&
+      value.getUTCDate() === day
+      ? value.getTime()
+      : undefined;
+  };
+  const start = parseDate(startText);
+  const end = parseDate(endText);
+  if (start === undefined || end === undefined || end < start) {
+    throw new Error("TuShare 查询必须提供合法的起止日期");
+  }
+  if ((end - start) / 86_400_000 > constraint.maxLookbackDays) {
+    throw new Error("TuShare 查询超过执行计划允许的回看窗口");
   }
 }
 
@@ -306,7 +360,11 @@ class Execution implements AgentExecution {
   private activeCount = 0;
   private paused = false;
 
-  constructor(private readonly state: AgentExecutionSnapshot, adapters: readonly AgentCapabilityAdapter[]) {
+  constructor(
+    private readonly state: AgentExecutionSnapshot,
+    adapters: readonly AgentCapabilityAdapter[],
+    private readonly resolveHost: (hostname: string) => Promise<readonly string[]>,
+  ) {
     this.adapters = new Map(adapters.map((adapter) => [adapter.name, adapter]));
     if (this.adapters.size !== adapters.length) throw new Error("能力注册表存在重复 ID");
     for (const capability of state.capabilities) if (!this.adapters.has(capability)) throw new Error(`能力未注册: ${capability}`);
@@ -326,7 +384,7 @@ class Execution implements AgentExecution {
     if (!adapter || !this.state.capabilities.includes(capabilityId)) throw new Error(`能力未授权: ${capabilityId}`);
     if (capabilityId === "internal_web_fetch") {
       if (!isRecord(params) || typeof params.url !== "string") throw new Error("网络策略拒绝: 缺少 URL");
-      assertNetwork(params.url, this.state.network);
+      await assertNetwork(params.url, this.state.network, this.resolveHost);
     }
     let effectiveParams = params;
     if (capabilityId === "internal_tushare_dataset") {
@@ -408,7 +466,13 @@ export class AgentExecutionFactory {
   constructor(private readonly options: FactoryOptions) {}
 
   create(input: CreateAgentExecutionInput): AgentExecution {
-    if (input.snapshot) return new Execution(structuredClone(input.snapshot), this.options.createAdapters());
+    const resolveHost =
+      this.options.resolveHost ??
+      (async (hostname: string) =>
+        (await lookup(hostname, { all: true, verbatim: true })).map(
+          (entry) => entry.address,
+        ));
+    if (input.snapshot) return new Execution(structuredClone(input.snapshot), this.options.createAdapters(), resolveHost);
     const policy = validatePolicy(input.policy);
     const ceiling = this.options.modeCapabilities[input.interactionMode] ?? [];
     const requested = policy?.requestedCapabilities;
@@ -435,6 +499,12 @@ export class AgentExecutionFactory {
       usage: { steps: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0, durationMs: 0, peakConcurrentSubtasks: 0 },
     };
     if (!Number.isInteger(snapshot.maxConcurrentSubtasks) || snapshot.maxConcurrentSubtasks < 1) throw new Error("maxConcurrentSubtasks 必须为正整数");
-    return new Execution(snapshot, this.options.createAdapters());
+    if (
+      snapshot.maxConcurrentSubtasks >
+      (this.options.maxConcurrentSubtasks ?? 8)
+    ) {
+      throw new Error("maxConcurrentSubtasks 超过系统并发上限");
+    }
+    return new Execution(snapshot, this.options.createAdapters(), resolveHost);
   }
 }

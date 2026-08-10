@@ -54,6 +54,7 @@ function factory() {
   return new AgentExecutionFactory({
     modeCapabilities: AGENT_MODE_CAPABILITIES,
     createAdapters: () => tools,
+    resolveHost: async () => ["93.184.216.34"],
   });
 }
 
@@ -142,6 +143,16 @@ describe("AgentExecution 类型化约束与网络 enforcement", () => {
     ).toThrow("未知网络策略字段");
     expect(() =>
       create("research", {
+        network: { allowPrivateNetwork: "yes" },
+      } as never),
+    ).toThrow("allowPrivateNetwork 非法");
+    expect(() =>
+      create("research", {
+        network: { allowCredentialedUrls: 1 },
+      } as never),
+    ).toThrow("allowCredentialedUrls 非法");
+    expect(() =>
+      create("research", {
         costWarning: { currency: "CNY", micros: -1 },
       } as never),
     ).toThrow("costWarning 非法");
@@ -226,6 +237,32 @@ describe("AgentExecution 类型化约束与网络 enforcement", () => {
     ).toThrow("只能收窄");
   });
 
+  it("拒绝解析到私网地址的普通域名", async () => {
+    const execution = new AgentExecutionFactory({
+      modeCapabilities: {
+        research: ["internal_web_fetch"],
+        scheduled_task_setup: [],
+        scheduled_task_edit: [],
+        scheduled_task_execution: [],
+      },
+      createAdapters: () => [tool("internal_web_fetch")],
+      resolveHost: async () => ["10.0.0.8"],
+    }).create({
+      runId: "run-dns-private",
+      objective: "读取公开网页",
+      input: {},
+      skillIds: ["research"],
+      interactionMode: "research",
+      model: { provider: "test", id: "test" },
+    });
+
+    await expect(
+      execution.executeCapability("internal_web_fetch", "call", {
+        url: "https://public-looking.example/report",
+      }),
+    ).rejects.toThrow("解析到私网地址");
+  });
+
   it("TuShare 包装能力执行时强制数据集、行数与回看窗口约束", async () => {
     const execution = create("scheduled_task_execution", {
       requestedCapabilities: ["internal_tushare_dataset"],
@@ -254,6 +291,12 @@ describe("AgentExecution 类型化约束与网络 enforcement", () => {
         params: { start_date: "20260701", end_date: "20260720" },
       }),
     ).rejects.toThrow("回看窗口");
+    await expect(
+      execution.executeCapability("internal_tushare_dataset", "call-4", {
+        dataset: "moneyflow",
+        params: {},
+      }),
+    ).rejects.toThrow("必须提供合法的起止日期");
   });
 
   it("TuShare 省略 maxRows 时向 raw adapter 传入冻结上限", async () => {
@@ -286,11 +329,15 @@ describe("AgentExecution 类型化约束与网络 enforcement", () => {
 
     await execution.executeCapability("internal_tushare_dataset", "call", {
       dataset: "moneyflow",
-      params: {},
+      params: { start_date: "20260701", end_date: "20260710" },
     });
     expect(rawExecute).toHaveBeenCalledWith(
       "call",
-      { dataset: "moneyflow", params: {}, maxRows: 10 },
+      {
+        dataset: "moneyflow",
+        params: { start_date: "20260701", end_date: "20260710" },
+        maxRows: 10,
+      },
       undefined,
     );
   });
@@ -326,6 +373,12 @@ describe("AgentExecution 资源许可、观测与恢复", () => {
     await expect(
       create("research").acquireSubtask(controller.signal),
     ).rejects.toThrow("已取消");
+  });
+
+  it("拒绝超过系统 ceiling 的子任务并发额度", () => {
+    expect(() =>
+      create("research", { maxConcurrentSubtasks: 9 }),
+    ).toThrow("超过系统并发上限");
   });
 
   it("步骤、工具与 Token 只累计观测，成本 unknown 与真实零值可区分", () => {

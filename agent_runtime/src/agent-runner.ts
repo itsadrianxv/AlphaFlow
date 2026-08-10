@@ -107,6 +107,7 @@ export class AgentRunner {
       if (!params.signal.aborted && !/未授权|扩权|能力|constraint|网络策略/.test(message)) throw error;
       const stopReason = params.signal.aborted ? "cancelled" : "boundary_violation";
       execution.observe({ kind: "duration", durationMs: Date.now() - startedAt });
+      execution.pause();
       return {
         kind: "stopped",
         stopReason,
@@ -124,9 +125,9 @@ export class AgentRunner {
       costUsd: outcome.usage.cost,
     });
     execution.observe({ kind: "duration", durationMs: Date.now() - startedAt });
+    execution.pause();
 
     if (outcome.kind === "waiting_for_input") {
-      execution.pause();
       return {
         kind: "waiting_for_input",
         inputRequest: outcome.inputRequest,
