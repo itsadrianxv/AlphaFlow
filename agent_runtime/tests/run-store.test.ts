@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { AgentRuntimeRunStore } from "../src/run-store";
 
 describe("AgentRuntimeRunStore", () => {
@@ -95,5 +98,65 @@ describe("AgentRuntimeRunStore", () => {
     expect(
       store.snapshot("run_cancel")?.events.some((event) => event.type === "run.succeeded"),
     ).toBe(false);
+  });
+
+  it("runtime 重启后恢复同一冻结策略和累计观测", () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "agent-run-store-"));
+    const file = path.join(directory, "runs.json");
+    try {
+      const first = new AgentRuntimeRunStore(60_000, file);
+      first.createOrGet({
+        runKind: "immediate_research",
+        interactionMode: "research",
+        runId: "run_persisted",
+        userId: "user_1",
+        skillId: "skill_1",
+        prompt: "需要澄清",
+      });
+      first.setExecutionSnapshot("run_persisted", {
+        version: "agent-execution.v1",
+        runId: "run_persisted",
+        userId: "user_1",
+        idempotencyKey: "run_persisted",
+        objective: "持续研究",
+        input: { prompt: "需要澄清" },
+        skillIds: ["skill_1"],
+        interactionMode: "research",
+        capabilities: ["internal_web_search"],
+        capabilityConstraints: {},
+        network: {
+          allowPublicHttp: true,
+          allowPrivateNetwork: false,
+          allowCredentialedUrls: false,
+          allowedSchemes: ["http", "https"],
+        },
+        maxConcurrentSubtasks: 1,
+        model: { provider: "test", id: "test" },
+        usage: {
+          steps: 3,
+          toolCalls: 2,
+          inputTokens: 100,
+          outputTokens: 20,
+          durationMs: 50,
+          peakConcurrentSubtasks: 1,
+        },
+      });
+      first.markRunning("run_persisted");
+      first.markWaitingForInput("run_persisted", { question: "继续吗？" });
+
+      const restored = new AgentRuntimeRunStore(60_000, file);
+      expect(restored.snapshot("run_persisted")).toMatchObject({
+        status: "waiting_for_input",
+        input: {
+          executionSnapshot: {
+            capabilities: ["internal_web_search"],
+            usage: { steps: 3, toolCalls: 2, inputTokens: 100 },
+          },
+        },
+      });
+      expect(restored.getRequest("run_persisted")?.policy).toBeUndefined();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

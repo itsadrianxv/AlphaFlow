@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import ipaddress
+import http.client
+import socket
+import ssl
+
 from dataclasses import dataclass, field
 import hashlib
 from importlib.util import find_spec
 import json
 import os
 from typing import Any, Generic, TypeVar
+from urllib.parse import urlparse
 
 from app.data_providers import get_default_data_provider
 from app.data_providers.errors import DataProviderError
@@ -18,6 +24,87 @@ from app.services.tavily_capability_client import TavilyCapabilityClient
 from app.services.zhipu_search_client import ZhipuSearchClient
 
 _T = TypeVar("_T")
+_MAX_WEB_FETCH_BYTES = 2 * 1024 * 1024
+
+
+class _PinnedHttpConnection(http.client.HTTPConnection):
+    def __init__(self, host: str, address: str, port: int, timeout: float):
+        super().__init__(host, port=port, timeout=timeout)
+        self._approved_address = address
+
+    def connect(self) -> None:
+        self.sock = socket.create_connection(
+            (self._approved_address, self.port),
+            self.timeout,
+        )
+
+
+class _PinnedHttpsConnection(http.client.HTTPSConnection):
+    def __init__(self, host: str, address: str, port: int, timeout: float):
+        super().__init__(
+            host,
+            port=port,
+            timeout=timeout,
+            context=ssl.create_default_context(),
+        )
+        self._approved_address = address
+
+    def connect(self) -> None:
+        raw_socket = socket.create_connection(
+            (self._approved_address, self.port),
+            self.timeout,
+        )
+        self.sock = self._context.wrap_socket(raw_socket, server_hostname=self.host)
+
+
+def _fetch_with_approved_address(url: str, address: str, timeout_seconds: float) -> dict[str, Any]:
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    if not hostname or parsed.scheme not in {"http", "https"}:
+        raise ValueError("WEB_FETCH_URL_INVALID")
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    connection_type = (
+        _PinnedHttpsConnection if parsed.scheme == "https" else _PinnedHttpConnection
+    )
+    connection = connection_type(hostname, address, port, timeout_seconds)
+    target = parsed.path or "/"
+    if parsed.query:
+        target = f"{target}?{parsed.query}"
+    try:
+        connection.request(
+            "GET",
+            target,
+            headers={
+                "Host": hostname,
+                "User-Agent": "AlphaFlow-AgentRuntime/1.0",
+                "Accept": "text/html,text/plain,application/json;q=0.8,*/*;q=0.5",
+            },
+        )
+        response = connection.getresponse()
+        if 300 <= response.status < 400:
+            raise ValueError("WEB_FETCH_REDIRECT_FORBIDDEN")
+        if response.status < 200 or response.status >= 300:
+            raise ValueError(f"WEB_FETCH_HTTP_{response.status}")
+        content_length = response.getheader("Content-Length")
+        if content_length and int(content_length) > _MAX_WEB_FETCH_BYTES:
+            raise ValueError("WEB_FETCH_RESPONSE_TOO_LARGE")
+        body = response.read(_MAX_WEB_FETCH_BYTES + 1)
+        if len(body) > _MAX_WEB_FETCH_BYTES:
+            raise ValueError("WEB_FETCH_RESPONSE_TOO_LARGE")
+        content_type = response.getheader("Content-Type") or ""
+        charset = "utf-8"
+        for part in content_type.split(";")[1:]:
+            key, _, value = part.strip().partition("=")
+            if key.lower() == "charset" and value:
+                charset = value.strip('"')
+        return {
+            "title": url,
+            "url": url,
+            "markdown": body.decode(charset, errors="replace"),
+            "description": None,
+        }
+    finally:
+        connection.close()
 
 
 @dataclass(frozen=True)
@@ -219,13 +306,37 @@ class ExternalCapabilityGateway:
         request_id: str,
         payload: dict[str, Any],
     ) -> CapabilityResult[dict[str, Any] | None]:
-        provider_name, client = self._resolve_web_client()
+        provider_name = "direct-web"
         diagnostics = {
-            **client.diagnostics(),
+            "pinnedAddress": True,
             "requestFingerprint": _fingerprint(payload),
         }
         try:
-            document = client.fetch(url=str(payload.get("url", "")).strip())
+            url = str(payload.get("url", "")).strip()
+            approved_addresses = {
+                str(item).strip()
+                for item in payload.get("approvedAddresses", [])
+                if str(item).strip()
+            }
+            hostname = urlparse(url).hostname
+            if not hostname or not approved_addresses:
+                raise ValueError("WEB_FETCH_NETWORK_APPROVAL_MISSING")
+            resolved_addresses = {
+                item[4][0]
+                for item in socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+            }
+            if resolved_addresses != approved_addresses:
+                raise ValueError("WEB_FETCH_DNS_APPROVAL_CHANGED")
+            for address in resolved_addresses:
+                parsed = ipaddress.ip_address(address)
+                if not parsed.is_global:
+                    raise ValueError("WEB_FETCH_PRIVATE_ADDRESS_FORBIDDEN")
+            approved_address = sorted(approved_addresses)[0]
+            document = _fetch_with_approved_address(
+                url,
+                approved_address,
+                timeout_seconds=20,
+            )
             return CapabilityResult(
                 provider=provider_name,
                 capability="web",

@@ -208,12 +208,13 @@ export function createInternalTools(options: ToolFactoryOptions): AgentTool[] {
         url: Type.String({ minLength: 1 }),
       }),
       execute: async (_toolCallId, params, signal) => {
-        const input = params as { url: string };
+        const input = params as { url: string; approvedAddresses: string[] };
         return callPython(
           "internal_web_fetch",
           "/api/v1/capabilities/web/fetch",
           {
             url: input.url,
+            approvedAddresses: input.approvedAddresses,
           },
           signal,
         );

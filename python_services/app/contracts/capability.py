@@ -53,6 +53,7 @@ class WebSearchCapabilityRequest(BaseModel):
 
 class WebFetchCapabilityRequest(BaseModel):
     url: str = Field(..., min_length=1)
+    approvedAddresses: list[str] = Field(..., min_length=1, max_length=16)
 
 
 class ConceptMatchCapabilityRequest(BaseModel):

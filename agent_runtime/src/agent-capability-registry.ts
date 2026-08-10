@@ -57,6 +57,7 @@ export class RuntimeAgentExecutionFactory {
 
     return registry.create({
       runId: request.runId,
+      userId: request.userId,
       objective: request.title?.trim() || request.prompt.trim().slice(0, 160),
       input: {
         prompt: request.prompt,

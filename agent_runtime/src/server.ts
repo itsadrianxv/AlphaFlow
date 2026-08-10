@@ -197,7 +197,10 @@ function writeSseEvent(response: ServerResponse, event: AgentRuntimeEvent) {
 
 async function main() {
   const config = readConfig();
-  const store = new AgentRuntimeRunStore(config.runTtlMs);
+  const store = new AgentRuntimeRunStore(
+    config.runTtlMs,
+    path.resolve(config.sessionRoot, "run-store.json"),
+  );
   const skillRegistry = await new SkillRegistry().load();
   const webInternalClient = new WebInternalClient(config);
   const pythonGatewayClient = new PythonGatewayClient(config);

@@ -29,6 +29,8 @@ const completed: AgentCompletedResult = {
     boundary: {
       version: "agent-execution.v1",
       runId: request.runId,
+      userId: request.userId,
+      idempotencyKey: request.runId,
       objective: "即时研究",
       input: {},
       skillIds: ["research"],

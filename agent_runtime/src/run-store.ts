@@ -23,7 +23,12 @@ type RunRecord = Omit<AgentRunSnapshot, "events"> & {
 export class AgentRuntimeRunStore {
   private readonly runs = new Map<string, RunRecord>();
 
-  constructor(private readonly runTtlMs: number) {}
+  constructor(
+    private readonly runTtlMs: number,
+    private readonly persistencePath?: string,
+  ) {
+    this.restore();
+  }
 
   createOrGet(request: StartRunRequest) {
     const existing = this.runs.get(request.runId);
@@ -59,6 +64,7 @@ export class AgentRuntimeRunStore {
       skillIds: request.skillIds,
       title: run.title,
     });
+    this.persist();
     return run;
   }
 
@@ -99,6 +105,7 @@ export class AgentRuntimeRunStore {
     const run = this.runs.get(runId);
     if (run) {
       run.input.executionSnapshot = structuredClone(snapshot);
+      this.persist();
     }
   }
 
@@ -130,6 +137,7 @@ export class AgentRuntimeRunStore {
     }
     this.updateStatus(runId, "running", { startedAt: true });
     this.appendEvent(runId, "run.started");
+    this.persist();
   }
 
   markWaitingForInput(runId: string, request: UserInputRequest) {
@@ -150,6 +158,7 @@ export class AgentRuntimeRunStore {
     run.status = "waiting_for_input";
     this.appendEvent(runId, "user.input.requested", run.waitingForInput);
     this.appendEvent(runId, "run.waiting_for_input", run.waitingForInput);
+    this.persist();
     return true;
   }
 
@@ -184,6 +193,7 @@ export class AgentRuntimeRunStore {
       userMessageId: patch.userMessageId,
       assistantMessageId: patch.assistantMessageId,
     });
+    this.persist();
     return { kind: "resumed" as const, request: { ...run.request } };
   }
 
@@ -206,6 +216,7 @@ export class AgentRuntimeRunStore {
     this.updateStatus(runId, "succeeded", { completedAt: true });
     this.appendEvent(runId, "run.succeeded", finalOutput);
     this.scheduleCleanup(runId);
+    this.persist();
   }
 
   recordAudit(runId: string, audit: Record<string, unknown>) {
@@ -227,6 +238,7 @@ export class AgentRuntimeRunStore {
         ? audit.toolSummaries.length
         : 0,
     });
+    this.persist();
   }
 
   markFailed(runId: string, errorCode: string, errorMessage: string) {
@@ -249,6 +261,7 @@ export class AgentRuntimeRunStore {
     this.updateStatus(runId, "failed", { completedAt: true });
     this.appendEvent(runId, "run.failed", { errorCode, errorMessage });
     this.scheduleCleanup(runId);
+    this.persist();
   }
 
   markCancelled(runId: string, reason: string) {
@@ -264,6 +277,7 @@ export class AgentRuntimeRunStore {
     this.updateStatus(runId, "cancelled", { completedAt: true });
     this.appendEvent(runId, "run.cancelled", { reason });
     this.scheduleCleanup(runId);
+    this.persist();
   }
 
   appendEvent(
@@ -347,7 +361,46 @@ export class AgentRuntimeRunStore {
 
     run.cleanupTimer = setTimeout(() => {
       this.runs.delete(runId);
+      this.persist();
     }, this.runTtlMs);
+  }
+
+  private restore() {
+    if (!this.persistencePath || !existsSync(this.persistencePath)) return;
+    try {
+      const raw = JSON.parse(
+        readFileSync(this.persistencePath, { encoding: "utf8" }),
+      ) as unknown;
+      if (!Array.isArray(raw)) return;
+      for (const value of raw) {
+        if (
+          !value ||
+          typeof value !== "object" ||
+          typeof (value as { id?: unknown }).id !== "string"
+        ) continue;
+        const stored = value as Omit<RunRecord, "subscribers">;
+        this.runs.set(stored.id, {
+          ...stored,
+          subscribers: new Set(),
+          abortController: undefined,
+          cleanupTimer: undefined,
+        });
+      }
+    } catch {
+      throw new Error("AGENT_RUN_STORE_RESTORE_FAILED");
+    }
+  }
+
+  private persist() {
+    if (!this.persistencePath) return;
+    const directory = path.dirname(this.persistencePath);
+    mkdirSync(directory, { recursive: true });
+    const temporaryPath = `${this.persistencePath}.tmp`;
+    const records = [...this.runs.values()].map(
+      ({ subscribers: _subscribers, abortController: _abort, cleanupTimer: _timer, ...record }) => record,
+    );
+    writeFileSync(temporaryPath, JSON.stringify(records), { encoding: "utf8" });
+    renameSync(temporaryPath, this.persistencePath);
   }
 
   private toSnapshot(run: RunRecord): AgentRunSnapshot {
@@ -370,3 +423,11 @@ export class AgentRuntimeRunStore {
     };
   }
 }
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
+import path from "node:path";

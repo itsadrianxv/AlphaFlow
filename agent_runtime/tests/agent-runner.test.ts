@@ -27,6 +27,7 @@ function createPlan(): AgentRunPlan {
     ],
   }).create({
     runId: "run-1",
+    userId: "user-1",
     objective: "只读即时研究",
     input: { symbol: "000001.SZ" },
     skillIds: ["research"],

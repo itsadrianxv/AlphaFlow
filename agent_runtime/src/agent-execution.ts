@@ -22,6 +22,9 @@ export type AgentStopReason =
 export type AgentExecutionSnapshot = {
   version: "agent-execution.v1";
   runId: string;
+  userId: string;
+  idempotencyKey: string;
+  parentRunId?: string;
   objective: string;
   input: Record<string, unknown>;
   skillIds: string[];
@@ -82,6 +85,7 @@ export type AgentExecution = {
 
 type CreateAgentExecutionInput = {
   runId: string;
+  userId: string;
   objective: string;
   input: Record<string, unknown>;
   skillIds: string[];
@@ -253,7 +257,7 @@ async function assertNetwork(
   urlText: string,
   network: Required<NetworkPolicyNarrowing>,
   resolveHost: (hostname: string) => Promise<readonly string[]>,
-) {
+): Promise<readonly string[]> {
   let url: URL;
   try { url = new URL(urlText); } catch { throw new Error("网络策略拒绝: URL 无法解析"); }
   const scheme = url.protocol.slice(0, -1) as "http" | "https";
@@ -277,7 +281,9 @@ async function assertNetwork(
     ) {
       throw new Error("网络策略拒绝: 主机名解析到私网地址");
     }
+    return [...new Set(addresses)].sort();
   }
+  return [hostname];
 }
 
 function validateConstraints(capabilities: readonly string[], constraints: CapabilityConstraintRequest | undefined) {
@@ -382,11 +388,16 @@ class Execution implements AgentExecution {
   async executeCapability(capabilityId: string, toolCallId: string, params: unknown, signal?: AbortSignal) {
     const adapter = this.adapters.get(capabilityId);
     if (!adapter || !this.state.capabilities.includes(capabilityId)) throw new Error(`能力未授权: ${capabilityId}`);
+    let effectiveParams = params;
     if (capabilityId === "internal_web_fetch") {
       if (!isRecord(params) || typeof params.url !== "string") throw new Error("网络策略拒绝: 缺少 URL");
-      await assertNetwork(params.url, this.state.network, this.resolveHost);
+      const approvedAddresses = await assertNetwork(
+        params.url,
+        this.state.network,
+        this.resolveHost,
+      );
+      effectiveParams = { ...params, approvedAddresses };
     }
-    let effectiveParams = params;
     if (capabilityId === "internal_tushare_dataset") {
       const constraint =
         this.state.capabilityConstraints.internal_tushare_dataset;
@@ -486,6 +497,8 @@ export class AgentExecutionFactory {
     const snapshot: AgentExecutionSnapshot = {
       version: "agent-execution.v1",
       runId: input.runId,
+      userId: input.userId,
+      idempotencyKey: input.runId,
       objective: input.objective,
       input: structuredClone(input.input),
       skillIds: [...input.skillIds],

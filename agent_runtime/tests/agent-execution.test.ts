@@ -76,6 +76,7 @@ function create(
       : policy;
   return factory().create({
     runId: `run-${interactionMode}`,
+    userId: "user-test",
     objective: "执行研究任务",
     input: { prompt: "研究" },
     skillIds: ["research"],
@@ -249,6 +250,7 @@ describe("AgentExecution 类型化约束与网络 enforcement", () => {
       resolveHost: async () => ["10.0.0.8"],
     }).create({
       runId: "run-dns-private",
+      userId: "user-test",
       objective: "读取公开网页",
       input: {},
       skillIds: ["research"],
@@ -311,6 +313,7 @@ describe("AgentExecution 类型化约束与网络 enforcement", () => {
       createAdapters: () => [tool("internal_tushare_dataset", rawExecute)],
     }).create({
       runId: "run-tushare-narrowing",
+      userId: "user-test",
       objective: "执行数据查询",
       input: {},
       skillIds: ["scheduled-task-execution"],
@@ -412,6 +415,7 @@ describe("AgentExecution 资源许可、观测与恢复", () => {
     const snapshot = original.pause();
     const restored = factory().create({
       runId: "run-forged",
+      userId: "forged-user",
       objective: "伪造目标",
       input: { prompt: "伪造" },
       skillIds: ["forged"],
@@ -423,6 +427,8 @@ describe("AgentExecution 资源许可、观测与恢复", () => {
     restored.observe({ kind: "step", count: 2 });
     expect(restored.snapshot).toMatchObject({
       runId: "run-research",
+      userId: "user-test",
+      idempotencyKey: "run-research",
       interactionMode: "research",
       capabilities: ["internal_web_search"],
       maxConcurrentSubtasks: 2,

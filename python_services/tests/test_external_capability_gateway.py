@@ -412,3 +412,78 @@ def test_search_web_maps_tavily_errors_to_tavily_provider():
     assert exc_info.value.code == "tavily_search_failed"
     assert exc_info.value.diagnostics["endpoint"] == "https://api.tavily.com"
 
+
+def test_fetch_web_rechecks_dns_approval_at_provider_call():
+    from app.gateway.external_capability_gateway import (
+        CapabilityError,
+        ExternalCapabilityGateway,
+    )
+
+    class WebClient:
+        def is_configured(self) -> bool:
+            return True
+
+        def diagnostics(self) -> dict[str, object]:
+            return {"configured": True}
+
+        def fetch(self, *, url: str):
+            return {"url": url}
+
+    gateway = ExternalCapabilityGateway(tavily_client=WebClient())
+
+    with patch(
+        "app.gateway.external_capability_gateway.socket.getaddrinfo",
+        return_value=[(2, 1, 6, "", ("10.0.0.8", 0))],
+    ):
+        with pytest.raises(CapabilityError) as exc_info:
+            gateway.fetch_web_page(
+                "req_dns_rebinding",
+                {
+                    "url": "https://example.com/report",
+                    "approvedAddresses": ["93.184.216.34"],
+                },
+            )
+
+    assert "WEB_FETCH_DNS_APPROVAL_CHANGED" in exc_info.value.message
+
+
+def test_fetch_web_calls_provider_when_dns_approval_is_unchanged():
+    from app.gateway.external_capability_gateway import ExternalCapabilityGateway
+
+    class WebClient:
+        def is_configured(self) -> bool:
+            return True
+
+        def diagnostics(self) -> dict[str, object]:
+            return {"configured": True}
+
+        def fetch(self, *, url: str):
+            return {"url": url}
+
+    gateway = ExternalCapabilityGateway(tavily_client=WebClient())
+
+    with (
+        patch(
+            "app.gateway.external_capability_gateway.socket.getaddrinfo",
+            return_value=[(2, 1, 6, "", ("93.184.216.34", 0))],
+        ),
+        patch(
+            "app.gateway.external_capability_gateway._fetch_with_approved_address",
+            return_value={"url": "https://example.com/report"},
+        ) as fetch,
+    ):
+        result = gateway.fetch_web_page(
+            "req_dns_approved",
+            {
+                "url": "https://example.com/report",
+                "approvedAddresses": ["93.184.216.34"],
+            },
+        )
+
+    assert result.data == {"url": "https://example.com/report"}
+    fetch.assert_called_once_with(
+        "https://example.com/report",
+        "93.184.216.34",
+        timeout_seconds=20,
+    )
+
